@@ -9,6 +9,8 @@ description: 使用 xTB 进行低成本结构筛选、单点、优化、频率�
 
 单点与优化可以使用 `chemical.xtb@1`，它固定使用 GFN2-xTB，接受 `sp`、`opt`、`opt-sp`：
 
+生成文件前，在命令中显式 cd 到 research_create/research_read 返回的 work_dir，或使用该目录下的绝对输出路径；未关联 Node 时使用工作区内的 research/work/。work_dir 是返回的位置建议，不是 bash 参数。以下相对路径示例假设已在同一命令中切换到工作目录；输入若在其他位置，请使用绝对路径。报告放在 reports/，不要在工作区根目录散落文件或移动历史请求。
+
 ```bash
 "$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.xtb --version 1 --input geometry=input.xyz --output prepared/xtb.json -- --task opt-sp --charge 0 --multiplicity 1
 ```

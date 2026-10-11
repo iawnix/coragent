@@ -162,6 +162,8 @@ def read(root, *, ref, offset=0, limit=16000, session_id=None, jobs=(), field=No
                 elif offset <= start and start + len(prefix) + len(serialized) <= end:
                     visible.append(field_name)
             response['node_id'] = value['node']['id']
+            from .nodes import work_dir
+            response['work_dir'] = work_dir(root, value['node']['id'])
             response['node_revision'] = value['node']['revision']
             if selected is not None and offset == 0 and end == len(full):
                 visible.append(field)

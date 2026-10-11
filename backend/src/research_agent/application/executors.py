@@ -21,6 +21,10 @@ from research_agent.jobs.inputs import content_digest
 from research_agent.application.execution_catalog import installed_catalogs
 
 
+class RunnerArgumentsError(ValueError):
+    """An expected runner CLI validation failure, safe to display without a traceback."""
+
+
 def registered_executor(identifier, version):
     from .execution_catalog import registered_entry
     return registered_entry("executors", identifier, version)
@@ -65,6 +69,8 @@ def print_runner_help(executor, version):
     print('Managed argv template: ' + json.dumps(descriptor['argv']))
     print('Provide input roles with preparer --input role=file: ' + json.dumps(descriptor['inputs']))
     print('Pass other runner arguments after --. The preparer supplies fixed input/output/executable flags.')
+    print('Preparation writes a request, not calculation results. Use --output to obtain request_file and '
+          'request_sha256, then submit both with node_id to job_start, regardless of calculation duration.')
     if not descriptor.get('cli'):
         print('No bundled CLI help; consult the method Skill or native program documentation.')
         return
@@ -216,7 +222,7 @@ def _prepare(config, environment, base, descriptor, resources, inputs, arguments
             with contextlib.redirect_stderr(diagnostic):
                 cli.parse_arguments(argv[1:] if descriptor["runtime"] == "python" else argv[len(command):])
         except SystemExit as exc:
-            raise ValueError("runner_arguments_invalid: " + diagnostic.getvalue().strip()) from exc
+            raise RunnerArgumentsError("runner_arguments_invalid: " + diagnostic.getvalue().strip()) from exc
     execution_argv = list(argv)
     environment_evidence = probe_binding(settings, selected, descriptor.get("requirements", {}))
     module_paths = descriptor.get('module_paths')
@@ -262,7 +268,7 @@ def main():
     parser.add_argument("--dependency", action="append", default=[], help="source=relative Job destination")
     parser.add_argument("--collect", action="append", default=[], help="Additional required relative Job output")
     parser.add_argument("--work-id", help="New identity for an intentional recalculation")
-    parser.add_argument("--output", help="Save a request and print its file/digest for job_start")
+    parser.add_argument("--output", help="Save a Job request (not calculation results); relative paths resolve from the command cwd. Print request_file and request_sha256 for job_start")
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.help:
@@ -294,8 +300,11 @@ def main():
         inputs[role] = source
     arguments = args.arguments[1:] if args.arguments[:1] == ["--"] else args.arguments
     options = {"dependencies": args.dependency, "collect": args.collect, "work_id": args.work_id, "input_artifact_ids": args.input_artifact}
-    request = (prepare_script(args.config, args.environment, args.backend, args.script, arguments, **options)
-               if args.script else prepare(args.config, args.environment, args.executor, args.version, inputs, arguments, **options))
+    try:
+        request = (prepare_script(args.config, args.environment, args.backend, args.script, arguments, **options)
+                   if args.script else prepare(args.config, args.environment, args.executor, args.version, inputs, arguments, **options))
+    except RunnerArgumentsError as exc:
+        parser.exit(2, str(exc) + '\n')
     encoded = (json.dumps(request, indent=2) + "\n").encode()
     if args.output:
         path = Path(args.output).expanduser().resolve()

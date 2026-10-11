@@ -9,6 +9,8 @@ Use `chemical.cf22d@1` with the target's `pyscf` binding. The executor supports
 `sp`, `opt`, `opt-sp`, `ts`, `freq`, `thermo`, `opt_freq`, and `ts_freq`.
 CF22D and its dispersion implementation must be available in that environment.
 
+Before generating files, explicitly cd in the command to the work_dir returned by research_create/research_read, or use absolute output paths beneath it; before Node association, use workspace research/work/. work_dir is returned guidance, not a bash parameter. The relative paths below assume that directory was selected in the same command; use absolute paths for inputs stored elsewhere. Put reports in reports/; avoid loose files in the workspace root and leave historical requests in place.
+
 ```bash
 "$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.cf22d --version 1 --input geometry=input.xyz --output prepared/cf22d.json -- --task opt-sp --basis def2-tzvp --charge 0 --multiplicity 1
 ```

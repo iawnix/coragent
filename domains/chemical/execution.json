@@ -175,7 +175,7 @@
         "skills/_shared/reaction_checks.py": "sha256:8f147559e13b3055e14290f1bef7cf58738a4ee0aaf8e4e3bfb77833abcc3e55",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
-        "skills/gaussian/scripts/cli.py": "sha256:5026fdc19cdf46eb4f2c9a4afd7091e0607e4064229f7792d2e02bc7bb9566dc",
+        "skills/gaussian/scripts/cli.py": "sha256:b020439cd06a75962e9d75752b65b621264b7897d71ccea2167c49d5e0476bbc",
         "skills/gaussian/scripts/gaussian_io.py": "sha256:0bb41a8fc88db5a837be5796c3019f6d9c9650dcb315d23abdaaa24748634fd6",
         "skills/gaussian/scripts/input_job.py": "sha256:4effba6319eb907e048295eb777897e24f143fe4b357a2875ffd11fa24515660",
         "skills/gaussian/scripts/run.py": "sha256:29dd77a8f9c6b653db58f7025ab89f4edcff79b07c025efc0e83873888669604"
@@ -245,7 +245,7 @@
         "skills/_shared/reaction_checks.py": "sha256:8f147559e13b3055e14290f1bef7cf58738a4ee0aaf8e4e3bfb77833abcc3e55",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
-        "skills/gaussian/scripts/cli.py": "sha256:5026fdc19cdf46eb4f2c9a4afd7091e0607e4064229f7792d2e02bc7bb9566dc",
+        "skills/gaussian/scripts/cli.py": "sha256:b020439cd06a75962e9d75752b65b621264b7897d71ccea2167c49d5e0476bbc",
         "skills/gaussian/scripts/gaussian_io.py": "sha256:0bb41a8fc88db5a837be5796c3019f6d9c9650dcb315d23abdaaa24748634fd6",
         "skills/gaussian/scripts/input_job.py": "sha256:4effba6319eb907e048295eb777897e24f143fe4b357a2875ffd11fa24515660",
         "skills/gaussian/scripts/run.py": "sha256:29dd77a8f9c6b653db58f7025ab89f4edcff79b07c025efc0e83873888669604"

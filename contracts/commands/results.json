@@ -392,6 +392,10 @@
         },
         "ref": {
           "type": "string"
+        },
+        "work_dir": {
+          "type": "string",
+          "description": "Absolute directory for this Node’s mutable drafts, geometry, scripts and prepared Job requests. Suggested location only; use in file paths or an explicit shell cd. Does not change native tool arguments or cwd. Derived from the active workspace; not an immutable Artifact."
         }
       },
       "required": [
@@ -442,6 +446,10 @@
               "type": "null"
             }
           ]
+        },
+        "work_dir": {
+          "type": "string",
+          "description": "Absolute directory for this Node’s mutable drafts, geometry, scripts and prepared Job requests. Suggested location only; use in file paths or an explicit shell cd. Does not change native tool arguments or cwd. Derived from the active workspace; not an immutable Artifact."
         }
       },
       "required": [
@@ -677,6 +685,10 @@
         },
         "review_notice_count": {
           "type": "integer"
+        },
+        "work_dir": {
+          "type": "string",
+          "description": "Absolute directory for this Node’s mutable drafts, geometry, scripts and prepared Job requests. Suggested location only; use in file paths or an explicit shell cd. Does not change native tool arguments or cwd. Derived from the active workspace; not an immutable Artifact."
         }
       },
       "required": [

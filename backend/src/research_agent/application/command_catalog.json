@@ -22,7 +22,10 @@
           "ref": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "description": "Exact Node, Result or research record reference. Omit for a snapshot. For Artifacts use artifact_read; for Jobs use job_status."
               },
               {
                 "type": "null"
@@ -30,10 +33,15 @@
             ]
           },
           "offset": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": 0,
+            "description": "Starting Unicode character offset for a referenced object, default 0. Continue with returned next_offset."
           },
           "limit": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 32000,
+            "description": "Maximum Unicode characters for a referenced object (default 16000); responses also have a byte budget. For snapshots this is a byte budget. Follow returned pagination."
           },
           "session_id": {
             "type": [
@@ -88,8 +96,13 @@
                   {
                     "type": "string",
                     "const": "relations"
+                  },
+                  {
+                    "type": "string",
+                    "const": "subjects"
                   }
-                ]
+                ],
+                "description": "Read one editable field of a Node; requires ref pointing to a Node. Not supported for Results or records."
               },
               {
                 "type": "null"
@@ -1081,6 +1094,10 @@
               },
               "review_notice_count": {
                 "type": "integer"
+              },
+              "work_dir": {
+                "type": "string",
+                "description": "Absolute directory for this Node’s mutable drafts, geometry, scripts and prepared Job requests. Suggested location only; use in file paths or an explicit shell cd. Does not change native tool arguments or cwd. Derived from the active workspace; not an immutable Artifact."
               }
             },
             "required": [
@@ -1116,7 +1133,9 @@
         "type": "object",
         "properties": {
           "query": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Case-insensitive literal substring, not a regular expression. Empty or omitted lists recent objects."
           },
           "origin": {
             "anyOf": [
@@ -1144,7 +1163,9 @@
           "node_id": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
               },
               {
                 "type": "null"
@@ -1154,7 +1175,10 @@
           "kind": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Exact object/record kind: node, result, or a returned record kind such as task, note, job or result_published. Omit for all kinds; record is not an aggregate filter. Use origin=user/runtime/agent to filter record authors."
               },
               {
                 "type": "null"
@@ -1162,13 +1186,20 @@
             ]
           },
           "after_sequence": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": 0,
+            "description": "Return entries whose sequence is strictly greater than this value. Use a prior index_sequence to look for changes."
           },
           "offset": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of matching entries to skip, default 0. Continue with next_offset."
           },
           "limit": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of entries, default 20; this is not a byte or character count."
           },
           "session_id": {
             "type": [
@@ -1300,43 +1331,115 @@
         "type": "object",
         "properties": {
           "goal": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8000,
+            "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,8000}(?![\\s\\S])",
+            "description": "Maximum 8000 Unicode characters (code points), not UTF-8 bytes.",
+            "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
           },
           "title": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,1000}(?![\\s\\S])",
+            "description": "Maximum 1000 Unicode characters (code points), not UTF-8 bytes.",
+            "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
           },
           "proposal": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 16000,
+                "description": "Maximum 16000 Unicode characters (code points), not UTF-8 bytes.",
+                "pattern": "^[\\s\\S]{0,16000}(?![\\s\\S])",
+                "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "plan": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 16000,
+                "description": "Maximum 16000 Unicode characters (code points), not UTF-8 bytes.",
+                "pattern": "^[\\s\\S]{0,16000}(?![\\s\\S])",
+                "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "source_refs": {
             "type": "array",
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "maxItems": 64,
+            "uniqueItems": true,
+            "description": "Original user requirements: exact user_* references returned in the research context. Only user messages are accepted; use input_refs for background materials."
           },
           "input_refs": {
             "type": "array",
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "maxItems": 64,
+            "uniqueItems": true,
+            "description": "Background references for this Node: existing Nodes, Results, user messages, notes, runtime records, Jobs, collection receipts or verified Artifacts. These create citations, not fixed Result input dependencies. Unlike research_result.inputs, this field accepts contextual records."
           },
           "relations": {
             "type": "array",
             "items": {
-              "type": "object"
-            }
+              "type": "object",
+              "required": [
+                "kind",
+                "target"
+              ],
+              "properties": {
+                "kind": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "part_of"
+                    },
+                    {
+                      "type": "string",
+                      "const": "requires"
+                    },
+                    {
+                      "type": "string",
+                      "const": "alternative_to"
+                    }
+                  ]
+                },
+                "target": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 0,
+                  "maxLength": 4000,
+                  "description": "Reason for this relation; maximum 4000 Unicode characters.",
+                  "pattern": "^[\\s\\S]{0,4000}(?![\\s\\S])",
+                  "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+                }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 64
           },
           "session_id": {
             "type": [
@@ -1362,7 +1465,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Named roles such as target and calculated, pointing to immutable Artifact or Result references. Labels do not certify identity."
+            "description": "Named roles such as target and calculated, pointing only to existing result_* or verified Artifact references. Nodes, user messages, Jobs, receipts and file paths are not accepted. Labels do not certify identity."
           }
         },
         "required": [
@@ -1571,6 +1674,10 @@
           },
           "ref": {
             "type": "string"
+          },
+          "work_dir": {
+            "type": "string",
+            "description": "Absolute directory for this Node’s mutable drafts, geometry, scripts and prepared Job requests. Suggested location only; use in file paths or an explicit shell cd. Does not change native tool arguments or cwd. Derived from the active workspace; not an immutable Artifact."
           }
         },
         "required": [
@@ -1612,36 +1719,78 @@
         "type": "object",
         "properties": {
           "node_id": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "description": "Exact existing node_id returned by research_create or research_read. Reuse the returned reference; do not invent an ID."
           },
           "note": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64000,
+            "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,64000}(?![\\s\\S])",
+            "description": "Maximum 64000 Unicode characters (code points), not UTF-8 bytes.",
+            "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
           },
           "goal": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8000,
+            "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,8000}(?![\\s\\S])",
+            "description": "Maximum 8000 Unicode characters (code points), not UTF-8 bytes.",
+            "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
           },
           "title": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,1000}(?![\\s\\S])",
+            "description": "Maximum 1000 Unicode characters (code points), not UTF-8 bytes.",
+            "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
           },
           "proposal": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 16000,
+                "description": "Maximum 16000 Unicode characters (code points), not UTF-8 bytes.",
+                "pattern": "^[\\s\\S]{0,16000}(?![\\s\\S])",
+                "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "plan": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 16000,
+                "description": "Maximum 16000 Unicode characters (code points), not UTF-8 bytes.",
+                "pattern": "^[\\s\\S]{0,16000}(?![\\s\\S])",
+                "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "progress": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 16000,
+                "description": "Maximum 16000 Unicode characters (code points), not UTF-8 bytes.",
+                "pattern": "^[\\s\\S]{0,16000}(?![\\s\\S])",
+                "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "status": {
@@ -1661,22 +1810,71 @@
             ]
           },
           "assessment_ref": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "description": "Select an existing Result or agent-authored note/record belonging to this same Node as its current synthesis. Use its exact returned reference; a user message, Job or Artifact cannot be selected."
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "add_relations": {
             "type": "array",
             "items": {
-              "type": "object"
-            }
+              "type": "object",
+              "required": [
+                "kind",
+                "target"
+              ],
+              "properties": {
+                "kind": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "part_of"
+                    },
+                    {
+                      "type": "string",
+                      "const": "requires"
+                    },
+                    {
+                      "type": "string",
+                      "const": "alternative_to"
+                    }
+                  ]
+                },
+                "target": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 0,
+                  "maxLength": 4000,
+                  "description": "Reason for this relation; maximum 4000 Unicode characters.",
+                  "pattern": "^[\\s\\S]{0,4000}(?![\\s\\S])",
+                  "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+                }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 64
           },
           "remove_relations": {
             "type": "array",
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "maxItems": 64,
+            "uniqueItems": true,
+            "description": "Exact link_* IDs of declared relations returned for this Node. Do not pass a target node_id or citation link; only part_of, requires and alternative_to relations can be removed."
           },
           "session_id": {
             "type": [
@@ -1702,7 +1900,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Named roles such as target and calculated, pointing to immutable Artifact or Result references. Labels do not certify identity."
+            "description": "Named roles such as target and calculated, pointing only to existing result_* or verified Artifact references. Nodes, user messages, Jobs, receipts and file paths are not accepted. Labels do not certify identity."
           }
         },
         "required": [
@@ -1912,6 +2110,10 @@
           },
           "ref": {
             "type": "string"
+          },
+          "work_dir": {
+            "type": "string",
+            "description": "Absolute directory for this Node’s mutable drafts, geometry, scripts and prepared Job requests. Suggested location only; use in file paths or an explicit shell cd. Does not change native tool arguments or cwd. Derived from the active workspace; not an immutable Artifact."
           }
         },
         "required": [
@@ -1954,55 +2156,132 @@
         "type": "object",
         "properties": {
           "node_id": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "description": "Exact existing node_id returned by research_create or research_read. Reuse the returned reference; do not invent an ID."
           },
           "conclusion": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64000,
+            "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,64000}(?![\\s\\S])",
+            "description": "Maximum 64000 Unicode characters (code points), not UTF-8 bytes.",
+            "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
           },
           "summary": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,4000}(?![\\s\\S])",
+            "description": "Maximum 4000 Unicode characters (code points), not UTF-8 bytes.",
+            "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
           },
           "observation": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 64000,
+                "description": "Maximum 64000 Unicode characters (code points), not UTF-8 bytes.",
+                "pattern": "^[\\s\\S]{0,64000}(?![\\s\\S])",
+                "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "limitations": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 32000,
+                "description": "Maximum 32000 Unicode characters (code points), not UTF-8 bytes.",
+                "pattern": "^[\\s\\S]{0,32000}(?![\\s\\S])",
+                "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "inputs": {
             "type": "array",
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "maxItems": 64,
+            "uniqueItems": true,
+            "description": "Fixed materials actually used to derive this Result: existing result_* references or verified Artifact references only. Omit if none. User messages (user_*), Nodes, notes, runtime records, Jobs and collection receipts belong in evidence_refs, not inputs."
           },
           "evidence_refs": {
             "type": "array",
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "maxItems": 64,
+            "uniqueItems": true,
+            "description": "Supporting citations: exact returned references to Artifacts, Results, user messages (user_*), Nodes, notes, runtime records, Jobs or collection receipts. User messages record requirements, not proof of a scientific claim. Unlike inputs, this field accepts contextual and execution records."
           },
           "files": {
             "type": "array",
             "items": {
-              "type": "object"
-            }
+              "type": "object",
+              "required": [
+                "name",
+                "artifact_ref"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000,
+                  "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,1000}(?![\\s\\S])",
+                  "description": "File display name; 1–1000 Unicode characters, with non-whitespace text.",
+                  "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+                },
+                "purpose": {
+                  "type": "string",
+                  "minLength": 0,
+                  "maxLength": 16000,
+                  "description": "Optional file purpose; maximum 16000 Unicode characters.",
+                  "pattern": "^[\\s\\S]{0,16000}(?![\\s\\S])",
+                  "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+                },
+                "artifact_ref": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256,
+                  "description": "Exact verified Artifact reference returned by artifact_create, artifact_register or job_collect; not a path, Job ID or collection receipt."
+                }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 128,
+            "description": "Files delivered with this Result. Register/create files as Artifacts or collect Job outputs first, then use their returned artifact_ref values. Mutable filesystem paths are not accepted as artifact_ref."
           },
           "supersedes": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "description": "Exact result_* reference of an older Result on this same Node being explicitly corrected. Does not delete the older Result or select the new assessment automatically."
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "as_assessment": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Set true only to select this Result as the Node current synthesis using the Node revision last read. Defaults to false. Without progress, a selection conflict still saves the Result; with progress, a conflict saves neither."
           },
           "session_id": {
             "type": [
@@ -2028,7 +2307,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Named roles such as target and calculated, pointing to immutable Artifact or Result references. Labels do not certify identity."
+            "description": "Named roles such as target and calculated, pointing only to existing result_* or verified Artifact references. Nodes, user messages, Jobs, receipts and file paths are not accepted. Labels do not certify identity."
           },
           "check_refs": {
             "type": "array",
@@ -2037,11 +2316,15 @@
             "items": {
               "type": "string"
             },
-            "description": "Exact Artifact or collection receipt references for checks; no pass verdict is required."
+            "description": "Evidence for scoped checks: verified Artifact or Job collection receipt references only. Use the exact receipt returned by job_collect, not a job_id. A check may be inconclusive; citation does not certify a pass verdict."
           },
           "progress": {
             "type": "string",
-            "description": "With as_assessment=true, atomically publish, select the Result and update progress; a read conflict aborts all changes."
+            "description": "Requires as_assessment=true. Atomically revise the current assessment and progress using the last read Node. Maximum 16000 Unicode characters (code points), not UTF-8 bytes.",
+            "maxLength": 16000,
+            "minLength": 1,
+            "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,16000}(?![\\s\\S])",
+            "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
           }
         },
         "required": [
@@ -2461,6 +2744,10 @@
                 "type": "null"
               }
             ]
+          },
+          "work_dir": {
+            "type": "string",
+            "description": "Absolute directory for this Node’s mutable drafts, geometry, scripts and prepared Job requests. Suggested location only; use in file paths or an explicit shell cd. Does not change native tool arguments or cwd. Derived from the active workspace; not an immutable Artifact."
           }
         },
         "required": [
@@ -2721,7 +3008,8 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": false
+            "additionalProperties": false,
+            "description": "Explicitly authorize another identical execution: identify the matching predecessor_job_id and explain reason and budget. Use a new request/work identity; replaying the same request still reuses its Job. On duplicate_execution normally use the returned job_id with job_status/job_collect."
           },
           "prepared_ref": {
             "type": "string"
@@ -4105,7 +4393,8 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": false
+            "additionalProperties": false,
+            "description": "Explicitly authorize another identical execution: identify the matching predecessor_job_id and explain reason and budget. Use a new request/work identity; replaying the same request still reuses its Job. On duplicate_execution normally use the returned job_id with job_status/job_collect."
           }
         },
         "required": [
@@ -4248,7 +4537,8 @@
                 "minLength": 1
               }
             },
-            "additionalProperties": false
+            "additionalProperties": false,
+            "description": "Explicitly authorize another identical execution: identify the matching predecessor_job_id and explain reason and budget. Use a new request/work identity; replaying the same request still reuses its Job. On duplicate_execution normally use the returned job_id with job_status/job_collect."
           },
           "prepared_ref": {
             "type": "string"

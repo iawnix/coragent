@@ -1,9 +1,60 @@
 # Job and material workflow
 
+Generated-file placement is a workflow convention, not a new native tool restriction. `research_create` and Node `research_read` return an absolute `work_dir` for mutable structures, scripts, temporary files and prepared requests. Before Node association, use workspace `research/work/`; put reports in `reports/`. Prefer explicit absolute output paths. Alternatively, begin a generating command with `cd -- "<returned work_dir>" && ...`, quoting the actual path; create the unassociated work directory if needed. Then `--output prepared/request.json` and relative inputs resolve from that command’s cwd. `work_dir` is not a bash argument. Do not assume a shell cd persists into later calls or changes read/write/edit path resolution. Ordinary reads, searches and diagnostics that generate no files need no directory change.
+
+Keep originals in `inputs/`, preserve runtime-owned Job/Artifact files, and do not move historical requests or evidence. Avoid generated files in the workspace root. For SSH or remote Jobs, use the configured remote work/scratch directory or user-specified destination; local `work_dir` is not a remote path. With scp/rsync, distinguish local and remote endpoints; local downloads and redirected output should use the local draft/report directory. These conventions guide the agent’s file placement and do not add filesystem isolation or change existing tool permissions.
+
 Prepare a domain request through its installed Skill. Submit the returned request_file and request_sha256 to job_start; use node_id for explicit research association. Other execution fields are pinned in the file. A direct argv command uses declared inputs, outputs and platform. No research object is required for preparation or diagnostics. Unassociated preparation and diagnostics remain available.
 
 The adapter fixes the Node revision and actual inputs at submission. Later plan changes cannot change what an earlier Job tested. Job Runtime remains the source of dispatch and terminal facts. job_status observes, job_cancel requests cancellation, job_reconcile resolves uncertainty, and job_collect preserves outputs and provenance without executing again.
 
 artifact_create stores new text, artifact_register imports a file, and artifact_read reads bounded bytes. Scientific Job outputs should be collected with their producer identity. Analysis requests declare and stage their actual inputs; validators run as ordinary Jobs. Reading a file does not establish scientific evidence usage.
 
+The following tool-call sequence uses placeholders for actual returned values:
+
+1. Prepare through bash with the selected executor and `--output prepared/request.json`. Inspect the request. The returned `request_file` and `request_sha256` describe work to submit; preparation has not run the scientific calculation. Correct preparation errors before submitting. Scientific calculations use Jobs regardless of their expected duration.
+2. `job_start({"node_id":"<node_id>","request_file":"<request_file>","request_sha256":"<request_sha256>"})`. Do not add execution fields already pinned by the request. To change them, prepare again. `prepared_ref` is an alternative to the file/digest pair, not an additional field. A Job's `timeout_seconds` controls calculation runtime; bash's timeout controls preparation.
+3. `job_status({"job_id":"<job_start job_id>"})` observes execution; it does not collect files or confirm scientific validity. Reuse the same Job ID until terminal. An actual monitor event_id may also select its Job.
+4. `job_collect({"job_id":"<same job_id>"})` preserves available outputs and logs, including those of failed Jobs. Inspect output_validation and result_receipt.collection_state; partial collection is not complete evidence. Read relevant artifacts with `artifact_read({"artifact_id":"<selected artifacts entry artifact_id>"})` or its returned artifact_ref.
+5. After inspecting the actual outputs, publish with `research_result({"node_id":"<node_id>","conclusion":"<supported conclusion and limitations>","evidence_refs":["<job_id>","<result_receipt.receipt_id>"],"files":[{"name":"<output name>","artifact_ref":"<selected artifacts entry artifact_ref>"}]})`. For scoped checks, the exact receipt may also go in check_refs. Only fixed Results/Artifacts actually used belong in inputs; a Job ID or receipt is never a Result input or file attachment.
+
+Use artifact_create with name and actual text content for an authored report. Use artifact_register with a workspace file path for existing bytes. Both return artifact_id and artifact_ref; neither certifies an executed calculation. Do not recreate raw Job output as authored text or register it without its producer to bypass job_collect. artifact_read's offset/limit are bytes; follow next_offset to continue reading.
+
 Use research_update with node_id and note to explain what changed; use research_result with node_id and conclusion when there is a useful result to cite. Result files use registered artifact_ref values. Native work directories contain mutable drafts; a published result points to fixed materials. No research lifecycle transition is required before using a Job or native file tool.
+
+Choose reference fields by purpose, using exact returned IDs:
+
+| Field | Purpose and accepted references |
+| --- | --- |
+| research_create.source_refs | Original user requirements; user_* messages only. |
+| research_create.input_refs | Background citations; existing Nodes, Results, user messages, notes, runtime records, Jobs, collection receipts and verified Artifacts. |
+| research_result.inputs | Fixed materials actually used to derive the conclusion; existing Results and verified Artifacts only. Omit when none apply. |
+| research_result.evidence_refs | Supporting citations; the same reference types as Node input_refs, including user messages and execution records. A requirement citation is not scientific proof. |
+| research_result.files[].artifact_ref | Delivered file; a verified Artifact reference, never a mutable path, Job ID or receipt. |
+| research_result.check_refs | Scoped check evidence; verified Artifacts or collection receipts, not Job IDs. Inconclusive checks are allowed. |
+| subjects on create/update/result | Named roles mapped to existing Results or verified Artifacts only. |
+| research_update.assessment_ref | An existing Result or agent-authored note/record belonging to the same Node. |
+| research_result.supersedes | An older Result on the same Node being explicitly corrected. |
+
+For a candidate structure resolved from a user request, cite the structure Artifact and original user message in evidence_refs. Do not put the user message in inputs. For example (replace every example ID with its actual returned reference):
+
+```json
+{"node_id":"node_...","conclusion":"A candidate structure was resolved; the reaction mechanism remains undetermined.","evidence_refs":["art_...","user_..."]}
+```
+
+Search uses `kind`, for example `research_search({"kind":"result"})` for published Results or `{"kind":"result_published"}` for their publication records. There is no aggregate `kind="record"`; omit kind and use origin to filter user/runtime/agent records. `research_read({"ref":"<node_id>","field":"subjects"})` reads a Node's subjects. Read pagination counts Unicode characters, search pagination counts entries, and artifact_read pagination counts bytes.
+
+Research text limits count Unicode code points, not UTF-8 bytes: goal 8000, title 1000, proposal/plan/progress 16000, note/conclusion/observation 64000, summary 4000, limitations 32000, relation reason 4000, file name 1000 and file purpose 16000. Combining marks count separately. Output byte budgets still apply; read large results in pages.
+
+Task tools use actual user submission IDs represented as decimal strings, distinct from research user_* references. Read task_read for the current task revision; do not use a Node revision as expected_revision. task_update accepts only the selected action's fields (reason may accompany any action):
+
+| action | Required fields and meaning |
+| --- | --- |
+| refine | source_submission_ids from actual user requests; optionally replace objective or criteria. |
+| progress | evidence_refs; cite adopted Results/Artifacts or Jobs owned by this task. Notes alone do not reset the no-progress allowance. Collection receipt IDs are not accepted here. |
+| wait | wait with job_ids owned by this task and mode all/any. Unknown outcomes wake the task for reconciliation. |
+| block | reason explaining the blocker. |
+| propose_completion | completion entries covering every criterion_id, each supported by a fixed Result or Artifact. Then deliver the final answer; this call alone does not finish delivery. |
+| set_research | research containing complete entry_node_ids and focus_node_ids arrays; replaces both, and [] clears a list. |
+
+For intentional identical recalculation, prepare with a new work_id and submit repeat with the matching predecessor_job_id, reason and budget. Reusing an existing request identity reuses its Job; duplicate_execution normally means inspect/collect the returned Job. Validator Jobs require the registered validator_id/version and Artifacts in the count/order declared by their input roles; collected_output roles require the producer's current collected evidence. job_probe checks platform infrastructure, not scientific software. job_reconcile recovers the existing execution state without resubmission. After job_cancel, inspect the returned state; unknown is not confirmation that execution stopped.

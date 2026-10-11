@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -71,6 +72,68 @@ def test_xyz_shortcut_rejects_ignored_scientific_validation(tmp_path):
         '--output-dir', str(tmp_path/'out')], capture_output=True, text=True)
     assert result.returncode == 2
     assert '--validation requires --input-gjf' in result.stderr
+    assert 'remove --validation saddle and keep --task opt' in result.stderr
+
+
+@pytest.mark.parametrize('option', [
+    ['--task-validation', 'opt'], ['--task-validation=opt'], ['--validation', 'opt'],
+])
+def test_preparer_argument_error_is_actionable_and_recoverable(tmp_path, monkeypatch, capsys,
+                                                            mock_environment_probe, option):
+    from research_agent.application import executors
+    config = tmp_path/'gaussian.toml'
+    marker = tmp_path/'gaussian-started'
+    program = tmp_path/'g16'
+    program.write_text(f'#!/bin/sh\ntouch "{marker}"\n')
+    program.chmod(0o700)
+    config.write_text('''default_environment = "local"
+[environments.local]
+kind = "local"
+[environments.local.python]
+manager = "conda"
+conda_executable = "/fixture/conda"
+prefix = "/fixture/runner"
+lock_ref = "/fixture/runner.lock"
+[environments.local.backends.gaussian]
+command = ''' + json.dumps(str(program)) + '\n')
+    source = tmp_path/'input.xyz'
+    source.write_text('3\nfixture\nO 0 0 0\nH 0 0 1\nH 0 1 0\n')
+    output = tmp_path/'request.json'
+    args = ['--config', str(config), '--environment', 'local', '--executor', 'chemical.gaussian',
+            '--version', '1', '--input', f'geometry={source}', '--output', str(output), '--', '--task', 'opt']
+    # Exercise the actual CLI entrypoint: rejection occurs before any target probe or calculation.
+    rejected = subprocess.run([sys.executable, '-m', executors.__name__, *args, *option],
+                              capture_output=True, text=True)
+    assert rejected.returncode == 2
+    assert 'runner_arguments_invalid' in rejected.stderr
+    assert 'keep --task opt' in rejected.stderr
+    assert 'Traceback' not in rejected.stderr
+    assert rejected.stdout == ''
+    assert not output.exists()
+    assert not marker.exists()
+    # Apply the diagnostic: remove the unsupported option and retain --task opt.
+    monkeypatch.setattr(sys, 'argv', [executors.__name__, *args])
+    executors.main()
+    prepared = json.loads(capsys.readouterr().out)
+    assert prepared['request_file'] == str(output)
+    assert prepared['request_sha256'] == hashlib.sha256(output.read_bytes()).hexdigest()
+    request = json.loads(output.read_text())
+    argv = request['metadata']['execution_argv']
+    assert argv[argv.index('--task') + 1] == 'opt'
+    assert not marker.exists(), 'preparation must not run the scientific executable'
+
+
+def test_explicit_gjf_task_error_preserves_validation_mode(capsys):
+    from research_agent.application import executors
+    base, descriptor = executors.registered_executor('chemical.gaussian-input', '1')
+    cli = executors._load_cli(base, descriptor)
+    args = ['--input-gjf', 'input.gjf', '--executable', 'unused', '--output-dir', 'results']
+    with pytest.raises(SystemExit) as rejected:
+        cli.parse_arguments([*args, '--task', 'opt'])
+    assert rejected.value.code == 2
+    assert 'remove --task for explicit GJF and use --validation' in capsys.readouterr().err
+    corrected = cli.parse_arguments([*args, '--validation', 'opt'])
+    assert corrected.validation == 'opt' and corrected.task is None
 
 
 def test_prepared_gaussian_request_tracks_checkpoint_and_collection(tmp_path, mock_environment_probe):

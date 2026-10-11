@@ -23,12 +23,45 @@ def test_result_runtime_input_expansion_does_not_change_retry_identity(tmp_path)
     assert len(relations.graph(tmp_path)['results']) == 1
 
 
-def test_result_inputs_are_fixed_materials_or_results(tmp_path):
+@pytest.mark.parametrize('kind', ['node', 'user', 'note', 'record', 'job', 'collection_receipt'])
+def test_result_inputs_are_fixed_materials_or_results(tmp_path, kind):
     workspace(tmp_path)
     node = nodes.create(tmp_path, {'goal':'Analyze'})['node']
-    with pytest.raises(ValueError, match='result_inputs_require_fixed'):
-        results.publish(tmp_path, {'node_id':node['id'], 'conclusion':'Not a frozen input', 'inputs':[node['id']]})
+    source = records.record_source(tmp_path, {'session_id':'s', 'message_id':'m', 'text':'Resolve a candidate structure'})
+    note = nodes.update(tmp_path, {'node_id':node['id'], 'note':'Candidate needs verification'})
+    event = records.record_event(tmp_path, {'kind':'job', 'title':'Resolution completed', 'node_id':node['id']})
+    ref = {'node':node['id'], 'user':source['source_ref'], 'note':note['ref'], 'record':event['ref'],
+           'job':'job_fixture', 'collection_receipt':'job_result_' + 'a'*64}[kind]
+    external = {ref:{'kind':kind}} if kind in {'job', 'collection_receipt'} else {}
+    request = {'node_id':node['id'], 'conclusion':'Candidate only; mechanism undetermined',
+               'inputs':[ref], '_reference_details':external}
+    with pytest.raises(ValueError, match='result_inputs_require_fixed') as rejected:
+        results.publish(tmp_path, request)
+    assert f'inputs[0]={ref!r}' in str(rejected.value)
+    assert 'evidence_refs' in str(rejected.value)
+    assert 'Omit inputs' in str(rejected.value)
     assert not relations.graph(tmp_path)['results']
+    saved = results.publish(tmp_path, {**request, 'inputs':[], 'evidence_refs':[ref]})['result']
+    assert saved['inputs'] == []
+    assert saved['evidence_refs'] == [ref]
+    assert any(edge['source'] == saved['id'] and edge['target'] == ref and edge['kind'] == 'cites'
+               for edge in relations.graph(tmp_path)['relations'].values())
+
+
+def test_result_accepts_fixed_inputs_alongside_contextual_evidence(tmp_path):
+    workspace(tmp_path)
+    node = nodes.create(tmp_path, {'goal':'Analyze'})['node']
+    prior = results.publish(tmp_path, {'node_id':node['id'], 'conclusion':'Candidate identified'})['result']
+    source = records.record_source(tmp_path, {'session_id':'s', 'message_id':'m', 'text':'Assess this candidate'})
+    artifact = 'art_' + 'b'*64
+    inputs = [prior['id'], artifact]
+    saved = results.publish(tmp_path, {'node_id':node['id'], 'conclusion':'Candidate requires more evidence',
+        'inputs':inputs, 'evidence_refs':[source['source_ref']],
+        '_reference_details':{artifact:{'kind':'artifact'}}})['result']
+    assert saved['inputs'] == inputs
+    edges = {edge['target']:edge['kind'] for edge in relations.graph(tmp_path)['relations'].values()
+             if edge['source'] == saved['id']}
+    assert edges == {prior['id']:'uses', artifact:'uses', source['source_ref']:'cites'}
 
 
 def test_requires_cycles_are_diagnostic_and_reversible(tmp_path):

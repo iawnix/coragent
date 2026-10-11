@@ -11,7 +11,7 @@
           "ref": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "shared.json#/tools/state/properties/ref"
               },
               {
                 "type": "null"
@@ -19,10 +19,10 @@
             ]
           },
           "offset": {
-            "type": "integer"
+            "$ref": "shared.json#/tools/state/properties/offset"
           },
           "limit": {
-            "type": "integer"
+            "$ref": "shared.json#/tools/state/properties/limit"
           },
           "session_id": {
             "type": [
@@ -79,7 +79,7 @@
         "type": "object",
         "properties": {
           "query": {
-            "type": "string"
+            "$ref": "shared.json#/tools/search/properties/query"
           },
           "origin": {
             "anyOf": [
@@ -94,7 +94,7 @@
           "node_id": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "shared.json#/tools/search/properties/node_id"
               },
               {
                 "type": "null"
@@ -104,7 +104,7 @@
           "kind": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "shared.json#/tools/search/properties/kind"
               },
               {
                 "type": "null"
@@ -112,13 +112,13 @@
             ]
           },
           "after_sequence": {
-            "type": "integer"
+            "$ref": "shared.json#/tools/search/properties/after_sequence"
           },
           "offset": {
-            "type": "integer"
+            "$ref": "shared.json#/tools/search/properties/offset"
           },
           "limit": {
-            "type": "integer"
+            "$ref": "shared.json#/tools/search/properties/limit"
           },
           "session_id": {
             "type": [
@@ -145,43 +145,39 @@
         "type": "object",
         "properties": {
           "goal": {
-            "type": "string"
+            "$ref": "shared.json#/tools/create/properties/goal"
           },
           "title": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "$ref": "shared.json#/tools/create/properties/title"
           },
           "proposal": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "$ref": "shared.json#/tools/create/properties/proposal"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "plan": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "$ref": "shared.json#/tools/create/properties/plan"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "source_refs": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "$ref": "shared.json#/tools/create/properties/source_refs"
           },
           "input_refs": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "$ref": "shared.json#/tools/create/properties/input_refs"
           },
           "relations": {
-            "type": "array",
-            "items": {
-              "type": "object"
-            }
+            "$ref": "shared.json#/tools/create/properties/relations"
           },
           "session_id": {
             "type": [
@@ -199,15 +195,7 @@
             ]
           },
           "subjects": {
-            "type": "object",
-            "maxProperties": 32,
-            "propertyNames": {
-              "pattern": "^[a-z][a-z0-9_]{0,63}$"
-            },
-            "additionalProperties": {
-              "type": "string"
-            },
-            "description": "Named roles such as target and calculated, pointing to immutable Artifact or Result references. Labels do not certify identity."
+            "$ref": "shared.json#/tools/create/properties/subjects"
           }
         },
         "required": [
@@ -232,58 +220,65 @@
         "type": "object",
         "properties": {
           "node_id": {
-            "type": "string"
+            "$ref": "shared.json#/tools/update/properties/node_id"
           },
           "note": {
-            "type": "string"
+            "$ref": "shared.json#/tools/update/properties/note"
           },
           "goal": {
-            "type": "string"
+            "$ref": "shared.json#/tools/create/properties/goal"
           },
           "title": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "$ref": "shared.json#/tools/create/properties/title"
           },
           "proposal": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "$ref": "shared.json#/tools/update/properties/proposal"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "plan": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "$ref": "shared.json#/tools/update/properties/plan"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "progress": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "$ref": "shared.json#/tools/update/properties/progress"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "status": {
             "$ref": "shared.json#/tools/update/properties/status"
           },
           "assessment_ref": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "$ref": "shared.json#/tools/update/properties/assessment_ref"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "add_relations": {
-            "type": "array",
-            "items": {
-              "type": "object"
-            }
+            "$ref": "shared.json#/tools/update/properties/add_relations"
           },
           "remove_relations": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "$ref": "shared.json#/tools/update/properties/remove_relations"
           },
           "session_id": {
             "type": [
@@ -301,15 +296,7 @@
             ]
           },
           "subjects": {
-            "type": "object",
-            "maxProperties": 32,
-            "propertyNames": {
-              "pattern": "^[a-z][a-z0-9_]{0,63}$"
-            },
-            "additionalProperties": {
-              "type": "string"
-            },
-            "description": "Named roles such as target and calculated, pointing to immutable Artifact or Result references. Labels do not certify identity."
+            "$ref": "shared.json#/tools/update/properties/subjects"
           }
         },
         "required": [
@@ -336,55 +323,55 @@
         "type": "object",
         "properties": {
           "node_id": {
-            "type": "string"
+            "$ref": "shared.json#/tools/result/properties/node_id"
           },
           "conclusion": {
-            "type": "string"
+            "$ref": "shared.json#/tools/result/properties/conclusion"
           },
           "summary": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "$ref": "shared.json#/tools/result/properties/summary"
           },
           "observation": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "$ref": "shared.json#/tools/result/properties/observation"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "limitations": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "$ref": "shared.json#/tools/result/properties/limitations"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "inputs": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "$ref": "shared.json#/tools/result/properties/inputs"
           },
           "evidence_refs": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "$ref": "shared.json#/tools/result/properties/evidence_refs"
           },
           "files": {
-            "type": "array",
-            "items": {
-              "type": "object"
-            }
+            "$ref": "shared.json#/tools/result/properties/files"
           },
           "supersedes": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "$ref": "shared.json#/tools/result/properties/supersedes"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "as_assessment": {
-            "type": "boolean"
+            "$ref": "shared.json#/tools/result/properties/as_assessment"
           },
           "session_id": {
             "type": [
@@ -402,28 +389,13 @@
             ]
           },
           "subjects": {
-            "type": "object",
-            "maxProperties": 32,
-            "propertyNames": {
-              "pattern": "^[a-z][a-z0-9_]{0,63}$"
-            },
-            "additionalProperties": {
-              "type": "string"
-            },
-            "description": "Named roles such as target and calculated, pointing to immutable Artifact or Result references. Labels do not certify identity."
+            "$ref": "shared.json#/tools/result/properties/subjects"
           },
           "check_refs": {
-            "type": "array",
-            "maxItems": 128,
-            "uniqueItems": true,
-            "items": {
-              "type": "string"
-            },
-            "description": "Exact Artifact or collection receipt references for checks; no pass verdict is required."
+            "$ref": "shared.json#/tools/result/properties/check_refs"
           },
           "progress": {
-            "type": "string",
-            "description": "With as_assessment=true, atomically publish, select the Result and update progress; a read conflict aborts all changes."
+            "$ref": "shared.json#/tools/result/properties/progress"
           }
         },
         "required": [

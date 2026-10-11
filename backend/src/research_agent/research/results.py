@@ -54,8 +54,12 @@ def publish(root, request):
         progress = text(request['progress'], 'progress', required=True)
         basis.check(root, node, request, {'progress', 'assessment_ref'})
     inputs = list(validate_refs(root, request.get('inputs', []), external))
-    if any(not ref.startswith('result_') and external.get(ref, {}).get('kind') != 'artifact' for ref in inputs):
-        raise ValueError('result_inputs_require_fixed_results_or_artifacts: cite execution records in evidence_refs')
+    for index, ref in enumerate(inputs):
+        if not ref.startswith('result_') and external.get(ref, {}).get('kind') != 'artifact':
+            raise ValueError(
+                f'result_inputs_require_fixed_results_or_artifacts: inputs[{index}]={ref!r} '
+                'is not a Result or verified Artifact; cite user messages, Nodes, notes and execution '
+                'records in evidence_refs instead. Omit inputs when no fixed materials were used.')
     evidence = validate_refs(root, request.get('evidence_refs', []), external)
     files = request.get('files', [])
     if not isinstance(files, list) or len(files) > 128:

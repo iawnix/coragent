@@ -59,12 +59,16 @@ def test_recipe_index_honors_binding_selection_without_probing(tmp_path, monkeyp
         executors.list_recipes(config=config, environment='typo')
 
 
-def test_selected_gaussian_help_uses_runner_contract_without_target_access(monkeypatch, capsys):
+@pytest.mark.parametrize('executor', ['chemical.gaussian', 'chemical.gaussian-input'])
+def test_selected_gaussian_help_uses_runner_contract_without_target_access(monkeypatch, capsys, executor):
     monkeypatch.setattr(executors, 'probe_binding', lambda *_: pytest.fail('help must not probe'))
     output = cli(executors, monkeypatch, capsys, '--config', '/missing/job.toml', '--environment', 'remote',
-                 '--executor', 'chemical.gaussian-input', '--version', '1', '--help')
+                 '--executor', executor, '--version', '1', '--help')
     assert '--input-gjf' in output and '--validation' in output and 'saddle' in output
-    assert 'chemical.gaussian-input@1' in output
+    assert executor + '@1' in output
+    assert 'XYZ only' in output and 'Explicit GJF only' in output
+    assert 'Neither mode supports --task-validation' in ' '.join(output.split())
+    assert 'request_file' in output and 'request_sha256' in output and 'job_start' in output
     assert '--script' in cli(executors, monkeypatch, capsys, '--help')
 
 

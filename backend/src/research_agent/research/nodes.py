@@ -11,8 +11,10 @@ from . import basis, relations
 def text(value, name, *, required=False, limit=16000):
     if value is None and not required:
         return None
-    if not isinstance(value, str) or required and not value.strip() or len(value.encode()) > limit:
-        raise ValueError(name + '_invalid')
+    if not isinstance(value, str) or required and not value.strip():
+        raise ValueError(name + '_invalid: use a string' + (' with non-whitespace text' if required else ''))
+    if len(value) > limit:
+        raise ValueError(f'{name}_invalid: maximum {limit} Unicode characters; received {len(value)}')
     return value
 
 
@@ -53,7 +55,12 @@ def validate_refs(root, refs, external=None):
 
 
 def response(root, node, request, **values):
-    return {'accepted': True, 'node': node, 'relations': relations.links(root, node['id']), 'read_basis': basis.issue(root, [node], request.get('session_id')), **values}
+    return {'accepted': True, 'node': node, 'work_dir': work_dir(root, node['id']), 'relations': relations.links(root, node['id']), 'read_basis': basis.issue(root, [node], request.get('session_id')), **values}
+
+
+def work_dir(root, node_id):
+    """Derived guidance, never persisted into historical Node records."""
+    return str(Path(root).resolve() / 'research/nodes' / node_id / 'work')
 
 
 @workspace_transaction('research.create')
@@ -94,7 +101,8 @@ def update(root, request):
         changed.add('relations')
     basis.check(root, node, request, changed)
     for key in changed - {'relations', 'status', 'assessment_ref', 'subjects'}:
-        node[key] = text(request[key], key, required=key in {'goal', 'title'})
+        node[key] = text(request[key], key, required=key in {'goal', 'title'},
+                         limit={'goal': 8000, 'title': 1000}.get(key, 16000))
     if 'subjects' in changed:
         from .context import subjects
         node['subjects'] = subjects(root, request['subjects'], request.get('_reference_details', {}))

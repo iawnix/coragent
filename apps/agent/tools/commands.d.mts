@@ -9,7 +9,7 @@ export interface CommandParameters {
     "session_id"?: string | null;
     "event_ids"?: Array<string>;
     "focus_node_ids"?: Array<string>;
-    "field"?: "goal" | "title" | "proposal" | "plan" | "progress" | "status" | "assessment_ref" | "relations" | null;
+    "field"?: "goal" | "title" | "proposal" | "plan" | "progress" | "status" | "assessment_ref" | "relations" | "subjects" | null;
     "entry_node_ids"?: Array<string>;
   };
   "research.search": {
@@ -24,12 +24,16 @@ export interface CommandParameters {
   };
   "research.create": {
     "goal": string;
-    "title"?: string | null;
+    "title"?: string;
     "proposal"?: string | null;
     "plan"?: string | null;
     "source_refs"?: Array<string>;
     "input_refs"?: Array<string>;
-    "relations"?: Array<Record<string, unknown>>;
+    "relations"?: Array<{
+      "kind": "part_of" | "requires" | "alternative_to";
+      "target": string;
+      "reason"?: string;
+    }>;
     "session_id"?: string | null;
     "request_id"?: string;
     "read_basis"?: string | null;
@@ -39,13 +43,17 @@ export interface CommandParameters {
     "node_id": string;
     "note": string;
     "goal"?: string;
-    "title"?: string | null;
+    "title"?: string;
     "proposal"?: string | null;
     "plan"?: string | null;
     "progress"?: string | null;
     "status"?: "open" | "paused" | "closed";
     "assessment_ref"?: string | null;
-    "add_relations"?: Array<Record<string, unknown>>;
+    "add_relations"?: Array<{
+      "kind": "part_of" | "requires" | "alternative_to";
+      "target": string;
+      "reason"?: string;
+    }>;
     "remove_relations"?: Array<string>;
     "session_id"?: string | null;
     "request_id"?: string;
@@ -55,12 +63,16 @@ export interface CommandParameters {
   "research.result": {
     "node_id": string;
     "conclusion": string;
-    "summary"?: string | null;
+    "summary"?: string;
     "observation"?: string | null;
     "limitations"?: string | null;
     "inputs"?: Array<string>;
     "evidence_refs"?: Array<string>;
-    "files"?: Array<Record<string, unknown>>;
+    "files"?: Array<{
+      "name": string;
+      "purpose"?: string;
+      "artifact_ref": string;
+    }>;
     "supersedes"?: string | null;
     "as_assessment"?: boolean;
     "session_id"?: string | null;
@@ -369,6 +381,7 @@ export interface CommandResults {
     "record"?: JsonValue;
     "review_notices"?: Array<JsonValue>;
     "review_notice_count"?: number;
+    "work_dir"?: string;
     [key: string]: unknown;
   };
   "research.search": {
@@ -427,6 +440,7 @@ export interface CommandResults {
     "read_basis": string;
     "view_error"?: string;
     "ref": string;
+    "work_dir"?: string;
   };
   "research.update": {
     "accepted": true;
@@ -465,6 +479,7 @@ export interface CommandResults {
     "read_basis": string;
     "view_error"?: string;
     "ref": string;
+    "work_dir"?: string;
   };
   "research.result": {
     "accepted": true;
@@ -537,6 +552,7 @@ export interface CommandResults {
     "result_saved": true;
     "assessment_selected": boolean;
     "conflict": string | null;
+    "work_dir"?: string;
   };
   "research.source": {
     "source_ref": string;

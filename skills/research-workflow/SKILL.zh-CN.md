@@ -15,6 +15,8 @@ description: 在 Pi 原生循环中协调研究问题、领域 Skill、持久 Jo
 
 领域方法参考适用的已安装 Skill。缺少对应 Skill 或封装时，可使用有依据的方法与任务脚本，明确假设并验证，不能将目录当成能力白名单。Pi 原生 read/write/edit/bash 准备输入、分析和报告；`job_start` 管理科学计算，关联研究时明确传 node_id，不猜“最近一个 Node”。准备和诊断可以没有研究归属。`job_collect` 发布材料与执行回执。
 
+生成文件时，Node 草稿和请求使用 research_create/research_read 返回的 work_dir；未关联 Node 时使用 research/work，报告放在 reports/。通过显式输出路径或命令中的 cd 选择位置。work_dir 是研究工具返回的位置建议，不是 bash 参数，也不会改变任何工具的 cwd；普通读取无需切换目录。保留原始输入和运行时存储，避免在工作区根目录散落生成文件，历史证据保持原位。远程命令使用配置的远程工作或 scratch 目录或用户指定位置，与本地 work_dir 分开。详见[文件与 Job 约定](references/tools.zh-CN.md)。
+
 进程成功不等于科学结论成立。按任务检查收敛、几何、频率、连通性和方法局限。research_update 记录解释与计划；research_result 发布可复用结论并引用依据。失败和不确定性都可以如实记录。
 
 重复提交前先读 Job 回执。未知派发结果沿用身份协调，不换身份绕过去重；更换输入的新科学尝试使用新提交身份。Monitor 的 next_run 在所属会话能够接收时恢复事件及相关 Node，不选择科学方案、不要求 checkpoint，也不因 Node open 无限续跑。

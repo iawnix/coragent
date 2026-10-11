@@ -25,15 +25,37 @@ test('research tools preserve Nodes, results and original tasks through a restar
     let tools=createResearchTools({commandBridge:bridge});
     assert.deepEqual(tools.map(t=>t.name),['research_read','research_search','research_create','research_update','research_result']);
     const api={callId:'create1',coragent:{workspace_root:root,session_id:'s',operation_id:'operation-1',principal:'root_agent'}};
-    const run=async(name,args,callId)=> (await tools.find(t=>t.name===name).execute(args,{...api,callId})).details.result;
+    const run=async(name,args,callId)=> {
+      const tool=tools.find(t=>t.name===name);
+      validateToolArguments(tool,{type:'toolCall',id:callId,name,arguments:args});
+      return (await tool.execute(args,{...api,callId})).details.result;
+    };
     const created=await run('research_create',{goal:'Compare pathways',plan:'Calculate both pathways.'},'create1');
     const nodeId=created.node.id;
     assert.deepEqual(await run('research_create',{goal:'Compare pathways',plan:'Calculate both pathways.'},'create1'),created);
     const updated=await run('research_update',{node_id:nodeId,note:'First attempt failed; retry with another geometry.',plan:'Try another geometry.'},'update1');
     assert.equal(updated.node.plan,'Try another geometry.');
-    const published=await run('research_result',{node_id:nodeId,conclusion:'The fixture does not establish a preferred pathway.',as_assessment:true},'result1');
+    await assert.rejects(run('research_result',{node_id:nodeId,conclusion:'Candidate only.',inputs:[task.source_ref]},'bad-input'), error=>{
+      assert.match(error.message,/result_inputs_require_fixed_results_or_artifacts/);
+      assert.match(error.message,/inputs\[0\]=/);
+      assert.match(error.message,/user_/);
+      assert.match(error.message,/evidence_refs/);
+      return true;
+    });
+    const rejected=await bridge.execute_command('research.read',{ref:nodeId,session_id:'s'});
+    assert.equal(rejected.results.length,0);
+    const published=await run('research_result',{node_id:nodeId,conclusion:'The fixture does not establish a preferred pathway.',evidence_refs:[task.source_ref],as_assessment:true},'result1');
     assert.equal(published.result_saved,true);
     assert.equal(published.assessment_selected,true);
+    assert.deepEqual(published.result.inputs,[]);
+    assert.deepEqual(published.result.evidence_refs,[task.source_ref]);
+    const subjects=await run('research_read',{ref:nodeId,field:'subjects'},'subjects');
+    assert.deepEqual(JSON.parse(subjects.text).value,{});
+    const products=await run('research_search',{node_id:nodeId,kind:'result'},'search-results');
+    assert.deepEqual(products.records.map(row=>row.ref),[published.result.id]);
+    const history=await run('research_search',{node_id:nodeId,kind:'result_published'},'search-history');
+    assert.equal(history.total,1);
+    assert.equal(history.records[0].kind,'result_published');
     await assert.rejects(tools.find(t=>t.name==='research_update').execute({node_id:nodeId,note:'forged'},{...api,coragent:{...api.coragent,principal:'guest'}}),/principal/);
     await bridge.close();
     bridge=create_python_runtime_bridge({workspace_root:root,workspace_id:'memory'});
@@ -66,6 +88,9 @@ test('tool schemas express research choices without exposing receipt and executi
   assert.doesNotThrow(()=>validate('create',{goal:'Find the transition structure.'}));
   assert.doesNotThrow(()=>validate('update',{node_id:'node_1',note:'Failed optimization; inspect gradients.'}));
   assert.doesNotThrow(()=>validate('result',{node_id:'node_1',conclusion:'Evidence is insufficient.'}));
+  assert.doesNotThrow(()=>validate('state',{ref:'node_1',field:'subjects'}));
+  assert.throws(()=>validate('state',{field:'subjects'}));
+  assert.throws(()=>validate('search',{type:'result'}));
   assert.throws(()=>validate('update',{node_id:'node_1',note:'fake',read_basis:'forged'}));
   assert.throws(()=>validate('state',{event_ids:['event_forged']}));
   assert.throws(()=>validate('state',{entry_node_ids:['node_A'],focus_node_ids:['node_A']}));
@@ -73,6 +98,41 @@ test('tool schemas express research choices without exposing receipt and executi
   assert.doesNotThrow(()=>validate('jobStart',{command:['true'],node_id:'node_1'}));
   assert.throws(()=>validate('jobStart',{command:['true']}));
   assert.equal(contracts.change,undefined);
+});
+
+test('research text limits agree across model schema, command validation and Python for Unicode',async()=>{
+  await mkdir(TEST_ROOT,{recursive:true});
+  const root=await mkdtemp(join(TEST_ROOT,'unicode-contract-'));
+  let bridge;
+  try {
+    const workspaces=create_workspace_initializer();
+    await workspaces.initialize_workspace({workspace_root:root,workspace_id:'unicode-contract'});
+    await workspaces.admit_workspace(root);
+    bridge=create_python_runtime_bridge({workspace_root:root,workspace_id:'unicode-contract'});
+    const tools=createResearchTools({commandBridge:bridge});
+    const validate=(name,args)=>{
+      const tool=tools.find(t=>t.name===name);
+      validateToolArguments(tool,{type:'toolCall',id:'unicode',name,arguments:args});
+      return tool;
+    };
+    const run=async(name,args,callId)=>(await validate(name,args).execute(args,{callId,coragent:{workspace_root:root,
+      session_id:'unicode',operation_id:callId,principal:'root_agent'}})).details.result;
+    const created=await run('research_create',{goal:'研'.repeat(8000),title:'🧪'.repeat(1000)},'create');
+    const nodeId=created.node.id;
+    const summary='e\u0301'.repeat(2000);
+    const saved=await run('research_result',{node_id:nodeId,conclusion:'Unicode evidence.',summary},'publish');
+    const persisted=await bridge.execute_command('research.read',{ref:saved.result.id});
+    assert.equal(JSON.parse(persisted.text).summary,summary);
+    for (const [name,args,command] of [
+      ['research_create',{goal:'研'.repeat(8001)},'research.create'],
+      ['research_create',{goal:'g',title:'🧪'.repeat(1001)},'research.create'],
+      ['research_result',{node_id:nodeId,conclusion:'c',summary:summary+'\u0301'},'research.result'],
+      ['research_result',{node_id:nodeId,conclusion:'c',summary:'x'.repeat(4000)+'\n'},'research.result'],
+    ]) {
+      assert.throws(()=>validate(name,args));
+      await assert.rejects(bridge.execute_command(command,args),/schema_field_invalid/);
+    }
+  } finally {await bridge?.close();await rm(root,{recursive:true,force:true});}
 });
 
 test('tools acknowledge returned revisions and bind writes to their trusted session',async()=>{

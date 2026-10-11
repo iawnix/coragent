@@ -4,7 +4,7 @@ export interface ToolParameters {
   state: {
     "root"?: string;
     "ref"?: string;
-    "field"?: "goal" | "title" | "proposal" | "plan" | "progress" | "status" | "assessment_ref" | "relations";
+    "field"?: "goal" | "title" | "proposal" | "plan" | "progress" | "status" | "assessment_ref" | "relations" | "subjects";
     "offset"?: number;
     "limit"?: number;
   };
@@ -12,7 +12,7 @@ export interface ToolParameters {
     "root"?: string;
     "query"?: string;
     "node_id"?: string;
-    "type"?: "node" | "result" | "record";
+    "kind"?: string;
     "origin"?: "user" | "runtime" | "agent";
     "after_sequence"?: number;
     "offset"?: number;
