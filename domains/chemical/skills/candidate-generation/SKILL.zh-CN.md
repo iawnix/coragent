@@ -35,8 +35,10 @@ checkpoint、原子映射与 IRC 输入约定见 [Gaussian 路径准备](referen
 
 已有材料端点的 QST2/QST3 使用 `chemical.qst-prepare@1`；有界一维/二维扫描使用
 `chemical.scan-xtb@1` 或 `chemical.scan-gaussian@1`；xTB 梯度与 NEB 使用
-`chemical.gradient-xtb@1`、`chemical.neb-xtb@1`。输入合同、可选路径环境绑定、
+`chemical.gradient-xtb@1`、`chemical.neb-xtb@2`。输入合同、可选路径环境绑定、
 续算规则及 calculator 实际边界见[材料路径操作](references/path_search.zh-CN.md)。
 
-基态自旋 Gaussian 梯度与 NEB 另有 chemical.gradient-gaussian@1、chemical.neb-gaussian@1，
+基态自旋 Gaussian 梯度与 NEB 另有 chemical.gradient-gaussian@1、chemical.neb-gaussian@2，
 独立电子设置与范围见[路径操作](references/path_search.zh-CN.md)。
+
+新 xTB/Gaussian 路径搜索使用 [ASE NEB v2](references/ase_neb_executor.zh-CN.md)。失败或畸变时按[搜索恢复](../method-selection/references/search_recovery.zh-CN.md)诊断，结合[局部几何](../chemical-input/references/local_diagnostics.zh-CN.md)和[轨迹](../report/references/research_tools.zh-CN.md)选择重启帧。

@@ -45,3 +45,5 @@
 绑定或程序字节发生变化后须重新准备请求，不能继续派发旧准备命令。
 
 控制 shell 的 PATH 不是选定的科学环境；其中找不到 `g16` 不证明配置的 Gaussian binding 不可用。默认执行 `true` 的 `job_probe` 只检查派发，软件诊断使用上述定向 environment_check。检查成功后准备小规模相关计算，不反复执行同一探针。通用 native Job 要显式把程序输出写入声明的输出文件。
+
+可选 path profile 使用含 ASE/SciPy 的 path.lock 支持 NEB v2；显式配置 path_xtb/path_gaussian。轨迹及图文报告 Job 使用含 Matplotlib/Pillow 的既有 structure 绑定。

@@ -5,6 +5,16 @@ This file records user-visible changes. Current architecture is documented in
 
 ## Unreleased
 
+- Persist natural-language user pause/resume/cancel instructions in the Task Controller,
+  preventing automatic continuation after research stops. Cancel task scheduling before
+  contacting Job backends; retry pending cleanup without waking the model.
+
+- Add ASE NEB v2 with Gaussian/xTB calculators, FIRE/BFGS, optional IDPP,
+  evaluation budgets and preserved partial paths; remove the former NumPy NEB
+  implementation and v1 entries. Old requests require preparation with v2 units.
+- Add independent local geometry diagnostics, trajectory/mode illustrations and
+  evidence-bound illustrated reports, plus practical search and failure-recovery guidance.
+
 - Add authenticated Host `files/list`, `files/stat`, `files/read` and `files/pin`
   capabilities for CoRHub 0.20.0+64: bounded material browsing and version-checked
   file snapshots over the existing Link, without waking Pi or exposing state files.
@@ -20,7 +30,7 @@ This file records user-visible changes. Current architecture is documented in
 - Research tool cards display recorded execution time, including after reconnect;
   Job submission time remains distinct from the background computation duration.
 - Added general chemistry materials, mapping/conformer comparison, CREST ensembles,
-  complex sampling, xTB/Gaussian scans and NumPy NEB, QST2/QST3 preparation, and
+  complex sampling, xTB/Gaussian scans and ASE NEB, QST2/QST3 preparation, and
   reaction-independent stationary-point/mode/IRC checks.
 - Added thermochemistry and conformer free energies, multistep pathway checks,
   conditional TST/branching, and mass-action kinetic networks.

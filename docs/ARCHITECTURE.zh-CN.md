@@ -83,6 +83,8 @@ Task Controller 位于 SessionWorker 内。普通工具工作继续使用原生 
 
 暂停只抑制后续自动执行，当前回复和已有 Job 可以收尾；用户打断回复会同时暂停任务。恢复是用户控制操作。取消任务须显式选择保留还是请求取消已有 Job。Monitor 查询不发送模型输入或恢复任务。`CORAGENT_AUTOMATIC_CONTINUATION=0` 关闭自动输入，保留用户输入与状态读取。
 
+自然语言任务控制使用 `task_update action=apply_user_control`，引用当前 run 已消费的最新真实用户提交。运行时校验来源、当前输入归属及修订号；自动输入不构成控制授权。处理停止指令的 run 可以完成只读核实、用户要求的 Job 取消与最终确认，但不能继续发起工作或创建替代任务。Task 取消先于 Job 查询与取消落盘；后端故障保留为持久化清理工作，不唤醒模型。取消 Job 或修改 Node 状态都不会停止顶层 Task。
+
 自动观察与显式进展更新共用持久身份集合：单项 Result ID、Artifact 内容摘要及归属 Job 的里程碑。改计划、追加 note、新建 Node 和换焦点记录活动但不补充进展额度；复用身份、换引用组合或重启也不补充额度。每项完成条件需要固定 Result 或 Artifact 证据，科学适用性仍由 Agent 判断。这些控制不能判断新产出是否具有科学价值。
 
 Host 重启从 Pi 现有 session catalog 发现会话，最多并行恢复四个 Worker；每个 Worker 核对自身 durable 任务。恢复失败通过 `monitor/health` 展示。只有 SessionWorker 写会话 SQLite；聚合视图来自 Task、Pi、Job 各自事实源，不声称跨系统原子快照。

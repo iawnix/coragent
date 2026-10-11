@@ -64,3 +64,5 @@ from every environment. Changed binding or executable evidence requires preparin
 a new request before dispatch, not running an old prepared command.
 
 The control shell's PATH is not the selected scientific environment. A missing `g16` there does not establish absence from a configured Gaussian binding. A default `job_probe` running `true` checks dispatch only; use the targeted environment check above for the solver. Once that succeeds, prepare a small relevant calculation instead of repeating the same probe. Capture native program output explicitly in declared output files when using generic native Jobs.
+
+The optional path profile uses path.lock with ASE/SciPy for NEB v2; configure path_xtb/path_gaussian explicitly. Trajectory and illustrated report Jobs use the existing structure binding with Matplotlib/Pillow.

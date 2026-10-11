@@ -78,3 +78,5 @@ checks and source structures in the research record and explain relevant differe
 - [name_resolution.md](references/name_resolution.md): lookup, inference input and result fields.
 - [structure_input.md](references/structure_input.md): graph checks, geometries and structure comparison.
 - [reaction_mapping.md](references/reaction_mapping.md): atom mapping and reaction graph checks.
+
+Use `chemical.local-diagnostics@1` for explicit reaction-center coordinates, short contacts and reference/local alignment; it is independently callable and does not certify bonds, electronic structure or TS identity. See [local diagnostics](references/local_diagnostics.md).

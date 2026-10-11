@@ -7,9 +7,9 @@ Runner output contains only run IDs, result counts, status and failed test file
 names and valid line numbers matched against the public source inventory. Case names, parameters,
 assertions and detailed failures remain in each run's local report and log files.
 
-`prepare` also caches the public `structure` and `wrapper` Conda locks for the complete public
+`prepare` also caches the public `structure`, `wrapper` and `path` Conda locks for the complete public
 installer acceptance. `--job-profiles` selects these preparation profiles; it
-defaults to `structure,wrapper`. The installation tests use those caches offline and
+defaults to `structure,wrapper,path`. The installation tests use those caches offline and
 cover package activation, ordinary structure Jobs, repeat installation, and purge.
 
 ```bash

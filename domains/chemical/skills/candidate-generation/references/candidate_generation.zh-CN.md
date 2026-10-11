@@ -47,3 +47,5 @@ ID 绑定。关联每个不可变 compute intent，并保留方法/参数。收�
 
 已有材料端点可用 `chemical.qst-prepare@1`；有界扫描和 xTB NEB 见
 [路径操作](path_search.zh-CN.md)。这些入口不认证端点属于同一个基元步骤。
+
+新 NEB 路径使用 [ASE v2](ase_neb_executor.zh-CN.md)。重启帧按几何、力和反应坐标证据选择，不默认选失败 TS 搜索中最低能量帧；见[搜索恢复](../../method-selection/references/search_recovery.zh-CN.md)。

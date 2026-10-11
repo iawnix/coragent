@@ -174,7 +174,7 @@
       }
     },
     "path": {
-      "lock": "structure.lock",
+      "lock": "path.lock",
       "backends": [
         "path_xtb",
         "path_gaussian"
@@ -190,7 +190,7 @@
         "glibc": "2.28"
       },
       "resources": {
-        "structure.lock": "sha256:b2447fff9059d0819049b9d4761e740d6a69a5f3686bf40cc7122edc3307d39b"
+        "path.lock": "sha256:61495791d074c193b71decd13283fd1e63dd965be34f65e8f4e6ecba7d7c5eec"
       }
     }
   }

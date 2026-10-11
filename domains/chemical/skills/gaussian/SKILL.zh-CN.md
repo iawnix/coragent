@@ -73,7 +73,7 @@ bash 命令只准备并校验 Job 请求；`prepared/gaussian.json` 是请求文
 嵌入材料端点的 QST2/QST3 准备与有界 ModRedundant 扫描网格见
 [材料路径操作](../candidate-generation/references/path_search.zh-CN.md)。
 Gaussian 扫描适配沿用 HF/DFT SCF 能量范围。梯度/NEB 另用 chemical.gradient-gaussian@1、
-chemical.neb-gaussian@1，设置见路径操作中的电子态适配说明。
+chemical.neb-gaussian@2，设置见路径操作中的电子态适配说明。
 
 ## 明确电子态的计算
 
@@ -83,3 +83,5 @@ HF/DFT 与闭壳层单重激发 TDDFT/TDHF/TDA 单点/优化。chemical.state-tr
 先读[电子态合同](references/electronic_states.zh-CN.md)。原生固定 root 优化在缺少
 独立特征信息时保留态连续性未验证。既有 Gaussian 通用能量保护继续有效。
 不同自旋交叉使用 [surface-crossing](../surface-crossing/SKILL.zh-CN.md)。
+
+SCF/TS/IRC 故障、checkpoint 复用和 route 不匹配见[搜索诊断与恢复](../method-selection/references/search_recovery.zh-CN.md)。新梯度驱动 NEB 使用独立 path_gaussian 绑定的 [ASE NEB v2](../candidate-generation/references/ase_neb_executor.zh-CN.md)。

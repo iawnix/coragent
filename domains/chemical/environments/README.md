@@ -11,11 +11,12 @@ optimized for the maintainer's CPU. Other targets need their own verified lock.
 | Lock | Bindings | Contents |
 | --- | --- | --- |
 | wrapper.lock | Gaussian/xTB/CREST Python wrappers | Python 3.11 and packaging tools; native solvers are installed separately |
-| structure.lock | structure, validation | RDKit and NumPy |
+| structure.lock | structure, validation | RDKit, NumPy, Matplotlib and Pillow for geometry/trajectory/report analysis |
+| path.lock | path_xtb, path_gaussian | Structure dependencies plus ASE 3.29.0 and SciPy for NEB v2 |
 | cf22d.lock | pyscf | PySCF, geomeTRIC and PySCF dispersion, all from Conda |
 | render.lock + render.requirements.txt | render | RDKit, Cairo, Matplotlib, xyzrender and its rendering dependencies |
 
-Text reports use the Host's standard library and do not need `render.lock`.
+The basic text report helper uses the Host's standard library. Illustrated report/trajectory Jobs use `structure`; neither needs `render.lock`.
 Rendering's notebook dependencies are upstream xyzrender requirements; they
 are confined to the rendering target. No environment includes the CoRAgent wheel.
 
@@ -82,9 +83,9 @@ calculations before publishing the new lock. Fixed pip entries must include
 the hashes of their upstream artifacts. Do not export credentials, add a
 local-only wheel, or replace the lock of a running installation in place.
 
-The optional `path` profile reuses structure.lock for explicitly configured
-`path_xtb` / `path_gaussian` native bindings. It provides RDKit/NumPy for scans,
-gradients and NEB without changing the existing lightweight wrappers. For example,
+The optional `path` profile uses path.lock for explicitly configured
+`path_xtb` / `path_gaussian` native bindings. It provides RDKit/NumPy, ASE and SciPy for scans,
+gradients and ASE NEB v2 without changing the existing lightweight wrappers. For example,
 configure `[environments.local.backends.path_xtb]` with `command = "/opt/xtb/bin/xtb"`
 (and activation_script if needed), then select `--job-profile local:path`.
 This profile has no default native scientific smoke calculation; the selected

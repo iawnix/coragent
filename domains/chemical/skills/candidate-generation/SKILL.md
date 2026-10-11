@@ -48,10 +48,12 @@ The bundled DA path supports six neutral, non-aromatic carbon reaction centers. 
 
 For supplied material endpoints, use `chemical.qst-prepare@1` for QST2/QST3.
 For bounded 1D/2D grids use `chemical.scan-xtb@1` or `chemical.scan-gaussian@1`;
-for xTB gradients/NEB use `chemical.gradient-xtb@1` and `chemical.neb-xtb@1`.
+for xTB gradients/NEB use `chemical.gradient-xtb@1` and `chemical.neb-xtb@2`.
 Read [material-based path operations](references/path_search.md) for schemas,
 optional path environment bindings, resume rules and actual calculator limits.
 
 Ground-spin Gaussian gradients and NEB are also available as `chemical.gradient-gaussian@1`
-and `chemical.neb-gaussian@1`; their separate electronic settings and scope are in
+and `chemical.neb-gaussian@2`; their separate electronic settings and scope are in
 [path operations](references/path_search.md).
+
+Use [ASE NEB v2](references/ase_neb_executor.md) for new xTB/Gaussian band searches. Diagnose failed or distorted searches with [search recovery](../method-selection/references/search_recovery.md); inspect [local geometry](../chemical-input/references/local_diagnostics.md) and [trajectories](../report/references/research_tools.md) before choosing a restart frame.

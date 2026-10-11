@@ -141,7 +141,8 @@ CoRAgent does not install site-managed Gaussian or xTB binaries.
 
 The same installer prepares scientific environments from the domain's pinned
 `environments/manifest.json`. Profiles are `structure` (RDKit/NumPy, shared with
-validation), `pyscf` (CF22D), `render`, and `wrapper` (Python for already configured
+validation and trajectory/report analysis), `path` (ASE/SciPy for configured
+path_xtb/path_gaussian), `pyscf` (CF22D), `render`, and `wrapper` (Python for already configured
 Gaussian/xTB programs). The native programs must already exist on their targets.
 
 ```bash

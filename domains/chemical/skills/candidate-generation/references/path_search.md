@@ -2,6 +2,8 @@
 
 [中文](path_search.zh-CN.md)
 
+NEB uses [ASE](ase_neb_executor.md), with version-2 inputs and executors.
+
 ## Contents
 
 - [Independent execution and environments](#independent-execution-and-environments)
@@ -12,7 +14,7 @@
 
 ## Independent execution and environments
 
-The five version-1 recipes below each take one `input` JSON Artifact. They do not
+The recipes below each take one `input` JSON Artifact; QST/scans/gradients use version 1 and NEB uses version 2. They do not
 require a reaction name, DA topology or a complete research workflow. Prepare via
 `research_agent.application.executors`, submit returned request_file/request_sha256
 with node_id to job_start and collect the terminal Job. Example (replace absolute
@@ -33,11 +35,11 @@ paths and Artifact refs with the real returned values):
 Native path operations need **RDKit/NumPy plus the configured solver**, unlike the
 standard-library-only Gaussian/xTB wrappers. Configure path_xtb/path_gaussian with
 the appropriate native command/activation script. `--job-profile local:path`
-binds only those explicitly configured backends to the existing structure.lock;
+binds only those explicitly configured backends to path.lock (RDKit/NumPy, ASE and SciPy);
 it does not install solvers or run default native scientific acceptance jobs.
 Check the selected recipe using environment_check with --executor and --version,
 then run a bounded scientific case. The existing wrapper profile stays unchanged.
-The path profile does not add ASE. No new native binding is inferred from PATH.
+ASE is required by NEB. No new native binding is inferred from PATH.
 
 All embedded materials use chemical-material/1, supplied angstrom coordinates,
 2–256 atoms, known charge/multiplicity and an explicit ground-state declaration.
@@ -120,27 +122,16 @@ The calculator contract binds atom_ids, coordinates + digest, model, convergence
 and primary sources. It requires electronic energy and Cartesian **dE/dR**;
 energy-only outputs cannot drive NEB. The engine explicitly converts gradients to
 negative forces in hartree/angstrom using 1 bohr = 0.529177210903 Å. Core algorithms
-accept independent calculators; only xTB has a bundled native gradient adapter.
-Gaussian gradients/calculator remain unimplemented and must not be claimed available.
+accept independent calculators; xTB and Gaussian have separate native adapters.
+See the Gaussian settings/scope at the end of this reference.
 
-`chemical-neb-input/1` contains reactant, product, mapping, xTB settings and optional:
-image_count (default 7, 3–32), max_steps (100, 0–1000), fmax (0.001 hartree/angstrom),
-spring (0.05 hartree/angstrom²), step_size (1 angstrom²/hartree), max_displacement
-(0.05 Å), climb_after (null disables climbing, otherwise a zero-based iteration).
-Endpoints are fixed and retained; no minimum certification follows from their use.
-
-Optional `images` is an image_count × atom_count × 3 angstrom array in reactant
-order, with first/last matching mapped endpoints. Otherwise interpolation is linear
-Cartesian with no alignment. Near-collisions and duplicate adjacent initial images
-are rejected; revise the supplied path instead of assuming interpolation is chemical.
-
-The engine uses improved energy-weighted tangents, perpendicular physical forces,
-parallel spring forces, and optional highest-internal-image climbing. Optimization
-is capped projected-force relaxation, not ASE/FIRE/BFGS. The convergence measure is
-maximum atom NEB-force norm over internal images, including a requested climbing
-image once active. Small NEB force alone does not establish a physical stationary
-point. Maximum calculator calls are 2 + (max_steps+1)*(image_count-2); endpoints
-are evaluated once. Native per-call timeouts and the outer Job walltime both matter.
+`chemical.neb-xtb@2` and `chemical.neb-gaussian@2` use ASE NEB with
+chemical-neb-input/2. See the [ASE contract](ase_neb_executor.md) for FIRE/BFGS,
+linear/IDPP interpolation, explicit eV/Å force units, evaluation budgets and
+partial-output handling. Endpoints remain fixed and candidates require separate
+TS validation. The former NumPy NEB implementation and version-1 entries have
+been removed; rebuild old requests with the new contract rather than renaming
+the schema or reusing legacy numerical parameters.
 
 ## Evidence and limits
 
@@ -164,12 +155,10 @@ scan fallback as a completed relaxed grid; these recipes retain per-point eviden
 
 ## Gaussian ground-spin gradients and NEB
 
-`chemical.gradient-gaussian@1` and `chemical.neb-gaussian@1` reuse the existing
-chemical-gradient-input/1 and chemical-neb-input/1 geometry/mapping/budget
-contracts, but their settings are the [electronic adapter settings](../../gaussian/references/electronic_states.md),
+`chemical.gradient-gaussian@1` and `chemical.neb-gaussian@2` use
+chemical-gradient-input/1 and chemical-neb-input/2 respectively. Their settings are the [electronic adapter settings](../../gaussian/references/electronic_states.md),
 with theory=ground and a supported gas-phase functional/basis. Use path_gaussian.
 Original-axis forces are negated and converted to dE/dR in Eh/Å. Printed coordinate
 precision (2e-6 Å) is recorded in calculator evidence. Independent finite-difference
 and deterministic native Job tests cover units/sign/staging; no physical Gaussian
-NEB benchmark is implied. The NEB algorithm and unvalidated candidate semantics
-are unchanged; declared spins/S² do not prove wavefunction branch continuity.
+NEB benchmark is implied. ASE NEB retains unvalidated candidate semantics; declared spins/S² do not prove wavefunction branch continuity.

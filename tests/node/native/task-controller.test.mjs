@@ -20,6 +20,10 @@ async function fixture(t, storage = new MemoryStorage(), controllerOptions = {})
   const faux = fauxProvider(), models = createModels(); models.setProvider(faux.provider);
   let harness, admission, controller;
   const registry = createRegistry();
+  const toolContext = createToolExecutionContext({ workspace_root: "/workspace", session_id: "session", operation_id: null,
+    allowed_authorities: ["task_control"], allowed_effects: ["read", "task_write"] });
+  registry.install(defineExtension({ name: "test-task-tools", tools: createTaskTools(() => controller).map(tool =>
+    wrapToolForHarness(tool, { toolContext, invocation: api => ({ workspaceRoot: "/workspace", sessionId: "session", operationId: String(api.taskId) }) })) }));
   registry.install(defineExtension({ name: "test-task-input", hooks: [hook(GenerationTask, {
     beforeRequest: async (_request, api, ctx) => {
       const live = await api.snapshot(LiveDoc, api.conversationId, ctx);
@@ -44,6 +48,7 @@ async function fixture(t, storage = new MemoryStorage(), controllerOptions = {})
     calls.push({ command, params });
     if (command === "job.list") return { jobs: [...jobStates].map(([job_id, state]) => ({ job_id, state })), next_cursor: null };
     if (command === "job.status") return { job_id: params.job_id, state: jobStates.get(params.job_id) };
+    if (command === "job.cancel") { jobStates.set(params.job_id, "cancelled"); return { job_id: params.job_id, state: "cancelled" }; }
     if (command === "research.read") { if (params.ref === "missing") throw new Error("unknown evidence"); return { ref: params.ref, node_id: params.ref }; }
     if (command === "artifact.read") return { artifact_id: params.artifact_id,
       sha256: artifacts.get(params.artifact_id) };
@@ -735,4 +740,169 @@ test("disabling recovery prevents a pending retry after restart", async t => {
   assert.equal(task.state, "active");
   assert.equal(task.execution_recovery.state, "attention_required");
   assert.equal(task.continuation.sequence, 1);
+});
+
+const taskControlCall = args => ({ ...fauxAssistantMessage(""), stopReason: "toolUse",
+  content: [{ type: "toolCall", id: "user-control", name: "task_update", arguments: args }] });
+
+for (const action of ["pause", "cancel"]) test(`natural-language ${action} persists through the model tool and survives reconciliation/reopen`, async t => {
+  const env = await fixture(t);
+  await env.begin();
+  env.jobStates.set("job_55", "running"); env.jobStates.set("job_56", "running");
+  const params = async control => ({ action: "apply_user_control", control,
+    expected_revision: (await env.controller.current(context)).revision,
+    source_submission_ids: [String((await env.admission.latest(context)).id)],
+    ...(control === "cancel" ? { jobs: "cancel" } : {}) });
+  env.faux.setResponses([async () => taskControlCall(await params(action)), async () => {
+    const current = await env.controller.current(context);
+    assert.equal(current.state, action === "pause" ? "paused" : "cancelled");
+    assert.ok(await env.controller.toolRestriction(context, "job_start"));
+    assert.ok(await env.controller.toolRestriction(context, "task_begin"));
+    assert.equal(await env.controller.toolRestriction(context, "job_cancel"), null);
+    await assert.rejects(env.controller.binding(context), { code: "task_not_active" });
+    return fauxAssistantMessage("已停止这项研究，不会继续启动计算或分析。");
+  }]);
+  const input = await env.admission.submitUser({ requestId: "stop-research", content: action === "pause" ? "先暂停研究，保留计算" : "停掉这个研究，也停止正在运行的计算" }, context);
+  await env.conversation.waitForIdle(context);
+  assert.equal((await (await env.harness.submission(input.id, context)).status(context)).status, "done", "stop acknowledgement must be deliverable");
+  for (let i = 0; i < 4; i++) await env.controller.reconcile();
+  let task = await env.controller.current(context);
+  assert.equal(task.state, action === "pause" ? "paused" : "cancelled");
+  assert.equal(task.continuation.sequence, 0);
+  assert.equal(task.sources.at(-1).submission_id, String(input.id));
+  assert.equal(env.jobStates.get("job_55"), action === "cancel" ? "cancelled" : "running");
+  await env.reopen();
+  for (let i = 0; i < 4; i++) await env.controller.reconcile();
+  task = await env.controller.current(context);
+  assert.equal(task.continuation.sequence, 0);
+  if (action === "cancel") assert.deepEqual((await env.controller.prepareMonitor([
+    { event: { event_id: "ended", user_task_id: task.user_task_id } }], context)).events, []);
+  await assert.rejects(env.admission.submitInternal({ requestId: "late-event", producer: "monitor", content: "Job ended",
+    identity: { event_ids: ["ended"] }, basis: { task_revision: task.revision,
+      control_epoch: task.control_epoch, task_owners: [task.user_task_id] } }, context), { code: "task_paused" });
+  if (action === "pause") {
+    env.faux.setResponses([async () => taskControlCall(await params("resume")), fauxAssistantMessage("继续研究")]);
+    await env.admission.submitUser({ requestId: "resume-research", content: "继续这个研究" }, context);
+    await env.conversation.waitForIdle(context);
+    assert.equal((await env.controller.current(context)).state, "active");
+  }
+});
+
+test("task cancellation commits before unavailable Job discovery, and retries cleanup without another model run", async t => {
+  const env = await fixture(t); await env.begin();
+  env.jobStates.set("job_55", "running");
+  const execute = env.kernel.execute_command;
+  let unavailable = true;
+  env.kernel.execute_command = async (command, params) => {
+    if (command === "job.list") {
+      assert.equal((await env.controller.current(context)).state, "cancelled", "scheduling must stop before external Job discovery");
+      if (unavailable) throw new Error("deterministic disconnected Job backend");
+    }
+    return execute(command, params);
+  };
+  env.faux.setResponses([async () => taskControlCall({ action: "apply_user_control", control: "cancel", jobs: "cancel",
+    expected_revision: (await env.controller.current(context)).revision,
+    source_submission_ids: [String((await env.admission.latest(context)).id)] }), fauxAssistantMessage("研究已取消，计算取消仍待核实。")]);
+  await env.admission.submitUser({ requestId: "stop-offline", content: "停掉研究和计算" }, context);
+  await env.conversation.waitForIdle(context);
+  let task = await env.controller.current(context);
+  assert.equal(task.state, "cancelled"); assert.equal(task.cancel_jobs.discovery_pending, true);
+  assert.ok(task.cancel_jobs.errors.discovery);
+  unavailable = false;
+  await env.reopen(); await env.controller.reconcile();
+  task = await env.controller.current(context);
+  assert.equal(task.cancel_jobs.discovery_pending, false);
+  assert.deepEqual(task.cancel_jobs.pending, []);
+  assert.equal(task.cancel_jobs.receipts.job_55.state, "cancelled");
+  assert.equal(task.continuation.sequence, 0);
+});
+
+for (const source of ["automatic", "historical"]) test(`internal runs cannot control a task using ${source} authorization`, async t => {
+  const env = await fixture(t); const original = await env.begin();
+  let entered, finish;
+  const ready = new Promise(resolve => { entered = resolve; });
+  env.faux.setResponses([() => new Promise(resolve => { entered(); finish = () => resolve(fauxAssistantMessage("partial")); })]);
+  await env.controller.reconcile(); await ready;
+  try {
+    const task = await env.controller.current(context);
+    const id = source === "automatic" ? String((await env.admission.latest(context)).id) : original.sources[0].submission_id;
+    await assert.rejects(env.controller.update({ action: "apply_user_control", control: "cancel", jobs: "cancel",
+      expected_revision: task.revision, source_submission_ids: [id] }, "invalid-control", context),
+    { code: source === "automatic" ? "task_source_invalid" : "task_control_source_invalid" });
+    assert.equal((await env.controller.current(context)).state, "active");
+    assert.equal(env.calls.some(call => call.command === "job.cancel"), false);
+  } finally { finish(); }
+  await env.conversation.waitForIdle(context);
+});
+
+test("a stop tool cannot reuse a superseded user instruction, and its own receipt replays without new cancellations", async t => {
+  const env = await fixture(t); await env.begin();
+  let entered, finish;
+  const ready = new Promise(resolve => { entered = resolve; });
+  env.faux.setResponses([() => new Promise(resolve => { entered(); finish = () => resolve(fauxAssistantMessage("ack")); }), fauxAssistantMessage("new input")]);
+  const first = await env.admission.submitUser({ requestId: "first-stop", content: "停止研究" }, context);
+  await ready;
+  try {
+    await env.admission.submitUser({ requestId: "new-user", content: "先说明现在的状态", whenBusy: "followUp" }, context);
+    const task = await env.controller.current(context);
+    await assert.rejects(env.controller.update({ action: "apply_user_control", control: "pause",
+      expected_revision: task.revision, source_submission_ids: [String(first.id)] }, "old-stop", context), { code: "task_control_source_invalid" });
+  } finally { finish(); }
+  await env.conversation.waitForIdle(context);
+  let applied, request;
+  env.jobStates.set("job_55", "running");
+  env.faux.setResponses([async () => {
+    request = { action: "apply_user_control", control: "cancel", jobs: "cancel",
+      expected_revision: (await env.controller.current(context)).revision,
+      source_submission_ids: [String((await env.admission.latest(context)).id)] };
+    applied = await env.controller.update(request, "stable-stop", context);
+    return fauxAssistantMessage("已停止");
+  }]);
+  await env.admission.submitUser({ requestId: "final-stop", content: "现在停止研究并取消计算" }, context);
+  await env.conversation.waitForIdle(context);
+  const count = env.calls.filter(call => call.command === "job.cancel").length;
+  const replayed = await env.controller.update(request, "stable-stop", context);
+  assert.equal(replayed.task.state, applied.task.state);
+  assert.equal(env.calls.filter(call => call.command === "job.cancel").length, count);
+  await assert.rejects(env.controller.update({ ...request, control: "resume", jobs: undefined }, "stable-stop", context), { code: "request_id_reused" });
+});
+
+for (const control of ["pause", "cancel"]) test(`a ${control} steered into a consumed automatic run permits only its stop finalization`, async t => {
+  const env = await fixture(t); await env.begin();
+  let entered, finish, stopped, acknowledge;
+  const ready = new Promise(resolve => { entered = resolve; });
+  const finalized = new Promise(resolve => { stopped = resolve; });
+  let stopInput;
+  env.faux.setResponses([
+    () => new Promise(resolve => { entered(); finish = () => resolve({ ...fauxAssistantMessage(""), stopReason: "toolUse",
+      content: [{ type: "toolCall", id: "read-before-stop", name: "task_read", arguments: {} }] }); }),
+    async () => taskControlCall({ action: "apply_user_control", control,
+      expected_revision: (await env.controller.current(context)).revision,
+      source_submission_ids: [String(stopInput.id)], ...(control === "cancel" ? { jobs: "keep" } : {}) }),
+    () => new Promise(resolve => { stopped(); acknowledge = () => resolve(fauxAssistantMessage("研究已停止")); }),
+  ]);
+  await env.controller.reconcile(); await ready;
+  const automatic = await env.admission.latest(context);
+  stopInput = await env.admission.submitUser({ requestId: "steered-stop", content: "停止研究", whenBusy: "steer" }, context);
+  finish(); await finalized;
+  const record = await (await env.harness.submission(automatic.id, context)).status(context);
+  const origin = await env.admission.origin(record, context);
+  try {
+    const task = await env.controller.current(context);
+    assert.equal(task.state, control === "pause" ? "paused" : "cancelled");
+    await env.controller.assertExecutionAllowed(record, origin, context);
+    await assert.rejects(env.controller.assertExecutionAllowed(record, { ...origin, consumption: null }, context));
+    await assert.rejects(env.controller.begin({ title: "Replacement", objective: "Restart",
+      source_submission_ids: [String(stopInput.id)], criteria: [{ id: "again", description: "More work" }] }, "replacement", context), { code: "task_not_active" });
+    await assert.rejects(env.controller.binding(context), { code: "task_not_active" });
+    if (control === "pause") {
+      await env.controller.control({ user_task_id: task.user_task_id, action: "pause", expected_revision: task.revision,
+        request_id: "new-monitor-pause" }, context);
+      await assert.rejects(env.controller.assertExecutionAllowed(record, origin, context));
+    }
+  } finally { acknowledge(); }
+  await env.conversation.waitForIdle(context);
+  await assert.rejects(env.controller.assertExecutionAllowed(record, origin, context));
+  for (let i = 0; i < 3; i++) await env.controller.reconcile();
+  assert.equal((await env.controller.current(context)).continuation.sequence, 1);
 });

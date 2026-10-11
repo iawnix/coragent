@@ -246,10 +246,10 @@ def test_electronic_and_crossing_jobs(tmp_path,monkeypatch,operation):
     elif operation=='state-tracking':s=tracking_input(True)
     elif operation=='crossing-check':s=crossing_input()
     elif operation=='gradient-gaussian':s={'schema_version':'chemical-gradient-input/1','material':h2(1.4),'settings':config()}
-    elif operation=='neb-gaussian':s={'schema_version':'chemical-neb-input/1','reactant':h2(.8,center=True),'product':h2(1.2,center=True),
+    elif operation=='neb-gaussian':s={'schema_version':'chemical-neb-input/2','reactant':h2(.8,center=True),'product':h2(1.2,center=True),
         'mapping':[['atom_1','atom_1'],['atom_2','atom_2']],'settings':config(),'image_count':3,'max_steps':0}
     else:s=mecp_input();s['material']=h2(2.);s['hessian_step_angstrom']=None
-    path=root/'input.json';path.write_text(json.dumps(s));request=prepare(config_path,'local','chemical.'+operation,'1',{'input':path})
+    path=root/'input.json';path.write_text(json.dumps(s));request=prepare(config_path,'local','chemical.'+operation,'2' if operation=='neb-gaussian' else '1',{'input':path})
     node=execute('research.create',root,{'goal':'Bound electronic/crossing fixture'})['node'];receipt=execute('job.start',root,{**request,'node_id':node['id']})
     try:
         for _ in range(600):

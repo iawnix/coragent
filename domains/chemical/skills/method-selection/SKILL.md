@@ -53,3 +53,5 @@ retrying or declaring the method unavailable.
 
 - [Request preparation](references/request_preparation.md): installed executors, explicit inputs and recovery.
 - [Runner results, units and electronic state](references/runner_results.md)
+
+When a search fails or repeats the same outcome, use [search diagnosis and recovery](references/search_recovery.md) to separate execution, numerical and hypothesis problems before changing settings or seeds.

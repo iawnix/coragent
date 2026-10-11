@@ -442,3 +442,26 @@ A–J 的约定模块开发及确定性验收完成，实现、测试和文档�
 最终全量 fast **924 项通过，0 失败、0 错误、0 跳过**。另有 **6 项 native-pi 测试通过**，覆盖本地 Worker/Job 等待、Monitor 唤醒、重启、失败恢复、部分回答后继续及分支，并读取新增科学 Skill 资源；使用本地确定性模型与假凭据，不证明真实模型自主科学推理正确。各测试运行清理审计通过。实施文档同步后的 static、package、资源摘要及 diff 检查均通过。
 
 测试环境、缓存、日志与证据全部留在本机 `local_debug/`，未纳入提交或分发，也未外发。此次未运行真实模型/远程研究，未运行 Gaussian、xTB、CREST 的真实化学求解基准；已通过的是合同、数值算法、解析、确定性进程适配及实际本地 Job 生命周期。
+
+
+## 后续补充：ASE NEB 与搜索诊断（2026-10-11）
+
+上文 F/I 中 NumPy NEB 与 @1 是历史实施记录，已由本节实现取代，不再提供执行入口。
+
+本节更新上述 F/I 的历史实现边界：新 `chemical.neb-xtb@2`、`chemical.neb-gaussian@2`
+使用 ASE 3.29.0 improved-tangent/climbing NEB、FIRE/BFGS 和可选有界 IDPP。
+已删除 v1 算法和执行入口，旧请求须按 v2 字段和单位重新准备。path profile 改用独立 path.lock（含 ASE/SciPy），不安装原生求解器。
+保存逐次求值、完整/未完成路径、逐轮 .traj/XYZ、能量与 NEB 力；候选始终未验证，失败与达到
+预算退出非零。范围仍为非周期单表面，xTB GFN1/GFN2 或 Gaussian 气相指定自旋基态 HF/DFT。
+
+从旧 workflow 吸收搜索/恢复经验并改写为通用参考：route/SCF/优化/IRC/解析/执行故障分开，
+依据证据复用 checkpoint、选择帧、更新 Hessian 和假设；不恢复旧节点编号、阶段门禁或重试状态机。
+新增独立 `chemical.local-diagnostics@1`、`chemical.trajectory@1`、`chemical.research-report@1`，
+提供局部纯旋转拟合/接触/内部坐标、轨迹与模式 GIF/XYZ/剖面、带来源与作者解释的图文报告。
+能量图复用既有物理量/条件/计量合同，几何阈值和报告生成均不自动认证 TS 或机制。
+
+合同和实际调用见 [ASE NEB](../domains/chemical/skills/candidate-generation/references/ase_neb_executor.zh-CN.md)、
+[搜索恢复](../domains/chemical/skills/method-selection/references/search_recovery.zh-CN.md)、
+[局部诊断](../domains/chemical/skills/chemical-input/references/local_diagnostics.zh-CN.md)、
+[轨迹与报告](../domains/chemical/skills/report/references/research_tools.zh-CN.md)。
+验证采用真实 ASE/解析势与本地确定性原生替身；不等同于真实 Gaussian/xTB 反应基准。

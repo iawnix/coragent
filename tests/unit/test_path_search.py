@@ -19,7 +19,7 @@ from ensemble_material import canonical, checked, xyz_text
 from gradient_contract import calculation, evaluate_evidence
 from input_job import inspect_input
 from material import build_material
-from neb_engine import neb, nudged_forces
+from ase_neb import neb
 from path_contract import BOHR_ANGSTROM, material, qst
 from path_xtb import XtbCalculator, gradient_file
 from path_gaussian import GaussianOptimizer
@@ -124,28 +124,20 @@ def test_bad_calculator_evidence_cannot_drive_neb(fault):
 
 
 def neb_input():
-    spec={'schema_version':'chemical-neb-input/1',**endpoints(),'settings':settings(),'image_count':3,
+    spec={'schema_version':'chemical-neb-input/2',**endpoints(),'settings':settings(),'image_count':3,
           'images':[[[0,0,0],[1,0,0]],[[0,0,0],[2,.3,0]],[[0,0,0],[3,0,0]]],
-          'max_steps':100,'fmax':1e-5,'step_size':.2,'max_displacement':.05,'climb_after':0}
+          'max_steps':200,'fmax_ev_per_angstrom':1e-5,'max_step_angstrom':.05,'climb_after':0}
     return spec
 
 
 def test_climbing_neb_converges_on_independent_analytic_potential(tmp_path):
     spec=neb_input();result=neb(spec,tmp_path/'neb',Analytic)
     assert result['status']=='converged'
-    assert result['max_neb_force_hartree_per_angstrom']<=1e-5
+    assert result['max_neb_force_ev_per_angstrom']<=1e-5
     assert np.allclose(result['images'][1],[[0,0,0],[2,0,0]],atol=1e-5)
     assert result['images'][0]==spec['images'][0] and result['images'][-1]==spec['images'][-1]
     assert result['candidate']['validated_ts'] is False
     assert result['iterations'][-1]['climbing_image']==1
-
-
-def test_neb_projection_springs_and_climbing_sign():
-    images=np.array([[[0.,0,0]],[[1.,0,0]],[[3.,0,0]]]);forces=np.array([[[0.,0,0]],[[2.,3,0]],[[0.,0,0]]])
-    normal=nudged_forces(images,[0,1,2],forces,.5)
-    assert np.allclose(normal[1],[[.5,3,0]])
-    climbing=nudged_forces(images,[0,2,1],forces,.5,1)
-    assert np.allclose(climbing[1],[[-2,3,0]]) and np.all(normal[[0,-1]]==0)
 
 
 def test_neb_limit_and_partial_calculator_failure_keep_only_evaluated_candidate(tmp_path):
@@ -319,10 +311,10 @@ def test_registered_path_operations_through_jobs(tmp_path,monkeypatch,operation)
     elif operation.startswith('scan'):spec=scan_input(backend=operation.split('-')[1])
     elif operation=='gradient-xtb':spec={'schema_version':'chemical-gradient-input/1','material':molecule(1.5),'settings':settings()}
     else:
-        spec={'schema_version':'chemical-neb-input/1',**endpoints(),'settings':settings(),'image_count':3,'max_steps':0}
+        spec={'schema_version':'chemical-neb-input/2',**endpoints(),'settings':settings(),'image_count':3,'max_steps':0}
         spec.update(reactant=molecule(center=True),product=molecule(3.,permutation=[1,0],center=True))
     source=root/'input.json';source.write_text(json.dumps(spec))
-    prepared=prepare(config,'local','chemical.'+operation,'1',{'input':source})
+    prepared=prepare(config,'local','chemical.'+operation,'2' if operation=='neb-xtb' else '1',{'input':source})
     node=execute('research.create',root,{'goal':'Independent path operation fixture'})['node']
     receipt=execute('job.start',root,{**prepared,'node_id':node['id']})
     try:
@@ -330,10 +322,12 @@ def test_registered_path_operations_through_jobs(tmp_path,monkeypatch,operation)
             status=execute('job.status',root,{'job_id':receipt['job_id']})
             if status['state'] in ('succeeded','failed'):break
             time.sleep(.01)
-        assert status['state']=='succeeded'
+        # This monotonic synthetic path has nonzero climbing force. With no
+        # optimizer steps it must remain limited, while retaining collectable evidence.
+        assert status['state']==('failed' if operation=='neb-xtb' else 'succeeded')
         assert execute('job.collect',root,{'job_id':receipt['job_id']})['output_validation']['complete']
         result=json.loads((Path(receipt['cwd'])/'results/result.json').read_text())
-        if operation=='neb-xtb':assert result['status']=='converged' and not result['candidate']['validated_ts']
+        if operation=='neb-xtb':assert result['status']=='step_limit' and not result['candidate']['validated_ts']
         if operation=='qst-prepare':assert result['kind']=='QST3'
     finally:execute('job.cancel',root,{'job_id':receipt['job_id']})
 
@@ -376,22 +370,6 @@ def test_core_neb_accepts_independent_calculator_settings(tmp_path):
     s=neb_input();s['settings']={'analytic_fixture':True}
     result=neb(s,tmp_path/'out',Analytic)
     assert result['status']=='converged' and result['model']['method']=='synthetic_double_well'
-
-
-def test_neb_tangent_failure_never_pairs_new_energy_with_old_geometry(tmp_path,monkeypatch):
-    import neb_engine
-    original=neb_engine.nudged_forces; calls=[]
-    def fail_second(images,energies,forces,spring,climbing):
-        calls.append(images.copy())
-        if len(calls)==2: raise ValueError('synthetic tangent failure')
-        return original(images,energies,forces,spring,climbing)
-    monkeypatch.setattr(neb_engine,'nudged_forces',fail_second)
-    result=neb(neb_input(),tmp_path/'out',Analytic)
-    assert result['status']=='failed' and result['max_neb_force_hartree_per_angstrom'] is None
-    assert result['images']==calls[-1].tolist() and result['images']!=calls[0].tolist()
-    candidate=checked(json.loads((tmp_path/'out/candidate.material.json').read_text()))
-    assert candidate['coordinates'].tolist()==calls[-1][1].tolist()
-    assert result['energies_hartree'][1]==potential(candidate['coordinates'])[0]
 
 
 def test_path_environment_profile_is_opt_in_and_preserves_wrapper_bindings(tmp_path):

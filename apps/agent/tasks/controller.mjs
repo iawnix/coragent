@@ -5,13 +5,17 @@ import shared from "../../../contracts/commands/shared.json" with { type: "json"
 
 export const UserTasks = defineDoc({ kind: "coragent.user-tasks", version: 1,
   scope: "conversation", history: "latest", fork: "initial",
-  initial: () => ({ current: null, ids: [], cancellation_tasks: [], job_cancellations: [], automatic_suppressed: false, user_epoch: 0 }) });
+  initial: () => ({ current: null, ids: [], cancellation_tasks: [], job_cancellations: [], automatic_suppressed: false, user_epoch: 0, latest_user_submission_id: null }) });
 export const UserTask = defineDocFamily({ kind: "coragent.user-task", version: 2, family: true,
   scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
 const ControlReceipt = defineDocFamily({ kind: "coragent.task-control-receipt", version: 1, family: true,
   scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
 // A block ends scheduling, but the run that recorded it must deliver its explanation.
 const BlockFinalization = defineDocFamily({ kind: "coragent.task-block-finalization", version: 1, family: true,
+  scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
+// A user-directed stop disables scheduling immediately, but its consumed run
+// may still verify cancellations and acknowledge the user's instruction.
+const UserControlFinalization = defineDocFamily({ kind: "coragent.task-user-control-finalization", version: 1, family: true,
   scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
 const terminal = new Set(["completed", "cancelled"]);
 const jobFinished = new Set(["succeeded", "failed", "timed_out", "cancelled", "collected", "unknown"]);
@@ -127,6 +131,31 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     return jobs;
   }
   async function settleCancellations(task, ctx) {
+    if (task.cancel_jobs.discovery_pending) {
+      let jobs, error;
+      try { jobs = await ownedJobs(task.user_task_id); }
+      catch (failure) { error = { code: failure.code || "job_cancellation_discovery_failed", message: failure.message }; }
+      await conversation.commit(async tx => {
+        const current = await tx.doc(UserTask, conversation.id, task.user_task_id, null);
+        if (!current.cancel_jobs.discovery_pending) return;
+        if (error) {
+          current.cancel_jobs.errors.discovery = error;
+          changed(current, "job_cancel_error", "runtime", error.code);
+          return;
+        }
+        delete current.cancel_jobs.errors.discovery;
+        current.cancel_jobs.discovery_pending = false;
+        current.cancel_jobs.pending = [...new Set([...current.cancel_jobs.pending,
+          ...jobs.filter(job => !jobFinished.has(job.state) || job.state === "unknown").map(job => job.job_id)])];
+        if (!current.cancel_jobs.pending.length && !current.cancel_jobs.uncertain.length) {
+          const index = await tx.doc(UserTasks, conversation.id);
+          index.cancellation_tasks = index.cancellation_tasks.filter(id => id !== task.user_task_id);
+        }
+        changed(current, "job_cancel_discovery", "runtime", "Owned Jobs selected after task cancellation was committed");
+      }, ctx);
+      if (error) return;
+      task = await controller.read({ user_task_id: task.user_task_id }, ctx);
+    }
     for (const jobId of [...task.cancel_jobs.pending, ...task.cancel_jobs.uncertain]) {
       const observing = task.cancel_jobs.uncertain.includes(jobId);
       let result, error;
@@ -229,7 +258,12 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       return task ? { user_task_id: task.user_task_id, control_epoch: task.control_epoch } : null;
     },
     async afterAdmission(tx, { id, requestId, producer, identity, control }) {
-      if (producer === "user" || !control) return;
+      if (producer === "user") {
+        const index = await tx.doc(UserTasks, conversation.id);
+        index.latest_user_submission_id = String(id);
+        return;
+      }
+      if (!control) return;
       const task = await tx.doc(UserTask, conversation.id, control.user_task_id, null);
       task.continuation.sequence += 1;
       task.continuation.reservation = { submission_id: id,
@@ -273,7 +307,15 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
 
   async function assertExecution(tx, record, origin) {
         const { index, task } = await currentTx(tx);
-        requireValue(enabled && !index.automatic_suppressed, "task_paused", "Automatic execution was paused");
+        let finalizingStop = false;
+        if (task && ["paused", "cancelled"].includes(task.state) && origin.consumption) {
+          const receipt = await tx.doc(UserControlFinalization, conversation.id, task.user_task_id, null);
+          const live = await tx.doc(LiveDoc, conversation.id);
+          finalizingStop = receipt.control_epoch === task.control_epoch && receipt.submission_id === live.run?.inputs[0]
+            && receipt.submission_ids?.includes(record.id) && live.run?.inputs.includes(record.id)
+            && origin.consumption.submission_id === record.id;
+        }
+        requireValue(enabled && (!index.automatic_suppressed || finalizingStop), "task_paused", "Automatic execution was paused");
         let finalizingBlock = false;
         if (task?.state === "blocked" && origin.consumption) {
           const receipt = await tx.doc(BlockFinalization, conversation.id, task.user_task_id, null);
@@ -283,12 +325,12 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
             && receipt.submission_ids?.includes(record.id) && live.run?.inputs.includes(record.id);
         }
         if (origin.producer === "task_controller") {
-          requireValue(task?.user_task_id === origin.identity.user_task_id && (finalizingBlock || !["paused", "blocked", "cancelled", "completed"].includes(task.state)),
+          requireValue(task?.user_task_id === origin.identity.user_task_id && (finalizingBlock || finalizingStop || !["paused", "blocked", "cancelled", "completed"].includes(task.state)),
             "task_superseded", "Task no longer permits automatic execution");
           if (!origin.consumption) requireValue(task.control_epoch === origin.admission_basis.control_epoch,
             "task_superseded", "New user input superseded this automatic continuation");
         } else if (task) {
-          requireValue(finalizingBlock || !["paused", "blocked", "cancelled", "completed"].includes(task.state), "task_paused", "Task is not accepting automatic execution");
+          requireValue(finalizingBlock || finalizingStop || !["paused", "blocked", "cancelled", "completed"].includes(task.state), "task_paused", "Task is not accepting automatic execution");
           if (!origin.consumption) requireValue(task.continuation.reservation?.submission_id === record.id
             && task.continuation.reservation.control_epoch === task.control_epoch,
           "task_superseded", "New user input superseded this automatic event");
@@ -296,10 +338,17 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
   }
   const controller = {
     inputOrigin: (record, ctx) => admission.origin(record, ctx),
-    async toolRestriction(ctx) {
+    async toolRestriction(ctx, toolName) {
       const task = await getCurrent(ctx);
-      if (task?.execution_recovery?.phase !== "delivery") return null;
       const live = await harness.snapshot(LiveDoc, conversation.id, ctx);
+      if (task && ["paused", "cancelled"].includes(task.state)) {
+        const receipt = await harness.snapshot(UserControlFinalization, conversation.id, task.user_task_id, ctx);
+        if (receipt?.control_epoch === task.control_epoch && receipt.submission_id === live?.run?.inputs[0]) {
+          if (toolName === "job_cancel") return null;
+          return "The user stopped this task. Only read-only checks, Job cancellation and the final acknowledgement are permitted; do not launch work or create a replacement task.";
+        }
+      }
+      if (task?.execution_recovery?.phase !== "delivery") return null;
       if (live?.run?.inputs[0] !== task.completion_submission_id) return null;
       const record = await (await harness.submission(task.completion_submission_id, ctx)).status(ctx);
       if ((await admission.origin(record, ctx))?.producer !== "task_controller") return null;
@@ -336,6 +385,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     },
     current: settleWait, pauseInTransaction,
     async binding(ctx) {
+      requireValue(!await controller.toolRestriction(ctx), "task_not_active", "This run may only finalize the user's stop request");
       const task = await settleWait(ctx);
       if (!task || terminal.has(task.state)) return null;
       requireValue(task.state === "active", "task_not_active", "Only an active user task may start new Jobs");
@@ -355,6 +405,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         next_cursor: offset + limit < ids.length ? String(offset + limit) : null };
     },
     async begin(params, requestId, ctx) {
+      requireValue(!await controller.toolRestriction(ctx), "task_not_active", "This run may only finalize the user's stop request");
       const replayed = await readReceipt(requestId, params, ctx);
       if (replayed !== null) return replayed;
       const sources = await sourceRecords(params.source_submission_ids, ctx);
@@ -380,6 +431,13 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       const replayed = await readReceipt(requestId, params, ctx);
       if (replayed !== null) return replayed;
       const basis = await getCurrent(ctx);
+      if (params.action === "apply_user_control") {
+        const sources = await sourceRecords(params.source_submission_ids, ctx);
+        requireValue(basis, "task_not_active", "No current task exists");
+        return controller.control({ user_task_id: basis.user_task_id, action: params.control,
+          request_id: requestId, expected_revision: params.expected_revision, jobs: params.jobs }, ctx,
+        { sources, payload: params, control_epoch: basis.control_epoch });
+      }
       const sources = params.action === "refine" ? await sourceRecords(params.source_submission_ids, ctx) : null;
       requireValue(params.action === "set_research" || params.research === undefined, "task_research_invalid", "Research bindings use set_research");
       if (params.action === "set_research") await verifyResearch(params.research);
@@ -478,20 +536,35 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         changed(task, "tool_progress", "runtime", task.progress.summary);
       }, ctx);
     },
-    async control({ user_task_id, action, request_id, expected_revision, jobs }, ctx) {
+    async control({ user_task_id, action, request_id, expected_revision, jobs }, ctx, userInstruction = null) {
       requireValue(["pause", "resume", "cancel"].includes(action), "task_action_invalid", "Unknown task control action");
       if (action === "cancel") requireValue(["keep", "cancel"].includes(jobs), "task_cancel_policy_required", "Specify jobs=keep or jobs=cancel");
-      const cancellationTargets = action === "cancel" && jobs === "cancel"
-        ? (await ownedJobs(user_task_id)).filter(job => !jobFinished.has(job.state) || job.state === "unknown").map(job => job.job_id) : [];
+      else requireValue(jobs === undefined, "task_cancel_policy_invalid", "Job policy belongs only to cancellation");
       const result = await conversation.commit(tx => receipt(tx, request_id,
-        { user_task_id, action, expected_revision, jobs }, async () => {
+        userInstruction?.payload || { user_task_id, action, expected_revision, jobs }, async () => {
           const { index, task } = await currentTx(tx);
           requireValue(task?.user_task_id === user_task_id && !terminal.has(task.state), "task_not_active", "Task is not the current nonterminal task");
           requireValue(task.revision === expected_revision, "task_revision_conflict", "Read the current task revision before controlling it");
+          const live = await tx.doc(LiveDoc, conversation.id);
+          if (userInstruction) {
+            requireValue(task.control_epoch === userInstruction.control_epoch, "task_superseded", "Task control changed during source verification");
+            requireValue(userInstruction.sources.some(source => source.submission_id === index.latest_user_submission_id)
+              && userInstruction.sources.every(source => live.run?.inputs.includes(Number(source.submission_id))),
+            "task_control_source_invalid", "Cite the latest actual user instruction consumed by this run; automatic inputs and historical instructions cannot control a task");
+            task.sources.push(...userInstruction.sources.filter(source => !task.sources.some(previous => previous.submission_id === source.submission_id)));
+          }
           task.control_epoch += 1;
           task.state = action === "resume" ? "active" : action === "pause" ? "paused" : "cancelled";
           task.reason = action === "resume" ? null : `User requested ${action}`;
           index.automatic_suppressed = action !== "resume";
+          if (action !== "resume") {
+            task.wait = null; task.execution_recovery = null;
+            if (userInstruction) {
+              const finalization = await tx.doc(UserControlFinalization, conversation.id, task.user_task_id, null);
+              Object.assign(finalization, { control_epoch: task.control_epoch, submission_id: live.run.inputs[0],
+                submission_ids: [...live.run.inputs] });
+            }
+          }
           if (action === "resume") {
             task.continuation.no_progress = 0; task.wait = null;
             task.execution_recovery = null;
@@ -503,10 +576,9 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
             }
           }
           if (action === "cancel") {
-            task.cancel_jobs = { policy: jobs, pending: cancellationTargets, receipts: {}, uncertain: [], errors: {} };
-            if (cancellationTargets.length) index.cancellation_tasks.push(task.user_task_id);
-            const live = await tx.doc(LiveDoc, conversation.id);
-            if (live.run) {
+            task.cancel_jobs = { policy: jobs, discovery_pending: jobs === "cancel", pending: [], receipts: {}, uncertain: [], errors: {} };
+            if (jobs === "cancel") index.cancellation_tasks.push(task.user_task_id);
+            if (live.run && !userInstruction) {
               const runTask = await tx.task(live.run.taskId);
               if (runTask && runTask.state.status !== "terminal") tx.setTask({ ...runTask, abortRequested: true });
             }
@@ -621,6 +693,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           content: task.state === "completing"
             ? "Recover only the final response for the existing completion proposal. Read the retained evidence if needed and deliver the final explanation. Do not repeat scientific calculations, writes, emails or other external deliveries. The runtime will complete the task after this response is recorded."
             : "Continue the existing authorized user task using the runtime task snapshot. This is an internal continuation, not new user authorization. Work until verified completion, a concrete Job wait, or an explicit blocker. "
+            + "User-directed stops must be persisted with task_update action=apply_user_control when consuming the actual user instruction; this internal input is not control authorization. Job cancellation and Node status alone do not stop the task. "
             + (task.continuation.no_progress > 0 ? "Recent runs recorded no new evidence. Reassess the approach and remaining independent work; this count does not establish a research blocker. " : "")
             + (task.execution_recovery ? "The previous execution failed. Inspect existing tool and Job receipts before continuing; do not replay completed or uncertain external actions." : "") }, ctx);
       } catch (error) {

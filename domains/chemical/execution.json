@@ -1654,14 +1654,13 @@
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/gradient_contract.py": "sha256:f2df7207aa0fc1d8bdfc8e367fd1110dafe779c713feee6b8b02541de008c856",
-        "skills/candidate-generation/scripts/neb_engine.py": "sha256:fd1636b84a4ae8d0ccb807d70ebfe6366382025005375211e11eada1c41af1c2",
         "skills/candidate-generation/scripts/path_contract.py": "sha256:4e22f1a47cb59705cde359df933156901a0ec55d25634dcea2c3e992b2ce0e7c",
         "skills/candidate-generation/scripts/path_gaussian.py": "sha256:e2be5f4a15d60e9590b33cf28abfae082a386c4ecfebad1174a6462f7a8bb7d0",
         "skills/candidate-generation/scripts/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path_xtb.py": "sha256:3eedbdd988786f1ca53d783707027276fa3c9f57d90b6fe3a72d58b7c097735a",
         "skills/candidate-generation/scripts/scan_engine.py": "sha256:33148e909bb014b62a51816982eac6ed59c3c69990123110dfe4a689c65ed8f7",
-        "skills/candidate-generation/scripts/search.py": "sha256:f67ae9c359a9ee63253f04b7f3ce09734d0e27f6f7dca9e6b33bf9a2e0fb0e3e",
-        "skills/candidate-generation/scripts/search_cli.py": "sha256:a6f2232d4a045638729e393b63ff6abb086a13fb29a045bcf7b398d48ba97fc9",
+        "skills/candidate-generation/scripts/search.py": "sha256:ad11acb61889e82cd27380c472b02b4f3f7d31b84b21a85d0fda4f4e75c4dead",
+        "skills/candidate-generation/scripts/search_cli.py": "sha256:042acd00184d44d31de8af62f1d6a1fb716ab9f2e80748e8885a45d58a4149f6",
         "skills/chemical-input/scripts/analysis.py": "sha256:668e8a5a573c5e03c1ce1e91a466661066afe854c430e7112db1efe316ae1e07",
         "skills/chemical-input/scripts/analysis_cli.py": "sha256:623fc520661bd7863cd0b7eb7d13545571c8a43977dbbfe7fe7efff24247e216",
         "skills/chemical-input/scripts/analysis_material.py": "sha256:7eec6a5ec7f370a98815ebbdf4e317e5e24911b38eee48e46cadaa5262366210",
@@ -1737,14 +1736,13 @@
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/gradient_contract.py": "sha256:f2df7207aa0fc1d8bdfc8e367fd1110dafe779c713feee6b8b02541de008c856",
-        "skills/candidate-generation/scripts/neb_engine.py": "sha256:fd1636b84a4ae8d0ccb807d70ebfe6366382025005375211e11eada1c41af1c2",
         "skills/candidate-generation/scripts/path_contract.py": "sha256:4e22f1a47cb59705cde359df933156901a0ec55d25634dcea2c3e992b2ce0e7c",
         "skills/candidate-generation/scripts/path_gaussian.py": "sha256:e2be5f4a15d60e9590b33cf28abfae082a386c4ecfebad1174a6462f7a8bb7d0",
         "skills/candidate-generation/scripts/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path_xtb.py": "sha256:3eedbdd988786f1ca53d783707027276fa3c9f57d90b6fe3a72d58b7c097735a",
         "skills/candidate-generation/scripts/scan_engine.py": "sha256:33148e909bb014b62a51816982eac6ed59c3c69990123110dfe4a689c65ed8f7",
-        "skills/candidate-generation/scripts/search.py": "sha256:f67ae9c359a9ee63253f04b7f3ce09734d0e27f6f7dca9e6b33bf9a2e0fb0e3e",
-        "skills/candidate-generation/scripts/search_cli.py": "sha256:a6f2232d4a045638729e393b63ff6abb086a13fb29a045bcf7b398d48ba97fc9",
+        "skills/candidate-generation/scripts/search.py": "sha256:ad11acb61889e82cd27380c472b02b4f3f7d31b84b21a85d0fda4f4e75c4dead",
+        "skills/candidate-generation/scripts/search_cli.py": "sha256:042acd00184d44d31de8af62f1d6a1fb716ab9f2e80748e8885a45d58a4149f6",
         "skills/chemical-input/scripts/analysis.py": "sha256:668e8a5a573c5e03c1ce1e91a466661066afe854c430e7112db1efe316ae1e07",
         "skills/chemical-input/scripts/analysis_cli.py": "sha256:623fc520661bd7863cd0b7eb7d13545571c8a43977dbbfe7fe7efff24247e216",
         "skills/chemical-input/scripts/analysis_material.py": "sha256:7eec6a5ec7f370a98815ebbdf4e317e5e24911b38eee48e46cadaa5262366210",
@@ -1820,97 +1818,13 @@
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/gradient_contract.py": "sha256:f2df7207aa0fc1d8bdfc8e367fd1110dafe779c713feee6b8b02541de008c856",
-        "skills/candidate-generation/scripts/neb_engine.py": "sha256:fd1636b84a4ae8d0ccb807d70ebfe6366382025005375211e11eada1c41af1c2",
         "skills/candidate-generation/scripts/path_contract.py": "sha256:4e22f1a47cb59705cde359df933156901a0ec55d25634dcea2c3e992b2ce0e7c",
         "skills/candidate-generation/scripts/path_gaussian.py": "sha256:e2be5f4a15d60e9590b33cf28abfae082a386c4ecfebad1174a6462f7a8bb7d0",
         "skills/candidate-generation/scripts/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path_xtb.py": "sha256:3eedbdd988786f1ca53d783707027276fa3c9f57d90b6fe3a72d58b7c097735a",
         "skills/candidate-generation/scripts/scan_engine.py": "sha256:33148e909bb014b62a51816982eac6ed59c3c69990123110dfe4a689c65ed8f7",
-        "skills/candidate-generation/scripts/search.py": "sha256:f67ae9c359a9ee63253f04b7f3ce09734d0e27f6f7dca9e6b33bf9a2e0fb0e3e",
-        "skills/candidate-generation/scripts/search_cli.py": "sha256:a6f2232d4a045638729e393b63ff6abb086a13fb29a045bcf7b398d48ba97fc9",
-        "skills/chemical-input/scripts/analysis.py": "sha256:668e8a5a573c5e03c1ce1e91a466661066afe854c430e7112db1efe316ae1e07",
-        "skills/chemical-input/scripts/analysis_cli.py": "sha256:623fc520661bd7863cd0b7eb7d13545571c8a43977dbbfe7fe7efff24247e216",
-        "skills/chemical-input/scripts/analysis_material.py": "sha256:7eec6a5ec7f370a98815ebbdf4e317e5e24911b38eee48e46cadaa5262366210",
-        "skills/chemical-input/scripts/conformers.py": "sha256:b0150d7429219bf62f0da73ef40501459bdfbc27155c973de85724cdfccc75e6",
-        "skills/chemical-input/scripts/correspondence.py": "sha256:9e93ed7035757865c49e15f50318a9a64e1c561d759fb44200ace3ac15a2a4c8",
-        "skills/chemical-input/scripts/material.py": "sha256:fa6123ec3441b82f4609d5caf11325ccbea1b0bfc94d526ed921f0dd85b495ff",
-        "skills/chemical-input/scripts/material_cli.py": "sha256:2a943853166699daf6206211a08327444e9baf85167dbe38201ef55bbb6674ce",
-        "skills/chemical-input/scripts/tensor_order.py": "sha256:5df0a0611fea921400d3a7af6ddda3fb0543f9c82dda91db1b2ee8a88f3d4491",
-        "skills/crest/scripts/complex_sample.py": "sha256:2b4d5212e02de3d199f45299db87522feb11dab05a552356d13a42e2ab611c1d",
-        "skills/crest/scripts/crest_io.py": "sha256:32234e5f431fb464fc43d5ecbb56d83258b7de8eb438b87e6aa24d175ac2a79d",
-        "skills/crest/scripts/ensemble.py": "sha256:ce590df491047b9a39ef9666ae2dfdc96d2a40a4f185b62415f00f3d76b47b09",
-        "skills/crest/scripts/ensemble_cli.py": "sha256:b2593f171f107e9ca83b849219a967c44659ae3c09299ccc3593f2fdbedc87f0",
-        "skills/crest/scripts/ensemble_material.py": "sha256:2a52c033bb0ca2f6f531444808098206f2d2f48d74670f5fc8f1c2c93138302a",
-        "skills/crest/scripts/ensemble_select.py": "sha256:6d891716c8e85e8eb4b0274739e55028883801ef0c38d1d5a7fb56d07785f752",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
-        "skills/xtb/scripts/parser.py": "sha256:5922d0093eddf05b166d11be7b17220dc2da30e5d78a36ce887bfd67c34fc677"
-      },
-      "module_paths": [
-        "skills/_shared",
-        "skills/chemical-input/scripts",
-        "skills/crest/scripts",
-        "skills/gaussian/scripts"
-      ]
-    },
-    {
-      "id": "chemical.neb-xtb",
-      "version": "1",
-      "skill": "candidate-generation",
-      "backend": "path_xtb",
-      "runtime": "python",
-      "entry": "skills/candidate-generation/scripts/search.py",
-      "cli": "skills/candidate-generation/scripts/search_cli.py",
-      "argv": [
-        "{entry}",
-        "--input",
-        "{input:input}",
-        "--output-dir",
-        "results",
-        "neb-xtb",
-        "{args}",
-        "--executable",
-        "{executable}"
-      ],
-      "inputs": {
-        "input": "input.json"
-      },
-      "outputs": [
-        {
-          "path": "results",
-          "recursive": true,
-          "required": false,
-          "min_bytes": 0
-        },
-        {
-          "path": "results/result.json",
-          "required": true,
-          "min_bytes": 2,
-          "media_type": "application/json"
-        }
-      ],
-      "requirements": {
-        "python": ">=3.11",
-        "packages": {
-          "rdkit": ">=2025.9,<2027",
-          "numpy": ">=1.26,<3"
-        },
-        "imports": [
-          "rdkit.Chem",
-          "numpy"
-        ]
-      },
-      "resources": {
-        "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
-        "skills/candidate-generation/scripts/gradient_contract.py": "sha256:f2df7207aa0fc1d8bdfc8e367fd1110dafe779c713feee6b8b02541de008c856",
-        "skills/candidate-generation/scripts/neb_engine.py": "sha256:fd1636b84a4ae8d0ccb807d70ebfe6366382025005375211e11eada1c41af1c2",
-        "skills/candidate-generation/scripts/path_contract.py": "sha256:4e22f1a47cb59705cde359df933156901a0ec55d25634dcea2c3e992b2ce0e7c",
-        "skills/candidate-generation/scripts/path_gaussian.py": "sha256:e2be5f4a15d60e9590b33cf28abfae082a386c4ecfebad1174a6462f7a8bb7d0",
-        "skills/candidate-generation/scripts/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
-        "skills/candidate-generation/scripts/path_xtb.py": "sha256:3eedbdd988786f1ca53d783707027276fa3c9f57d90b6fe3a72d58b7c097735a",
-        "skills/candidate-generation/scripts/scan_engine.py": "sha256:33148e909bb014b62a51816982eac6ed59c3c69990123110dfe4a689c65ed8f7",
-        "skills/candidate-generation/scripts/search.py": "sha256:f67ae9c359a9ee63253f04b7f3ce09734d0e27f6f7dca9e6b33bf9a2e0fb0e3e",
-        "skills/candidate-generation/scripts/search_cli.py": "sha256:a6f2232d4a045638729e393b63ff6abb086a13fb29a045bcf7b398d48ba97fc9",
+        "skills/candidate-generation/scripts/search.py": "sha256:ad11acb61889e82cd27380c472b02b4f3f7d31b84b21a85d0fda4f4e75c4dead",
+        "skills/candidate-generation/scripts/search_cli.py": "sha256:042acd00184d44d31de8af62f1d6a1fb716ab9f2e80748e8885a45d58a4149f6",
         "skills/chemical-input/scripts/analysis.py": "sha256:668e8a5a573c5e03c1ce1e91a466661066afe854c430e7112db1efe316ae1e07",
         "skills/chemical-input/scripts/analysis_cli.py": "sha256:623fc520661bd7863cd0b7eb7d13545571c8a43977dbbfe7fe7efff24247e216",
         "skills/chemical-input/scripts/analysis_material.py": "sha256:7eec6a5ec7f370a98815ebbdf4e317e5e24911b38eee48e46cadaa5262366210",
@@ -1986,14 +1900,13 @@
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/gradient_contract.py": "sha256:f2df7207aa0fc1d8bdfc8e367fd1110dafe779c713feee6b8b02541de008c856",
-        "skills/candidate-generation/scripts/neb_engine.py": "sha256:fd1636b84a4ae8d0ccb807d70ebfe6366382025005375211e11eada1c41af1c2",
         "skills/candidate-generation/scripts/path_contract.py": "sha256:4e22f1a47cb59705cde359df933156901a0ec55d25634dcea2c3e992b2ce0e7c",
         "skills/candidate-generation/scripts/path_gaussian.py": "sha256:e2be5f4a15d60e9590b33cf28abfae082a386c4ecfebad1174a6462f7a8bb7d0",
         "skills/candidate-generation/scripts/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path_xtb.py": "sha256:3eedbdd988786f1ca53d783707027276fa3c9f57d90b6fe3a72d58b7c097735a",
         "skills/candidate-generation/scripts/scan_engine.py": "sha256:33148e909bb014b62a51816982eac6ed59c3c69990123110dfe4a689c65ed8f7",
-        "skills/candidate-generation/scripts/search.py": "sha256:f67ae9c359a9ee63253f04b7f3ce09734d0e27f6f7dca9e6b33bf9a2e0fb0e3e",
-        "skills/candidate-generation/scripts/search_cli.py": "sha256:a6f2232d4a045638729e393b63ff6abb086a13fb29a045bcf7b398d48ba97fc9",
+        "skills/candidate-generation/scripts/search.py": "sha256:ad11acb61889e82cd27380c472b02b4f3f7d31b84b21a85d0fda4f4e75c4dead",
+        "skills/candidate-generation/scripts/search_cli.py": "sha256:042acd00184d44d31de8af62f1d6a1fb716ab9f2e80748e8885a45d58a4149f6",
         "skills/chemical-input/scripts/analysis.py": "sha256:668e8a5a573c5e03c1ce1e91a466661066afe854c430e7112db1efe316ae1e07",
         "skills/chemical-input/scripts/analysis_cli.py": "sha256:623fc520661bd7863cd0b7eb7d13545571c8a43977dbbfe7fe7efff24247e216",
         "skills/chemical-input/scripts/analysis_material.py": "sha256:7eec6a5ec7f370a98815ebbdf4e317e5e24911b38eee48e46cadaa5262366210",
@@ -2947,16 +2860,119 @@
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
-        "skills/candidate-generation/scripts/gaussian_path.py": "sha256:44e792585860efb6cfa26f89c270c54f20dbed1c8abcfdddb57a2a7605ce355e",
+        "skills/candidate-generation/scripts/gaussian_path.py": "sha256:053867f804ee0b35f711c7df730427e736da5975f1df54909f15af4e6a05192e",
         "skills/candidate-generation/scripts/gradient_contract.py": "sha256:f2df7207aa0fc1d8bdfc8e367fd1110dafe779c713feee6b8b02541de008c856",
-        "skills/candidate-generation/scripts/neb_engine.py": "sha256:fd1636b84a4ae8d0ccb807d70ebfe6366382025005375211e11eada1c41af1c2",
         "skills/candidate-generation/scripts/path_contract.py": "sha256:4e22f1a47cb59705cde359df933156901a0ec55d25634dcea2c3e992b2ce0e7c",
         "skills/candidate-generation/scripts/path_gaussian.py": "sha256:e2be5f4a15d60e9590b33cf28abfae082a386c4ecfebad1174a6462f7a8bb7d0",
         "skills/candidate-generation/scripts/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path_xtb.py": "sha256:3eedbdd988786f1ca53d783707027276fa3c9f57d90b6fe3a72d58b7c097735a",
         "skills/candidate-generation/scripts/scan_engine.py": "sha256:33148e909bb014b62a51816982eac6ed59c3c69990123110dfe4a689c65ed8f7",
-        "skills/candidate-generation/scripts/search.py": "sha256:f67ae9c359a9ee63253f04b7f3ce09734d0e27f6f7dca9e6b33bf9a2e0fb0e3e",
-        "skills/candidate-generation/scripts/search_cli.py": "sha256:a6f2232d4a045638729e393b63ff6abb086a13fb29a045bcf7b398d48ba97fc9",
+        "skills/candidate-generation/scripts/search.py": "sha256:ad11acb61889e82cd27380c472b02b4f3f7d31b84b21a85d0fda4f4e75c4dead",
+        "skills/candidate-generation/scripts/search_cli.py": "sha256:042acd00184d44d31de8af62f1d6a1fb716ab9f2e80748e8885a45d58a4149f6",
+        "skills/chemical-input/scripts/analysis.py": "sha256:668e8a5a573c5e03c1ce1e91a466661066afe854c430e7112db1efe316ae1e07",
+        "skills/chemical-input/scripts/analysis_cli.py": "sha256:623fc520661bd7863cd0b7eb7d13545571c8a43977dbbfe7fe7efff24247e216",
+        "skills/chemical-input/scripts/analysis_material.py": "sha256:7eec6a5ec7f370a98815ebbdf4e317e5e24911b38eee48e46cadaa5262366210",
+        "skills/chemical-input/scripts/conformers.py": "sha256:b0150d7429219bf62f0da73ef40501459bdfbc27155c973de85724cdfccc75e6",
+        "skills/chemical-input/scripts/correspondence.py": "sha256:9e93ed7035757865c49e15f50318a9a64e1c561d759fb44200ace3ac15a2a4c8",
+        "skills/chemical-input/scripts/material.py": "sha256:fa6123ec3441b82f4609d5caf11325ccbea1b0bfc94d526ed921f0dd85b495ff",
+        "skills/chemical-input/scripts/material_cli.py": "sha256:2a943853166699daf6206211a08327444e9baf85167dbe38201ef55bbb6674ce",
+        "skills/chemical-input/scripts/tensor_order.py": "sha256:5df0a0611fea921400d3a7af6ddda3fb0543f9c82dda91db1b2ee8a88f3d4491",
+        "skills/crest/scripts/complex_sample.py": "sha256:2b4d5212e02de3d199f45299db87522feb11dab05a552356d13a42e2ab611c1d",
+        "skills/crest/scripts/crest_io.py": "sha256:32234e5f431fb464fc43d5ecbb56d83258b7de8eb438b87e6aa24d175ac2a79d",
+        "skills/crest/scripts/ensemble.py": "sha256:ce590df491047b9a39ef9666ae2dfdc96d2a40a4f185b62415f00f3d76b47b09",
+        "skills/crest/scripts/ensemble_cli.py": "sha256:b2593f171f107e9ca83b849219a967c44659ae3c09299ccc3593f2fdbedc87f0",
+        "skills/crest/scripts/ensemble_material.py": "sha256:2a52c033bb0ca2f6f531444808098206f2d2f48d74670f5fc8f1c2c93138302a",
+        "skills/crest/scripts/ensemble_select.py": "sha256:6d891716c8e85e8eb4b0274739e55028883801ef0c38d1d5a7fb56d07785f752",
+        "skills/energetics/scripts/energy.py": "sha256:ec382088ed86e8cf3e592a3a6dfebea45b4d86d512f5a9ba2426f36afd4aa91d",
+        "skills/energetics/scripts/energy_analysis.py": "sha256:f5c12b5105dc61e5aec8dff9fd8043043c103ac258b855c170850f51f8c1463f",
+        "skills/energetics/scripts/energy_cli.py": "sha256:cfba3b86a2bb0feda9dba06f2e960480bb5d1053fb8a0d2449134316ff2e2519",
+        "skills/energetics/scripts/energy_common.py": "sha256:c39aa866c4bf7b1483852d0816bea69cfb8c93038b10fb726b3e0f788962c45f",
+        "skills/energetics/scripts/kinetic_network.py": "sha256:c2926f3b31cf0197f206cf73cdf8df4d0f038af4adfcc1aa5b027eb0ea881c93",
+        "skills/energetics/scripts/kinetics.py": "sha256:4b5493f612c8ae27a72d5d770d48d42c9379c30bbdf7ed85b7a81429d8b24ea3",
+        "skills/energetics/scripts/thermochemistry.py": "sha256:ae3f849988f9baa1803ef35120274c5ddccfec239967e8f87fdd4a5684dd6550",
+        "skills/gaussian/scripts/electronic.py": "sha256:bccfbd3f397893966cc9ca44558ec216b212d61d6d8f5d5f665a87a790daaf08",
+        "skills/gaussian/scripts/electronic_cli.py": "sha256:9fac0a6b0ffae98c6fbe679d7a3f48c1d77c3f929113bda99e55a9d0060b8dbc",
+        "skills/gaussian/scripts/electronic_contract.py": "sha256:430ffaecb6ef12a128df446c5a66b272aeac111056dba8d79e9df3bede244121",
+        "skills/gaussian/scripts/electronic_parse.py": "sha256:e5716b7e6581245f8855d40b293076c5dd8de548b3af938db9d1e57411427075",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/state_tracking.py": "sha256:d22ad0867715f2d0b8da4679eb276010932c7aeb44319e38d339f85b8e14d3cc",
+        "skills/xtb/scripts/parser.py": "sha256:5922d0093eddf05b166d11be7b17220dc2da30e5d78a36ce887bfd67c34fc677"
+      },
+      "module_paths": [
+        "skills/_shared",
+        "skills/chemical-input/scripts",
+        "skills/crest/scripts",
+        "skills/gaussian/scripts",
+        "skills/energetics/scripts"
+      ]
+    },
+    {
+      "id": "chemical.neb-xtb",
+      "version": "2",
+      "skill": "candidate-generation",
+      "backend": "path_xtb",
+      "runtime": "python",
+      "entry": "skills/candidate-generation/scripts/ase_search.py",
+      "cli": "skills/candidate-generation/scripts/ase_cli.py",
+      "argv": [
+        "{entry}",
+        "--input",
+        "{input:input}",
+        "--output-dir",
+        "results",
+        "neb-xtb",
+        "{args}",
+        "--executable",
+        "{executable}"
+      ],
+      "inputs": {
+        "input": "input.json"
+      },
+      "outputs": [
+        {
+          "path": "results",
+          "recursive": true,
+          "required": false,
+          "min_bytes": 0
+        },
+        {
+          "path": "results/result.json",
+          "required": true,
+          "min_bytes": 2,
+          "media_type": "application/json"
+        }
+      ],
+      "requirements": {
+        "python": ">=3.11",
+        "packages": {
+          "rdkit": ">=2025.9,<2027",
+          "numpy": ">=1.26,<3",
+          "ase": "==3.29.0",
+          "scipy": ">=1.8.1,<2"
+        },
+        "imports": [
+          "rdkit.Chem",
+          "numpy",
+          "ase.mep",
+          "ase.optimize",
+          "scipy"
+        ]
+      },
+      "resources": {
+        "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
+        "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
+        "skills/candidate-generation/scripts/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
+        "skills/candidate-generation/scripts/ase_neb.py": "sha256:6db74b119aac28eb6b4146cfdb3799ac83d5259bf1c1cafc2f3a096a947be39a",
+        "skills/candidate-generation/scripts/ase_search.py": "sha256:0951a2a03d234cb1e82dc06f5185a09213d366dcd8a4f20253eadf54ad179d57",
+        "skills/candidate-generation/scripts/gaussian_path.py": "sha256:053867f804ee0b35f711c7df730427e736da5975f1df54909f15af4e6a05192e",
+        "skills/candidate-generation/scripts/gradient_contract.py": "sha256:f2df7207aa0fc1d8bdfc8e367fd1110dafe779c713feee6b8b02541de008c856",
+        "skills/candidate-generation/scripts/path_contract.py": "sha256:4e22f1a47cb59705cde359df933156901a0ec55d25634dcea2c3e992b2ce0e7c",
+        "skills/candidate-generation/scripts/path_gaussian.py": "sha256:e2be5f4a15d60e9590b33cf28abfae082a386c4ecfebad1174a6462f7a8bb7d0",
+        "skills/candidate-generation/scripts/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
+        "skills/candidate-generation/scripts/path_xtb.py": "sha256:3eedbdd988786f1ca53d783707027276fa3c9f57d90b6fe3a72d58b7c097735a",
+        "skills/candidate-generation/scripts/scan_engine.py": "sha256:33148e909bb014b62a51816982eac6ed59c3c69990123110dfe4a689c65ed8f7",
+        "skills/candidate-generation/scripts/search.py": "sha256:ad11acb61889e82cd27380c472b02b4f3f7d31b84b21a85d0fda4f4e75c4dead",
+        "skills/candidate-generation/scripts/search_cli.py": "sha256:042acd00184d44d31de8af62f1d6a1fb716ab9f2e80748e8885a45d58a4149f6",
         "skills/chemical-input/scripts/analysis.py": "sha256:668e8a5a573c5e03c1ce1e91a466661066afe854c430e7112db1efe316ae1e07",
         "skills/chemical-input/scripts/analysis_cli.py": "sha256:623fc520661bd7863cd0b7eb7d13545571c8a43977dbbfe7fe7efff24247e216",
         "skills/chemical-input/scripts/analysis_material.py": "sha256:7eec6a5ec7f370a98815ebbdf4e317e5e24911b38eee48e46cadaa5262366210",
@@ -2996,12 +3012,12 @@
     },
     {
       "id": "chemical.neb-gaussian",
-      "version": "1",
+      "version": "2",
       "skill": "candidate-generation",
       "backend": "path_gaussian",
       "runtime": "python",
-      "entry": "skills/candidate-generation/scripts/gaussian_path.py",
-      "cli": "skills/candidate-generation/scripts/search_cli.py",
+      "entry": "skills/candidate-generation/scripts/ase_search.py",
+      "cli": "skills/candidate-generation/scripts/ase_cli.py",
       "argv": [
         "{entry}",
         "--input",
@@ -3034,26 +3050,33 @@
         "python": ">=3.11",
         "packages": {
           "rdkit": ">=2025.9,<2027",
-          "numpy": ">=1.26,<3"
+          "numpy": ">=1.26,<3",
+          "ase": "==3.29.0",
+          "scipy": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
-          "numpy"
+          "numpy",
+          "ase.mep",
+          "ase.optimize",
+          "scipy"
         ]
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
-        "skills/candidate-generation/scripts/gaussian_path.py": "sha256:44e792585860efb6cfa26f89c270c54f20dbed1c8abcfdddb57a2a7605ce355e",
+        "skills/candidate-generation/scripts/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
+        "skills/candidate-generation/scripts/ase_neb.py": "sha256:6db74b119aac28eb6b4146cfdb3799ac83d5259bf1c1cafc2f3a096a947be39a",
+        "skills/candidate-generation/scripts/ase_search.py": "sha256:0951a2a03d234cb1e82dc06f5185a09213d366dcd8a4f20253eadf54ad179d57",
+        "skills/candidate-generation/scripts/gaussian_path.py": "sha256:053867f804ee0b35f711c7df730427e736da5975f1df54909f15af4e6a05192e",
         "skills/candidate-generation/scripts/gradient_contract.py": "sha256:f2df7207aa0fc1d8bdfc8e367fd1110dafe779c713feee6b8b02541de008c856",
-        "skills/candidate-generation/scripts/neb_engine.py": "sha256:fd1636b84a4ae8d0ccb807d70ebfe6366382025005375211e11eada1c41af1c2",
         "skills/candidate-generation/scripts/path_contract.py": "sha256:4e22f1a47cb59705cde359df933156901a0ec55d25634dcea2c3e992b2ce0e7c",
         "skills/candidate-generation/scripts/path_gaussian.py": "sha256:e2be5f4a15d60e9590b33cf28abfae082a386c4ecfebad1174a6462f7a8bb7d0",
         "skills/candidate-generation/scripts/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path_xtb.py": "sha256:3eedbdd988786f1ca53d783707027276fa3c9f57d90b6fe3a72d58b7c097735a",
         "skills/candidate-generation/scripts/scan_engine.py": "sha256:33148e909bb014b62a51816982eac6ed59c3c69990123110dfe4a689c65ed8f7",
-        "skills/candidate-generation/scripts/search.py": "sha256:f67ae9c359a9ee63253f04b7f3ce09734d0e27f6f7dca9e6b33bf9a2e0fb0e3e",
-        "skills/candidate-generation/scripts/search_cli.py": "sha256:a6f2232d4a045638729e393b63ff6abb086a13fb29a045bcf7b398d48ba97fc9",
+        "skills/candidate-generation/scripts/search.py": "sha256:ad11acb61889e82cd27380c472b02b4f3f7d31b84b21a85d0fda4f4e75c4dead",
+        "skills/candidate-generation/scripts/search_cli.py": "sha256:042acd00184d44d31de8af62f1d6a1fb716ab9f2e80748e8885a45d58a4149f6",
         "skills/chemical-input/scripts/analysis.py": "sha256:668e8a5a573c5e03c1ce1e91a466661066afe854c430e7112db1efe316ae1e07",
         "skills/chemical-input/scripts/analysis_cli.py": "sha256:623fc520661bd7863cd0b7eb7d13545571c8a43977dbbfe7fe7efff24247e216",
         "skills/chemical-input/scripts/analysis_material.py": "sha256:7eec6a5ec7f370a98815ebbdf4e317e5e24911b38eee48e46cadaa5262366210",
@@ -3089,6 +3112,279 @@
         "skills/crest/scripts",
         "skills/gaussian/scripts",
         "skills/energetics/scripts"
+      ]
+    },
+    {
+      "id": "chemical.local-diagnostics",
+      "version": "1",
+      "skill": "chemical-input",
+      "backend": "structure",
+      "runtime": "python",
+      "entry": "skills/chemical-input/scripts/diagnostics_job.py",
+      "cli": "skills/chemical-input/scripts/diagnostics_cli.py",
+      "argv": [
+        "{entry}",
+        "--input",
+        "{input:input}",
+        "--output",
+        "results/result.json",
+        "{args}"
+      ],
+      "inputs": {
+        "input": "input.json"
+      },
+      "outputs": [
+        {
+          "path": "results/result.json",
+          "required": true,
+          "min_bytes": 2,
+          "media_type": "application/json"
+        }
+      ],
+      "requirements": {
+        "python": ">=3.11",
+        "packages": {
+          "rdkit": ">=2025.9,<2027",
+          "numpy": ">=1.26,<3"
+        },
+        "imports": [
+          "rdkit.Chem",
+          "numpy"
+        ]
+      },
+      "resources": {
+        "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
+        "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
+        "skills/candidate-generation/scripts/gradient_contract.py": "sha256:f2df7207aa0fc1d8bdfc8e367fd1110dafe779c713feee6b8b02541de008c856",
+        "skills/candidate-generation/scripts/path_contract.py": "sha256:4e22f1a47cb59705cde359df933156901a0ec55d25634dcea2c3e992b2ce0e7c",
+        "skills/candidate-generation/scripts/path_gaussian.py": "sha256:e2be5f4a15d60e9590b33cf28abfae082a386c4ecfebad1174a6462f7a8bb7d0",
+        "skills/candidate-generation/scripts/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
+        "skills/candidate-generation/scripts/path_xtb.py": "sha256:3eedbdd988786f1ca53d783707027276fa3c9f57d90b6fe3a72d58b7c097735a",
+        "skills/candidate-generation/scripts/scan_engine.py": "sha256:33148e909bb014b62a51816982eac6ed59c3c69990123110dfe4a689c65ed8f7",
+        "skills/candidate-generation/scripts/search.py": "sha256:ad11acb61889e82cd27380c472b02b4f3f7d31b84b21a85d0fda4f4e75c4dead",
+        "skills/candidate-generation/scripts/search_cli.py": "sha256:042acd00184d44d31de8af62f1d6a1fb716ab9f2e80748e8885a45d58a4149f6",
+        "skills/chemical-input/scripts/analysis.py": "sha256:668e8a5a573c5e03c1ce1e91a466661066afe854c430e7112db1efe316ae1e07",
+        "skills/chemical-input/scripts/analysis_cli.py": "sha256:623fc520661bd7863cd0b7eb7d13545571c8a43977dbbfe7fe7efff24247e216",
+        "skills/chemical-input/scripts/analysis_material.py": "sha256:7eec6a5ec7f370a98815ebbdf4e317e5e24911b38eee48e46cadaa5262366210",
+        "skills/chemical-input/scripts/conformers.py": "sha256:b0150d7429219bf62f0da73ef40501459bdfbc27155c973de85724cdfccc75e6",
+        "skills/chemical-input/scripts/correspondence.py": "sha256:9e93ed7035757865c49e15f50318a9a64e1c561d759fb44200ace3ac15a2a4c8",
+        "skills/chemical-input/scripts/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
+        "skills/chemical-input/scripts/diagnostics_job.py": "sha256:0131be82bf407225f1af6047555087fd194b0301b896c71617f99e0a39bb3c87",
+        "skills/chemical-input/scripts/local_diagnostics.py": "sha256:fb5735de64aefd60ebe909555d3fc5ed8d69196520fc9765c2f29da63cdd0eb0",
+        "skills/chemical-input/scripts/material.py": "sha256:fa6123ec3441b82f4609d5caf11325ccbea1b0bfc94d526ed921f0dd85b495ff",
+        "skills/chemical-input/scripts/material_cli.py": "sha256:2a943853166699daf6206211a08327444e9baf85167dbe38201ef55bbb6674ce",
+        "skills/chemical-input/scripts/tensor_order.py": "sha256:5df0a0611fea921400d3a7af6ddda3fb0543f9c82dda91db1b2ee8a88f3d4491",
+        "skills/crest/scripts/complex_sample.py": "sha256:2b4d5212e02de3d199f45299db87522feb11dab05a552356d13a42e2ab611c1d",
+        "skills/crest/scripts/crest_io.py": "sha256:32234e5f431fb464fc43d5ecbb56d83258b7de8eb438b87e6aa24d175ac2a79d",
+        "skills/crest/scripts/ensemble.py": "sha256:ce590df491047b9a39ef9666ae2dfdc96d2a40a4f185b62415f00f3d76b47b09",
+        "skills/crest/scripts/ensemble_cli.py": "sha256:b2593f171f107e9ca83b849219a967c44659ae3c09299ccc3593f2fdbedc87f0",
+        "skills/crest/scripts/ensemble_material.py": "sha256:2a52c033bb0ca2f6f531444808098206f2d2f48d74670f5fc8f1c2c93138302a",
+        "skills/crest/scripts/ensemble_select.py": "sha256:6d891716c8e85e8eb4b0274739e55028883801ef0c38d1d5a7fb56d07785f752",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/xtb/scripts/parser.py": "sha256:5922d0093eddf05b166d11be7b17220dc2da30e5d78a36ce887bfd67c34fc677"
+      },
+      "module_paths": [
+        "skills/_shared",
+        "skills/chemical-input/scripts",
+        "skills/crest/scripts"
+      ]
+    },
+    {
+      "id": "chemical.trajectory",
+      "version": "1",
+      "skill": "report",
+      "backend": "structure",
+      "runtime": "python",
+      "entry": "skills/report/scripts/research_job.py",
+      "cli": "skills/report/scripts/research_cli.py",
+      "argv": [
+        "{entry}",
+        "--input",
+        "{input:input}",
+        "--output-dir",
+        "results",
+        "trajectory",
+        "{args}"
+      ],
+      "inputs": {
+        "input": "input.json"
+      },
+      "outputs": [
+        {
+          "path": "results",
+          "recursive": true,
+          "required": false,
+          "min_bytes": 0
+        },
+        {
+          "path": "results/result.json",
+          "required": true,
+          "min_bytes": 2,
+          "media_type": "application/json"
+        }
+      ],
+      "requirements": {
+        "python": ">=3.11",
+        "packages": {
+          "rdkit": ">=2025.9,<2027",
+          "numpy": ">=1.26,<3",
+          "matplotlib": ">=3.9,<4",
+          "pillow": ">=10,<13"
+        },
+        "imports": [
+          "rdkit.Chem",
+          "numpy",
+          "matplotlib",
+          "PIL.Image"
+        ]
+      },
+      "resources": {
+        "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
+        "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
+        "skills/candidate-generation/scripts/gradient_contract.py": "sha256:f2df7207aa0fc1d8bdfc8e367fd1110dafe779c713feee6b8b02541de008c856",
+        "skills/candidate-generation/scripts/path_contract.py": "sha256:4e22f1a47cb59705cde359df933156901a0ec55d25634dcea2c3e992b2ce0e7c",
+        "skills/candidate-generation/scripts/path_gaussian.py": "sha256:e2be5f4a15d60e9590b33cf28abfae082a386c4ecfebad1174a6462f7a8bb7d0",
+        "skills/candidate-generation/scripts/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
+        "skills/candidate-generation/scripts/path_xtb.py": "sha256:3eedbdd988786f1ca53d783707027276fa3c9f57d90b6fe3a72d58b7c097735a",
+        "skills/candidate-generation/scripts/scan_engine.py": "sha256:33148e909bb014b62a51816982eac6ed59c3c69990123110dfe4a689c65ed8f7",
+        "skills/candidate-generation/scripts/search.py": "sha256:ad11acb61889e82cd27380c472b02b4f3f7d31b84b21a85d0fda4f4e75c4dead",
+        "skills/candidate-generation/scripts/search_cli.py": "sha256:042acd00184d44d31de8af62f1d6a1fb716ab9f2e80748e8885a45d58a4149f6",
+        "skills/chemical-input/scripts/analysis.py": "sha256:668e8a5a573c5e03c1ce1e91a466661066afe854c430e7112db1efe316ae1e07",
+        "skills/chemical-input/scripts/analysis_cli.py": "sha256:623fc520661bd7863cd0b7eb7d13545571c8a43977dbbfe7fe7efff24247e216",
+        "skills/chemical-input/scripts/analysis_material.py": "sha256:7eec6a5ec7f370a98815ebbdf4e317e5e24911b38eee48e46cadaa5262366210",
+        "skills/chemical-input/scripts/conformers.py": "sha256:b0150d7429219bf62f0da73ef40501459bdfbc27155c973de85724cdfccc75e6",
+        "skills/chemical-input/scripts/correspondence.py": "sha256:9e93ed7035757865c49e15f50318a9a64e1c561d759fb44200ace3ac15a2a4c8",
+        "skills/chemical-input/scripts/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
+        "skills/chemical-input/scripts/diagnostics_job.py": "sha256:0131be82bf407225f1af6047555087fd194b0301b896c71617f99e0a39bb3c87",
+        "skills/chemical-input/scripts/local_diagnostics.py": "sha256:fb5735de64aefd60ebe909555d3fc5ed8d69196520fc9765c2f29da63cdd0eb0",
+        "skills/chemical-input/scripts/material.py": "sha256:fa6123ec3441b82f4609d5caf11325ccbea1b0bfc94d526ed921f0dd85b495ff",
+        "skills/chemical-input/scripts/material_cli.py": "sha256:2a943853166699daf6206211a08327444e9baf85167dbe38201ef55bbb6674ce",
+        "skills/chemical-input/scripts/tensor_order.py": "sha256:5df0a0611fea921400d3a7af6ddda3fb0543f9c82dda91db1b2ee8a88f3d4491",
+        "skills/crest/scripts/complex_sample.py": "sha256:2b4d5212e02de3d199f45299db87522feb11dab05a552356d13a42e2ab611c1d",
+        "skills/crest/scripts/crest_io.py": "sha256:32234e5f431fb464fc43d5ecbb56d83258b7de8eb438b87e6aa24d175ac2a79d",
+        "skills/crest/scripts/ensemble.py": "sha256:ce590df491047b9a39ef9666ae2dfdc96d2a40a4f185b62415f00f3d76b47b09",
+        "skills/crest/scripts/ensemble_cli.py": "sha256:b2593f171f107e9ca83b849219a967c44659ae3c09299ccc3593f2fdbedc87f0",
+        "skills/crest/scripts/ensemble_material.py": "sha256:2a52c033bb0ca2f6f531444808098206f2d2f48d74670f5fc8f1c2c93138302a",
+        "skills/crest/scripts/ensemble_select.py": "sha256:6d891716c8e85e8eb4b0274739e55028883801ef0c38d1d5a7fb56d07785f752",
+        "skills/energetics/scripts/energy.py": "sha256:ec382088ed86e8cf3e592a3a6dfebea45b4d86d512f5a9ba2426f36afd4aa91d",
+        "skills/energetics/scripts/energy_analysis.py": "sha256:f5c12b5105dc61e5aec8dff9fd8043043c103ac258b855c170850f51f8c1463f",
+        "skills/energetics/scripts/energy_cli.py": "sha256:cfba3b86a2bb0feda9dba06f2e960480bb5d1053fb8a0d2449134316ff2e2519",
+        "skills/energetics/scripts/energy_common.py": "sha256:c39aa866c4bf7b1483852d0816bea69cfb8c93038b10fb726b3e0f788962c45f",
+        "skills/energetics/scripts/kinetic_network.py": "sha256:c2926f3b31cf0197f206cf73cdf8df4d0f038af4adfcc1aa5b027eb0ea881c93",
+        "skills/energetics/scripts/kinetics.py": "sha256:4b5493f612c8ae27a72d5d770d48d42c9379c30bbdf7ed85b7a81429d8b24ea3",
+        "skills/energetics/scripts/thermochemistry.py": "sha256:ae3f849988f9baa1803ef35120274c5ddccfec239967e8f87fdd4a5684dd6550",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/report/scripts/research_cli.py": "sha256:37af37d3af1447ba2ef8e96528aae067698bd78f3c47f48e6f9f6272a743aed3",
+        "skills/report/scripts/research_job.py": "sha256:145e79aff39320abb613f4b6d5b70082a653fbb2b78516b050def9d0c44ec342",
+        "skills/report/scripts/research_report.py": "sha256:9051875bb9a816cde16d558d920b3641cb9fe5719a76b2e0d43112658b373dc8",
+        "skills/report/scripts/trajectory.py": "sha256:85570e189259f40a002950442ac517d8bd9afd4514a9971a68651a90fe6ec953",
+        "skills/xtb/scripts/parser.py": "sha256:5922d0093eddf05b166d11be7b17220dc2da30e5d78a36ce887bfd67c34fc677"
+      },
+      "module_paths": [
+        "skills/_shared",
+        "skills/chemical-input/scripts",
+        "skills/crest/scripts",
+        "skills/energetics/scripts",
+        "skills/candidate-generation/scripts"
+      ]
+    },
+    {
+      "id": "chemical.research-report",
+      "version": "1",
+      "skill": "report",
+      "backend": "structure",
+      "runtime": "python",
+      "entry": "skills/report/scripts/research_job.py",
+      "cli": "skills/report/scripts/research_cli.py",
+      "argv": [
+        "{entry}",
+        "--input",
+        "{input:input}",
+        "--output-dir",
+        "results",
+        "report",
+        "{args}"
+      ],
+      "inputs": {
+        "input": "input.json"
+      },
+      "outputs": [
+        {
+          "path": "results",
+          "recursive": true,
+          "required": false,
+          "min_bytes": 0
+        },
+        {
+          "path": "results/result.json",
+          "required": true,
+          "min_bytes": 2,
+          "media_type": "application/json"
+        }
+      ],
+      "requirements": {
+        "python": ">=3.11",
+        "packages": {
+          "rdkit": ">=2025.9,<2027",
+          "numpy": ">=1.26,<3",
+          "matplotlib": ">=3.9,<4",
+          "pillow": ">=10,<13"
+        },
+        "imports": [
+          "rdkit.Chem",
+          "numpy",
+          "matplotlib",
+          "PIL.Image"
+        ]
+      },
+      "resources": {
+        "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
+        "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
+        "skills/candidate-generation/scripts/gradient_contract.py": "sha256:f2df7207aa0fc1d8bdfc8e367fd1110dafe779c713feee6b8b02541de008c856",
+        "skills/candidate-generation/scripts/path_contract.py": "sha256:4e22f1a47cb59705cde359df933156901a0ec55d25634dcea2c3e992b2ce0e7c",
+        "skills/candidate-generation/scripts/path_gaussian.py": "sha256:e2be5f4a15d60e9590b33cf28abfae082a386c4ecfebad1174a6462f7a8bb7d0",
+        "skills/candidate-generation/scripts/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
+        "skills/candidate-generation/scripts/path_xtb.py": "sha256:3eedbdd988786f1ca53d783707027276fa3c9f57d90b6fe3a72d58b7c097735a",
+        "skills/candidate-generation/scripts/scan_engine.py": "sha256:33148e909bb014b62a51816982eac6ed59c3c69990123110dfe4a689c65ed8f7",
+        "skills/candidate-generation/scripts/search.py": "sha256:ad11acb61889e82cd27380c472b02b4f3f7d31b84b21a85d0fda4f4e75c4dead",
+        "skills/candidate-generation/scripts/search_cli.py": "sha256:042acd00184d44d31de8af62f1d6a1fb716ab9f2e80748e8885a45d58a4149f6",
+        "skills/chemical-input/scripts/analysis.py": "sha256:668e8a5a573c5e03c1ce1e91a466661066afe854c430e7112db1efe316ae1e07",
+        "skills/chemical-input/scripts/analysis_cli.py": "sha256:623fc520661bd7863cd0b7eb7d13545571c8a43977dbbfe7fe7efff24247e216",
+        "skills/chemical-input/scripts/analysis_material.py": "sha256:7eec6a5ec7f370a98815ebbdf4e317e5e24911b38eee48e46cadaa5262366210",
+        "skills/chemical-input/scripts/conformers.py": "sha256:b0150d7429219bf62f0da73ef40501459bdfbc27155c973de85724cdfccc75e6",
+        "skills/chemical-input/scripts/correspondence.py": "sha256:9e93ed7035757865c49e15f50318a9a64e1c561d759fb44200ace3ac15a2a4c8",
+        "skills/chemical-input/scripts/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
+        "skills/chemical-input/scripts/diagnostics_job.py": "sha256:0131be82bf407225f1af6047555087fd194b0301b896c71617f99e0a39bb3c87",
+        "skills/chemical-input/scripts/local_diagnostics.py": "sha256:fb5735de64aefd60ebe909555d3fc5ed8d69196520fc9765c2f29da63cdd0eb0",
+        "skills/chemical-input/scripts/material.py": "sha256:fa6123ec3441b82f4609d5caf11325ccbea1b0bfc94d526ed921f0dd85b495ff",
+        "skills/chemical-input/scripts/material_cli.py": "sha256:2a943853166699daf6206211a08327444e9baf85167dbe38201ef55bbb6674ce",
+        "skills/chemical-input/scripts/tensor_order.py": "sha256:5df0a0611fea921400d3a7af6ddda3fb0543f9c82dda91db1b2ee8a88f3d4491",
+        "skills/crest/scripts/complex_sample.py": "sha256:2b4d5212e02de3d199f45299db87522feb11dab05a552356d13a42e2ab611c1d",
+        "skills/crest/scripts/crest_io.py": "sha256:32234e5f431fb464fc43d5ecbb56d83258b7de8eb438b87e6aa24d175ac2a79d",
+        "skills/crest/scripts/ensemble.py": "sha256:ce590df491047b9a39ef9666ae2dfdc96d2a40a4f185b62415f00f3d76b47b09",
+        "skills/crest/scripts/ensemble_cli.py": "sha256:b2593f171f107e9ca83b849219a967c44659ae3c09299ccc3593f2fdbedc87f0",
+        "skills/crest/scripts/ensemble_material.py": "sha256:2a52c033bb0ca2f6f531444808098206f2d2f48d74670f5fc8f1c2c93138302a",
+        "skills/crest/scripts/ensemble_select.py": "sha256:6d891716c8e85e8eb4b0274739e55028883801ef0c38d1d5a7fb56d07785f752",
+        "skills/energetics/scripts/energy.py": "sha256:ec382088ed86e8cf3e592a3a6dfebea45b4d86d512f5a9ba2426f36afd4aa91d",
+        "skills/energetics/scripts/energy_analysis.py": "sha256:f5c12b5105dc61e5aec8dff9fd8043043c103ac258b855c170850f51f8c1463f",
+        "skills/energetics/scripts/energy_cli.py": "sha256:cfba3b86a2bb0feda9dba06f2e960480bb5d1053fb8a0d2449134316ff2e2519",
+        "skills/energetics/scripts/energy_common.py": "sha256:c39aa866c4bf7b1483852d0816bea69cfb8c93038b10fb726b3e0f788962c45f",
+        "skills/energetics/scripts/kinetic_network.py": "sha256:c2926f3b31cf0197f206cf73cdf8df4d0f038af4adfcc1aa5b027eb0ea881c93",
+        "skills/energetics/scripts/kinetics.py": "sha256:4b5493f612c8ae27a72d5d770d48d42c9379c30bbdf7ed85b7a81429d8b24ea3",
+        "skills/energetics/scripts/thermochemistry.py": "sha256:ae3f849988f9baa1803ef35120274c5ddccfec239967e8f87fdd4a5684dd6550",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/report/scripts/research_cli.py": "sha256:37af37d3af1447ba2ef8e96528aae067698bd78f3c47f48e6f9f6272a743aed3",
+        "skills/report/scripts/research_job.py": "sha256:145e79aff39320abb613f4b6d5b70082a653fbb2b78516b050def9d0c44ec342",
+        "skills/report/scripts/research_report.py": "sha256:9051875bb9a816cde16d558d920b3641cb9fe5719a76b2e0d43112658b373dc8",
+        "skills/report/scripts/trajectory.py": "sha256:85570e189259f40a002950442ac517d8bd9afd4514a9971a68651a90fe6ec953",
+        "skills/xtb/scripts/parser.py": "sha256:5922d0093eddf05b166d11be7b17220dc2da30e5d78a36ce887bfd67c34fc677"
+      },
+      "module_paths": [
+        "skills/_shared",
+        "skills/chemical-input/scripts",
+        "skills/crest/scripts",
+        "skills/energetics/scripts",
+        "skills/candidate-generation/scripts"
       ]
     }
   ],

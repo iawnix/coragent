@@ -25,3 +25,5 @@ criteria explicitly and select methods that can evaluate them.
 
 Ask for independent Review when a bounded counterargument would help. The Root
 must still respond and own the next decision.
+
+Before changing a mechanism after a failed run, use [search recovery](../../method-selection/references/search_recovery.md) to classify the evidence. Route mismatch calls for input/binding diagnosis; complete repeated same-basin IRC calls for a mode/candidate/hypothesis review. Distinguish these from incomplete paths. Compare concerted versus stepwise routes, proton relays, solvent/catalyst participation, conformers, spin and competing sites with discriminating calculations. Local proximity thresholds are not a mechanism classifier, and no fixed retry count replaces evidence.

@@ -418,7 +418,7 @@ def main(argv=None):
     parser.add_argument('--dry-run',action='store_true')
     parser.add_argument('--apply',action='store_true')
     parser.add_argument('--components',default='python,host,node,pi')
-    parser.add_argument('--job-profiles',default='structure,wrapper',help='Public Conda profiles to cache during prepare; comma-separated.')
+    parser.add_argument('--job-profiles',default='structure,wrapper,path',help='Public Conda profiles to cache during prepare; comma-separated.')
     values=list(sys.argv[1:] if argv is None else argv)
     extra=values[values.index('--')+1:] if '--' in values else []
     if '--' in values: values=values[:values.index('--')]

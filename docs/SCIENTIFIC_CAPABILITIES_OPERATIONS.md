@@ -67,7 +67,7 @@ lists independent executors, their backends and scientific limits. Bundled modul
 
 - Name/SMILES/XYZ materials, mapping candidates, tensor reordering and conformer comparison.
 - CF22D, xTB and Gaussian calculations; bounded CREST ensembles and rigid-fragment complex sampling.
-- xTB/Gaussian relaxed scans, QST2/QST3 preparation, gradients and NumPy NEB candidate searches.
+- xTB/Gaussian relaxed scans, QST2/QST3 preparation, gradients and ASE NEB v2 candidate searches.
 - General stationary-point, mode and IRC checks; thermochemistry, conformer free energies and energy profiles.
 - Multistep pathway checks, conditional TST, common-precursor branching and mass-action networks.
 - Limited Gaussian ground-spin and singlet TD/TDA calculations, supplied-tensor state tracking, and local different-spin crossing searches/checks.
@@ -76,10 +76,10 @@ The xTB convenience wrapper still accepts `sp/opt/opt-sp`; bounded scans and NEB
 have separate executors. Frequencies and dynamics use native commands through
 generic Jobs. See the [xTB Skill](../domains/chemical/skills/xtb/SKILL.md).
 The optional `path` environment profile binds `path_xtb` / `path_gaussian` and
-reuses RDKit/NumPy; it does not install native solvers or run a default scientific
+uses path.lock with RDKit/NumPy, ASE and SciPy; it does not install native solvers or run a default scientific
 smoke calculation. See [environment setup](../domains/chemical/environments/README.md).
 
-The bundled NEB algorithm does not use ASE. QBICS remains an external, explicitly
+NEB uses ASE with Gaussian/xTB calculators through version-2 entries; the former NumPy implementation has been removed. QBICS remains an external, explicitly
 verified command/script route; the bundled crossing search uses Gaussian and a
 local NumPy algorithm. State tracking requires supplied AO density/overlap tensors;
 automatic extraction from Gaussian checkpoints is not implemented. Classical
@@ -87,7 +87,7 @@ TS/IRC checks do not certify crossings or excited-state continuity. Legacy DA
 validators are explicit specialized options; other reactions use the
 [general checks](../domains/chemical/skills/validation/references/general_checks.md).
 See the [report Skill](../domains/chemical/skills/report/SKILL.md) for molecular images,
-data tables, energy plots, and their evidence requirements.
+data tables, energy plots, standalone trajectory/report Jobs and their evidence requirements. Local geometry diagnostics and practical search-recovery guidance are linked from the input and method-selection Skills.
 
 ## Validation
 

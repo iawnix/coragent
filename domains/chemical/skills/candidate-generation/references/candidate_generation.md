@@ -59,3 +59,5 @@ Record the observations, scientific criteria, unresolved questions and next step
 Supplied material endpoints can use `chemical.qst-prepare@1`; bounded scan and
 xTB NEB recipes are documented in [path operations](path_search.md). These
 interfaces do not certify that an endpoint pair describes one elementary step.
+
+For new NEB paths, use [ASE v2](ase_neb_executor.md). Choose restart frames by geometry, force and reaction-coordinate evidence, not the lowest energy of a failed TS search; see [search recovery](../../method-selection/references/search_recovery.md).

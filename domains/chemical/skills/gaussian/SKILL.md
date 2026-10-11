@@ -90,3 +90,5 @@ Read [electronic state contracts](references/electronic_states.md). Native fixed
 optimization retains unverified state continuity until independent character
 information is available. Existing generic Gaussian energy guards remain in force.
 For different-spin crossings, use [surface-crossing](../surface-crossing/SKILL.md).
+
+For SCF/TS/IRC failures, checkpoint reuse and route mismatch, read [search diagnosis and recovery](../method-selection/references/search_recovery.md). New gradient-driven NEB searches use [ASE NEB v2](../candidate-generation/references/ase_neb_executor.md) with the separate path_gaussian binding.

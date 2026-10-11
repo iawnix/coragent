@@ -58,21 +58,21 @@ Job 文件位于 `runs/jobs/<job_id>`。收集把声明文件登记为生产 Job
 
 - 名称/SMILES/XYZ 材料、映射候选、张量重排与构象比较。
 - CF22D、xTB、Gaussian 计算，以及有界 CREST 构象集合和刚性片段复合物采样。
-- xTB/Gaussian 弛豫扫描、QST2/QST3 准备、梯度与 NumPy NEB 候选搜索。
+- xTB/Gaussian 弛豫扫描、QST2/QST3 准备、梯度与 ASE NEB v2 候选搜索。
 - 通用驻点、模式与 IRC 检查，以及热化学、构象自由能与能量剖面。
 - 多步路径检查、条件 TST、共同前体竞争分支与质量作用动力学网络。
 - 有限范围的 Gaussian 指定自旋基态和单重 TD/TDA 计算、给定张量的态跟踪、不同自旋表面的局部交叉搜索与检查。
 
 xTB 的便捷封装仍接受 `sp/opt/opt-sp`；有界扫描和 NEB 使用独立执行器。
 频率和分子动力学使用原生命令与通用 Job，详见 [xTB Skill](../domains/chemical/skills/xtb/SKILL.zh-CN.md)。
-可选 `path` 环境 profile 绑定 `path_xtb` / `path_gaussian`，复用 RDKit/NumPy；
+可选 `path` 环境 profile 绑定 `path_xtb` / `path_gaussian`，使用含 RDKit/NumPy、ASE、SciPy 的 path.lock；
 不安装原生求解器，也不默认运行科学冒烟计算，见[环境配置](../domains/chemical/environments/README.zh-CN.md)。
 
-内置 NEB 算法不使用 ASE。QBICS 仍需明确核实外部命令或脚本；内置交叉搜索使用
+NEB 统一使用 ASE 版本 2 接入 Gaussian/xTB calculator，旧 NumPy 实现已删除。QBICS 仍需明确核实外部命令或脚本；内置交叉搜索使用
 Gaussian 与本地 NumPy 算法。态跟踪需要提供 AO 密度/重叠张量，尚未实现从 Gaussian
 检查点自动提取。经典 TS/IRC 检查不认证跨态或激发态连续性。旧 DA 验证器为显式专用
 选项，其它反应使用[通用检查](../domains/chemical/skills/validation/references/general_checks.zh-CN.md)。
-报告整理包含分子图、数据表和能量曲线，做法与证据要求见[报告 Skill](../domains/chemical/skills/report/SKILL.zh-CN.md)。
+局部诊断与搜索恢复指南分别见 chemical-input/method-selection。独立轨迹与报告 Job 包含分子图、数据表和能量曲线，做法与证据要求见[报告 Skill](../domains/chemical/skills/report/SKILL.zh-CN.md)。
 
 ## 验证
 

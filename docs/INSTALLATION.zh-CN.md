@@ -123,7 +123,8 @@ Gaussian 或 xTB 原生程序。
 
 主安装器根据 domain 的 `environments/manifest.json` 自动准备科研环境。首次安装没有
 `job.toml` 时，默认建立本地 `structure`（RDKit/NumPy，与 validation 共用）环境。
-已有绑定保持有效；可显式选择 `pyscf`、`render`，或为已有 Gaussian/xTB 绑定准备 `wrapper`。
+已有绑定保持有效；structure 也提供轨迹/图文报告依赖；可显式选择
+`path`（ASE/SciPy，用于已配置 path_xtb/path_gaussian）、`pyscf`、`render`，或为已有 Gaussian/xTB 绑定准备 `wrapper`。
 原生 Gaussian/xTB 软件需在目标机器上预先安装。
 
 ```bash

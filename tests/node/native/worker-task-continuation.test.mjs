@@ -11,13 +11,15 @@ import { TEST_ROOT, TEST_SOCKET_ROOT, managedPython, pinnedPiSource, assertInsta
 const execute = promisify(execFile);
 const packageRoot = resolve(process.env.CORAGENT_TEST_PACKAGE_ROOT || process.cwd());
 
-for (const scenario of ["single", "branches", "block-resume", "execution-recovery", "delivery-recovery"]) test(`real Worker continues ${scenario} research after a partial answer and completes one durable delivery`, { timeout: 60_000 }, async () => {
+for (const scenario of ["single", "branches", "block-resume", "execution-recovery", "delivery-recovery", "user-stop"]) test(`real Worker continues ${scenario} research after a partial answer and completes one durable delivery`, { timeout: 60_000 }, async () => {
   await assertInstalledRuntime(packageRoot);
   const root = await mkdtemp(join(TEST_ROOT, "task-flow-"));
   const socketRoot = join(TEST_SOCKET_ROOT, "t");
   await mkdir(socketRoot);
   const saved = { ...process.env };
   let backend, server, requests = 0, fixtureError, failureRequests = 0, recoveryRestarted = false, blockedWrite = false;
+  let scope;
+  const blockedStopCalls = new Set();
   const observedRequests = [];
   const tools = [];
   try {
@@ -32,6 +34,10 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
       try {
         let body = ""; for await (const part of req) body += part;
         const request = JSON.parse(body); observedRequests.push(request);
+        if (scenario === "user-stop" && requests === 4) {
+          await backend.sendInput({ ...scope, client_message_id: "stop-research", request_id: "stop-research",
+            text: "Stop this research and cancel its running calculations.", mode: "steer" });
+        }
         if (failureRequests === 0 && ((scenario === "execution-recovery" && requests === 4)
           || (scenario === "delivery-recovery" && requests === 7))) {
           failureRequests++;
@@ -42,6 +48,9 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
         const results = request.messages.filter(message => message.role === "tool").map(message => {
           if (scenario === "delivery-recovery" && message.content.includes("Delivery recovery permits read-only tools")) {
             blockedWrite = true; return null;
+          }
+          if (scenario === "user-stop" && message.content.includes("The user stopped this task.")) {
+            blockedStopCalls.add(message.tool_call_id); return null;
           }
           assert.match(message.content, /^\s*[\[{]/, "fixture tools must return their structured success result");
           return JSON.parse(message.content);
@@ -121,7 +130,15 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
         ];
         const deliverySteps = [...singleSteps.slice(0, 7),
           { name: "bash", arguments: { command: "touch forbidden-delivery-write" } }, singleSteps[7]];
-        const steps = scenario === "branches" ? branchSteps : scenario === "block-resume" ? blockSteps
+        const stopSteps = [...singleSteps.slice(0, 5),
+          { name: "task_update", arguments: { expected_revision: task?.revision, action: "apply_user_control",
+            control: "cancel", jobs: "cancel", source_submission_ids: userIds } },
+          { name: "bash", arguments: { command: "touch forbidden-stop-write" } },
+          singleSteps[0],
+          { name: "task_read", arguments: {} },
+          "Research is cancelled. No further analysis or calculations will be launched.",
+        ];
+        const steps = scenario === "user-stop" ? stopSteps : scenario === "branches" ? branchSteps : scenario === "block-resume" ? blockSteps
           : scenario === "delivery-recovery" ? deliverySteps : singleSteps;
         const step = steps[requests++];
         assert.ok(step, "completed research must not trigger another model request");
@@ -155,7 +172,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
     await assert.doesNotReject(async () => { backend = await createCoRAgentHarnessBackend(options); });
     let created;
     await assert.doesNotReject(async () => { created = await backend.createSession({ workspace_id: "task-flow", model: { provider: "fixture", id: "fixture" } }); });
-    const scope = { workspace_id: "task-flow", session_id: created.session.session_id };
+    scope = { workspace_id: "task-flow", session_id: created.session.session_id };
     await backend.sendInput({ ...scope, client_message_id: "start-fixture-task", request_id: "start-fixture-task",
       text: "Perform the local fixture research and report the completed finding. Do not send anything externally.", mode: "auto" });
     let overview;
@@ -193,7 +210,29 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
         await backend.close(); backend = await createCoRAgentHarnessBackend(options); recoveryRestarted = true;
       }
       if (overview.task?.state === "completed") break;
+      if (scenario === "user-stop" && overview.task?.state === "cancelled" && requests === 10) {
+        const runs = await backend.monitor("monitor/runs", { ...scope, user_task_id: overview.task.user_task_id });
+        if (runs.items.every(run => run.state === "done")) break;
+      }
       await new Promise(done => setTimeout(done, 100));
+    }
+    if (scenario === "user-stop") {
+      assert.equal(overview.task?.state, "cancelled");
+      assert.equal(requests, 10, "the stopped run must finish its acknowledgement");
+      assert.equal(blockedStopCalls.size, 2, "both shell work and replacement tasks are blocked");
+      await assert.rejects(readFile(join(workspaceRoot, "task-flow", "forbidden-stop-write")), { code: "ENOENT" });
+      const runs = await backend.monitor("monitor/runs", { ...scope, user_task_id: overview.task.user_task_id });
+      assert.ok(runs.items.every(run => run.state === "done"));
+      const stoppedId = overview.task.user_task_id;
+      await backend.close(); backend = await createCoRAgentHarnessBackend(options);
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const restored = await backend.monitor("monitor/overview", scope);
+        assert.equal(restored.task.user_task_id, stoppedId);
+        assert.equal(restored.task.state, "cancelled");
+        await new Promise(done => setTimeout(done, 100));
+      }
+      assert.equal(requests, 10, "restart and Monitor queries must not resume cancelled research");
+      return;
     }
     assert.equal(overview.task?.state, "completed");
     assert.equal(requests, scenario === "branches" ? 17 : scenario === "block-resume" ? 11 : scenario === "delivery-recovery" ? 9 : 8);

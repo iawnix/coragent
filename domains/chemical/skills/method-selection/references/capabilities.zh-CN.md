@@ -25,16 +25,17 @@
 | 复合物排布 | `chemical.complex-sample` | 有种子的刚性片段组装/扰动、碰撞与距离检查、原子来源；需要已有坐标，总自旋可保持未知，不进行优化 |
 | 材料 QST2/QST3 | `chemical.qst-prepare` | 已有映射端点/猜测、相容态声明、置换与 GJF 导出；不认证极小点或基元步骤 |
 | 弛豫扫描网格 | `chemical.scan-xtb`、`chemical.scan-gaussian` | 有界独立点一维/二维网格、原生约束、实际偏差、物理能量、失败记录和终止结果续算；不自动证明路径连续 |
-| 梯度与 NEB | `chemical.gradient-xtb`、`chemical.neb-xtb` | xTB 6.7.1 GFN1/GFN2 梯度、单位/符号核对、NumPy 改进切向/爬山 NEB 和有界力松弛；保留部分路径，Gaussian 基态自旋 calculator 由独立电子接口提供；无 ASE 适配 |
+| 梯度与 NEB | `chemical.gradient-xtb`、`chemical.neb-xtb` | xTB 6.7.1 GFN1/GFN2 梯度、单位/符号核对、v2 为 ASE 改进切向/爬山 NEB 与 FIRE/BFGS；保留部分路径和求值预算 |
 | 能量分析 | `chemical.thermochemistry`、`chemical.ensemble-free-energy`、`chemical.energy-profile`、`chemical.scan-slice` | 基态来源组合、标准态、仅熵低频下限、有限构象 G、守恒计量能量差及成功扫描点；动力学另见后续条目 |
 | 路径审计 | `chemical.pathway-check` | 明确假设、原子/计量/共享中间体连续性、缺步骤及可选经典模式/IRC 重算；不自动穷尽机制 |
 | 条件动力学 | `chemical.tst`、`chemical.branching`、`chemical.kinetic-network` | 经典 TST、共同前体初始分支及带守恒/误差检查的封闭质量作用积分；不保证刚性网络求解 |
 | Gaussian 电子态 | `chemical.electronic-gaussian`、`chemical.state-tracking` | 基态自旋 HF/DFT、单重 TDDFT/TDHF/TDA 单点/优化；目标能量/梯度/自旋解析；AO 特征重叠需提供密度/跨帧度量 |
-| Gaussian 梯度/NEB | `chemical.gradient-gaussian`、`chemical.neb-gaussian` | 气相基态自旋梯度 calculator；复用有界 NumPy NEB，不自动证明波函数分支 |
+| Gaussian 梯度/NEB | `chemical.gradient-gaussian`、`chemical.neb-gaussian` | 气相基态自旋梯度 calculator；使用 ASE NEB v2，不自动证明波函数分支 |
 | 不同自旋交叉 | `chemical.mecp-gaussian`、`chemical.crossing-check` | 投影局部搜索及独立能隙/梯度/可选交叉缝 Hessian 检查；不提供全局 MECP、SOC、同自旋 CI 或非绝热动力学；不是 QBICS |
-| 结构图与报告 | `chemical.render`、report Skill | 有结构渲染；报告引用实际材料，不将执行标记提升为科学结论 |
+| 局部结构诊断 | `chemical.local-diagnostics` | 显式局部坐标、短接触、全局/中心纯旋转对齐；不判断键或电子态 |
+| 结构图与报告 | `chemical.render`、`chemical.trajectory`、`chemical.research-report` | 固定视角轨迹/模式示意、坐标剖面和有来源的图文报告；明确作者解释与未完整路径 |
 
-所有已注册入口当前版本为 `1`；实际参数与依赖见相应 Skill、CLI 和执行目录。上表不是工具白名单；未封装的方法可通过有依据、已核实的原生命令或任务脚本执行。单分子单点/优化不需要构造 R/P、映射或 TS。
+NEB 统一使用 ASE 版本 `2`，旧版本 `1` 入口已删除；其余上述入口为版本 `1`；实际参数与依赖见相应 Skill、CLI 和执行目录。上表不是工具白名单；未封装的方法可通过有依据、已核实的原生命令或任务脚本执行。单分子单点/优化不需要构造 R/P、映射或 TS。
 
 ## 验证器的真实适用范围
 

@@ -61,3 +61,5 @@ description: 将化学名称、描述或给定结构转成分子图和初始几�
 - [name_resolution.zh-CN.md](references/name_resolution.zh-CN.md)：查询、推断候选格式和结果字段。
 - [structure_input.zh-CN.md](references/structure_input.zh-CN.md)：分子图检查、几何生成和结构对照。
 - [reaction_mapping.zh-CN.md](references/reaction_mapping.zh-CN.md)：原子映射与反应图检查。
+
+`chemical.local-diagnostics@1` 可独立检查显式反应中心坐标、短接触及参考/局部对齐，不认证键、电子结构或 TS。见[局部结构诊断](references/local_diagnostics.zh-CN.md)。

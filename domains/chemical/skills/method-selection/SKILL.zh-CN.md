@@ -42,3 +42,5 @@ description: 选择科学方法并准备命名计算环境；用户已经指定�
 
 - [请求准备](references/request_preparation.zh-CN.md)：声明入口、显式输入与恢复。
 - [Runner 结果、单位与电子态](references/runner_results.zh-CN.md)
+
+搜索失败或反复得到相同结果时，按[搜索诊断与恢复](references/search_recovery.zh-CN.md)先区分执行、数值和假设问题，再修改设置或种子。

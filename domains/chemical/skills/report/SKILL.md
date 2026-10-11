@@ -68,3 +68,5 @@ requested endpoint yield. Distinguish kinetic predictions from product-G ranking
 For electronic/crossing outputs, show target vs reference energy and separate
 state-character continuity, numerical stationarity and curvature. An unverified
 state or missing Hessian must remain visible in the report.
+
+Use independent `chemical.trajectory@1` and `chemical.research-report@1` Jobs for fixed-camera GIF/XYZ/CSV profiles and illustrated Markdown packages. They retain incomplete paths, supplied author assessment and source evidence; energy comparisons are recomputed through the existing energetics contract. See [trajectory and report contracts](references/research_tools.md).

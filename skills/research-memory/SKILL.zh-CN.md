@@ -7,7 +7,7 @@ description: 用持久问题 Node、显式关系、执行观察与不可变 Resu
 
 先读注入的工作区上下文或 `research_read {}`。上下文在预算内保留原始用户要求、关键 Node、Result 与执行事实；省略不表示不存在或已经完成。按返回引用继续读取。执行回执记录事实，领域 Skill 和 Agent 负责科学解释。
 
-用户任务的目标、交付条件、等待、阻塞和完成由 `task_read`、`task_update` 管理。Node 的 open/paused/closed 不会暂停或完成用户任务。科学解释与证据仍保存在 Memory，任务进展和完成依据引用这些记录。
+用户任务的目标、交付条件、等待、阻塞和完成由 `task_read`、`task_update` 管理。Node 的 open/paused/closed 不会暂停或完成用户任务。真实用户的停止或恢复指令通过 `task_update action=apply_user_control` 写入；仅取消 Job 也不会停止任务。授权来源与 Job 策略见[研究工作流](../research-workflow/SKILL.zh-CN.md)。科学解释与证据仍保存在 Memory，任务进展和完成依据引用这些记录。
 
 ## 五种小操作
 

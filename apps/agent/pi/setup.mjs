@@ -141,7 +141,7 @@ export async function createCoRAgentHarness(databasePath, options) {
         hook(CompactionTask, { prepareSummary: input => contextManager.prepareSummary(input) }),
         hook(ToolTask, {
           beforeTool: async (call, api, context) => {
-            const restriction = await taskController.toolRestriction(context);
+            const restriction = await taskController.toolRestriction(context, call.name);
             const tool = durableTools.find(tool => tool.name === call.name);
             if (restriction && !["read", "grep", "find", "ls"].includes(call.name) && tool?.metadata?.effect !== "read") return { block: restriction };
             const packagePolicy = packageReadGuard({ toolName: call.name, args: call.arguments });

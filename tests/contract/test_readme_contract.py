@@ -53,7 +53,8 @@ def test_readmes_link_to_setup_usage_and_developer_guides() -> None:
 def test_public_document_set_covers_install_architecture_and_maintenance() -> None:
     for path in PUBLIC_DOCS:
         assert path.is_file()
-        assert path.read_text(encoding="utf-8").startswith("# ")
+        # A leading brand image is allowed; the document still needs an H1.
+        assert re.search(r"^# \S.+$", path.read_text(encoding="utf-8"), re.MULTILINE)
 
     installation = INSTALLATION.read_text(encoding="utf-8")
     for heading in [

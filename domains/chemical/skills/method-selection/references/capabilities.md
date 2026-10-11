@@ -25,16 +25,17 @@
 | Complex placements | `chemical.complex-sample` | Seeded rigid-fragment assembly/perturbation, collision/distance checks and lineage; supplied coordinates required, unknown total spin preserved; no optimization |
 | Material QST2/QST3 | `chemical.qst-prepare` | Supplied mapped endpoint/guess geometries, explicit compatible states, permutation and GJF export; no minimum or elementary-step certification |
 | Relaxed scan grids | `chemical.scan-xtb`, `chemical.scan-gaussian` | Bounded independent-point 1D/2D grids; native constraints, actual deviations, physical energies, failures and terminal-result continuation; no automatic path continuity |
-| Gradients and NEB | `chemical.gradient-xtb`, `chemical.neb-xtb` | xTB 6.7.1 GFN1/GFN2 gradients, explicit unit/sign checks, NumPy improved-tangent/climbing NEB and finite force relaxation; partial paths retained; Gaussian ground-spin calculator is available through the separate electronic adapter; no ASE adapter |
+| Gradients and NEB | `chemical.gradient-xtb`, `chemical.neb-xtb` | xTB 6.7.1 GFN1/GFN2 gradients, explicit unit/sign checks, ASE improved-tangent/climbing NEB with FIRE/BFGS in v2; partial paths and evaluation budgets retained |
 | Energy analysis | `chemical.thermochemistry`, `chemical.ensemble-free-energy`, `chemical.energy-profile`, `chemical.scan-slice` | Ground-state source combinations, standard states, entropy-only frequency floor, finite conformer G, balanced energy differences and successful scan slices; separate bounded kinetic executors below |
 | Pathway audit | `chemical.pathway-check` | Explicit hypotheses, atom/stoichiometric/shared-intermediate continuity, missing steps and optional recomputed classical mode/IRC evidence; no exhaustive generator |
 | Conditional kinetics | `chemical.tst`, `chemical.branching`, `chemical.kinetic-network` | Classical TST, common-precursor initial branches, closed mass-action integration with conservation/error checks; no stiff-solver guarantee |
 | Gaussian state calculations | `chemical.electronic-gaussian`, `chemical.state-tracking` | Ground-spin HF/DFT and singlet TDDFT/TDHF/TDA SP/opt; target energy/gradient/spin parsing; AO transition-character overlap requires supplied density/cross-metric tensors |
-| Gaussian gradients/NEB | `chemical.gradient-gaussian`, `chemical.neb-gaussian` | Gas-phase ground-spin gradient calculator; same bounded NumPy NEB, no automatic wavefunction branch proof |
+| Gaussian gradients/NEB | `chemical.gradient-gaussian`, `chemical.neb-gaussian` | Gas-phase ground-spin gradient calculator; ASE NEB v2, no automatic wavefunction branch proof |
 | Different-spin crossings | `chemical.mecp-gaussian`, `chemical.crossing-check` | Projected local search and independent gap/gradient/optional seam-Hessian checks; no global MECP, SOC, same-spin CI or nonadiabatic dynamics; not QBICS |
-| Rendering and reports | `chemical.render`, report Skill | Structure rendering exists; reports cite actual materials, not execution flags as scientific conclusions |
+| Local diagnostics | `chemical.local-diagnostics` | Explicit local coordinates, contacts and proper global/center alignment; no bond or electronic verdict |
+| Rendering and reports | `chemical.render`, `chemical.trajectory`, `chemical.research-report` | Fixed-camera trajectories/mode illustrations, coordinate profiles and evidence-bound illustrated reports; author assessment and incomplete paths remain explicit |
 
-All registered entries above currently use version `1`; consult their Skill, CLI and execution descriptor for arguments/dependencies. This is not an execution whitelist: justified, verified native commands or task scripts remain usable. Independent molecular SP/optimization needs no R/P, mapping or TS.
+NEB uses version `2` (ASE); its version `1` entries have been removed. Other entries above use version `1`; consult their Skill, CLI and execution descriptor for arguments/dependencies. This is not an execution whitelist: justified, verified native commands or task scripts remain usable. Independent molecular SP/optimization needs no R/P, mapping or TS.
 
 ## Validator scope
 

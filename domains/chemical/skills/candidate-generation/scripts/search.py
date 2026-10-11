@@ -10,7 +10,6 @@ from analysis_material import read_json
 from ensemble_material import canonical
 from gradient_contract import evaluate_evidence
 from material import digest, object_fields
-from neb_engine import neb
 from path_contract import material, qst, settings
 from path_gaussian import GaussianOptimizer
 from path_process import write_json
@@ -32,9 +31,7 @@ def run(args):
         backend = args.operation.split('-')[1]
         cls = XtbCalculator if backend == 'xtb' else GaussianOptimizer
         result = scan(spec,output,backend,lambda m,s:cls(m,s,args.executable),max_points=args.max_points)
-    elif args.operation == 'neb-xtb':
-        result = neb(spec,output,lambda m,s:XtbCalculator(m,s,args.executable))
-    else:
+    elif args.operation == 'gradient-xtb':
         object_fields(spec,('schema_version','material','settings'),'gradient input')
         if spec.get('schema_version') != 'chemical-gradient-input/1': raise ValueError('chemical-gradient-input/1 required')
         m=material(spec['material']); s=settings(spec['settings'],'xtb')
@@ -49,6 +46,8 @@ def run(args):
         except (ValueError, RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
             result['error'] = {'type':type(exc).__name__, 'reason':str(exc)}
         finally: write_json(output/'result.json',result)
+    else:
+        raise ValueError('operation not supported by this entrypoint')
     return result
 
 

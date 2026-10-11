@@ -7,7 +7,7 @@ description: Resume research through persistent problem Nodes, explicit relation
 
 Start from the injected workspace context or `research_read {}`. It preserves original user requirements and selects relevant Nodes, Results and execution facts within a budget. Omitted content is not absent or completed; use the returned references to inspect it. Scientific interpretation belongs to you and the domain Skill, not the execution receipt.
 
-User task control belongs to `task_read` and `task_update`: objective, delivery criteria, waiting, blockers and completion. A Node's open/paused/closed status does not pause or complete that task. Keep scientific interpretation and evidence here, and reference those records from task progress or completion.
+User task control belongs to `task_read` and `task_update`: objective, delivery criteria, waiting, blockers and completion. A Node's open/paused/closed status does not pause or complete that task. Apply actual user stop/resume instructions through `task_update action=apply_user_control`; cancelling Jobs alone also leaves the task active. See the [research workflow](../research-workflow/SKILL.md) for source authorization and Job policy. Keep scientific interpretation and evidence here, and reference those records from task progress or completion.
 
 ## Five small operations
 

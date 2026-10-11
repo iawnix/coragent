@@ -2,6 +2,8 @@
 
 [English](path_search.md)
 
+NEB 统一使用 [ASE](ase_neb_executor.zh-CN.md)，输入和执行器为版本 2。
+
 ## 内容
 
 - [独立执行与环境](#独立执行与环境)
@@ -12,7 +14,7 @@
 
 ## 独立执行与环境
 
-以下五个入口均为版本 `1`，输入角色只有一个 `input` JSON Artifact。
+以下入口的输入角色只有一个 `input` JSON Artifact；QST/扫描/梯度为版本 1，NEB 为版本 2。
 不要求反应名称、DA 拓扑或完整研究流程。通过既有准备器生成请求，
 将 request_file/request_sha256 和 node_id 交给 job_start，终止后收集。
 占位符应换成真实绝对路径和 Artifact 引用：
@@ -31,9 +33,9 @@
 
 原生路径操作需要 **RDKit/NumPy 加已配置的求解器**，不同于只需标准库的旧 Gaussian/xTB
 包装器。为 path_xtb/path_gaussian 配置相应原生命令/激活脚本，再以
-`--job-profile local:path` 为显式配置的后端绑定已有 structure.lock。
+`--job-profile local:path` 为显式配置的后端绑定 path.lock（RDKit/NumPy、ASE、SciPy）。
 此 profile 不安装求解器、不默认执行原生科学验收；先按 --executor/--version
-检查选定入口环境，再运行有界科学案例。旧 wrapper 环境不变；不新增 ASE，
+检查选定入口环境，再运行有界科学案例。旧 wrapper 环境不变；NEB 使用 ASE，
 也不根据 PATH 自动猜测原生绑定。
 
 嵌入材料为 chemical-material/1，要求已有 angstrom 坐标、2–256 原子、已知电荷/多重度
@@ -99,24 +101,14 @@ SCC 和终止状态。日志打印态信息时核对一致性；输入声明不�
 chemical-calculation/1 绑定 atom_ids、坐标及摘要、model、收敛和原始来源。
 要求电子能和 Cartesian **dE/dR**；仅有能量不能运行 NEB。引擎用
 1 bohr = 0.529177210903 Å，显式转换成负梯度力（hartree/angstrom）。
-核心算法可接独立 calculator；内置原生梯度适配目前只有 xTB。
-Gaussian 梯度/calculator 尚未实现，不能因支持 Gaussian 扫描而声称可运行 Gaussian NEB。
+核心算法可接独立 calculator；已有 xTB 和 Gaussian 独立原生适配。
+Gaussian 使用不同电子设置，具体范围见本参考末节。
 
-`chemical-neb-input/1` 包含 reactant、product、mapping、xTB settings，可选参数：
-image_count 默认 7（3–32）、max_steps 默认 100（0–1000）、fmax 默认 0.001 hartree/angstrom、
-spring 默认 0.05 hartree/angstrom²、step_size 默认 1 angstrom²/hartree、
-max_displacement 默认 0.05 Å、climb_after 默认 null（禁用爬山，否则指定零基迭代号）。
-端点固定并保留，不因此认证其为极小点。
-
-可选 `images` 为 image_count × atom_count × 3 的 angstrom 数组，按反应物原子顺序，
-首尾必须与映射端点一致。否则使用不作对齐的线性 Cartesian 插值。
-近重合原子和相邻重复初始 image 会被拒绝，应修订路径，不能假定插值在化学上合理。
-
-引擎使用能量加权改进切向、垂直物理力、平行弹簧力，并可将最高内部 image 设为爬山点。
-优化器为限制最大位移的投影力松弛，不是 ASE/FIRE/BFGS。收敛量是内部 image 的最大
-逐原子 NEB 力范数；要求爬山时必须启动爬山后才可收敛。NEB 力小不证明物理驻点。
-最多 2+(max_steps+1)*(image_count-2) 次 calculator 调用，端点只算一次；
-原生逐调用超时和外层 Job walltime 都需要纳入预算。
+`chemical.neb-xtb@2`、`chemical.neb-gaussian@2` 使用 ASE NEB 和
+chemical-neb-input/2。FIRE/BFGS、linear/IDPP 初始化、显式 eV/Å 力单位、求值预算
+及部分输出处理见 [ASE 合同](ase_neb_executor.zh-CN.md)。端点固定，候选需独立 TS 验证。
+原 NumPy NEB 实现和版本 1 执行入口已删除；旧请求须按新合同重新准备，不能只改
+schema 名称或直接复用旧数值参数。
 
 ## 证据与限制
 
@@ -134,10 +126,9 @@ NEB 不自动续跑未知 Job；审查后的旧路径可作为新任务的显式
 
 ## Gaussian 基态自旋梯度与 NEB
 
-chemical.gradient-gaussian@1 和 chemical.neb-gaussian@1 复用已有
-chemical-gradient-input/1、chemical-neb-input/1 的几何/映射/预算合同，但 settings
+chemical.gradient-gaussian@1 和 chemical.neb-gaussian@2 分别使用
+chemical-gradient-input/1、chemical-neb-input/2；settings
 使用[电子态适配器设置](../../gaussian/references/electronic_states.zh-CN.md)，要求
 理论 ground 及受支持的气相泛函/基组，绑定 path_gaussian。原坐标轴的力取负并转为
 Eh/Å 的 dE/dR，计算证据记录 2e-6 Å 打印坐标精度。独立有限差分与确定性原生 Job
-测试核对单位/符号/派发，不代表真实 Gaussian NEB 基准。NEB 算法及未验证候选语义
-保持一致，多重度/S² 不证明波函数分支连续。
+测试核对单位/符号/派发，不代表真实 Gaussian NEB 基准。ASE NEB 的候选仍为未验证，多重度/S² 不证明波函数分支连续。

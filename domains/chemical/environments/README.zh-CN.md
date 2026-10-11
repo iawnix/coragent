@@ -10,11 +10,12 @@ glibc >=2.28。CF22D 选择通用 x86_64 PySCF 构建，不绑定维护者的 CP
 | 锁文件 | 绑定 | 内容 |
 | --- | --- | --- |
 | wrapper.lock | Gaussian/xTB/CREST 包装脚本 | Python 3.11 与安装工具；原生求解器单独安装 |
-| structure.lock | structure、validation | RDKit 与 NumPy |
+| structure.lock | structure、validation | RDKit、NumPy、Matplotlib、Pillow，供结构/轨迹/报告分析 |
+| path.lock | path_xtb、path_gaussian | structure 依赖加 ASE 3.29.0 与 SciPy，供 NEB v2 |
 | cf22d.lock | pyscf | PySCF、geomeTRIC 和 dispersion，全部由 Conda 安装 |
 | render.lock + render.requirements.txt | render | RDKit、Cairo、Matplotlib、xyzrender 及其依赖 |
 
-文本报告只使用 Host 标准库，不需要渲染锁。渲染环境中的 notebook 依赖来自
+基础文本报告 helper 使用 Host 标准库；图文报告/轨迹 Job 使用 structure，均不需要渲染锁。渲染环境中的 notebook 依赖来自
 xyzrender 上游要求，只安装在渲染目标中。这些环境均不安装 CoRAgent wheel。
 
 统一入口 `install.sh` 根据 `manifest.json` 准备环境。首次安装没有提供 `job.toml`
@@ -64,8 +65,8 @@ RDKit、Job 内的解析器配置路径和乙醇结构生成；其他环境执�
 通过后发布。pip 条目必须附上游产物的摘要。不要导出凭据、引入仅本机存在的 wheel，
 或就地替换正在使用的安装锁。
 
-可选 `path` profile 为显式配置的 `path_xtb` / `path_gaussian` 原生绑定复用
-structure.lock，提供扫描、梯度与 NEB 所需 RDKit/NumPy，不改变旧轻量包装器。
+可选 `path` profile 为显式配置的 `path_xtb` / `path_gaussian` 原生绑定使用
+path.lock，提供 RDKit/NumPy、ASE、SciPy，供扫描、梯度与 ASE NEB v2，不改变旧轻量包装器。
 例如为 `[environments.local.backends.path_xtb]` 配置
 `command = "/opt/xtb/bin/xtb"`（需要时加 activation_script），再选择
 `--job-profile local:path`。该 profile 不默认进行原生科学计算冒烟测试；

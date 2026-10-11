@@ -158,7 +158,7 @@ export interface ToolParameters {
   taskRead: Record<string, never>;
   taskUpdate: {
     "expected_revision": number;
-    "action": "refine" | "progress" | "wait" | "block" | "propose_completion" | "set_research";
+    "action": "refine" | "progress" | "wait" | "block" | "propose_completion" | "set_research" | "apply_user_control";
     "reason"?: string;
     "objective"?: string;
     "criteria"?: Array<{
@@ -179,5 +179,7 @@ export interface ToolParameters {
       "entry_node_ids": Array<string>;
       "focus_node_ids": Array<string>;
     };
+    "control"?: "pause" | "resume" | "cancel";
+    "jobs"?: "keep" | "cancel";
   };
 }

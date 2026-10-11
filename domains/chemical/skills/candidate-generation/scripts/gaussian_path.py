@@ -8,7 +8,6 @@ for part in ('_shared','chemical-input/scripts','crest/scripts','gaussian/script
 from analysis_material import read_json
 from electronic import GaussianElectronic
 from gradient_contract import calculation,evaluate_evidence
-from neb_engine import neb
 from path_contract import material
 from path_process import write_json
 from search_cli import parse_arguments
@@ -36,7 +35,7 @@ class GaussianPathCalculator:
 
 def run(args):
     spec,sha=read_json(args.input)
-    if args.operation=='neb-gaussian':return neb(spec,args.output_dir,lambda m,s:GaussianPathCalculator(m,s,args.executable))
+    if args.operation!='gradient-gaussian':raise ValueError('this entrypoint only runs Gaussian gradients')
     schema(spec,'chemical-gradient-input/1',('material','settings'))
     m=material(spec['material']);calculator=GaussianPathCalculator(m,spec['settings'],args.executable)
     args.output_dir.mkdir(parents=True,exist_ok=False)
