@@ -27,7 +27,7 @@ def _run(script: Path, *args: str) -> dict:
 def test_workspace_cli_roundtrip_uses_canonical_research_workspace(tmp_path):
     workspace=tmp_path/"workspace"
     initialized=_run(CLI,"--root",str(workspace),"--workspace-id","workspace_cli")
-    assert initialized["schema_version"]=="research_workspace/2"
+    assert initialized["schema_version"]=="research_workspace/3"
     assert initialized["state"]=="ready"
     request=tmp_path/"create.json"
     request.write_text(json.dumps({"goal": "Verify the optimized structure"}))

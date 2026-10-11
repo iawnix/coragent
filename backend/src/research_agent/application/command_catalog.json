@@ -2576,10 +2576,53 @@
       }
     },
     {
+      "id": "research.allocate_task",
+      "domain": "research",
+      "effect": "write",
+      "allowed": [
+        "session_id",
+        "request_id"
+      ],
+      "required": [
+        "session_id",
+        "request_id"
+      ],
+      "schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "session_id",
+          "request_id"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "pattern": "^task_[1-9][0-9]*$"
+          }
+        },
+        "required": [
+          "identifier"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "id": "job.start",
       "domain": "runtime",
       "allowed": [
-        "job_id",
         "request_id",
         "command",
         "cwd",
@@ -2608,9 +2651,6 @@
       "schema": {
         "type": "object",
         "properties": {
-          "job_id": {
-            "type": "string"
-          },
           "request_id": {
             "type": "string"
           },
@@ -2746,7 +2786,7 @@
               "string",
               "null"
             ],
-            "pattern": "^task_[A-Za-z0-9_-]+$"
+            "pattern": "^task_[1-9][0-9]*$"
           }
         },
         "required": [],
@@ -3242,9 +3282,6 @@
                 "media_type": {
                   "type": "string"
                 },
-                "artifact_ref": {
-                  "type": "string"
-                },
                 "provenance": {
                   "type": "object",
                   "properties": {
@@ -3307,7 +3344,6 @@
                 "sha256",
                 "size_bytes",
                 "media_type",
-                "artifact_ref",
                 "provenance"
               ],
               "additionalProperties": false
@@ -4422,7 +4458,8 @@
           },
           "cursor": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "^job_[1-9][0-9]*$"
           }
         },
         "additionalProperties": false
@@ -4488,7 +4525,6 @@
       "id": "artifact.register",
       "domain": "runtime",
       "allowed": [
-        "artifact_id",
         "path",
         "job_id",
         "sha256",
@@ -4498,9 +4534,6 @@
       "schema": {
         "type": "object",
         "properties": {
-          "artifact_id": {
-            "type": "string"
-          },
           "path": {
             "type": "string"
           },
@@ -4533,9 +4566,6 @@
             "type": "integer"
           },
           "media_type": {
-            "type": "string"
-          },
-          "artifact_ref": {
             "type": "string"
           },
           "provenance": {
@@ -4600,7 +4630,6 @@
           "sha256",
           "size_bytes",
           "media_type",
-          "artifact_ref",
           "provenance"
         ],
         "additionalProperties": false
@@ -4610,7 +4639,6 @@
       "id": "artifact.create",
       "domain": "runtime",
       "allowed": [
-        "artifact_id",
         "content",
         "name",
         "job_id",
@@ -4621,9 +4649,6 @@
       "schema": {
         "type": "object",
         "properties": {
-          "artifact_id": {
-            "type": "string"
-          },
           "content": {
             "anyOf": [
               {
@@ -4676,9 +4701,6 @@
           "media_type": {
             "type": "string"
           },
-          "artifact_ref": {
-            "type": "string"
-          },
           "provenance": {
             "type": "object",
             "properties": {
@@ -4741,7 +4763,6 @@
           "sha256",
           "size_bytes",
           "media_type",
-          "artifact_ref",
           "provenance"
         ],
         "additionalProperties": false
@@ -4753,27 +4774,28 @@
       "allowed": [
         "artifact_id",
         "offset",
-        "limit",
-        "artifact_ref"
+        "limit"
       ],
-      "required": [],
+      "required": [
+        "artifact_id"
+      ],
       "schema": {
         "type": "object",
         "properties": {
           "artifact_id": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^art_[1-9][0-9]*$"
           },
           "offset": {
             "type": "integer"
           },
           "limit": {
             "type": "integer"
-          },
-          "artifact_ref": {
-            "type": "string"
           }
         },
-        "required": [],
+        "required": [
+          "artifact_id"
+        ],
         "additionalProperties": false
       },
       "result": {
@@ -4792,9 +4814,6 @@
             "type": "integer"
           },
           "media_type": {
-            "type": "string"
-          },
-          "artifact_ref": {
             "type": "string"
           },
           "content": {
@@ -4817,7 +4836,6 @@
           "sha256",
           "size_bytes",
           "media_type",
-          "artifact_ref",
           "content",
           "next_offset"
         ],

@@ -22,7 +22,7 @@ def wait_reaped(receipt):
 @pytest.mark.parametrize('code', [0, 23])
 def test_exit_receipt_survives_without_status_polling(tmp_path, code):
     first=LocalProcessPlatform()
-    receipt=first.start(JobSpec(command=(sys.executable,'-c',f'raise SystemExit({code})'),cwd=tmp_path))
+    receipt=first.start(JobSpec(job_id="job_1", command=(sys.executable,'-c',f'raise SystemExit({code})'),cwd=tmp_path))
     wait_reaped(receipt)
     recovered=LocalProcessPlatform().status(receipt)
     assert recovered.state==(JobState.FAILED if code else JobState.SUCCEEDED)
@@ -31,18 +31,18 @@ def test_exit_receipt_survives_without_status_polling(tmp_path, code):
 
 def test_timeout_enforced_without_polling_and_restart_cancel(tmp_path):
     first=LocalProcessPlatform()
-    receipt=first.start(JobSpec(command=(sys.executable,'-c','import time;time.sleep(30)'),cwd=tmp_path,timeout_seconds=.15))
+    receipt=first.start(JobSpec(job_id="job_1", command=(sys.executable,'-c','import time;time.sleep(30)'),cwd=tmp_path,timeout_seconds=.15))
     wait_reaped(receipt)
     assert LocalProcessPlatform().status(receipt).state==JobState.TIMED_OUT
     second=tmp_path/'cancel';second.mkdir()
-    receipt=first.start(JobSpec(command=(sys.executable,'-c','import time;time.sleep(30)'),cwd=second))
+    receipt=first.start(JobSpec(job_id="job_1", command=(sys.executable,'-c','import time;time.sleep(30)'),cwd=second))
     try:assert LocalProcessPlatform().cancel(receipt).state==JobState.CANCELLED
     finally:wait_reaped(receipt)
 
 
 def test_missing_or_empty_outputs_do_not_rewrite_exit_code(tmp_path):
     runtime=LocalProcessPlatform()
-    receipt=runtime.start(JobSpec(command=(sys.executable,'-c',"open('empty','w').close()"),cwd=tmp_path,
+    receipt=runtime.start(JobSpec(job_id="job_1", command=(sys.executable,'-c',"open('empty','w').close()"),cwd=tmp_path,
         outputs=(JobOutput('empty',required=True,min_bytes=1),JobOutput('missing',required=True))))
     wait_reaped(receipt)
     result=runtime.collect(receipt)
@@ -54,11 +54,11 @@ def test_same_job_name_in_distinct_directories_does_not_reuse_a_terminal_observa
     platform = LocalProcessPlatform()
     first = tmp_path / 'first'; first.mkdir()
     second = tmp_path / 'second'; second.mkdir()
-    old = platform.start(JobSpec(command=(sys.executable, '-c', 'pass'), cwd=first, job_id='job_same'))
+    old = platform.start(JobSpec(command=(sys.executable, '-c', 'pass'), cwd=first, job_id='job_1'))
     wait_reaped(old)
     assert platform.status(old).state == JobState.SUCCEEDED
     new = platform.start(JobSpec(command=(sys.executable, '-c', 'import time; time.sleep(.3); raise SystemExit(23)'),
-                                 cwd=second, job_id='job_same'))
+                                 cwd=second, job_id='job_1'))
     try:
         assert platform.status(new).state == JobState.RUNNING
     finally:
@@ -75,20 +75,20 @@ def workspace(root):
 def test_job_attempt_collection_and_repeated_request_are_durable(tmp_path):
     workspace(tmp_path)
     source=tmp_path/'in.txt';source.write_text('input')
-    request={'root':str(tmp_path),'job_id':'job_test','command':[sys.executable,'-c',"from pathlib import Path;Path('result').write_text(Path('data/source').read_text())"],
+    request={'root':str(tmp_path),'request_id':'job_1','command':[sys.executable,'-c',"from pathlib import Path;Path('result').write_text(Path('data/source').read_text())"],
         'inputs':[{'source':str(source),'destination':'data/source'}], 'outputs':[{'path':'result','required':True,'min_bytes':1}]}
     receipt=dispatch('start',request)
     assert dispatch('start',request)['job_id']==receipt['job_id']
     for _ in range(100):
-        if dispatch('status',{'root':str(tmp_path),'job_id':'job_test'})['state']!='running':break
+        if dispatch('status',{'root':str(tmp_path),'job_id':'job_1'})['state']!='running':break
         time.sleep(.02)
-    result=dispatch('collect',{'root':str(tmp_path),'job_id':'job_test'})
+    result=dispatch('collect',{'root':str(tmp_path),'job_id':'job_1'})
     materials=list(manifests(tmp_path))
     assert execution(tmp_path, receipt['job_id'])['state']=='succeeded'
     assert result['output_validation']['complete']
     assert len(materials)>=2
     assert all(a['provenance']['job_id']==receipt['job_id'] for a in materials)
-    again=dispatch('collect',{'root':str(tmp_path),'job_id':'job_test'})
+    again=dispatch('collect',{'root':str(tmp_path),'job_id':'job_1'})
     assert len(list(manifests(tmp_path)))==len(materials)
     with pytest.raises(ValueError,match='different parameters'):
         dispatch('start',{**request,'command':[sys.executable,'-c','pass']})
@@ -114,10 +114,10 @@ def test_caller_request_id_replays_without_submitting_again(tmp_path):
 def test_terminal_receipt_arrives_during_supervisor_liveness_check(tmp_path, monkeypatch):
     from research_agent.jobs import JobReceipt
     from research_agent.jobs import local
-    receipt=JobReceipt('job_race','local','now',('true',),str(tmp_path),123,
+    receipt=JobReceipt('job_1','local','now',('true',),str(tmp_path),123,
                        {'supervised':True,'supervisor_start':'original'})
     def process_disappeared(pid):
-        (tmp_path/'status.json').write_text(json.dumps({'job_id':'job_race','state':'succeeded','exit_code':0}))
+        (tmp_path/'status.json').write_text(json.dumps({'job_id':'job_1','state':'succeeded','exit_code':0}))
         return None
     monkeypatch.setattr(local,'identity',process_disappeared)
     assert LocalProcessPlatform().status(receipt).state == JobState.SUCCEEDED

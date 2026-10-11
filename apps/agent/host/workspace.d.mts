@@ -1,6 +1,6 @@
 import type { WorkspaceMode } from "../contracts/session-mode.mjs";
 
-export const WORKSPACE_MANIFEST_SCHEMA: "research_workspace/2";
+export const WORKSPACE_MANIFEST_SCHEMA: "research_workspace/3";
 export const WORKSPACE_STATES: readonly ["ready", "admission_pending"];
 
 export function validate_workspace_manifest(
@@ -13,7 +13,7 @@ export function validate_workspace_files(
 ): Promise<WorkspaceManifest>;
 
 export interface WorkspaceManifest {
-  readonly schema_version: "research_workspace/2";
+  readonly schema_version: "research_workspace/3";
   readonly workspace_id: string;
   readonly workspace_mode: WorkspaceMode;
   readonly profile_id: string;

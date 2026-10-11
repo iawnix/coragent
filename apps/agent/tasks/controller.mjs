@@ -84,8 +84,8 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     const jobs = refs.some(ref => ref.startsWith("job_")) ? await ownedJobs(userTaskId) : [];
     const identities = await Promise.all([...new Set(refs)].map(async ref => {
       ctx?.abortSignal?.throwIfAborted();
-      if (/^a[1-9][0-9]*$/.test(ref) || /^art_[a-f0-9]{64}$/.test(ref)) {
-        const selector = ref.startsWith("art_") ? { artifact_id: ref } : { artifact_ref: ref };
+      if (/^art_[1-9][0-9]*$/.test(ref)) {
+        const selector = { artifact_id: ref };
         const artifact = await kernel.execute_command("artifact.read", { ...selector, limit: 1 });
         return [artifactIdentity(artifact)];
       }
@@ -298,7 +298,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       return conversation.commit(tx => receipt(tx, requestId, params, async () => {
         const { index, task: existing } = await currentTx(tx);
         requireValue(!existing || terminal.has(existing.state), "task_already_exists", "This conversation already has a nonterminal user task; update it");
-        const id = `task_${hash([sessionId, requestId]).slice(0, 24)}`;
+        const { identifier: id } = await kernel.execute_command("research.allocate_task", { session_id: sessionId, request_id: requestId });
         const task = await tx.doc(UserTask, conversation.id, id, null);
         Object.assign(task, { schema_version: "coragent-user-task/2", user_task_id: id,
           workspace_id: workspaceId, session_id: sessionId, conversation_id: conversation.id,
@@ -379,7 +379,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         if (message.role !== "toolResult" || message.isError || !substantive.has(message.toolName)) continue;
         const result = message.details.result;
         if (message.toolName === "research_result") { refs.push(result.result.id); identities.push(resultIdentity(result.result.id)); }
-        else if (message.toolName.startsWith("artifact_")) { refs.push(result.artifact_ref); identities.push(artifactIdentity(result)); }
+        else if (message.toolName.startsWith("artifact_")) { refs.push(result.artifact_id); identities.push(artifactIdentity(result)); }
         else if (result.accepted !== false) observations.push(result);
       }
       // Successful tool receipts already attest immutable products. Only Job

@@ -57,7 +57,7 @@ def test_repaired_job_dedup_and_late_failure_cannot_replace_selected_evidence(re
                'command': [sys.executable, '-c', program],
                'inputs': [{'source': str(source), 'destination': 'geometry.txt'}],
                'outputs': [{'path': 'energy.txt', 'required': True, 'min_bytes': 1}]}
-    failed, failure = run_attempt(root, {**request, 'job_id': 'job_failed_attempt', 'request_id': 'failed-attempt'})
+    failed, failure = run_attempt(root, {**request, 'request_id': 'failed-attempt'})
     assert failure['status']['state'] == 'failed'
     failed_receipt = failure['result_receipt']['receipt_id']
     initial = execute('research.result', root, {'node_id': node_id, 'conclusion': 'This input failed before an energy was available; the pathway is unresolved.',
@@ -65,7 +65,7 @@ def test_repaired_job_dedup_and_late_failure_cannot_replace_selected_evidence(re
     old = initial['result']
 
     source.write_text('repaired geometry')
-    repaired, success = run_attempt(root, {**request, 'job_id': 'job_repaired_attempt', 'request_id': 'repaired-attempt'})
+    repaired, success = run_attempt(root, {**request, 'request_id': 'repaired-attempt'})
     repaired_receipt = success['result_receipt']['receipt_id']
     assert success['status']['state'] == 'succeeded'
     assert success['output_validation']['complete']
@@ -79,10 +79,10 @@ def test_repaired_job_dedup_and_late_failure_cannot_replace_selected_evidence(re
     assert intents[0]['execution_fingerprint'] != intents[1]['execution_fingerprint']
     assert all(intent['node_id'] == node_id for intent in intents)
 
-    duplicate = execute('job.start', root, {**request, 'job_id': 'job_duplicate_attempt', 'request_id': 'duplicate-attempt'})
+    duplicate = execute('job.start', root, {**request, 'request_id': 'duplicate-attempt'})
     assert duplicate['accepted'] is False and duplicate['code'] == 'duplicate_execution'
     assert duplicate['job_id'] == repaired['job_id'], 'Duplicate points to the successful repaired input, never the earlier failure'
-    assert not (root / 'operations/jobs/job_duplicate_attempt.json').exists()
+    assert not (root / 'operations/jobs/job_3.json').exists()
     assert execute('job.collect', root, {'job_id': duplicate['job_id']})['result_receipt']['receipt_id'] == repaired_receipt
 
     corrected = execute('research.result', root, {'node_id': node_id,
@@ -120,12 +120,13 @@ def test_repaired_job_dedup_and_late_failure_cannot_replace_selected_evidence(re
     assert nodes.get_node(root, node_id)['assessment_ref'] == corrected['result']['id']
 
 
-def test_recent_results_follow_publication_sequence_not_uuid_or_clock(research_workspace, monkeypatch):
+def test_recent_results_follow_publication_sequence_not_lexical_id_or_clock(research_workspace, monkeypatch):
     root = research_workspace
     initial = execute('research.create', root, {'goal': 'Correct an earlier failed interpretation'})
     node_id = initial['node']['id']
-    identities = iter(['f' * 32, 'e' * 32, '0' * 32])
-    monkeypatch.setattr(results, 'uuid', SimpleNamespace(uuid4=lambda: SimpleNamespace(hex=next(identities))))
+    from research_agent.research.operational_ids import allocate_id
+    for _ in range(8):
+        allocate_id(root, 'result')
     monkeypatch.setattr(results, 'now', lambda: '2026-10-10T00:00:00+00:00')
     published = []
     for conclusion in ('Old failure', 'Second inconclusive attempt', 'Corrected positive observation'):

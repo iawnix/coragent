@@ -1,7 +1,7 @@
 """Immutable research products, distinct from execution collection receipts."""
 from pathlib import Path
+from .operational_ids import allocate_id
 import re
-import uuid
 from research_agent.foundation.transactions import read_json, write_json, workspace_transaction
 from research_agent.foundation.path_safety import path_has_symlink
 from . import basis, relations
@@ -10,7 +10,7 @@ from .nodes import get_node, save, text, validate_refs, response
 
 
 def get_result(root, result_id):
-    if not isinstance(result_id, str) or not re.fullmatch(r'result_[a-f0-9]{32}', result_id):
+    if not isinstance(result_id, str) or not re.fullmatch(r'result_[1-9][0-9]*', result_id):
         raise ValueError('result_id_invalid: use a returned Result reference')
     entry = relations.graph(root)['results'].get(result_id)
     if not entry:
@@ -28,7 +28,7 @@ def get_result(root, result_id):
 
 
 def publication_order(root, graph=None):
-    """Read Result headers in immutable publication order, independent of UUIDs."""
+    """Read Result headers in immutable publication order, independent of ID spelling and clocks."""
     graph = graph if graph is not None else relations.graph(root)
     return [graph['results'][record(root, row['ref'])['data']['result_id']]
             for row in journal(root)['records'] if row['origin'] == 'agent' and row['kind'] == 'result_published']
@@ -81,7 +81,7 @@ def publish(root, request):
         for used in detail.get('input_refs', []):
             if used not in inputs:
                 inputs.append(used)
-    result = dict(schema_version='research-result/1', id='result_' + uuid.uuid4().hex,
+    result = dict(schema_version='research-result/1', id=allocate_id(root, 'result'),
                   workspace_id=node['workspace_id'], node_id=node['id'],
                   summary=text(request.get('summary', conclusion[:600]), 'summary', required=True, limit=4000),
                   summary_is_excerpt='summary' not in request and len(conclusion) > 600,

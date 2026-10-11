@@ -7,9 +7,6 @@
       "schema": {
         "type": "object",
         "properties": {
-          "artifact_id": {
-            "type": "string"
-          },
           "path": {
             "type": "string"
           },
@@ -39,9 +36,6 @@
       "schema": {
         "type": "object",
         "properties": {
-          "artifact_id": {
-            "type": "string"
-          },
           "content": {
             "anyOf": [
               {
@@ -90,23 +84,25 @@
         "type": "object",
         "properties": {
           "artifact_id": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^art_[1-9][0-9]*$"
           },
           "offset": {
             "type": "integer"
           },
           "limit": {
             "type": "integer"
-          },
-          "artifact_ref": {
-            "type": "string"
           }
         },
-        "required": [],
+        "required": [
+          "artifact_id"
+        ],
         "additionalProperties": false
       },
       "examples": [
-        {}
+        {
+          "artifact_id": "art_1"
+        }
       ],
       "result": {
         "$ref": "results.json#/commands/artifact.read"

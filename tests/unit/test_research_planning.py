@@ -173,7 +173,7 @@ def test_unknown_scoped_node_is_rejected_instead_of_showing_unrelated_research(t
     workspace(tmp_path)
     node(tmp_path, 'Unrelated')
     with pytest.raises(ValueError, match='research_scope_node_not_found'):
-        read(tmp_path, entry_node_ids=['node_' + 'f' * 32])
+        read(tmp_path, entry_node_ids=['node_99999'])
 
 
 @pytest.mark.parametrize('budget', [2048, 3000, 16000])

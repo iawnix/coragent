@@ -1,9 +1,8 @@
 """Runtime-owned Job observations and automatic research journal entries."""
-import hashlib
-import json
 from pathlib import Path
 from research_agent.foundation.transactions import read_json, write_json, workspace_transaction
 from datetime import datetime, timezone
+from research_agent.research.operational_ids import allocate_id
 
 TERMINAL = {'succeeded', 'failed', 'timed_out', 'cancelled'}
 
@@ -19,8 +18,8 @@ def list_executions(root, *, session_id=None, user_task_id=None, limit=50, curso
     bindings = {row['job_id']: row for path in (root / 'operations/monitors').glob('*/binding.json')
                 for row in [read_binding(path)]}
     rows = []
-    for path in sorted((root / 'operations/executions').glob('*.json')):
-        if cursor is not None and path.stem <= cursor:
+    for path in sorted((root / 'operations/executions').glob('*.json'), key=lambda p: int(p.stem.split('_')[1])):
+        if cursor is not None and int(path.stem.split('_')[1]) <= int(cursor.split('_')[1]):
             continue
         binding = bindings.get(path.stem, {})
         if session_id is not None and binding.get('session_id') != session_id:
@@ -87,11 +86,11 @@ def observe_execution(root, receipt, value):
     return _observe(root, {'job_id': receipt.job_id, 'value': value})
 
 
-def execution_observation(receipt, status):
+def execution_observation(root, receipt, status):
     observation = {key: status.get(key) for key in ('state', 'exit_code', 'started_at', 'finished_at', 'error')}
     observation.update(workspace_id=receipt.workspace_id, job_id=receipt.job_id,
                        source='job_runtime', schema_version='execution-observation/1')
-    observation['observation_id'] = 'obs_' + hashlib.sha256(json.dumps(observation, sort_keys=True).encode()).hexdigest()
+    observation['observation_id'] = allocate_id(root, 'obs', observation)
     return observation
 
 
@@ -100,7 +99,7 @@ def persist_event(root, *, kind, title, content, references=(), data=None, ident
     value = {'kind': kind, 'title': title, 'content': content, 'references': list(references),
              'data': data or {}, 'node_id': node_id, 'node_revision': node_revision}
     key = identity if identity is not None else value
-    event_id = 'runtime_' + hashlib.sha256(json.dumps(key, sort_keys=True).encode()).hexdigest()
+    event_id = allocate_id(root, 'runtime', key)
     path = Path(root) / 'operations/events' / (event_id + '.json')
     if not path.exists():
         write_json(path, {'schema_version': 'runtime-event/1', 'event_id': event_id,

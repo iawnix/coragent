@@ -433,7 +433,7 @@ second session format.
 ## Workspace Bootstrap
 
 The first `./coragent --workspace <name>` invocation creates a 0700 workspace and
-the canonical `workspace_manifest.json` (`research_workspace/2`) and Research Memory storage when the named project does not exist. Nodes are created on demand under `research/nodes/`; there is no global progress or lifecycle document. The Host's WorkspaceDirectory exposes the same
+the canonical `workspace_manifest.json` (`research_workspace/3`) and Research Memory storage when the named project does not exist. Nodes are created on demand under `research/nodes/`; there is no global progress or lifecycle document. The Host's WorkspaceDirectory exposes the same
 operation to CoRHub. The Host itself does not create unnamed projects, and
 bootstrap validates the canonical protocol and refuses legacy or partial state
 rather than rewriting it.

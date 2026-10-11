@@ -1,6 +1,6 @@
 # Storage and recovery
 
-The workspace manifest uses `research_workspace/2`. Original requests, authored changes and execution observations have distinct sources. The unified Python namespace is `research_agent.research`; there is no parallel state or global-progress protocol.
+The workspace manifest uses `research_workspace/3`. Original requests, authored changes and execution observations have distinct sources. The unified Python namespace is `research_agent.research`; there is no parallel state or global-progress protocol.
 
 Research Nodes have stable IDs and work directories under `research/nodes/<node_id>/`. Immutable Results preserve the Node revision and actual evidence they refer to. Records retain changes; indexes, reverse links, workspace/Node Markdown and bounded retrieval are rebuildable views. Change relationships without moving Node directories.
 
@@ -9,3 +9,5 @@ Research Nodes have stable IDs and work directories under `research/nodes/<node_
 Use public tools for managed research data, native file tools for work files. Transactions publish coherent updates; request receipts recover retries. An uncertain dispatch must be reconciled using its original identity, not repeated with a new Job. An uncertain email remains a delivery problem; rewriting Memory cannot resend it.
 
 Old workspaces are unsupported and are not migrated or rewritten. Create a new workspace and explicitly import useful materials. Exact reference errors require inspecting the current object, not fabricating an ID or fallback location.
+
+Object IDs are canonical workspace-scoped ordinals such as `node_1`, `result_1` and `art_1`; use returned IDs directly. Artifact reads take `artifact_id`, and prepared requests use `prepared_1`. IDs are never recycled; content hashes remain separate.

@@ -214,7 +214,7 @@ def test_generic_jobs_execute_candidate_gaussian_and_registered_validators(tmp_p
     _,row=candidate(tmp_path);spec,logs=synthetic_logs(row)
     spec_record=artifact('register',{'root':str(tmp_path),'path':row['files']['spec.json']['path']})
     ref=spec_record['artifact_id']
-    mapping=run_job(tmp_path,{'job_id':'job_mapping','validator_id':'chemical.reaction_mapping', "validator_version": "1",'input_artifact_ids':[ref]})
+    mapping=run_job(tmp_path,{'request_id':'job_mapping','validator_id':'chemical.reaction_mapping', "validator_version": "1",'input_artifact_ids':[ref]})
     assert mapping['result_receipt']['validator_result']['verdict']=='pass'
     assert mapping['result_receipt']['validator_result']['bindings']['spec_artifact_id']==ref
     with pytest.raises(ValueError,match='collected_output'):
@@ -230,10 +230,10 @@ def test_generic_jobs_execute_candidate_gaussian_and_registered_validators(tmp_p
         command=[sys.executable,'skills/gaussian/scripts/run.py','--input-gjf','input.gjf','--executable',str(fixture),
                  '--output-dir','results','--method','M062X','--basis','6-31G**','--threads','12','--memory-mb','4000','--validation',validation]
         outputs=[{'path':'results/'+name,'required':True} for name in ['gaussian.out','parsed.json','result.json']+(['ts.chk'] if validation=='saddle' else ['irc_path_summary.json','gaussian_endpoint.xyz'])]
-        return run_job(tmp_path,{'job_id':job_id,'command':command,'inputs':inputs,'outputs':outputs})
+        return run_job(tmp_path,{'request_id':job_id,'command':command,'inputs':inputs,'outputs':outputs})
     ts=gaussian(row['files']['ts.gjf']['path'],'job_ts','saddle')
     raw=selected(ts,'gaussian.out')['artifact_id']
-    validated=run_job(tmp_path,{'job_id':'job_saddle','validator_id':'chemical.gaussian_saddle', "validator_version": "1",'input_artifact_ids':[ref,raw]})
+    validated=run_job(tmp_path,{'request_id':'job_saddle','validator_id':'chemical.gaussian_saddle', "validator_version": "1",'input_artifact_ids':[ref,raw]})
     assert validated['result_receipt']['validator_result']['verdict']=='pass'
     proof = validated['result_receipt']['validator_result']
     assert proof['execution_status'] == 'succeeded'
@@ -245,7 +245,7 @@ def test_generic_jobs_execute_candidate_gaussian_and_registered_validators(tmp_p
     irc=helper.prepare_irc(Path(row['files']['spec.json']['path']),Path(checkpoint['location']),tmp_path/'irc')
     forwards=gaussian(irc['inputs'][0]['path'],'job_forward','irc',irc['checkpoint']['path'])
     reverse=gaussian(irc['inputs'][1]['path'],'job_reverse','irc',irc['checkpoint']['path'])
-    joined=run_job(tmp_path,{'job_id':'job_connectivity','validator_id':'chemical.gaussian_irc_connectivity', "validator_version": "1",
+    joined=run_job(tmp_path,{'request_id':'job_connectivity','validator_id':'chemical.gaussian_irc_connectivity', "validator_version": "1",
         'input_artifact_ids':[ref,raw,selected(forwards,'gaussian.out')['artifact_id'],selected(reverse,'gaussian.out')['artifact_id']]})
     proof=joined['result_receipt']['validator_result']
     assert proof['verdict']=='pass',proof

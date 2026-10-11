@@ -7,7 +7,7 @@ from research_agent.foundation.protocol import WORKSPACE_ID_PATTERN
 from research_agent.foundation.path_safety import lexical_path, path_has_symlink
 from research_agent.foundation.transactions import TransactionCoordinator, read_json, write_json, workspace_transaction
 
-MANIFEST_SCHEMA = "research_workspace/2"
+MANIFEST_SCHEMA = "research_workspace/3"
 WORKSPACE_MODE = "research"
 WORKSPACE_STATES = frozenset({"ready", "admission_pending"})
 DIRECTORIES = ("inputs", "artifacts", "runs", "logs", "research", "operations", "environments", "reports")
@@ -28,7 +28,7 @@ def validate_workspace_manifest(manifest, root, *, require_ready=False, validate
         raise WorkspaceModeError("workspace_id_invalid")
     if manifest.get("workspace_root") != str(root) or manifest.get("workspace_mode") != "research":
         raise WorkspaceModeError("workspace_identity_mismatch")
-    for field, value in {"profile_id": "research_workspace_3", "memory_profile": "session", "memory_scope": "session", "research_memory_scope": "workspace", "execution_profile": "audited"}.items():
+    for field, value in {"profile_id": "research_workspace_4", "memory_profile": "session", "memory_scope": "session", "research_memory_scope": "workspace", "execution_profile": "audited"}.items():
         if manifest.get(field) != value:
             raise WorkspaceModeError("workspace_" + field + "_mismatch")
     if manifest.get("state") not in WORKSPACE_STATES or require_ready and manifest["state"] != "ready":
@@ -62,6 +62,8 @@ def _initialize(root, request):
     manifest = request["manifest"]
     write_json(root / "research/journal.json", {"schema_version": "research-journal/2", "sequence": 0, "records": []})
     write_json(root / "research/map.json", {"schema_version": "research-map/1", "nodes": {}, "results": {}, "relations": {}})
+    from .operational_ids import STATE_FILE, STATE_SCHEMA
+    write_json(root / STATE_FILE, {"schema_version": STATE_SCHEMA, "high_water": {}})
     write_json(root / "workspace_manifest.json", manifest)
     return manifest
 
@@ -92,7 +94,7 @@ def initialize_workspace(root, workspace_id, workspace_mode):
                 raise WorkspaceModeError("workspace_directory_symlink")
             target.mkdir(parents=True, exist_ok=True, mode=0o700)
         manifest = {"schema_version": MANIFEST_SCHEMA, "workspace_id": workspace_id,
-            "workspace_mode": "research", "profile_id": "research_workspace_3", "memory_profile": "session",
+            "workspace_mode": "research", "profile_id": "research_workspace_4", "memory_profile": "session",
             "memory_scope": "session", "research_memory_scope": "workspace", "execution_profile": "audited",
             "workspace_root": str(root), "created_at": _now(), "state": "admission_pending",
             "directories": list(DIRECTORIES), "research_memory": {"initialized": True, "admission_required": True}}

@@ -17,7 +17,7 @@
     },
     "event_id": {
       "type": "string",
-      "pattern": "^event_[a-f0-9]{32}$"
+      "pattern": "^event_[1-9][0-9]*$"
     },
     "session_id": {
       "type": "string",
@@ -34,7 +34,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^event_[a-f0-9]{32}$"
+        "pattern": "^event_[1-9][0-9]*$"
       },
       "minItems": 1,
       "uniqueItems": true

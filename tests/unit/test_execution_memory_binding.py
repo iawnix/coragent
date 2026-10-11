@@ -25,7 +25,7 @@ def test_job_binds_one_node_revision_and_retries_do_not_rebind(tmp_path):
     workspace(tmp_path)
     created = create(tmp_path, {'goal':'Validate candidate', 'proposal':'First proposal'})
     node = created['node']
-    request = {'root':str(tmp_path), 'job_id':'job_bound', 'node_id':node['id'], 'session_id':'original',
+    request = {'root':str(tmp_path), 'request_id':'job_bound', 'node_id':node['id'], 'session_id':'original',
         'command':[sys.executable,'-c',"print('evidence')"]}
     first = dispatch('start', request)
     update(tmp_path, {'node_id':node['id'], 'note':'Revise after new information',
@@ -62,7 +62,7 @@ def test_projection_failure_does_not_prevent_execution_collection_or_monitor(tmp
         raise OSError('Memory temporarily unavailable')
     with monkeypatch.context() as patch:
         patch.setattr(records, 'record_event', unavailable)
-        job = dispatch('start', {'root':str(tmp_path), 'job_id':'job_no_projection', 'session_id':'s',
+        job = dispatch('start', {'root':str(tmp_path), 'request_id':'job_no_projection', 'session_id':'s',
             'command':[sys.executable,'-c',"print('retained output')"]})
         result = finish(tmp_path, job['job_id'])
         assert result['result_receipt']['collection_state']=='complete'
@@ -85,13 +85,13 @@ def test_equal_bytes_from_another_material_do_not_prove_input_origin(tmp_path):
     second = material('create', {'root':str(tmp_path), 'name':'second', 'content':'identical'})
     assert first['artifact_id'] != second['artifact_id']
     with pytest.raises(ValueError, match='job_input_not_staged'):
-        dispatch('start', {'root':str(tmp_path), 'job_id':'job_false_origin',
+        dispatch('start', {'root':str(tmp_path), 'request_id':'job_false_origin',
             'command':[sys.executable,'-c','pass'],
             'inputs':[{'source':first['location'], 'destination':'input'}],
             'input_artifact_ids':[second['artifact_id']]})
     assert not (tmp_path/'operations/jobs/job_false_origin.json').exists()
     node = create(tmp_path, {'goal':'Use an exact input'})['node']
-    job = dispatch('start', {'root':str(tmp_path), 'job_id':'job_exact_origin', 'node_id':node['id'],
+    job = dispatch('start', {'root':str(tmp_path), 'request_id':'job_exact_origin', 'node_id':node['id'],
         'command':[sys.executable,'-c','pass'],
         'inputs':[{'source':first['location'], 'destination':'input'}],
         'input_artifact_ids':[first['artifact_id']]})

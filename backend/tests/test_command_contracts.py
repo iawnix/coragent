@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
     ('research.observe', {'read_basis': 'read_' + 'a' * 64, 'session_id': 'session-fixture'}),
     ('research.update', {'node_id': 'node_' + 'a' * 32, 'note': 'Observation', 'assessment_ref': None}),
     ('job.start', {'command': ['/bin/true'], 'environment': {'OMP_NUM_THREADS': '2'}}),
-    ('artifact.read', {'artifact_ref': 'a1', 'offset': 0, 'limit': 4096}),
+    ('artifact.read', {'artifact_id': 'art_1', 'offset': 0, 'limit': 4096}),
 ])
 def test_application_contract_accepts_transport_values(command, params):
     validate_command_params(command, params)
@@ -26,7 +26,7 @@ def test_application_contract_accepts_transport_values(command, params):
     ('research.update', {'node_id': 'node_' + 'a' * 32}),
     ('research.search', {'origin': 'untrusted-origin'}),
     ('job.start', {'command': ['/bin/true'], 'environment': {'OMP_NUM_THREADS': 2}}),
-    ('artifact.read', {'artifact_ref': 'a1', 'limit': '4096'}),
+    ('artifact.read', {'artifact_id': 'art_1', 'limit': '4096'}),
 ])
 def test_application_contract_rejects_malformed_parameters(command, params):
     with pytest.raises(CommandError):

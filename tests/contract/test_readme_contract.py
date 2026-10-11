@@ -180,7 +180,7 @@ def test_workspace_docs_match_bootstrap_canonical_file_names() -> None:
     contract = (REFERENCES / "storage.md").read_text(encoding="utf-8")
 
     for text in (architecture, contract):
-        for name in ["research_workspace/2", "research/nodes/", "artifacts/<id>/payload"]:
+        for name in ["research_workspace/3", "research/nodes/", "artifacts/<id>/payload"]:
             assert name in text
 
 

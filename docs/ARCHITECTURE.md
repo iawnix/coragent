@@ -50,7 +50,9 @@ Updates may change proposal, plan, progress, status or assessment and add/withdr
 
 ## Workspace and storage
 
-`workspace_manifest.json` uses `research_workspace/2`. Research records preserve original user messages and distinct author/runtime origins. Stable Node directories under `research/nodes/<id>/` contain their current view and work files; immutable results and history preserve earlier versions. Research indexes, reverse links and generated Markdown are rebuildable. Titles and relationship changes do not move directories.
+`workspace_manifest.json` uses `research_workspace/3`. Research records preserve original user messages and distinct author/runtime origins. Stable Node directories under `research/nodes/<id>/` contain their current view and work files; immutable results and history preserve earlier versions. Research indexes, reverse links and generated Markdown are rebuildable. Titles and relationship changes do not move directories.
+
+Research objects use workspace-scoped numeric IDs (`task_1`, `node_1`, `job_1`, `result_1`, `art_1`). Tools, storage and clients use the same canonical ID, without display aliases. Each type has a durable sequence in `operations/identifiers.json`; reservations survive failed operations, retries reuse identity keys, and gaps are allowed. Digests still verify content. New workspaces use manifest version 3; old workspaces are not migrated.
 
 `runs/jobs/` owns execution working directories. `operations/` owns durable intents, observations, collection/delivery receipts and exact short references. `artifacts/<id>/payload` and `manifest.json` own fixed file versions. Mutable Node work files must be registered before a Result cites them as published material. Reports remain ordinary user-facing files with fixed delivered versions.
 

@@ -1,4 +1,4 @@
-"""Diagnostics, projection repair and execution-ID CLI for canonical workspaces.
+"""Diagnostics and projection repair CLI for canonical workspaces.
 
 Workspace creation/admission belongs to ``research_agent.research.workspace`` and the
 Host.  The retired ResearchMap initializer and bootstrap commands are not
@@ -12,7 +12,6 @@ import json
 import sys
 from typing import Any
 
-from research_agent.research.operational_ids import allocate_operational_id
 from research_agent.research.doctor import inspect_workspace, rebuild
 
 
@@ -27,9 +26,6 @@ def main(argv: list[str] | None = None, **_: Any) -> int:
     ):
         command = sub.add_parser(name, help=help_text)
         command.add_argument("--root", required=True)
-    command = sub.add_parser("allocate_operational_id", help="reserve one execution-plane identifier")
-    command.add_argument("--root", required=True)
-    command.add_argument("--kind", choices=("calc", "sub", "op"), required=True)
 
     args = parser.parse_args(argv)
     try:
@@ -39,8 +35,6 @@ def main(argv: list[str] | None = None, **_: Any) -> int:
             result = inspect_workspace(args.root)
         elif args.command == "rebuild":
             result = rebuild(args.root)
-        else:
-            result = allocate_operational_id(args.root, args.kind)
     except (ValueError, OSError) as exc:
         print(json.dumps({"valid": False, "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2

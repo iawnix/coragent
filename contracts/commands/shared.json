@@ -537,7 +537,7 @@
         },
         "prepared_ref": {
           "type": "string",
-          "pattern": "^p[1-9][0-9]*$"
+          "pattern": "^prepared_[1-9][0-9]*$"
         },
         "request_sha256": {
           "type": "string",
@@ -881,11 +881,8 @@
         "artifact_id": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 256
-        },
-        "artifact_ref": {
-          "type": "string",
-          "pattern": "^a[1-9][0-9]*$"
+          "maxLength": 256,
+          "pattern": "^art_[1-9][0-9]*$"
         },
         "offset": {
           "type": "integer",
@@ -901,17 +898,8 @@
         }
       },
       "additionalProperties": false,
-      "anyOf": [
-        {
-          "required": [
-            "artifact_id"
-          ]
-        },
-        {
-          "required": [
-            "artifact_ref"
-          ]
-        }
+      "required": [
+        "artifact_id"
       ]
     },
     "taskBegin": {
@@ -1116,7 +1104,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "pattern": "^node_[a-f0-9]{32}$"
+                "pattern": "^node_[1-9][0-9]*$"
               },
               "uniqueItems": true,
               "maxItems": 128
@@ -1125,7 +1113,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "pattern": "^node_[a-f0-9]{32}$"
+                "pattern": "^node_[1-9][0-9]*$"
               },
               "uniqueItems": true,
               "maxItems": 16

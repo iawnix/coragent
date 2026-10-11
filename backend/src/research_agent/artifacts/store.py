@@ -21,7 +21,7 @@ from typing import BinaryIO
 from research_agent.foundation.path_safety import PathSafetyError, lexical_path, path_has_symlink
 
 
-_ARTIFACT_ID = re.compile(r"^art_[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+_ARTIFACT_ID = re.compile(r"^art_[1-9][0-9]*$")
 _CHUNK_SIZE = 1024 * 1024
 
 

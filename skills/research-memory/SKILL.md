@@ -50,7 +50,7 @@ After inspecting a failed calculation, use its actual Node ID:
 `add_relations` entries contain kind (`requires`, `part_of`, `alternative_to`), target and optional reason. Use `remove_relations` with returned relation IDs to withdraw a declaration. The framework stores the reverse query and history; do not update both endpoints yourself.
 
 ```json
-{"node_id":"node_comparison","note":"Compare once the candidate has usable energy and connectivity evidence.","add_relations":[{"kind":"requires","target":"node_candidate","reason":"Need a comparable candidate result"}]}
+{"node_id":"node_2","note":"Compare once the candidate has usable energy and connectivity evidence.","add_relations":[{"kind":"requires","target":"node_1","reason":"Need a comparable candidate result"}]}
 ```
 
 The map can contain feedback and competing approaches. A dependency is research intent, not permission to call tools. Actual material usage and explicit result citations preserve their concrete versions. Merely reading or retrieving a result does not mean adopting it as evidence.
@@ -60,7 +60,7 @@ The map can contain feedback and competing approaches. A dependency is research 
 A useful result can be negative or inconclusive. Job exit zero does not establish scientific validity; failure does not erase previous evidence. Publication does not close the Node. Closing a Node means stopping active work on that question, not proving its hypothesis.
 
 ```json
-{"node_id":"node_candidate","conclusion":"This candidate's IRC does not connect the target product.","evidence_refs":["a7"],"limitations":"Only this candidate was checked; other geometries remain possible."}
+{"node_id":"node_1","conclusion":"This candidate's IRC does not connect the target product.","evidence_refs":["art_7"],"limitations":"Only this candidate was checked; other geometries remain possible."}
 ```
 
 For files use `files: [{name, purpose?, artifact_ref}]` referencing registered materials. Never cite a mutable work file as an immutable result. To correct a result, publish another with `supersedes` referencing the original. Ordinary new results do not overwrite the Node's assessment. Read a downstream review notice when an input result is corrected; it does not automatically change old inputs or rerun work.
@@ -71,7 +71,7 @@ See [storage and recovery](references/storage.md), [public tools](../research-wo
 
 ## Subjects, checks and revisions
 
-Use `subjects` to name immutable Artifact or Result references, for example `{"target":"a1","calculated":"a2"}`. Nodes describe intended subjects; Results record the subjects actually interpreted. Roles are explicit labels, not proof of identity. Domain tools compare structures; Memory never parses molecular graphs or certifies scientific truth.
+Use `subjects` to name immutable Artifact or Result references, for example `{"target":"art_1","calculated":"art_2"}`. Nodes describe intended subjects; Results record the subjects actually interpreted. Roles are explicit labels, not proof of identity. Domain tools compare structures; Memory never parses molecular graphs or certifies scientific truth.
 
 Keep measured `observation`, authored `conclusion`, and exact `check_refs` separate. Checks may be failed or inconclusive; either may be cited in a Result. A check receipt records execution, parsing and scoped scientific checks separately.
 

@@ -49,7 +49,9 @@ uses / cites 必须来自确证材料输入或明确结果引用。文件名相�
 
 ## 工作区与存储
 
-`workspace_manifest.json` 使用 `research_workspace/2`。研究记录保留用户原文，并区分研究作者和运行事实来源。`research/nodes/<id>/` 保持稳定目录、当前视图与工作文件；不可变结果和历史保存旧版本。索引、反向查询与 Markdown 可重建，改标题或关系不移动目录。
+`workspace_manifest.json` 使用 `research_workspace/3`。研究记录保留用户原文，并区分研究作者和运行事实来源。`research/nodes/<id>/` 保持稳定目录、当前视图与工作文件；不可变结果和历史保存旧版本。索引、反向查询与 Markdown 可重建，改标题或关系不移动目录。
+
+研究对象使用工作区内按类型递增的编号（`task_1`、`node_1`、`job_1`、`result_1`、`art_1`），工具、存储和客户端使用同一正式 ID，没有显示别名。`operations/identifiers.json` 持久保存各类型的序号；失败不回收已预留编号，重试复用原身份，允许空号。内容校验仍使用哈希。新工作区使用版本 3 manifest，旧工作区不迁移。
 
 `runs/jobs/` 是执行工作目录；`operations/` 保存意图、观察、收集/投递回执和精确短引用；`artifacts/<id>/payload` 及 manifest 保存固定文件及来源。可变工作文件登记后才能成为正式结果材料。报告仍是面向用户的文件，实际交付版本固定。
 

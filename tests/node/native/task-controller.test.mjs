@@ -34,13 +34,19 @@ async function fixture(t, storage = new MemoryStorage()) {
   const conversation = await harness.root(context, { agent: { model: { provider: "faux", modelId: "faux-1" } } });
   admission = createInputAdmission({ harness, conversation, LiveDoc, InboxDoc, admitSubmission });
   const jobStates = new Map(), calls = [], artifacts = new Map();
+  const allocatedTasks = new Map();
   const kernel = { execute_command: async (command, params) => {
+    if (command === "research.allocate_task") {
+      const key = JSON.stringify([params.session_id, params.request_id]);
+      if (!allocatedTasks.has(key)) allocatedTasks.set(key, `task_${allocatedTasks.size + 1}`);
+      return { identifier: allocatedTasks.get(key) };
+    }
     calls.push({ command, params });
     if (command === "job.list") return { jobs: [...jobStates].map(([job_id, state]) => ({ job_id, state })), next_cursor: null };
     if (command === "job.status") return { job_id: params.job_id, state: jobStates.get(params.job_id) };
     if (command === "research.read") { if (params.ref === "missing") throw new Error("unknown evidence"); return { ref: params.ref, node_id: params.ref }; }
-    if (command === "artifact.read") return { artifact_ref: params.artifact_ref, artifact_id: params.artifact_id,
-      sha256: artifacts.get(params.artifact_id ?? params.artifact_ref) };
+    if (command === "artifact.read") return { artifact_id: params.artifact_id,
+      sha256: artifacts.get(params.artifact_id) };
     throw new Error(`Unexpected test command ${command}`);
   } };
   controller = createTaskController({ harness, conversation, admission, LiveDoc, InboxDoc, kernel, workspaceId: "workspace", sessionId: "session", context });
@@ -115,7 +121,7 @@ test("idle active tasks continue without Jobs and stop after bounded lack of pro
     source_submission_ids: [String(source.id)] }, "refine-paused", context), { code: "task_paused" });
 });
 
-const nodeId = n => `node_${n.toString(16).padStart(32, "0")}`;
+const nodeId = n => `node_${n + 1}`;
 const observed = (toolName, result) => [{ id: 200, model: [{ role: "toolResult", toolName, content: [], details: { result } }] }];
 
 test("research binding has one bounded write path, preserves task control and allows shared Nodes", async t => {
@@ -162,9 +168,9 @@ test("fixed evidence is counted once across tools, reference combinations, conte
   await progress(["result_1", "result_2"], "combination");
   await progress(["result_2"], "subset");
   assert.equal((await controller.current(context)).progress_version, 2);
-  artifacts.set("a1", "ab".repeat(32)); artifacts.set("a2", "sha256:" + "ab".repeat(32));
-  await controller.observeToolResults(observed("artifact_create", { artifact_ref: "a1", sha256: "ab".repeat(32) }), context);
-  await progress(["a2"], "alias");
+  artifacts.set("art_1", "ab".repeat(32)); artifacts.set("art_2", "sha256:" + "ab".repeat(32));
+  await controller.observeToolResults(observed("artifact_create", { artifact_id: "art_1", sha256: "ab".repeat(32) }), context);
+  await progress(["art_2"], "alias");
   assert.equal((await controller.current(context)).progress_version, 3);
   for (let n = 3; n < 140; n++) await controller.observeToolResults(observed("research_result", { result: { id: `result_${n}` } }), context);
   const task = await controller.current(context);
@@ -172,7 +178,7 @@ test("fixed evidence is counted once across tools, reference combinations, conte
   await controller.close();
   const reopened = createTaskController({ harness, conversation, admission, LiveDoc, InboxDoc, kernel, workspaceId: "workspace", sessionId: "session", context });
   t.after(() => reopened.close());
-  await reopened.update({ action: "progress", expected_revision: task.revision, evidence_refs: ["result_1", "result_2", "a2"] }, "after-restart", context);
+  await reopened.update({ action: "progress", expected_revision: task.revision, evidence_refs: ["result_1", "result_2", "art_2"] }, "after-restart", context);
   await reopened.observeToolResults(observed("research_result", { result: { id: "result_1" } }), context);
   assert.equal((await reopened.current(context)).progress_version, task.progress_version);
 });
@@ -203,16 +209,16 @@ test("committed updates replay before external validation, even after another ta
   assert.equal(externalReads, 1, "new operations still perform their required validation");
 });
 
-test("canonical Artifact IDs and short references share progress identity and support completion", async t => {
+test("canonical Artifact IDs deduplicate progress and support completion", async t => {
   const { controller, begin, artifacts, calls, conversation, faux } = await fixture(t);
   await begin();
-  const artifactId = `art_${"cd".repeat(32)}`, digest = "ab".repeat(32);
-  artifacts.set(artifactId, digest); artifacts.set("a1", "sha256:" + digest);
+  const artifactId = "art_1", digest = "ab".repeat(32);
+  artifacts.set(artifactId, digest); artifacts.set("art_1", "sha256:" + digest);
   let task = await controller.current(context);
   task = await controller.update({ action: "progress", expected_revision: task.revision, evidence_refs: [artifactId] }, "canonical-artifact", context);
   assert.deepEqual(calls.at(-1), { command: "artifact.read", params: { artifact_id: artifactId, limit: 1 } });
-  task = await controller.update({ action: "progress", expected_revision: task.revision, evidence_refs: ["a1", artifactId] }, "both-artifact-selectors", context);
-  await controller.observeToolResults(observed("artifact_register", { artifact_id: artifactId, artifact_ref: "a1", sha256: digest }), context);
+  task = await controller.update({ action: "progress", expected_revision: task.revision, evidence_refs: ["art_1", artifactId] }, "both-artifact-selectors", context);
+  await controller.observeToolResults(observed("artifact_register", { artifact_id: artifactId, sha256: digest }), context);
   assert.deepEqual((await controller.current(context)).progress_identities, [`artifact:${digest}`]);
   assert.equal((await controller.current(context)).progress_version, 1);
   let entered, finish;
@@ -227,7 +233,7 @@ test("canonical Artifact IDs and short references share progress identity and su
   } finally { finish(); }
   await conversation.waitForIdle(context); await controller.reconcile();
   assert.equal((await controller.current(context)).state, "completed");
-  assert.ok(calls.some(call => call.command === "artifact.read" && call.params.artifact_ref === "a1"));
+  assert.ok(calls.some(call => call.command === "artifact.read" && call.params.artifact_id === "art_1"));
   assert.ok(!calls.some(call => call.command === "research.read" && call.params.ref === artifactId));
 });
 
@@ -323,8 +329,8 @@ test("automatic observation skips historical Jobs while crediting current eviden
     ...observed("job_status", { job_id: "job_current", state: "running" }),
     ...observed("job_status", { job_id: "job_current", state: "running" }),
     ...observed("research_result", { result: { id: "result_current" } }),
-    ...observed("artifact_create", { artifact_ref: "a1", sha256: "ab".repeat(32), size_bytes: 100_000_000 }),
-    ...observed("artifact_register", { artifact_ref: "a2", sha256: "ab".repeat(32), size_bytes: 100_000_000 }),
+    ...observed("artifact_create", { artifact_id: "art_1", sha256: "ab".repeat(32), size_bytes: 100_000_000 }),
+    ...observed("artifact_register", { artifact_id: "art_2", sha256: "ab".repeat(32), size_bytes: 100_000_000 }),
   ], context);
   const task = await controller.current(context);
   assert.equal(ownershipReads, 1);
@@ -333,7 +339,7 @@ test("automatic observation skips historical Jobs while crediting current eviden
   assert.ok(!task.progress.evidence_refs.includes("job_historical"));
   await assert.rejects(controller.update({ action: "progress", expected_revision: task.revision,
     evidence_refs: ["job_historical"] }, "foreign-progress", context), { code: "task_evidence_invalid" });
-  await controller.observeToolResults(observed("artifact_register", { artifact_ref: "a3", sha256: "ab".repeat(32) }), context);
+  await controller.observeToolResults(observed("artifact_register", { artifact_id: "art_3", sha256: "ab".repeat(32) }), context);
   assert.equal((await controller.current(context)).progress_version, 1);
 });
 

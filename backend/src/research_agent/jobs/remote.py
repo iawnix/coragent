@@ -16,9 +16,7 @@ import re
 import shlex
 import subprocess
 import tempfile
-import uuid
 from datetime import datetime, timezone
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -108,8 +106,8 @@ class TorqueSSHPlatform(RemoteExecutionPlatform):
         _capture(command, timeout=self.transfer_timeout).check_returncode()
 
     def _remote_dir(self, spec: JobSpec) -> str:
-        job_id = spec.job_id or f"job_{uuid.uuid4().hex}"
-        if not re.fullmatch(r"job_[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}", job_id):
+        job_id = spec.job_id
+        if not isinstance(job_id, str) or not re.fullmatch(r"job_[1-9][0-9]*", job_id):
             raise ValueError("remote job id has an invalid format")
         scope = hashlib.sha256(str(spec.cwd.resolve()).encode()).hexdigest()[:24]
         return f"{self.remote_root}/{job_id}-{scope}"
@@ -203,7 +201,6 @@ class TorqueSSHPlatform(RemoteExecutionPlatform):
     def start(self, spec: JobSpec) -> JobReceipt:
         validate_submission({key: value for key, value in spec.metadata.items() if key in SUBMISSION_FIELDS},
                             kind='remote', scheduler=self.scheduler, allowed_queues=(self.allowed_queues,))
-        spec = replace(spec, job_id=spec.job_id or f"job_{uuid.uuid4().hex}")
         if (spec.cwd / 'receipt.json').exists() or (spec.cwd / 'spec.json').exists():
             raise ValueError('job directory already contains an execution; reconcile instead of resubmitting')
         remote_dir = self._remote_dir(spec)

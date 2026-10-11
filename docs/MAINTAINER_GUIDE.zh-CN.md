@@ -37,7 +37,7 @@ Python 测试按 `tests/unit/`、`tests/contract/` 和 `tests/integration/` 分�
 
 ## 研究记忆与执行边界
 
-`workspace_manifest.json` 使用 `research_workspace/2`。唯一命名空间是 `research_agent.research`，没有旧 state 或全局 progress 双协议。原始消息、Node 内容修订和运行事实来源分开；Node 目录保持稳定，多次尝试保留历史，不可变 Result 固定依据。
+`workspace_manifest.json` 使用 `research_workspace/3`。唯一命名空间是 `research_agent.research`，没有旧 state 或全局 progress 双协议。原始消息、Node 内容修订和运行事实来源分开；Node 目录保持稳定，多次尝试保留历史，不可变 Result 固定依据。
 
 Agent 使用 research_read / research_search / research_create / research_update / research_result。创建只要求 goal，记事只要求 node_id 与 note，发布只要求 node_id 与 conclusion。身份、读取依据、修订号和事务由适配层提供。后台 Job 不修改 Node 内容版本。显式关系单次存储，反向查询自动生成；实际 uses 需要确证输入，搜索不是采用证据。
 

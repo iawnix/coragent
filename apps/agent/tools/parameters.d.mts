@@ -141,8 +141,7 @@ export interface ToolParameters {
     "root"?: string;
   };
   artifactRead: {
-    "artifact_id"?: string;
-    "artifact_ref"?: string;
+    "artifact_id": string;
     "offset"?: number;
     "limit"?: number;
     "root"?: string;

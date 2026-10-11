@@ -48,7 +48,7 @@ while not Path('release').exists():time.sleep(.02)
     platform = LocalProcessPlatform(supervisor="systemd", platform_name="lab")
     unit = None
     try:
-        receipt = platform.start(JobSpec(command=tuple(command), cwd=cwd,
+        receipt = platform.start(JobSpec(job_id="job_1", command=tuple(command), cwd=cwd,
             env={"GAUSS_SCRDIR": "{scratch}"}, metadata={"resources": {"cpus": 1, "memory_mb": 128},
                 "execution_binding": {"binding": {"scratch_root": str(tmp_path / "scratch")}}}))
         unit = receipt.metadata["systemd_unit"]

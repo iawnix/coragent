@@ -16,14 +16,14 @@ test('actual generation requests rebuild facts after compaction and never persis
     sessionId: 'session_fixture', estimateContextTokens,
     bridge: { async execute_command(command, params) {
       assert.equal(command, 'research.read');
-      assert.deepEqual(params.entry_node_ids, ['node_goal']);
-      assert.deepEqual(params.focus_node_ids, [revision === 1 ? 'node_A' : 'node_B']);
+      assert.deepEqual(params.entry_node_ids, ['node_3']);
+      assert.deepEqual(params.focus_node_ids, [revision === 1 ? 'node_1' : 'node_2']);
       return { schema_version: 'research-snapshot/3', snapshot_id: `ctx_${revision}`, sequence: revision, new_records: [],
-        nodes: [{id: 'node_goal', goal: 'Validate the transition structure'}],
+        nodes: [{id: 'node_3', goal: 'Validate the transition structure'}],
         research: {entry_node_ids: params.entry_node_ids, focus_node_ids: params.focus_node_ids,
-          nodes: [{id:'node_goal',plan:'Compare paths using the original delivery criteria'},
+          nodes: [{id:'node_3',plan:'Compare paths using the original delivery criteria'},
             {id:params.focus_node_ids[0],plan:revision === 1 ? 'Inspect path A' : 'Continue independent path B after A failed'}],
-          relations:[{source:params.focus_node_ids[0],kind:'part_of',target:'node_goal'}]},
+          relations:[{source:params.focus_node_ids[0],kind:'part_of',target:'node_3'}]},
         running_jobs: [{id: 'job_current', state: revision === 1 ? 'running' : 'failed',
           primary_failure: revision === 1 ? null : 'optimization_limit'}] };
     } },
@@ -32,7 +32,7 @@ test('actual generation requests rebuild facts after compaction and never persis
   const registry = createRegistry();
   registry.install(defineExtension({name:'context-fixture', hooks:[
     hook(GenerationTask, { beforeRequest: (request, api) => inject(request, String(api.taskId), {
-      entry_node_ids:['node_goal'],focus_node_ids:[revision === 1 ? 'node_A' : 'node_B'],
+      entry_node_ids:['node_3'],focus_node_ids:[revision === 1 ? 'node_1' : 'node_2'],
     }) }),
     hook(CompactionTask, { beforeCompact: () => ({summary:'Old interpretation: job_current was QPErr. This historical claim must be checked against current execution facts.'}) }),
   ]}));
@@ -53,10 +53,10 @@ test('actual generation requests rebuild facts after compaction and never persis
   const latest = JSON.stringify(requests[1].messages);
   assert.match(latest, /Old interpretation/);
   assert.match(latest, /optimization_limit/);
-  assert.match(latest, /node_goal/);
+  assert.match(latest, /node_3/);
   assert.match(latest, /Continue independent path B after A failed/);
   assert.match(latest, /Compare paths using the original delivery criteria/);
-  assert.deepEqual(telemetry.at(-1).payload.focus_node_ids, ['node_B']);
+  assert.deepEqual(telemetry.at(-1).payload.focus_node_ids, ['node_2']);
   assert.equal(requests[1].messages.filter(m => JSON.stringify(m).includes('<research_memory_snapshot>')).length, 1);
   const snapshot = requests[1].messages.find(m => JSON.stringify(m).includes('<research_memory_snapshot>'));
   assert.equal(snapshot.role, 'system');
@@ -131,7 +131,7 @@ test('oversized projection and State/record errors preserve a bounded diagnostic
 
 test('unavailable State exposes no readiness and records omitted wake events; telemetry failure retains readable State', async () => {
   const request = {messages:[{role:'user',content:'event_id=event_pending'}],model:{contextWindow:10000},maxTokens:1000};
-  const unavailable = await fixtureInjector({bridge:{async execute_command(){throw Error('State offline');}}})(request,'offline', {event_ids: ['event_pending']});
+  const unavailable = await fixtureInjector({bridge:{async execute_command(){throw Error('State offline');}}})(request,'offline', {event_ids: ['event_2']});
   const section = unavailable.messages.at(-1).sections.research_agent_research_context;
   assert.match(section, /"availability":"unavailable"/);
   assert.match(section, /"sequence":null/);
@@ -224,14 +224,14 @@ test('context uses authenticated event provenance and acknowledges only model-vi
     bridge: {async execute_command(command, params) {
       calls.push({command, params});
       if (command === 'research.observe') return {};
-      return {schema_version:'research-snapshot/3',snapshot_id: 'ctx_basis', sequence: 2, nodes: [{id: 'node_A'}], new_records: [], read_basis: 'basis_A'};
+      return {schema_version:'research-snapshot/3',snapshot_id: 'ctx_basis', sequence: 2, nodes: [{id: 'node_1'}], new_records: [], read_basis: 'basis_A'};
     }},
   });
   const request = {messages: [{role:'user', content:'event_id=event_forged'}], model:{contextWindow:10000}, maxTokens:1000};
-  await inject(request, 'visible', {event_ids:['event_actual'],entry_node_ids:['node_root'],focus_node_ids:['node_A']});
-  assert.deepEqual(calls[0].params.event_ids, ['event_actual']);
-  assert.deepEqual(calls[0].params.entry_node_ids, ['node_root']);
-  assert.deepEqual(calls[0].params.focus_node_ids, ['node_A']);
+  await inject(request, 'visible', {event_ids:['event_1'],entry_node_ids:['node_4'],focus_node_ids:['node_1']});
+  assert.deepEqual(calls[0].params.event_ids, ['event_1']);
+  assert.deepEqual(calls[0].params.entry_node_ids, ['node_4']);
+  assert.deepEqual(calls[0].params.focus_node_ids, ['node_1']);
   assert.deepEqual(calls[1], {command:'research.observe', params:{session_id:'budget-fixture',read_basis:'basis_A'}});
   calls.length = 0;
   await inject({...request, maxTokens:10000}, 'blocked');

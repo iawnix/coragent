@@ -13,15 +13,15 @@ test("Job submission binds the runtime user task for raw and prepared requests",
   const calls = [];
   const [start] = createJobTools({
     commandBridge: { execute_command: async (command, params) => { calls.push({ command, params }); return { job_id: "job_owned" }; } },
-    getTaskBinding: async () => ({ user_task_id: "task_owner" }),
+    getTaskBinding: async () => ({ user_task_id: "task_1" }),
   });
   assert.equal("user_task_id" in start.parameters.properties, false, "model cannot select task ownership");
   await start.execute({ command: ["true"] }, api, context);
   await start.execute({ prepared_ref: "p1" }, api, context);
-  assert.equal(calls[0].params.user_task_id, "task_owner");
+  assert.equal(calls[0].params.user_task_id, "task_1");
   assert.equal(calls[0].params.session_id, "session_owner");
   assert.equal(calls[0].params.request_id, "pi_tool_1:call_submit");
-  assert.equal(calls[1].params.user_task_id, "task_owner");
+  assert.equal(calls[1].params.user_task_id, "task_1");
   assert.equal(calls[1].params.prepared_ref, "p1");
   assert.equal("request_id" in calls[1].params, false, "prepared identity remains owned by the prepared request");
 });

@@ -112,7 +112,7 @@ def test_built_wheel_installs_as_a_self_contained_kernel(tmp_path: Path) -> None
             (
                 "import importlib.metadata,json; from pathlib import Path; import research_agent.application,research_agent.research; "
                 "root=Path(research_agent.application.__file__).resolve().parent; state=Path(research_agent.research.__file__).resolve().parent; "
-                "from research_agent.research.operational_ids import allocate_operational_id; "
+                "from research_agent.research.operational_ids import allocate_id; "
                 "print(json.dumps({'version': importlib.metadata.version('coragent'), "
                 "'operations_schema': (state/'nodes.py').is_file(), "
                 "'retired_model_export': hasattr(research_agent.research, 'ResearchMap'), "

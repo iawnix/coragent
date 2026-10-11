@@ -23,16 +23,6 @@ def _root(params: dict[str, Any]) -> Path:
     return root
 
 
-def _id(payload: bytes, supplied: str | None = None, provenance_key: str | None = None) -> str:
-    digest = hashlib.sha256(payload).hexdigest()
-    # Job outputs retain producer identity: two Jobs producing equal
-    # bytes are distinct evidence records even though their payloads match.
-    generated = "art_" + hashlib.sha256(f"{provenance_key}\0{digest}".encode()).hexdigest() if provenance_key else "art_" + digest
-    if supplied is not None and supplied != generated:
-        raise ValueError("artifact_id does not match payload/provenance identity")
-    return supplied or generated
-
-
 def _store(root: Path) -> PayloadStore:
     return PayloadStore(root / "artifacts")
 
@@ -47,17 +37,7 @@ def _dispatch(root, request):
     from .api import validate_command_params
     validate_command_params("artifact." + operation, params, transport_fields=("root", "workspace_root"))
     root = _root(params); store = _store(root)
-    from research_agent.application.references import artifact_reference, resolve_artifact_reference
     supplied = params.get("artifact_id")
-    if supplied is not None:
-        supplied = resolve_artifact_reference(root, supplied)
-    if params.get("artifact_ref") is not None:
-        selected = resolve_artifact_reference(root, params["artifact_ref"])
-        if supplied is not None and selected != supplied:
-            raise ValueError("artifact_selector_conflict: artifact_id and artifact_ref disagree")
-        supplied = selected
-    if operation == "read" and (not isinstance(supplied, str) or not supplied):
-        raise ValueError("artifact_selector_required: provide artifact_ref or artifact_id")
     if operation in {"create", "register"}:
         job_id = params.get("job_id")
         if job_id:
@@ -97,16 +77,16 @@ def _dispatch(root, request):
         expected = params.get("sha256")
         if expected and expected.removeprefix("sha256:") != hashlib.sha256(payload).hexdigest():
             raise ValueError("artifact digest does not match expected sha256")
-        artifact_id = _id(payload, supplied, json.dumps(provenance, sort_keys=True))
+        from research_agent.research.operational_ids import allocate_id
+        artifact_id = allocate_id(root, "art", [provenance, hashlib.sha256(payload).hexdigest()])
         result = {**store.put_bytes(artifact_id,payload,media_type=params.get("media_type","application/octet-stream")).as_dict(),
                   "provenance":provenance}
         from research_agent.artifacts.registry import register_manifest
         from .job_state import persist_event
         register_manifest(root, {**result, "input_artifact_ids": input_artifact_ids})
-        result["artifact_ref"] = artifact_reference(root, artifact_id)
         binding = job.metadata.get("research_binding", {}) if job_id else {}
         persist_event(root, kind="material", title=provenance.get("name") or provenance.get("source_path", "Research material"),
-            content=f"Material {result['artifact_ref']} registered" + (f" from Job {job_id}." if job_id else "."),
+            content=f"Material {artifact_id} registered" + (f" from Job {job_id}." if job_id else "."),
             data=result, references=[artifact_id], identity=["material", artifact_id], **binding)
         return result
     if operation == "read":
@@ -116,6 +96,5 @@ def _dispatch(root, request):
         if not isinstance(offset, int) or offset < 0: raise ValueError("offset must be non-negative")
         if type(limit) is not int or not 1 <= limit <= 1_000_000: raise ValueError("limit must be 1..1000000")
         view = payload[offset:offset + limit]
-        from research_agent.application.references import annotate_artifact_references
-        return annotate_artifact_references(root, {**store.receipt(artifact_id).as_dict(), "content": view.decode("utf-8", errors="replace"), "next_offset": offset + len(view) if offset + len(view) < len(payload) else None})
+        return {**store.receipt(artifact_id).as_dict(), "content": view.decode("utf-8", errors="replace"), "next_offset": offset + len(view) if offset + len(view) < len(payload) else None}
     raise ValueError("unsupported artifact operation: " + operation)

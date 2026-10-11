@@ -16,7 +16,7 @@ from research_agent.foundation.transactions import TransactionCoordinator
 
 
 def finished(root, *, code=0, session_id='session', job_id='job_one'):
-    receipt=dispatch('start', {'root':str(root), 'job_id':job_id, 'session_id':session_id,
+    receipt=dispatch('start', {'root':str(root), 'request_id':job_id, 'session_id':session_id,
         'command':[sys.executable, '-c', f"from pathlib import Path;Path('result').write_text('observed');raise SystemExit({code})"],
         'outputs':[{'path':'result','required':True}]})
     for _ in range(200):
@@ -77,11 +77,11 @@ def test_lost_submission_receipt_never_resubmits(tmp_path, monkeypatch):
     calls=[]
     def lost(self,spec): calls.append(spec.job_id); raise RuntimeError('lost')
     monkeypatch.setattr(LocalProcessPlatform,'start',lost)
-    request={'root':str(tmp_path),'job_id':'job_uncertain','command':['true']}
+    request={'root':str(tmp_path),'request_id':'job_uncertain','command':['true']}
     with pytest.raises(RuntimeError): dispatch('start',request)
     assert dispatch('start',request)['state']=='unknown'
     assert len(calls)==1
-    assert dispatch('status',{'root':str(tmp_path),'job_id':'job_uncertain'})['state']=='unknown'
+    assert dispatch('status',{'root':str(tmp_path),'job_id':'job_1'})['state']=='unknown'
     assert read(tmp_path)['running_jobs'][0]['state']=='unknown'
 
 

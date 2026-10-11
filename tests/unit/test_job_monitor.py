@@ -10,7 +10,7 @@ from tests.unit.test_job_recovery import workspace
 
 def test_terminal_job_wakes_once_and_reclaims_failed_delivery(tmp_path):
     workspace(tmp_path)
-    job=dispatch('start',{'root':str(tmp_path),'job_id':'job_wake',
+    job=dispatch('start',{'root':str(tmp_path),'request_id':'job_wake',
         'session_id':'session_original','command':[sys.executable,'-c','pass']})
     for _ in range(100):
         command(tmp_path,'tick',{})
@@ -79,7 +79,7 @@ def test_long_queue_emits_one_diagnostic_event_without_poll_wakes(tmp_path, monk
         (spec.cwd/'receipt.json').write_text(json.dumps(receipt.__dict__))
         return receipt
     monkeypatch.setattr(TorqueSSHPlatform, 'start', submit)
-    dispatch('start',{'root':str(tmp_path),'job_id':'job_queue','session_id':'s',
+    dispatch('start',{'root':str(tmp_path),'request_id':'job_queue','session_id':'s',
         'command':['/bin/true']})
     status = SimpleNamespace(state=JobState.QUEUED,exit_code=None,error=None,diagnostics={'wait_seconds':10})
     monkeypatch.setattr(job_monitor,'_runtime',lambda root:SimpleNamespace(job_status=lambda receipt:status))

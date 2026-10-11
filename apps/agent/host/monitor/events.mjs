@@ -1,8 +1,8 @@
 import { lstat, readFile, readdir, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { validate_workspace_manifest } from "../workspace.mjs";
-const MONITOR_ID = /^monitor_[a-f0-9]{24}$/u;
-const MONITOR_EVENT_ID = /^event_[a-f0-9]{32}$/u;
+const MONITOR_ID = /^monitor_[1-9][0-9]*$/u;
+const MONITOR_EVENT_ID = /^event_[1-9][0-9]*$/u;
 
 export function createMonitorEvents({ listWorkspaces, clients, epoch }) {
   const monitorFiles = new Map();
@@ -115,7 +115,7 @@ function validMonitorBinding(binding, monitorId, identity) {
     && binding.schema_version === "coragent-job-monitor/2"
     && binding.monitor_id === monitorId
     && binding.workspace_id === identity.canonical
-    && typeof binding.job_id === "string" && /^job_[A-Za-z0-9_.:-]+$/u.test(binding.job_id)
+    && typeof binding.job_id === "string" && /^job_[1-9][0-9]*$/u.test(binding.job_id)
     && validResearchBinding(binding)
     && validTaskBinding(binding)
     && !Object.hasOwn(binding, "intent_id") && !Object.hasOwn(binding, "intent_digest")
@@ -159,11 +159,11 @@ function validMonitorEvent(event, eventId, monitorId, identity, binding) {
 function validResearchBinding(value) {
   if (Object.hasOwn(value, "attempt_id")) return false;
   return (value.node_id === null && value.node_revision === null)
-    || (typeof value.node_id === "string" && /^node_[A-Za-z0-9_-]+$/u.test(value.node_id)
+    || (typeof value.node_id === "string" && /^node_[1-9][0-9]*$/u.test(value.node_id)
       && Number.isSafeInteger(value.node_revision) && value.node_revision > 0);
 }
 
 function validTaskBinding(value) {
   return value.user_task_id === undefined || value.user_task_id === null
-    || (typeof value.user_task_id === "string" && /^task_[A-Za-z0-9_-]+$/u.test(value.user_task_id));
+    || (typeof value.user_task_id === "string" && /^task_[1-9][0-9]*$/u.test(value.user_task_id));
 }

@@ -79,8 +79,11 @@ export interface CommandParameters {
     "session_id"?: string | null;
     "read_basis": string | null;
   };
+  "research.allocate_task": {
+    "session_id": string;
+    "request_id": string;
+  };
   "job.start": {
-    "job_id"?: string;
     "request_id"?: string;
     "command"?: Array<string>;
     "cwd"?: string | null;
@@ -164,14 +167,12 @@ export interface CommandParameters {
     "cursor"?: string;
   };
   "artifact.register": {
-    "artifact_id"?: string;
     "path"?: string;
     "job_id"?: string;
     "sha256"?: string;
     "media_type"?: string;
   };
   "artifact.create": {
-    "artifact_id"?: string;
     "content"?: string | Array<number>;
     "name"?: string | null;
     "job_id"?: string;
@@ -179,10 +180,9 @@ export interface CommandParameters {
     "media_type"?: string;
   };
   "artifact.read": {
-    "artifact_id"?: string;
+    "artifact_id": string;
     "offset"?: number;
     "limit"?: number;
-    "artifact_ref"?: string;
   };
 }
 
@@ -545,6 +545,9 @@ export interface CommandResults {
   "research.observe": {
     "recorded": true;
   };
+  "research.allocate_task": {
+    "identifier": string;
+  };
   "job.start": {
     "job_id": string;
     "platform": string;
@@ -626,7 +629,6 @@ export interface CommandResults {
       "sha256": string;
       "size_bytes": number;
       "media_type": string;
-      "artifact_ref": string;
       "provenance": {
         "job_id": string | null;
         "node_id"?: string | null;
@@ -795,7 +797,6 @@ export interface CommandResults {
     "sha256": string;
     "size_bytes": number;
     "media_type": string;
-    "artifact_ref": string;
     "provenance": {
       "job_id": string | null;
       "node_id"?: string | null;
@@ -811,7 +812,6 @@ export interface CommandResults {
     "sha256": string;
     "size_bytes": number;
     "media_type": string;
-    "artifact_ref": string;
     "provenance": {
       "job_id": string | null;
       "node_id"?: string | null;
@@ -827,7 +827,6 @@ export interface CommandResults {
     "sha256": string;
     "size_bytes": number;
     "media_type": string;
-    "artifact_ref": string;
     "content": string;
     "next_offset": number | null;
   };

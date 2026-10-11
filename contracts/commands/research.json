@@ -513,6 +513,48 @@
       "result": {
         "$ref": "results.json#/commands/research.observe"
       }
+    },
+    {
+      "id": "research.allocate_task",
+      "domain": "research",
+      "effect": "write",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "session_id",
+          "request_id"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "session_id": "session-test",
+          "request_id": "begin-1"
+        }
+      ],
+      "result": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "pattern": "^task_[1-9][0-9]*$"
+          }
+        },
+        "required": [
+          "identifier"
+        ],
+        "additionalProperties": false
+      }
     }
   ]
 }

@@ -35,7 +35,7 @@
     },
     "monitor_id": {
       "type": "string",
-      "pattern": "^monitor_[a-f0-9]{24}$"
+      "pattern": "^monitor_[1-9][0-9]*$"
     },
     "workspace_id": {
       "type": "string",
@@ -43,7 +43,7 @@
     },
     "job_id": {
       "type": "string",
-      "pattern": "^job_[A-Za-z0-9_.:-]+$"
+      "pattern": "^job_[1-9][0-9]*$"
     },
     "job_digest": {
       "type": "string",
@@ -85,7 +85,7 @@
     },
     "event_id": {
       "type": "string",
-      "pattern": "^event_[a-f0-9]{32}$"
+      "pattern": "^event_[1-9][0-9]*$"
     },
     "state": {
       "enum": [
@@ -145,7 +145,7 @@
         "string",
         "null"
       ],
-      "pattern": "^node_[A-Za-z0-9_-]+$"
+      "pattern": "^node_[1-9][0-9]*$"
     },
     "node_revision": {
       "type": [
@@ -159,7 +159,7 @@
         "string",
         "null"
       ],
-      "pattern": "^task_[A-Za-z0-9_-]+$"
+      "pattern": "^task_[1-9][0-9]*$"
     }
   },
   "oneOf": [
@@ -177,7 +177,7 @@
       "properties": {
         "node_id": {
           "type": "string",
-          "pattern": "^node_[a-f0-9]{32}$"
+          "pattern": "^node_[1-9][0-9]*$"
         },
         "node_revision": {
           "type": "integer",

@@ -375,7 +375,7 @@ session 格式。
 ## 工作区初始化
 
 首次运行 `./coragent --workspace <name>` 时，客户端会在配置的 workspace root 下创建 0700 工作区
-以及 `research_workspace/2` 的 `workspace_manifest.json` 与 Research Memory 存储。Node 按需在 `research/nodes/` 创建，不生成全局 progress 或 lifecycle 文档。Host 的 WorkspaceDirectory 也提供同一操作给 CoRHub。Host 不会创建无名项目；
+以及 `research_workspace/3` 的 `workspace_manifest.json` 与 Research Memory 存储。Node 按需在 `research/nodes/` 创建，不生成全局 progress 或 lifecycle 文档。Host 的 WorkspaceDirectory 也提供同一操作给 CoRHub。Host 不会创建无名项目；
 初始化会验证规范协议，遇到旧格式或不完整状态时拒绝而不是重写。
 
 ## 运行 CoRAgent Web Research Explorer

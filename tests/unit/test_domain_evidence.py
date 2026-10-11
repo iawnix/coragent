@@ -105,9 +105,9 @@ def test_registered_comparison_runs_as_job_and_mismatch_remains_publishable(tmp_
     collected = run_job(tmp_path, prepared)
     comparison = selected(collected, '/comparison.json')
     assert json.loads(Path(comparison['location']).read_text())['status'] == 'mismatch'
-    node = execute('research.create', tmp_path, {'goal': 'Compare', 'subjects': {'target': refs[0]['artifact_ref']}})['node']
+    node = execute('research.create', tmp_path, {'goal': 'Compare', 'subjects': {'target': refs[0]['artifact_id']}})['node']
     saved = execute('research.result', tmp_path, {'node_id': node['id'], 'conclusion': 'Calculated a different isomer',
-        'subjects': {'target': refs[0]['artifact_ref'], 'calculated': refs[1]['artifact_ref']},
+        'subjects': {'target': refs[0]['artifact_id'], 'calculated': refs[1]['artifact_id']},
         'check_refs': [comparison['artifact_id']]})
     assert saved['result_saved']
     prepared['metadata']['input_roles']['target']['sha256'] = 'sha256:' + '0' * 64

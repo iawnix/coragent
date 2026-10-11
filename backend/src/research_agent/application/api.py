@@ -81,6 +81,9 @@ def execute(command: str, root: str | Path, params: dict[str, Any] | None = None
     if command.startswith("research."):
         from research_agent.research import records, nodes, results, retrieval, basis, views
         from . import memory_context
+        if command == "research.allocate_task":
+            from research_agent.research.operational_ids import allocate_id
+            return {"identifier": allocate_id(root, "task", [value["session_id"], value["request_id"]])}
         if command == "research.read":
             return memory_context.read(root, **value)
         if command == "research.search":

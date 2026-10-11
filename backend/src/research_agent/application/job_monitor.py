@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from research_agent.foundation.transactions import TransactionCoordinator, workspace_transaction, write_json, read_json
 from .execution import _runtime, _receipt
+from research_agent.research.operational_ids import allocate_id
 
 
 def now():return datetime.now(timezone.utc).isoformat()
@@ -24,7 +25,7 @@ def valid_node_binding(value):
         return False
     return (value.get('node_id') is None and value.get('node_revision') is None
             and 'node_id' in value and 'node_revision' in value) or (
-        isinstance(value.get('node_id'), str) and re.fullmatch(r'node_[A-Za-z0-9_-]+', value['node_id'])
+        isinstance(value.get('node_id'), str) and re.fullmatch(r'node_[1-9][0-9]*', value['node_id'])
         and type(value.get('node_revision')) is int and value['node_revision'] > 0)
 
 
@@ -61,7 +62,7 @@ def monitor_view(path):
 
 def bind(root, intent, session_id):
     if not session_id:return
-    job=intent['job_id'];mid='monitor_'+hashlib.sha256(job.encode()).hexdigest()[:24]
+    job=intent['job_id'];mid=allocate_id(root, 'monitor', job)
     path=root/'operations/monitors'/mid/'binding.json'
     if path.exists():
         read_binding(path)
@@ -152,7 +153,7 @@ def _commit_observation(root, request):
     if state not in {'succeeded','failed','timed_out','cancelled','unknown'} and not queue_wait:
         write(p,row);return result
     row['sequence']+=1
-    eid='event_'+hashlib.sha256(f"{row['monitor_id']}:{row['sequence']}:{state}".encode()).hexdigest()[:32]
+    eid=allocate_id(root, 'event', [row['monitor_id'], row['sequence'], state])
     event={**row,'schema_version':'coragent-job-monitor-event/2','event_id':eid,'state':state,
         'previous_state':previous,'status_digest':digest({'state':state,'exit_code':status.exit_code}),
         'program_status':None,'exit_status':status.exit_code,'error_class':None,
@@ -213,7 +214,7 @@ def validate_event(event):
 
 
 def assess(root, event_id, session_id):
-    if not isinstance(event_id, str) or not re.fullmatch(r"event_[A-Za-z0-9_-]+", event_id):
+    if not isinstance(event_id, str) or not re.fullmatch(r"event_[1-9][0-9]*", event_id):
         raise ValueError("invalid monitor event identity")
     root = Path(root)
     with TransactionCoordinator(root).locked():

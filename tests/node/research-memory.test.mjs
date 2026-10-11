@@ -67,8 +67,8 @@ test('tool schemas express research choices without exposing receipt and executi
   assert.doesNotThrow(()=>validate('update',{node_id:'node_1',note:'Failed optimization; inspect gradients.'}));
   assert.doesNotThrow(()=>validate('result',{node_id:'node_1',conclusion:'Evidence is insufficient.'}));
   assert.throws(()=>validate('update',{node_id:'node_1',note:'fake',read_basis:'forged'}));
-  assert.throws(()=>validate('state',{event_ids:['event_forged']}));
-  assert.throws(()=>validate('state',{entry_node_ids:['node_A'],focus_node_ids:['node_A']}));
+  assert.throws(()=>validate('state',{event_ids:['event_1']}));
+  assert.throws(()=>validate('state',{entry_node_ids:['node_1'],focus_node_ids:['node_1']}));
   assert.throws(()=>validate('update',{content:'old notebook protocol'}));
   assert.doesNotThrow(()=>validate('jobStart',{command:['true'],node_id:'node_1'}));
   assert.throws(()=>validate('jobStart',{command:['true']}));
@@ -84,15 +84,15 @@ test('tools acknowledge returned revisions and bind writes to their trusted sess
   }};
   const tools=createResearchTools({commandBridge:bridge});
   const run=(name,args,session='s')=>tools.find(t=>t.name===name).execute(args,{callId:'call',coragent:{workspace_root:'/tmp/memory',session_id:session,operation_id:'operation-1',principal:'root_agent'}});
-  await run('research_read',{ref:'node_A'});
-  await run('research_read',{ref:'node_B'});
-  await run('research_update',{node_id:'node_A',note:'interpret A'});
+  await run('research_read',{ref:'node_1'});
+  await run('research_read',{ref:'node_2'});
+  await run('research_update',{node_id:'node_1',note:'interpret A'});
   assert.equal(calls.at(-1).params.read_basis,undefined);
   assert.equal(calls.at(-1).params.session_id,'s');
-  await run('research_update',{node_id:'node_A',note:'another session'},'other');
+  await run('research_update',{node_id:'node_1',note:'another session'},'other');
   assert.equal(calls.at(-1).params.read_basis,undefined);
   assert.deepEqual(calls.filter(call=>call.command==='research.observe').map(call=>call.params), [
-    {session_id:'s',read_basis:'basis_node_A'}, {session_id:'s',read_basis:'basis_node_B'},
+    {session_id:'s',read_basis:'basis_node_1'}, {session_id:'s',read_basis:'basis_node_2'},
   ]);
 });
 
@@ -106,7 +106,7 @@ test('bridge binds command root and rejects alternate roots in transaction reque
 
 test('oversized Unicode replies preserve saved outcomes without acknowledging omitted fields',async()=>{
   const calls=[];
-  const node={id:'node_large',revision:2,goal:'研究'.repeat(12000)};
+  const node={id:'node_3',revision:2,goal:'研究'.repeat(12000)};
   const result={accepted:true,node,result:{id:'result_large',node_id:node.id,conclusion:'结果'.repeat(12000)},result_saved:true,assessment_selected:true,conflict:null,read_basis:'read_unseen'};
   const tools=createResearchTools({commandBridge:{async execute_command(command,params){calls.push({command,params});return result;}}});
   const tool=tools.find(t=>t.name==='research_result');
@@ -119,7 +119,7 @@ test('oversized Unicode replies preserve saved outcomes without acknowledging om
   assert.equal(visible.node.id,node.id);
   assert.equal(visible.result.id,'result_large');
   assert.equal(visible.read_basis,undefined);
-  assert.deepEqual(visible.read.map(item=>item.ref),['node_large','result_large']);
+  assert.deepEqual(visible.read.map(item=>item.ref),['node_3','result_large']);
   assert.ok(Buffer.byteLength(response.content[0].text) < tool.outputLimits.maxBytes);
   assert.ok(response.content[0].text.split('\n').length <= tool.outputLimits.maxLines);
 });
