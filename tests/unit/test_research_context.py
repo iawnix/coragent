@@ -14,7 +14,7 @@ def execute(command, root, params):
 
 
 def material(root, name):
-    return execute('artifact.create', root, {'name': name, 'content': name})['artifact_ref']
+    return execute('artifact.create', root, {'name': name, 'content': name})['artifact_id']
 
 
 def test_subjects_and_uncertain_checks_survive_publication_and_read(tmp_path):

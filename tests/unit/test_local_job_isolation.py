@@ -48,7 +48,7 @@ while not Path('release').exists():time.sleep(.02)
     platform = LocalProcessPlatform(supervisor="systemd", platform_name="lab")
     unit = None
     try:
-        receipt = platform.start(JobSpec(command=tuple(command), cwd=cwd,
+        receipt = platform.start(JobSpec(job_id="job_1", command=tuple(command), cwd=cwd,
             env={"GAUSS_SCRDIR": "{scratch}"}, metadata={"resources": {"cpus": 1, "memory_mb": 128},
                 "execution_binding": {"binding": {"scratch_root": str(tmp_path / "scratch")}}}))
         unit = receipt.metadata["systemd_unit"]
@@ -89,7 +89,7 @@ Path('result.txt').write_text('survived host stop')
         "import sys,json,time\nfrom pathlib import Path\n"
         + "sys.path[:0] = " + repr(sys.path) + "\n"
         + "from research_agent.jobs import LocalProcessPlatform,JobSpec\n"
-        + "receipt=LocalProcessPlatform(supervisor='systemd').start(JobSpec(command=" + repr(tuple(child_command))
+        + "receipt=LocalProcessPlatform(supervisor='systemd').start(JobSpec(job_id='job_1',command=" + repr(tuple(child_command))
         + ",cwd=Path(" + repr(str(cwd)) + "),timeout_seconds=20))\n"
         + "Path(" + repr(str(tmp_path / "parent-receipt.json")) + ").write_text(json.dumps(receipt.__dict__))\n"
         + "time.sleep(60)\n")

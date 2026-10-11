@@ -20,7 +20,7 @@ export function createMonitorAdmission({ admission, kernel, sessionId, wakeMessa
     return result;
   };
   function eventIdentity(ids) {
-    if (!Array.isArray(ids) || !ids.length || ids.length > 256 || ids.some(id => typeof id !== "string" || !/^event_[A-Za-z0-9_-]+$/u.test(id))) {
+    if (!Array.isArray(ids) || !ids.length || ids.length > 256 || ids.some(id => typeof id !== "string" || !/^event_[1-9][0-9]*$/u.test(id))) {
       throw fail("invalid_monitor_events", "Monitor input requires structured eventIds");
     }
     return { event_ids: [...new Set(ids)].sort() };

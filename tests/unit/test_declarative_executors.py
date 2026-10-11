@@ -72,17 +72,17 @@ def test_external_native_executor_runs_without_core_changes_or_python_binding(tm
     assert execution(root, receipt["job_id"])["metadata"]["executor"] == {"id": "external.copy", "version": "3"}
     artifact = next(item for item in collected['artifacts']
                     if item['provenance']['source_path'].endswith('/result.txt'))
-    content = execute('artifact.read', root, {'artifact_ref':artifact['artifact_ref']})
+    content = execute('artifact.read', root, {'artifact_id':artifact['artifact_id']})
     assert content['content'] == source.read_text()
     record = collected['result_receipt']
     assert record['collection_state'] == 'complete'
     published = execute('research.result', root, {'node_id':node['id'],
         'conclusion':'The deterministic fixture copied the declared input.',
         'evidence_refs':[receipt['job_id'], record['receipt_id']],
-        'files':[{'name':'result.txt', 'artifact_ref':artifact['artifact_ref']}]})
+        'files':[{'name':'result.txt', 'artifact_ref':artifact['artifact_id']}]})
     assert published['result_saved']
     assert published['result']['evidence_refs'] == [receipt['job_id'], record['receipt_id']]
-    assert published['result']['files'][0]['artifact_ref'] == artifact['artifact_ref']
+    assert published['result']['files'][0]['artifact_ref'] == artifact['artifact_id']
 
 
 def test_only_selected_binding_and_actual_input_content_change_work_identity(tmp_path, monkeypatch):

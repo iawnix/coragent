@@ -35,7 +35,13 @@ async function fixture(t) {
   harness = await Harness.open(new MemoryStorage(), { models, registry, settings: {} }, context);
   const conversation = await harness.root(context, { agent: { model: { provider: "faux", modelId: "faux-1" } } });
   admission = createInputAdmission({ harness, conversation, LiveDoc, InboxDoc, admitSubmission });
+  const allocatedTasks = new Map();
   const kernel = { execute_command: async (method, params) => {
+    if (method === "research.allocate_task") {
+      const key = JSON.stringify([params.session_id, params.request_id]);
+      if (!allocatedTasks.has(key)) allocatedTasks.set(key, `task_${allocatedTasks.size + 1}`);
+      return { identifier: allocatedTasks.get(key) };
+    }
     if (method === "job.list") return { jobs: [...jobs].map(([job_id, state]) => ({ job_id, state })), next_cursor: null };
     if (method === "job.status") return { job_id: params.job_id, state: jobs.get(params.job_id) };
     if (method === "job.cancel") {
@@ -76,7 +82,7 @@ test("an early Job event cannot consume an all-Jobs wait", async t => {
   task = await env.controller.update({ expected_revision: task.revision, action: "wait", wait: { job_ids: ["job_a", "job_b"], mode: "all" } }, "wait-all", context);
   env.faux.setResponses([fauxAssistantMessage("Unexpected early wake")]);
   const before = env.requests;
-  const response = await env.monitor.admit({ requestId: "batch-wait", eventIds: ["event_a"], token: "fixture-token", mode: "next_run" }, context);
+  const response = await env.monitor.admit({ requestId: "batch-wait", eventIds: ["event_1"], token: "fixture-token", mode: "next_run" }, context);
   await env.conversation.waitForIdle(context);
   assert.equal(response.accepted, false);
   assert.equal((await env.controller.current(context)).state, "waiting");
@@ -119,7 +125,7 @@ test("pause before first automatic consumption can resume past the invalidated r
   assert.equal((await env.controller.current(context)).continuation.sequence, 2);
 });
 
-test("failed final delivery leaves evidence and a blocker instead of completing", async t => {
+test("failed final delivery retains completion evidence and supports delivery-only recovery", async t => {
   const env = await fixture(t), entered = gate(), fail = gate();
   env.faux.setResponses([async () => { entered.resolve(); await fail.promise; throw new Error("Final delivery rejected"); }]);
   await env.controller.reconcile(context); await entered.promise;
@@ -129,9 +135,24 @@ test("failed final delivery leaves evidence and a blocker instead of completing"
   fail.resolve(); await env.conversation.waitForIdle(context);
   await env.reopen(); await env.controller.reconcile(context);
   const recovered = await env.controller.current(context);
-  assert.equal(recovered.state, "blocked");
+  assert.equal(recovered.state, "completing");
   assert.equal(recovered.completion[0].criterion_id, "report");
-  assert.match(recovered.reason, /not delivered/);
+  assert.equal(recovered.execution_recovery.state, "attention_required");
+  assert.equal(recovered.execution_recovery.phase, "delivery");
+  const finishing = gate(), release = gate();
+  env.faux.setResponses([async () => { finishing.resolve(); await release.promise; return fauxAssistantMessage("The report is complete"); }]);
+  await env.controller.control({ user_task_id: recovered.user_task_id, action: "resume", request_id: "resume-delivery",
+    expected_revision: recovered.revision }, context);
+  await env.controller.reconcile(); await finishing.promise;
+  try {
+    assert.match(await env.controller.toolRestriction(context), /read-only/);
+    await assert.rejects(env.controller.binding(context), { code: "task_not_active" });
+  } finally { release.resolve(); }
+  await env.conversation.waitForIdle(context); await env.controller.reconcile();
+  const delivered = await env.controller.current(context);
+  assert.equal(delivered.state, "completed");
+  assert.deepEqual(delivered.completion, recovered.completion);
+  assert.equal(delivered.execution_recovery, null);
 });
 
 test("mixed historical and current Job batches retain identity without driving the new task from old facts", async t => {
@@ -139,21 +160,21 @@ test("mixed historical and current Job batches retain identity without driving t
   const old = await env.controller.current(context);
   await env.controller.control({ user_task_id: old.user_task_id, action: "cancel", request_id: "cancel-old", expected_revision: old.revision, jobs: "keep" }, context);
   const current = await env.controller.begin({ title: "New research", objective: "Deliver new report", source_submission_ids: [String(env.source.id)], criteria: [{ id: "report", description: "New report" }] }, "begin-next", context);
-  env.events.set("event_old", { event_id: "event_old", user_task_id: old.user_task_id, job_id: "job_old", state: "succeeded" });
-  env.events.set("event_current", { event_id: "event_current", user_task_id: current.user_task_id, job_id: "job_current", state: "succeeded" });
-  const obsolete = await env.monitor.admit({ requestId: "old-only", eventIds: ["event_old"], token: "fixture-token", mode: "next_run" }, context);
+  env.events.set("event_4", { event_id: "event_4", user_task_id: old.user_task_id, job_id: "job_old", state: "succeeded" });
+  env.events.set("event_2", { event_id: "event_2", user_task_id: current.user_task_id, job_id: "job_current", state: "succeeded" });
+  const obsolete = await env.monitor.admit({ requestId: "old-only", eventIds: ["event_4"], token: "fixture-token", mode: "next_run" }, context);
   assert.equal(obsolete.skipped, true);
   assert.equal(await env.admission.status("old-only", context), null);
   env.faux.setResponses([fauxAssistantMessage("Analyze only current Job")]);
-  const draft = { requestId: "mixed-batch", eventIds: ["event_old", "event_current"], token: "fixture-token", mode: "next_run" };
+  const draft = { requestId: "mixed-batch", eventIds: ["event_4", "event_2"], token: "fixture-token", mode: "next_run" };
   assert.equal((await env.monitor.admit(draft, context)).accepted, true);
   await env.conversation.waitForIdle(context);
   const record = await env.admission.status("mixed-batch", context);
   const origin = await env.admission.origin(record, context);
-  assert.deepEqual(origin.identity.event_ids, ["event_current", "event_old"]);
+  assert.deepEqual(origin.identity.event_ids, ["event_2", "event_4"]);
   const entry = await env.conversation.commit(tx => tx.entry(record.entry), context);
-  assert.match(JSON.stringify(entry.model), /event_current/);
-  assert.doesNotMatch(JSON.stringify(entry.model), /event_old/);
+  assert.match(JSON.stringify(entry.model), /event_2/);
+  assert.doesNotMatch(JSON.stringify(entry.model), /event_4/);
   const before = env.requests;
   const retried = await env.monitor.admit(draft, context);
   assert.equal(retried.consumed, true);
@@ -197,7 +218,7 @@ test("an event interrupted before consumption is delivered through resumed task 
   const env = await fixture(t), entered = gate(), proceed = gate();
   env.setBeforeAutomatic(async () => { entered.resolve(); await proceed.promise; });
   env.faux.setResponses([fauxAssistantMessage("The deferred Job fact is analyzed")]);
-  const draft = { requestId: "event-before-pause", eventIds: ["event_deferred"], token: "fixture-token", mode: "next_run" };
+  const draft = { requestId: "event-before-pause", eventIds: ["event_3"], token: "fixture-token", mode: "next_run" };
   await env.monitor.admit(draft, context); await entered.promise;
   let task = await env.controller.current(context);
   await env.controller.control({ user_task_id: task.user_task_id, action: "pause", request_id: "pause-event", expected_revision: task.revision }, context);
@@ -222,7 +243,7 @@ test("pause while the consumption assessment is pending prevents the model reque
   let assessments = 0;
   env.setBeforeAssess(async () => { assessments++; if (assessments === 2) { entered.resolve(); await proceed.promise; } });
   env.faux.setResponses([fauxAssistantMessage("Must not be sent after pause")]);
-  await env.monitor.admit({ requestId: "assessment-race", eventIds: ["event_race"], token: "fixture-token", mode: "next_run" }, context);
+  await env.monitor.admit({ requestId: "assessment-race", eventIds: ["event_5"], token: "fixture-token", mode: "next_run" }, context);
   await entered.promise;
   const task = await env.controller.current(context);
   await env.controller.control({ user_task_id: task.user_task_id, action: "pause", request_id: "pause-assessment", expected_revision: task.revision }, context);

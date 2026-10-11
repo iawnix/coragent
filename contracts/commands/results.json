@@ -847,9 +847,6 @@
         "media_type": {
           "type": "string"
         },
-        "artifact_ref": {
-          "type": "string"
-        },
         "provenance": {
           "type": "object",
           "properties": {
@@ -912,7 +909,6 @@
         "sha256",
         "size_bytes",
         "media_type",
-        "artifact_ref",
         "provenance"
       ],
       "additionalProperties": false
@@ -935,9 +931,6 @@
         "media_type": {
           "type": "string"
         },
-        "artifact_ref": {
-          "type": "string"
-        },
         "content": {
           "type": "string"
         },
@@ -958,7 +951,6 @@
         "sha256",
         "size_bytes",
         "media_type",
-        "artifact_ref",
         "content",
         "next_offset"
       ],

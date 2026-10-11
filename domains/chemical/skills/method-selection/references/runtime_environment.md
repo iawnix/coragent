@@ -62,3 +62,5 @@ during initialization. Report the exact observation and selected target; an
 unconfigured binding or absent recipe does not prove the software is absent
 from every environment. Changed binding or executable evidence requires preparing
 a new request before dispatch, not running an old prepared command.
+
+The control shell's PATH is not the selected scientific environment. A missing `g16` there does not establish absence from a configured Gaussian binding. A default `job_probe` running `true` checks dispatch only; use the targeted environment check above for the solver. Once that succeeds, prepare a small relevant calculation instead of repeating the same probe. Capture native program output explicitly in declared output files when using generic native Jobs.

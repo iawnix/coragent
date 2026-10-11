@@ -9,9 +9,7 @@ import sys
 
 import pytest
 
-from research_agent.application.references import (ReferenceError, annotate_artifact_references, artifact_reference,
-                                       prepare_job, resolve_artifact_reference,
-                                       resolve_prepared_job)
+from research_agent.application.references import ReferenceError, prepare_job, resolve_prepared_job
 from research_agent.application.memory_context import read
 from research_agent.research.records import journal
 from research_agent.artifacts.registry import read_manifest
@@ -34,20 +32,20 @@ def test_prepared_ref_is_immutable_and_input_versions_are_checked(tmp_path):
     (tmp_path / "input.xyz").write_text("original geometry")
     path = prepared(tmp_path)
     first = prepare_job(tmp_path, {"request_file": str(path)})
-    assert first["prepared_ref"] == "p1"
+    assert first["prepared_ref"] == "prepared_1"
     assert prepare_job(tmp_path, {"request_file": str(path)}) == first
-    original = resolve_prepared_job(tmp_path, {"prepared_ref": "p1"})
+    original = resolve_prepared_job(tmp_path, {"prepared_ref": "prepared_1"})
     assert original["work_id"] == "work_one"
     assert original["inputs"][0]["sha256"]
     path.write_text(path.read_text().replace('"pass"', '"print(2)"'))
     second = prepare_job(tmp_path, {"request_file": str(path)})
     assert second["prepared_ref"] != first["prepared_ref"]
-    assert resolve_prepared_job(tmp_path, {"prepared_ref": "p1"}) == original
+    assert resolve_prepared_job(tmp_path, {"prepared_ref": "prepared_1"}) == original
     with pytest.raises(ReferenceError, match="prepared_override_forbidden"):
-        resolve_prepared_job(tmp_path, {"prepared_ref": "p1", "work_id": "replace"})
+        resolve_prepared_job(tmp_path, {"prepared_ref": "prepared_1", "work_id": "replace"})
     (tmp_path / "input.xyz").write_text("changed geometry")
     with pytest.raises(ReferenceError, match="prepared_input_changed"):
-        resolve_prepared_job(tmp_path, {"prepared_ref": "p1"})
+        resolve_prepared_job(tmp_path, {"prepared_ref": "prepared_1"})
     third = prepare_job(tmp_path, {"request_file": str(path)})
     assert third["prepared_ref"] not in {first["prepared_ref"], second["prepared_ref"]}
 
@@ -58,36 +56,34 @@ def test_concurrent_preparation_and_restart_reuse_one_reference(tmp_path):
     path = prepared(tmp_path)
     with ThreadPoolExecutor(max_workers=4) as pool:
         values = list(pool.map(lambda _: prepare_job(tmp_path, {"request_file": str(path)}), range(8)))
-    assert {value["prepared_ref"] for value in values} == {"p1"}
+    assert {value["prepared_ref"] for value in values} == {"prepared_1"}
     script = "from research_agent.application.references import prepare_job; import json,sys; print(json.dumps(prepare_job(sys.argv[1], {'request_file':sys.argv[2]})))"
     env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": os.pathsep.join(sys.path)}
     result = subprocess.run([sys.executable, "-c", script, str(tmp_path), str(path)], env=env, capture_output=True, text=True, check=True)
-    assert json.loads(result.stdout)["prepared_ref"] == "p1"
+    assert json.loads(result.stdout)["prepared_ref"] == "prepared_1"
     assert len(list((tmp_path / "operations/references/records").glob("*.json"))) == 1
 
 
-def test_artifact_refs_are_exact_typed_and_preserve_canonical_provenance(tmp_path):
+def test_artifact_ids_are_canonical_and_aliases_are_rejected(tmp_path):
     workspace(tmp_path)
     item = evidence("create", {"root": str(tmp_path), "name": "note", "content": "result"})
-    assert item["artifact_ref"] == "a1"
-    assert artifact_reference(tmp_path, item["artifact_id"]) == "a1"
-    assert evidence("read", {"root": str(tmp_path), "artifact_id": "a1"})["content"] == "result"
-    assert resolve_artifact_reference(tmp_path, "a1") == item["artifact_id"]
-    with pytest.raises(ReferenceError, match="reference_not_found.*available references: a1"):
-        resolve_artifact_reference(tmp_path, "a99")
-    with pytest.raises(ReferenceError, match="reference_type_mismatch"):
-        resolve_artifact_reference(tmp_path, "p1")
-    canonical = read_manifest(tmp_path, item["artifact_id"])
-    assert annotate_artifact_references(tmp_path, {"records": [canonical]})["records"][0]["artifact_ref"] == "a1"
+    assert item["artifact_id"] == "art_1"
+    assert "artifact_ref" not in item
+    assert evidence("create", {"root": str(tmp_path), "name": "note", "content": "result"}) == item
+    assert evidence("read", {"root": str(tmp_path), "artifact_id": "art_1"})["content"] == "result"
+    for selector in ({"artifact_ref": "a1"}, {"artifact_id": "a1"}, {"artifact_id": "art_" + "a" * 64}):
+        with pytest.raises(ValueError, match="schema_field_invalid"):
+            evidence("read", {"root": str(tmp_path), **selector})
+    assert read_manifest(tmp_path, "art_1")["artifact_id"] == "art_1"
 
 
-def test_artifact_refs_do_not_escape_the_bound_workspace(tmp_path):
+def test_artifact_ids_are_scoped_to_the_workspace(tmp_path):
     first, other = tmp_path / "first", tmp_path / "other"
     first.mkdir(); other.mkdir()
     workspace(first); workspace(other)
     evidence("create", {"root": str(first), "name": "note", "content": "result"})
-    with pytest.raises(ReferenceError, match="reference_not_found"):
-        resolve_artifact_reference(other, "a1")
+    with pytest.raises(ValueError, match="payload does not exist"):
+        evidence("read", {"root": str(other), "artifact_id": "art_1"})
 
 
 def test_preparation_cli_emits_only_a_file_and_digest_in_workspace(tmp_path):
@@ -119,7 +115,7 @@ command = ["/bin/true"]
     assert value == {"request_file": str(output), "request_sha256": hashlib.sha256(output.read_bytes()).hexdigest()}
     assert any(row['source'] == str(xyz) for row in json.loads(output.read_text())["inputs"])
     assert read(tmp_path) == before
-    assert not (tmp_path / "operations/references/index.json").exists()
+    assert not list((tmp_path / "operations/references/records").glob("*.json"))
 
 
 def test_tampered_prepared_snapshot_is_rejected(tmp_path):
@@ -127,12 +123,12 @@ def test_tampered_prepared_snapshot_is_rejected(tmp_path):
     (tmp_path / "input.xyz").write_text("geometry")
     path = prepared(tmp_path)
     prepare_job(tmp_path, {"request_file": str(path)})
-    snapshot = tmp_path / "operations/references/records/p1.json"
+    snapshot = tmp_path / "operations/references/records/prepared_1.json"
     value = json.loads(snapshot.read_text())
     value["payload"]["request"]["command"] = ["false"]
     snapshot.write_text(json.dumps(value))
     with pytest.raises(ReferenceError, match="prepared_snapshot_changed"):
-        resolve_prepared_job(tmp_path, {"prepared_ref": "p1"})
+        resolve_prepared_job(tmp_path, {"prepared_ref": "prepared_1"})
 
 
 def test_repeated_reference_submissions_reuse_the_same_real_job(tmp_path):
@@ -172,7 +168,7 @@ def test_registry_index_and_snapshot_recover_as_one_transaction(tmp_path, monkey
     path = prepared(tmp_path)
     original = transactions._atomic_json
     def fail_index(target, value):
-        if target == tmp_path / "operations/references/index.json":
+        if target == tmp_path / "operations/identifiers.json":
             raise OSError("simulated reference index write failure")
         return original(target, value)
     monkeypatch.setattr(transactions, "_atomic_json", fail_index)
@@ -180,8 +176,8 @@ def test_registry_index_and_snapshot_recover_as_one_transaction(tmp_path, monkey
         prepare_job(tmp_path, {"request_file": str(path)})
     monkeypatch.setattr(transactions, "_atomic_json", original)
     value = prepare_job(tmp_path, {"request_file": str(path)})
-    assert value["prepared_ref"] == "p1"
-    assert resolve_prepared_job(tmp_path, {"prepared_ref": "p1"})["work_id"] == "work_one"
+    assert value["prepared_ref"] == "prepared_1"
+    assert resolve_prepared_job(tmp_path, {"prepared_ref": "prepared_1"})["work_id"] == "work_one"
     assert len(list((tmp_path / "operations/references/records").glob("*.json"))) == 1
 
 
@@ -200,7 +196,7 @@ def test_file_submission_rejection_does_not_register_or_stage(tmp_path, change, 
     with pytest.raises(ValueError, match=error):
         execute("job.start", tmp_path, params)
     assert read(tmp_path) == before
-    assert not (tmp_path / "operations/references/index.json").exists()
+    assert not list((tmp_path / "operations/references/records").glob("*.json"))
     assert not list((tmp_path / "operations/jobs").glob("*.json"))
     assert not list((tmp_path / "runs/jobs").glob("*"))
 
@@ -230,14 +226,14 @@ def test_file_submission_freezes_one_read_and_replays_without_execution(tmp_path
     monkeypatch.setattr(references, "read_prepared_file", read_and_replace)
     first = execute("job.start", tmp_path, params)
     assert len(reads) == 1
-    assert first["prepared_ref"] == "p1"
-    frozen = resolve_prepared_job(tmp_path, {"prepared_ref": "p1"})
+    assert first["prepared_ref"] == "prepared_1"
+    frozen = resolve_prepared_job(tmp_path, {"prepared_ref": "prepared_1"})
     assert frozen["command"] == json.loads(encoded)["command"]
     path.write_bytes(encoded)
     replay = execute("job.start", tmp_path, params)
-    assert replay["prepared_ref"] == "p1"
+    assert replay["prepared_ref"] == "prepared_1"
     assert replay["job_id"] == first["job_id"]
-    assert execute("job.start", tmp_path, {"prepared_ref": "p1"})["job_id"] == first["job_id"]
+    assert execute("job.start", tmp_path, {"prepared_ref": "prepared_1"})["job_id"] == first["job_id"]
     for _ in range(200):
         status = execute_job("status", {"root": str(tmp_path), "job_id": first["job_id"]})
         if status["state"] in {"succeeded", "failed"}:
@@ -261,7 +257,7 @@ def test_file_reference_and_attempt_recover_in_the_same_dispatch_transaction(tmp
     original = transactions._atomic_json
 
     def fail_index(target, value):
-        if target == tmp_path / "operations/references/index.json":
+        if target == tmp_path / "operations/jobs/job_1.json":
             raise OSError("simulated index failure before dispatch")
         return original(target, value)
 
@@ -272,9 +268,24 @@ def test_file_reference_and_attempt_recover_in_the_same_dispatch_transaction(tmp
     replay = execute("job.start", tmp_path, params)
     assert replay["state"] == "unknown"
     assert not marker.exists()
-    assert resolve_prepared_job(tmp_path, {"prepared_ref": "p1"})["work_id"] == "work_one"
+    assert resolve_prepared_job(tmp_path, {"prepared_ref": "prepared_1"})["work_id"] == "work_one"
     attempts = list((tmp_path/"operations/executions").glob("*.json"))
     assert len(attempts) == 1
     intent = json.loads((tmp_path / f"operations/jobs/{replay['job_id']}.json").read_text())
-    assert intent["prepared_ref"] == "p1"
+    assert intent["prepared_ref"] == "prepared_1"
     assert intent["job_id"] == json.loads(attempts[0].read_text())["job_id"]
+
+
+def test_prepared_snapshot_cannot_be_rebound_to_another_allocation(tmp_path):
+    workspace(tmp_path)
+    (tmp_path / 'input.xyz').write_text('geometry')
+    path = prepared(tmp_path)
+    first = prepare_job(tmp_path, {'request_file': str(path)})['prepared_ref']
+    path.write_text(path.read_text().replace('"pass"', '"print(2)"'))
+    second = prepare_job(tmp_path, {'request_file': str(path)})['prepared_ref']
+    records = tmp_path / 'operations/references/records'
+    copied = json.loads((records / f'{second}.json').read_text())
+    copied['ref'] = first
+    (records / f'{first}.json').write_text(json.dumps(copied))
+    with pytest.raises(ReferenceError, match='reference_registry_invalid'):
+        resolve_prepared_job(tmp_path, {'prepared_ref': first})

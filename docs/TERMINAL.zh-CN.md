@@ -79,6 +79,23 @@ CoRAgent 提供以下客户端命令，名称、参数和补全由同一命令�
 
 无实际诊断功能的 `/debug` 已移除。
 
+Slash 补全在输入框上方使用稳定的候选窗口。上下键选择候选，Tab 或点击只补全，
+Enter 打开命令入口；参数候选的 Enter 只补全，再次 Enter 才提交完整命令。
+Esc 关闭候选并保留输入，Tab 可重新打开。`/monitor` 按当前参数位置展示子命令和选项，
+不会把任务 ID 改成小写，也不会将占位符作为真实参数提交。缺少参数时不执行操作。
+
+命令失败后，如果输入框尚未被编辑，原命令会恢复以便修正；迟到的失败回执不会覆盖新草稿。
+错误行保留 `F2 Details` 入口，可查看完整错误与用法，Esc 返回后保留草稿。
+路径和以 slash 开头的多行文本按普通消息处理；粘贴本身不会执行命令。
+
+命令面板、选择器和详情页跟随当前 Pi 主题，选中背景与正文颜色来自主题。
+`›` 表示键盘焦点，`[current]` 表示已经生效的选项。选择器支持点击和滚轮。
+正常运行或排队使用活动色，阻塞使用警告色，执行失败使用错误色，取消使用次级文字色。
+详情页区分字段名、数值、布尔值和状态；`/sys-prompt` 为 Markdown 标题、行内代码和代码块着色，保留原文。
+研究和诊断详情中的 `[]` 表示空列表，`{}` 表示空对象，`—` 表示未提供值，`""` 表示空字符串。
+空集合与字段名在同一行显示；Monitor 空列表显示 `No entries`，这些都不是错误状态。
+`NO_COLOR` 或 `TERM=dumb` 下，命令面板、补全、状态栏及工具摘要保留文字与符号提示。
+
 命令成功提示在 3 秒后消失，普通说明在 5 秒后消失；错误保留到关闭或下一次提交。
 提交新消息会清除已完成的命令提示。选择器或详情页打开时，`Esc` 先返回聊天；
 普通聊天中 `Esc` 打断当前 turn，临时命令提示不会拦截该操作。
@@ -95,6 +112,37 @@ CoRAgent 提供以下客户端命令，名称、参数和补全由同一命令�
 状态分别表达等待计算、准备继续、已暂停、需要处理和已完成；一轮模型回复结束不代表用户任务完成。
 断线和快照陈旧优先于缓存中的进展显示；未知数量使用 `—`，不推算完成百分比或时间。
 没有运行作业、打开选择器或阅读页时也保持显示。后台刷新保留焦点、选择、阅读位置和输入草稿。
+
+Monitor 的基础任务状态如下。`jobs running` 只统计运行中的计算作业，不表示模型是否正在回复，
+也不包含排队数量。`Needs attention` 的具体原因见 `/monitor` 的 `Reason`。
+
+| 任务状态 | 显示 | 含义 |
+| --- | --- | --- |
+| `active` | Researching | 用户任务仍在推进 |
+| `waiting` | Waiting for compute | 等待登记的计算条件；自动推进开启时附加 Continues when ready |
+| `paused` | Paused | 自动推进已暂停 |
+| `blocked` | Needs attention | 任务被阻塞；若模型正在回复，显示 Responding · Task blocked |
+| `completing` | Preparing delivery | 正在准备交付 |
+| `completed` | Completed | 用户任务已完成 |
+| `cancelled` | Cancelled | 用户任务已取消 |
+| `recovering` | Checking recovery | 正在检查恢复状态 |
+
+状态行也会显示以下运行或连接提示，优先级由连接、快照新鲜度和任务控制检查决定：
+
+| 显示 | 触发条件 |
+| --- | --- |
+| Checking status | 尚无当前会话的 Monitor 快照 |
+| No current task | 当前没有登记的用户任务 |
+| Checking recovery | 控制器尚未完成首次检查 |
+| Checking continuation / Preparing continuation | 任务 active、执行空闲，分别表示尚无／已有继续执行预留 |
+| Automatic continuation off | 任务 active、执行空闲且自动推进关闭 |
+| Connection lost | Monitor 请求或订阅失败 |
+| Status is stale | 快照时间无效或超过 30 秒未更新 |
+| Continuation error: … | 任务控制器报告错误 |
+| Continuation check overdue | active/waiting 任务的控制检查超过 30 秒或三个检查周期中的较大值 |
+
+`✓` 是普通状态标记，任务是否完成以旁边的文字为准；`Ⅱ` 表示暂停，`…` 表示检查或准备，
+`!` 表示需要注意，`×` 表示连接或控制错误。
 
 `/monitor` 概览实时展示原始目标、交付条件、最近登记的进展、具体 Job 等待条件、控制原因和
 自动推进设置。作业执行与输出收集分别显示；当前科学分析字段标明“Not recorded”，

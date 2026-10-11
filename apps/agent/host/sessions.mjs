@@ -4,7 +4,7 @@ import { validateId, cleanRequest } from "./validation.mjs";
 
 const SESSION_EVENT_HISTORY_LIMIT = 256;
 const SESSION_EVENT_HISTORY_BYTES = MAX_FRAME_BYTES / 4;
-const MONITOR_EVENT_ID = /^event_[a-f0-9]{32}$/u;
+const MONITOR_EVENT_ID = /^event_[1-9][0-9]*$/u;
 
 export function createHostSessions({ sessionBackend, workspace, deduplicate, clients, epoch, monitorToken }) {
   const live = new Map();

@@ -7,9 +7,6 @@
       "schema": {
         "type": "object",
         "properties": {
-          "job_id": {
-            "type": "string"
-          },
           "request_id": {
             "type": "string"
           },
@@ -127,7 +124,7 @@
               "string",
               "null"
             ],
-            "pattern": "^task_[A-Za-z0-9_-]+$"
+            "pattern": "^task_[1-9][0-9]*$"
           }
         },
         "required": [],
@@ -377,7 +374,7 @@
       },
       "examples": [
         {
-          "prepared_ref": "prepared_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          "prepared_ref": "prepared_1"
         }
       ],
       "result": {
@@ -409,7 +406,7 @@
       },
       "examples": [
         {
-          "event_id": "fixture-event",
+          "event_id": "event_1",
           "session_id": "fixture-session"
         }
       ],
@@ -439,7 +436,8 @@
           },
           "cursor": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "^job_[1-9][0-9]*$"
           }
         },
         "additionalProperties": false

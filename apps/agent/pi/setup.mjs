@@ -21,7 +21,7 @@ import { loadProductSkills } from "../resources/skills.mjs";
 import { createCoreTools } from "../tools/registry.mjs";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import { TODO_CONTEXT as PI_TODO_CONTEXT } from "@earendil-works/chord/context";
-import { createSystemPromptManifest, createSystemPromptTool } from "./prompt.mjs";
+import { createSystemPromptManifest } from "./prompt.mjs";
 import { createPackageSourceReadGuard } from "./policy.mjs";
 import { wrapToolForHarness } from "../tools/envelope.mjs";
 import { createToolExecutionContext } from "../tools/context.mjs";
@@ -69,7 +69,6 @@ export async function createCoRAgentHarness(databasePath, options) {
       skills: { source: loadedSkills.skillsRoot, items: loadedSkills.skills },
 
     });
-    const systemPromptTool = createSystemPromptTool(promptManifest);
     const harnessSettings = contextPolicy(createHarnessSettings(settingsManager));
     const contextManager = createContextManager({ bridge: commandBridge, coordinator: transactionCoordinator,
       sessionId, estimateContextTokens, inputTokens: harnessSettings.compaction.maxInputTokens,
@@ -87,7 +86,6 @@ export async function createCoRAgentHarness(databasePath, options) {
     const durableTools = [
       ...businessTools,
       ...createTaskTools(() => taskController),
-      systemPromptTool,
     ].map((tool) => wrapToolForHarness(tool, {
       toolContext,
       invocation: api => ({ workspaceRoot: cwd, sessionId,
@@ -143,6 +141,9 @@ export async function createCoRAgentHarness(databasePath, options) {
         hook(CompactionTask, { prepareSummary: input => contextManager.prepareSummary(input) }),
         hook(ToolTask, {
           beforeTool: async (call, api, context) => {
+            const restriction = await taskController.toolRestriction(context);
+            const tool = durableTools.find(tool => tool.name === call.name);
+            if (restriction && !["read", "grep", "find", "ls"].includes(call.name) && tool?.metadata?.effect !== "read") return { block: restriction };
             const packagePolicy = packageReadGuard({ toolName: call.name, args: call.arguments });
             if (packagePolicy?.block) return { block: packagePolicy.block.reason || String(packagePolicy.block) };
             return undefined;

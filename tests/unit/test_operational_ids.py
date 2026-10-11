@@ -1,82 +1,110 @@
-from __future__ import annotations
-
+"""One durable allocator serves research and execution identities."""
 import json
-import stat
+import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 import pytest
 
-from research_agent.research.operational_ids import allocate_operational_id
-from research_agent.research.workspace import admit_research_workspace, initialize_workspace
+from research_agent.research.operational_ids import allocate_id, STATE_FILE
+from research_agent.research.workspace import admit_research_workspace, initialize_workspace, WorkspaceModeError
+from research_agent.foundation.transactions import workspace_transaction, TransactionError
 
 
-def bootstrap_workspace_fixture(root: Path) -> None:
-    initialize_workspace(root, root.name, "research")
+def workspace(root):
+    initialize_workspace(root, root.name, 'research')
     admit_research_workspace(root)
 
 
-def test_operational_ids_are_workspace_wide_monotonic_and_private(tmp_path: Path) -> None:
-    workspace = tmp_path / "workspace"
-    bootstrap_workspace_fixture(workspace)
-
-    assert allocate_operational_id(workspace, "calc")["identifier"] == "calc_1"
-    assert allocate_operational_id(workspace, "sub")["identifier"] == "sub_1"
-    assert allocate_operational_id(workspace, "op")["identifier"] == "op_1"
-    assert allocate_operational_id(workspace, "calc")["identifier"] == "calc_2"
-
-    state_path = workspace / ".coragent-operational-ids.json"
-    lock_path = workspace / ".coragent-operational-ids.lock"
-    assert stat.S_IMODE(state_path.stat().st_mode) == 0o600
-    assert stat.S_IMODE(lock_path.stat().st_mode) == 0o600
-    assert json.loads(state_path.read_text(encoding="utf-8")) == {
-        "schema_version": "coragent-operational-id-state/1",
-        "high_water": {"calc": 2, "op": 1, "sub": 1},
-    }
+def test_concurrent_reservations_and_retries(tmp_path):
+    workspace(tmp_path)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        ids = list(pool.map(lambda n: allocate_id(tmp_path, 'task', ['session', n]), range(24)))
+    assert set(ids) == {f'task_{n}' for n in range(1, 25)}
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        assert list(pool.map(lambda n: allocate_id(tmp_path, 'task', ['session', n]), range(24))) == ids
+    assert allocate_id(tmp_path, 'task', ['another-session', 0]) == 'task_25'
+    assert allocate_id(tmp_path, 'node') == 'node_1'
 
 
-def test_operational_allocator_reconciles_human_ids_and_ignores_uuid_history(tmp_path: Path) -> None:
-    workspace = tmp_path / "workspace"
-    bootstrap_workspace_fixture(workspace)
-    (workspace / "nodes" / "node_1" / "attempts" / "calc_7").mkdir(parents=True)
-    (workspace / "nodes" / "node_1" / "attempts" / "calc_7" / "runs" / "sub_9").mkdir(parents=True)
-    (workspace / "reviews" / "claim_1" / "runs" / "sub_028def15-cbb5-42b4-bbfc-cfbd256c4a0b").mkdir(parents=True)
-    (workspace / "operations" / "activities" / "op_5").mkdir(parents=True)
-
-    assert allocate_operational_id(workspace, "calc")["identifier"] == "calc_8"
-    assert allocate_operational_id(workspace, "sub")["identifier"] == "sub_10"
-    assert allocate_operational_id(workspace, "op")["identifier"] == "op_6"
+def test_reservation_survives_process_restart_and_deletion(tmp_path):
+    workspace(tmp_path)
+    assert allocate_id(tmp_path, 'job', 'request') == 'job_1'
+    script = 'from research_agent.research.operational_ids import allocate_id; import sys; assert allocate_id(sys.argv[1], "job", "request") == "job_1"; assert allocate_id(sys.argv[1], "job", "next") == "job_2"'
+    subprocess.run([sys.executable, '-B', '-c', script, str(tmp_path)], check=True)
+    assert allocate_id(tmp_path, 'job', 'third') == 'job_3'
 
 
-def test_operational_allocator_never_reuses_reserved_ordinals(tmp_path: Path) -> None:
-    workspace = tmp_path / "workspace"
-    bootstrap_workspace_fixture(workspace)
-
-    assert allocate_operational_id(workspace, "sub")["identifier"] == "sub_1"
-    assert allocate_operational_id(workspace, "sub")["identifier"] == "sub_2"
-    assert allocate_operational_id(workspace, "sub")["identifier"] == "sub_3"
-
-
-def test_operational_allocator_serializes_concurrent_callers(tmp_path: Path) -> None:
-    workspace = tmp_path / "workspace"
-    bootstrap_workspace_fixture(workspace)
-
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        identifiers = list(executor.map(lambda _: allocate_operational_id(workspace, "op")["identifier"], range(24)))
-
-    assert sorted(identifiers, key=lambda value: int(value.split("_")[1])) == [
-        f"op_{ordinal}" for ordinal in range(1, 25)
-    ]
+def test_failed_transaction_never_recycles_reserved_identity(tmp_path):
+    workspace(tmp_path)
+    @workspace_transaction('test.failed')
+    def abort(root, request):
+        assert allocate_id(root, 'result', 'publication') == 'result_1'
+        raise ValueError('publication rejected')
+    with pytest.raises(ValueError, match='publication rejected'):
+        abort(tmp_path, {})
+    assert allocate_id(tmp_path, 'result', 'other') == 'result_2'
+    assert allocate_id(tmp_path, 'result', 'publication') == 'result_1'
 
 
-def test_operational_allocator_rejects_invalid_kind_and_symlink_state(tmp_path: Path) -> None:
-    workspace = tmp_path / "workspace"
-    bootstrap_workspace_fixture(workspace)
-    with pytest.raises(ValueError, match="unsupported operational ID kind"):
-        allocate_operational_id(workspace, "review")
+def test_old_manifest_rejected_without_modification(tmp_path):
+    workspace(tmp_path)
+    manifest = tmp_path / 'workspace_manifest.json'
+    value = json.loads(manifest.read_text()); value['schema_version'] = 'research_workspace/2'
+    manifest.write_text(json.dumps(value))
+    before = {p: p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
+    with pytest.raises(WorkspaceModeError, match='create a new research workspace'):
+        initialize_workspace(tmp_path, tmp_path.name, 'research')
+    with pytest.raises(WorkspaceModeError):
+        allocate_id(tmp_path, 'node')
+    assert {p: p.read_bytes() for p in before} == before
 
-    target = tmp_path / "state.json"
-    target.write_text("{}\n", encoding="utf-8")
-    (workspace / ".coragent-operational-ids.json").symlink_to(target)
-    with pytest.raises(ValueError, match="state must be a regular file"):
-        allocate_operational_id(workspace, "sub")
+
+def test_invalid_kind_and_symlink_state_rejected(tmp_path):
+    workspace(tmp_path)
+    with pytest.raises(ValueError, match='unsupported identifier kind'):
+        allocate_id(tmp_path, 'unknown')
+    path = tmp_path / STATE_FILE
+    path.unlink(); path.symlink_to(tmp_path / 'workspace_manifest.json')
+    with pytest.raises(TransactionError, match='symlink'):
+        allocate_id(tmp_path, 'node')
+
+
+def test_independent_processes_allocate_distinct_ids(tmp_path):
+    workspace(tmp_path)
+    script = 'from research_agent.research.operational_ids import allocate_id; import sys; allocate_id(sys.argv[1], "node", sys.argv[2])'
+    processes = [subprocess.Popen([sys.executable, '-B', '-c', script, str(tmp_path), str(n)]) for n in range(8)]
+    try:
+        assert all(process.wait(timeout=20) == 0 for process in processes)
+    finally:
+        for process in processes:
+            if process.poll() is None:
+                process.kill(); process.wait()
+    assert {allocate_id(tmp_path, 'node', str(n)) for n in range(8)} == {f'node_{n}' for n in range(1, 9)}
+
+
+def test_failed_artifact_publication_cannot_rebind_leftover_payload(tmp_path, monkeypatch):
+    from research_agent.application.api import execute
+    from research_agent.artifacts import registry
+    workspace(tmp_path)
+    with monkeypatch.context() as patch:
+        def reject(*args, **kwargs):
+            raise OSError('publication interrupted')
+        patch.setattr(registry, 'register_manifest', reject)
+        with pytest.raises(OSError, match='publication interrupted'):
+            execute('artifact.create', tmp_path, {'name': 'first', 'content': 'retained bytes'})
+    other = execute('artifact.create', tmp_path, {'name': 'second', 'content': 'different bytes'})
+    recovered = execute('artifact.create', tmp_path, {'name': 'first', 'content': 'retained bytes'})
+    assert recovered['artifact_id'] == 'art_1'
+    assert other['artifact_id'] == 'art_2'
+    assert execute('artifact.read', tmp_path, {'artifact_id': 'art_1'})['content'] == 'retained bytes'
+
+
+def test_task_allocation_is_shared_across_sessions_and_replays(tmp_path):
+    from research_agent.application.api import execute
+    workspace(tmp_path)
+    def begin(session):
+        return execute('research.allocate_task', tmp_path, {'session_id': session, 'request_id': 'same-request'})
+    assert begin('first') == {'identifier': 'task_1'}
+    assert begin('second') == {'identifier': 'task_2'}
+    assert begin('first') == {'identifier': 'task_1'}

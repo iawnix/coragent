@@ -25,9 +25,15 @@ Monitor 唤醒后先核对最新用户要求、已有结论与剩余预算；已
 
 交付前读取 email Skill 与配置检查。报告真实结果、缺失工作和限制。保留发送回执；发送后 Memory 更新失败不能重发。Node 状态不构成发送授权。
 
-提出任务完成前，逐项给出交付条件对应的不可变 Result 或材料，并说明剩余 Job。阶段报告和负结果可以构成进展，是否完成取决于用户的交付范围。关闭 Node、追加 note 或改写计划都不证明交付，也不重置无进展计数。科学内容记入 Memory，任务控制使用任务工具，不要求每轮 checkpoint。
+提出任务完成前，逐项给出交付条件对应的不可变 Result 或材料，并说明剩余 Job。阶段报告和负结果可以构成进展，是否完成取决于用户的交付范围。关闭 Node、追加 note 或改写计划都不证明交付，也不证明新增证据。科学内容记入 Memory，任务控制使用任务工具，不要求每轮 checkpoint。
 
 - [工具与执行](references/tools.zh-CN.md)
 - [精确 Skill 资源路径](references/skills.zh-CN.md)
 - [生成的公开合同](references/public_contract.zh-CN.md)
 - [English](SKILL.md)
+
+缺少计算、验证或本轮尚未完成都属于待办工作。没有可独立推进的工作后才进入 `wait`，随后结束回复。`block` 原因应说明具体缺失条件或耗尽的预算、恢复需要的改变，以及其它已授权路线为什么也无法推进；登记后向用户说明。不得把要求的计算擅自改成“计算或说明局限”，除非用户改变范围，否则阶段报告仍是进展。运行时检查引用存在，不代表科学上已完成。
+
+恢复时读取 `task_read` 与运行时快照中的新 `actual_user_submission_ids`。用户补充条件或明确要求可行替代路线后，调用 `task_update`，传 `action="refine"`、当前 `expected_revision` 与这些 `source_submission_ids`；范围没变就不传 objective/criteria。返回 active 后继续。`progress` 和 Node 状态修改不会解除任务阻塞。版本冲突先重读再重试。任务证据引用 `job_…` 或收集的 Artifact/Result，不传 `job_result_…` 回执。
+
+执行故障由 execution_recovery 单独记录，不等于研究 blocked。无新证据轮数提示重新评估方法，不是固定停止阈值。失败后先检查已有回执，不能盲目重复已完成或结果未知的外部操作。最终回复恢复沿用完成证据，仅补充说明，不启动新计算或重复发送。执行待处理时说明故障；新指令解决问题后可用 refine，用户也可在 Monitor 显式 resume。

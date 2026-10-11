@@ -44,6 +44,13 @@
       }
     },
     {
+      "command": "research.allocate_task",
+      "params": {
+        "session_id": "session-test",
+        "request_id": "begin-1"
+      }
+    },
+    {
       "command": "job.start",
       "params": {}
     },
@@ -76,13 +83,13 @@
     {
       "command": "job.resolve_prepared",
       "params": {
-        "prepared_ref": "prepared_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        "prepared_ref": "prepared_1"
       }
     },
     {
       "command": "job.monitor_assess",
       "params": {
-        "event_id": "fixture-event",
+        "event_id": "event_1",
         "session_id": "fixture-session"
       }
     },
@@ -107,7 +114,9 @@
     },
     {
       "command": "artifact.read",
-      "params": {}
+      "params": {
+        "artifact_id": "art_1"
+      }
     }
   ]
 }

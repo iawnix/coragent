@@ -11,7 +11,12 @@ export async function recordRun({ conversation, api, inputIds, userTaskId, conte
     const index = await tx.doc(RunIndex, conversation.id);
     const runId = String(inputIds[0]);
     let run = index.runs.find(item => item.run_id === runId);
-    if (!run) { run = { run_id: runId, user_task_id: userTaskId, input_ids: inputIds, generation_ids: [] }; index.runs.push(run); }
+    if (!run) {
+      // Insertion copies into the durable draft. Populate the first generation
+      // before pushing; mutating the detached source object would lose its ID.
+      index.runs.push({ run_id: runId, user_task_id: userTaskId, input_ids: inputIds, generation_ids: [api.taskId] });
+      return;
+    }
     if (userTaskId && !run.user_task_id) run.user_task_id = userTaskId;
     if (!run.generation_ids.includes(api.taskId)) run.generation_ids.push(api.taskId);
   }, context);

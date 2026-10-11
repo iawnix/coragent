@@ -142,8 +142,8 @@ def test_artifact_file_identity_and_old_protocol_rejected(tmp_path):
     node = execute('research.create', tmp_path, {'goal': 'Report'})['node']
     material = execute('artifact.create', tmp_path, {'name': 'analysis.txt', 'content': 'Preliminary'})
     result = execute('research.result', tmp_path, {'node_id': node['id'], 'conclusion': 'Report prepared',
-                     'files': [{'name': 'analysis.txt', 'artifact_ref': material['artifact_ref']}]})
-    assert result['result']['files'][0]['artifact_ref'] == material['artifact_ref']
+                     'files': [{'name': 'analysis.txt', 'artifact_ref': material['artifact_id']}]})
+    assert result['result']['files'][0]['artifact_ref'] == material['artifact_id']
     for command, params in [('research.change', {}), ('research.update', {'content': 'old'}), ('research.create', {'goal': 'x', 'origin': 'runtime'})]:
         with pytest.raises(ValueError):
             execute(command, tmp_path, params)
@@ -212,10 +212,10 @@ def test_thousand_nodes_ten_thousand_records_rank_page_and_rebuild(tmp_path, mon
     graph = {'schema_version': 'research-map/1', 'nodes': {}, 'relations': {}, 'results': {}}
     headers = []
     for i in range(10000):
-        node_id = 'node_' + f'{i % 1000:032x}'
+        node_id = f'node_{i % 1000 + 1}'
         node = {**template, 'id': node_id, 'title': f'Question {i % 1000}', 'goal': f'Compute question {i % 1000}',
                 'created_at': '2026-01-01', 'updated_at': f'2026-01-{1 + i % 28:02}'}
-        ref = 'note_' + records.digest(['large-corpus', i])
+        ref = f'note_{i + 1}'
         value = {'schema_version': 'research-record/2', 'ref': ref, 'sequence': i + 1, 'created_at': '2026-01-01',
                  'origin': 'agent', 'kind': 'node_created' if i < 1000 else 'note', 'title': node['title'],
                  'content': f'Observation {i}', 'references': [], 'data': {'node': node} if i < 1000 else {},
@@ -230,7 +230,7 @@ def test_thousand_nodes_ten_thousand_records_rank_page_and_rebuild(tmp_path, mon
             (directory / 'node.json').write_text(json.dumps(node))
     write_json(tmp_path / 'research/journal.json', {'schema_version': 'research-journal/2', 'sequence': 10000, 'records': headers})
     write_json(tmp_path / 'research/map.json', graph)
-    focused = 'node_' + '0' * 32
+    focused = 'node_1'
     snapshot = views.build_snapshot(tmp_path, max_bytes=16000,
                                     events=[{'event_id': 'event_focus', 'job_id': 'job_focus', 'node_id': focused, 'state': 'failed'}])
     assert snapshot['nodes'][0]['id'] == focused

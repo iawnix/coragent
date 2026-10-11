@@ -133,11 +133,11 @@ test("public input cannot impersonate an internal producer", async t => {
   }
   for (const mode of [undefined, 'auto', 'follow_up', 'steer']) {
     await assert.rejects(client.request('internal/monitor-wake', { ...input, token: 'private-monitor-token',
-      event_ids: ['event_' + 'a'.repeat(32)], mode }), { code: 'invalid_input' });
+      event_ids: ['event_1'], mode }), { code: 'invalid_input' });
   }
   await assert.rejects(client.request('input/send', { ...input, mode: 'next_run' }), { code: 'invalid_input' });
   await client.request('input/send', { ...input, source: 'phone' });
-  await client.request('internal/monitor-wake', { ...input, token: 'private-monitor-token', mode: 'next_run', event_ids: ['event_' + 'a'.repeat(32)], request_id: 'request-internal', client_message_id: 'message-internal' });
+  await client.request('internal/monitor-wake', { ...input, token: 'private-monitor-token', mode: 'next_run', event_ids: ['event_1'], request_id: 'request-internal', client_message_id: 'message-internal' });
   assert.deepEqual(received.map(value => value.source), ['user', 'monitor']);
   assert.equal(received.some(value => 'token' in value), false);
   await assert.rejects(client.request('turn/interrupt', { ...TARGET, request_id: 'interrupt-without-target' }), { code: 'invalid_identifier' });
@@ -310,7 +310,7 @@ test("Host relays real Job Monitor events and rejects old or mismatched identiti
   const notifications = [];
   env.client.on("notification", event => { if (event.method === "monitor/event") notifications.push(event.params.event); });
   await env.client.request("monitor/overview", TARGET);
-  const job = await bridge.execute_command("job.start", { job_id: "job_monitor_fixture", session_id: "session-a",
+  const job = await bridge.execute_command("job.start", { request_id: "monitor-fixture", session_id: "session-a",
     command: [process.env.CORAGENT_PYTHON, "-c", "print('monitor fixture')"], timeout_seconds: 5 });
   t.after(() => bridge.execute_command("job.cancel", { job_id: job.job_id }).catch(() => {}));
   for (let poll = 0; poll < 100; poll++) {
@@ -336,10 +336,10 @@ test("Host relays real Job Monitor events and rejects old or mismatched identiti
     { attempt_id: "attempt_wrong" },
     { job_id: "job_wrong" },
     { node_id: "node_" + "a".repeat(32), node_revision: 1 },
-    { user_task_id: "task_another" },
+    { user_task_id: "task_1" },
     { state: "completed" },
   ].entries()) {
-    const event_id = `event_${String(index + 1).repeat(32)}`;
+    const event_id = `event_${index + 2}`;
     await writeFile(join(monitorRoot, "events", event_id + ".json"), JSON.stringify({ ...event, ...patch, event_id }));
   }
   const oldRoot = join(root, "operations", "monitors", "mon_" + "a".repeat(24));

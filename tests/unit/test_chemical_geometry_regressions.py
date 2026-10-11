@@ -136,3 +136,22 @@ def test_nonfinite_coordinates_are_input_errors_not_scientific_mismatches():
         aligned_rmsd(geometry, invalid)
     with pytest.raises(ValueError, match='finite'):
         topology(mol, invalid)
+
+
+@pytest.mark.parametrize('smiles', [
+    '[CH2:1]=[CH:2][CH:3]=[CH2:4].[cH:5]1[cH:6][cH:7][cH:8][cH:9][cH:10]1',
+    '[CH2:1]=[CH:2][CH:3]=[CH2:4].[CH:5]1=[CH:6][CH:7]=[CH:8][CH:9]=[CH:10]1',
+    '[CH2:1]=[CH:2][CH:3]=[CH2:4].[NH:5]=[CH2:6]',
+    '[CH2:1]=[CH:2][CH:3]=[CH2:4].[NH2+:5]=[CH2:6]',
+])
+def test_unsupported_da_centers_are_not_chemical_counterevidence(smiles):
+    declared = reaction(smiles + '>>' + smiles, TRANSFORMATION)['checks']['declared_transformation']
+    assert declared['verdict'] == 'not_assessed'
+    assert declared['reason'] == 'unsupported_diels_alder_scope'
+    assert 'explicit bond changes' in declared['supported_scope']
+
+
+def test_missing_declared_da_atom_is_invalid_not_unsupported_scope():
+    declaration = {**TRANSFORMATION, 'dienophile': [5, 99], 'forming_bonds': [[1, 99], [4, 5]]}
+    checked = reaction(REACTANTS + '>>' + PRODUCT, declaration)
+    assert checked['checks']['declared_transformation']['verdict'] == 'fail'

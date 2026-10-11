@@ -44,7 +44,7 @@ must not be added to the default Python suite.
 
 ## Research Memory and Execution Boundaries
 
-`workspace_manifest.json` uses `research_workspace/2`. `research_agent.research` is the sole namespace, without a legacy state or global-progress protocol. Original messages, Node content revisions and runtime facts retain distinct origins. Stable Node directories preserve repeated attempts; immutable Results pin their basis.
+`workspace_manifest.json` uses `research_workspace/3`. `research_agent.research` is the sole namespace, without a legacy state or global-progress protocol. Original messages, Node content revisions and runtime facts retain distinct origins. Stable Node directories preserve repeated attempts; immutable Results pin their basis.
 
 Agent tools are research_read / research_search / research_create / research_update / research_result. Creation needs goal; a note needs node_id and note; publication needs node_id and conclusion. The trusted adapter supplies identities, read basis, revisions and transactions. Background Jobs do not change Node content revision. Relations are stored once with generated reverse queries. Actual uses requires proven inputs; search is not evidence adoption.
 

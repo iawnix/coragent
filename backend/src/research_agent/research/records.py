@@ -29,7 +29,7 @@ def journal(root):
 
 
 def record(root, ref):
-    if not isinstance(ref, str) or not re.fullmatch(r'(?:note|record|user)_[a-f0-9]{64}', ref):
+    if not isinstance(ref, str) or not re.fullmatch(r'(?:note|record|user)_[1-9][0-9]*', ref):
         raise ValueError('record_reference_invalid: use an exact returned reference')
     path = Path(root) / 'research/records' / (ref + '.json')
     if path_has_symlink(path):
@@ -48,7 +48,8 @@ def append_record(root, *, origin, kind, title, content, references=(), data=Non
     body = dict(origin=origin, kind=kind, title=title, content=content,
                 references=list(references), data=data or {}, node_id=node_id, node_revision=node_revision)
     prefix = 'user' if origin == 'user' else 'note' if origin == 'agent' else 'record'
-    ref = prefix + '_' + digest(identity if identity is not None else body)
+    from .operational_ids import allocate_id
+    ref = allocate_id(root, prefix, identity if identity is not None else body)
     path = root / 'research/records' / (ref + '.json')
     try:
         previous = record(root, ref)

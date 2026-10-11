@@ -40,6 +40,7 @@ def test_all_command_results_match_actual_api_replies(command_workspace):
         covered.add(command_id)
         return value
 
+    call('research.allocate_task', session_id='fixture', request_id='task-begin')
     source = call('research.source', session_id='fixture', message_id='question', text='Investigate a local result')
     created = call('research.create', goal='Investigate', session_id='fixture', source_refs=[source['source_ref']])
     node = created['node']['id']
@@ -53,7 +54,7 @@ def test_all_command_results_match_actual_api_replies(command_workspace):
     call('research.read', ref=node, field='goal', session_id='fixture')
     call('research.read', ref=node, limit=10, session_id='fixture')
     material = call('artifact.create', name='fixture.txt', content='fixture evidence')
-    call('artifact.read', artifact_ref=material['artifact_ref'])
+    call('artifact.read', artifact_id=material['artifact_id'])
     (root / 'input.txt').write_text('local fixture')
     call('artifact.register', path='input.txt')
     request = {'request_id': 'fixture-preparation', 'command': [sys.executable, '-c', 'pass'],
@@ -61,8 +62,8 @@ def test_all_command_results_match_actual_api_replies(command_workspace):
     (root / 'prepared.json').write_text(json.dumps(request))
     prepared = call('job.prepare', request_file='prepared.json')
     call('job.resolve_prepared', prepared_ref=prepared['prepared_ref'])
-    call('job.probe', job_id='job_probe_contract', command=[sys.executable, '-c', 'pass'])
-    job = call('job.start', job_id='job_contract', node_id=node, session_id='fixture',
+    call('job.probe', job_id='job_999', command=[sys.executable, '-c', 'pass'])
+    job = call('job.start', request_id='contract', node_id=node, session_id='fixture',
                command=[sys.executable, '-c', "print('local contract fixture')"])
     try:
         deadline = time.monotonic() + 10
@@ -110,6 +111,6 @@ def test_result_schemas_cover_non_success_variants():
 
 
 def test_result_catalog_is_complete_and_schemas_are_well_formed():
-    assert len(COMMAND_DEFINITIONS) == 20
+    assert len(COMMAND_DEFINITIONS) == 21
     for definition in COMMAND_DEFINITIONS.values():
         Draft202012Validator.check_schema(definition['result'])

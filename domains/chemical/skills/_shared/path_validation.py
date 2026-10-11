@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 from rdkit import Chem
 
-from reaction_checks import ordered_molecule, path_spec
+from reaction_checks import UnsupportedReactionScope, ordered_molecule, path_spec
 from gaussian_io import parse_log, parse_irc_log, select_job_section, final_geometry
 
 
@@ -171,6 +171,11 @@ def aligned_rmsd(a,b):
 def _validate(kind, paths, manifest):
     try:
         spec,checked,sides=specification(paths[0],manifest)
+    except UnsupportedReactionScope as exc:
+        return {'schema_version': 'validator-output/1', 'verdict': 'inconclusive',
+                'checks': {'method_scope': record(False, str(exc), missing=True)},
+                'parsing': {'status': 'completed'}, 'scientific_verdict': 'not_assessed',
+                'scope': 'Input is outside the supported DA method; no chemical counterevidence is established'}
     except (ValueError, KeyError) as exc:
         return {'schema_version':'validator-output/1','verdict':'fail','checks':{'specification':record(False,str(exc))},
                 'parsing': {'status': 'failed' if isinstance(exc, json.JSONDecodeError) else 'completed'},

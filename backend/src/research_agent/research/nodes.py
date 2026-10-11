@@ -1,5 +1,6 @@
 """A Node retains one research question across repeated attempts."""
 from pathlib import Path
+from .operational_ids import allocate_id
 import re
 import uuid
 from research_agent.foundation.transactions import read_json, write_json, workspace_transaction
@@ -19,7 +20,7 @@ def text(value, name, *, required=False, limit=16000):
 
 
 def get_node(root, node_id):
-    if not isinstance(node_id, str) or not re.fullmatch(r'node_[a-f0-9]{32}', node_id):
+    if not isinstance(node_id, str) or not re.fullmatch(r'node_[1-9][0-9]*', node_id):
         raise ValueError('node_id_invalid: use a returned Node reference')
     path = Path(root) / 'research/nodes' / node_id / 'node.json'
     if path_has_symlink(path):
@@ -74,7 +75,7 @@ def create(root, request):
     input_refs = validate_refs(root, request.get('input_refs', []), request.get('_reference_details'))
     from .context import subjects
     subject_refs = subjects(root, request.get('subjects', {}), request.get('_reference_details', {}))
-    node = dict(schema_version='research-node/1', id='node_' + uuid.uuid4().hex,
+    node = dict(schema_version='research-node/1', id=allocate_id(root, 'node'),
                 workspace_id=read_json(root / 'workspace_manifest.json')['workspace_id'],
                 title=title, goal=goal, proposal=text(request.get('proposal'), 'proposal'),
                 plan=text(request.get('plan'), 'plan'), progress='', status='open', assessment_ref=None,

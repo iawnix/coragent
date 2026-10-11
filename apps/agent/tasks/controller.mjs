@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { defineDoc, defineDocFamily } from "@earendil-works/pi-durable";
+import { taskRecoveryPolicy, retryableSubmission, recoveryReady } from "./recovery.mjs";
 import shared from "../../../contracts/commands/shared.json" with { type: "json" };
 
 export const UserTasks = defineDoc({ kind: "coragent.user-tasks", version: 1,
@@ -8,6 +9,9 @@ export const UserTasks = defineDoc({ kind: "coragent.user-tasks", version: 1,
 export const UserTask = defineDocFamily({ kind: "coragent.user-task", version: 2, family: true,
   scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
 const ControlReceipt = defineDocFamily({ kind: "coragent.task-control-receipt", version: 1, family: true,
+  scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
+// A block ends scheduling, but the run that recorded it must deliver its explanation.
+const BlockFinalization = defineDocFamily({ kind: "coragent.task-block-finalization", version: 1, family: true,
   scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
 const terminal = new Set(["completed", "cancelled"]);
 const jobFinished = new Set(["succeeded", "failed", "timed_out", "cancelled", "collected", "unknown"]);
@@ -38,8 +42,8 @@ const jobIdentities = (job, observed) => {
 
 /** Policy only: Pi owns all execution, submissions, transactions and recovery. */
 export function createTaskController({ harness, conversation, admission, LiveDoc, InboxDoc,
-  kernel, workspaceId, sessionId, context, intervalMs = 30000, enabled = true }) {
-  let stopped = false, started = false, timer, unsubscribe, scheduled = false, running = false, lastError = null, lastCheckedAt = null;
+  kernel, workspaceId, sessionId, context, intervalMs = 30000, enabled = true, recoveryPolicy = taskRecoveryPolicy(), now = Date.now }) {
+  let stopped = false, started = false, timer, recoveryTimer, unsubscribe, scheduled = false, running = false, lastError = null, lastCheckedAt = null;
   const currentTx = async tx => {
     const index = await tx.doc(UserTasks, conversation.id);
     return { index, task: taskRecord(index.current ? await tx.doc(UserTask, conversation.id, index.current, null) : null) };
@@ -81,11 +85,13 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
   };
   const verifyEvidence = async (refs, ctx, { completion = false, userTaskId } = {}) => {
     requireValue(Array.isArray(refs) && refs.length > 0, "task_evidence_required", "Completion and progress require evidence references");
+    requireValue(!refs.some(ref => ref.startsWith("job_result_")), "task_evidence_invalid",
+      "Job result receipts are not task evidence references; cite the owning job_id or collected Artifact/Result references");
     const jobs = refs.some(ref => ref.startsWith("job_")) ? await ownedJobs(userTaskId) : [];
     const identities = await Promise.all([...new Set(refs)].map(async ref => {
       ctx?.abortSignal?.throwIfAborted();
-      if (/^a[1-9][0-9]*$/.test(ref) || /^art_[a-f0-9]{64}$/.test(ref)) {
-        const selector = ref.startsWith("art_") ? { artifact_id: ref } : { artifact_ref: ref };
+      if (/^art_[1-9][0-9]*$/.test(ref)) {
+        const selector = { artifact_id: ref };
         const artifact = await kernel.execute_command("artifact.read", { ...selector, limit: 1 });
         return [artifactIdentity(artifact)];
       }
@@ -190,12 +196,22 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       const { index, task } = await currentTx(tx);
       if (producer === "user") {
         index.user_epoch += 1;
-        if (task && !terminal.has(task.state)) { task.control_epoch += 1; changed(task, "user_input", "user", "New user input supersedes pending automatic input"); }
+        if (task && !terminal.has(task.state)) {
+          task.control_epoch += 1;
+          if (task.execution_recovery) {
+            task.execution_recovery.state = "attention_required";
+            task.execution_recovery.next_retry_at = null;
+          }
+          changed(task, "user_input", "user", "New user input supersedes pending automatic input");
+        }
         return null;
       }
       requireValue(enabled && !index.automatic_suppressed, "task_paused", "Automatic input is suppressed");
+      if (task?.execution_recovery) requireValue(producer === "task_controller"
+        && recoveryReady(task.execution_recovery, task.control_epoch, now(), recoveryPolicy.maxRetries),
+      "task_execution_recovery", "Execution recovery is pending or needs attention; inspect the recovery record before resuming");
       if (producer === "task_controller") {
-        requireValue(task?.user_task_id === identity.user_task_id && task.state === "active"
+        requireValue(task?.user_task_id === identity.user_task_id && ["active", "completing"].includes(task.state)
           && task.control_epoch === basis.control_epoch && task.revision === basis.revision,
         "task_superseded", "Task continuation basis changed");
       } else if (task) {
@@ -219,22 +235,60 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       task.continuation.reservation = { submission_id: id,
         request_id: requestId,
         control_epoch: control.control_epoch, progress_version: task.progress_version };
+      if (task.execution_recovery) {
+        task.execution_recovery.state = "running"; task.execution_recovery.next_retry_at = null;
+        if (task.state === "completing") {
+          task.completion_submission_id = id; task.completion_control_epoch = task.control_epoch;
+        }
+      }
       if (producer === "monitor") task.event_inputs.push({ submission_id: id, request_id: requestId, event_ids: identity.event_ids });
       // The Pi submission is referenced, never copied into a second lifecycle.
     },
   };
   admission.setPolicy(policy);
 
+  async function settleWait(ctx) {
+    const basis = await getCurrent(ctx);
+    if (basis?.state !== "waiting") return basis;
+    let statuses;
+    try {
+      statuses = await Promise.all(basis.wait.job_ids.map(job_id => kernel.execute_command("job.status", { job_id })));
+    } catch (error) {
+      ctx?.abortSignal?.throwIfAborted();
+      // Status refresh must not prevent a user from reading or correcting a waiting task.
+      lastError = { code: error.code || "task_wait_observation_failed", message: error.message };
+      return getCurrent(ctx);
+    }
+    const ready = basis.wait.mode === "any" ? statuses.some(job => jobFinished.has(job.state)) : statuses.every(job => jobFinished.has(job.state));
+    if (!ready) return basis;
+    await conversation.commit(async tx => {
+      const { task } = await currentTx(tx);
+      if (task?.user_task_id !== basis.user_task_id || task.revision !== basis.revision
+        || task.control_epoch !== basis.control_epoch || task.state !== "waiting") return;
+      task.state = "active"; task.wait = null;
+      changed(task, "wait_ready", "runtime", "The explicit Job wait has completed");
+    }, ctx);
+    return getCurrent(ctx);
+  }
+
   async function assertExecution(tx, record, origin) {
         const { index, task } = await currentTx(tx);
         requireValue(enabled && !index.automatic_suppressed, "task_paused", "Automatic execution was paused");
+        let finalizingBlock = false;
+        if (task?.state === "blocked" && origin.consumption) {
+          const receipt = await tx.doc(BlockFinalization, conversation.id, task.user_task_id, null);
+          const live = await tx.doc(LiveDoc, conversation.id);
+          finalizingBlock = receipt.control_epoch === task.control_epoch && receipt.submission_id === live.run?.inputs[0]
+            && origin.consumption.submission_id === record.id
+            && receipt.submission_ids?.includes(record.id) && live.run?.inputs.includes(record.id);
+        }
         if (origin.producer === "task_controller") {
-          requireValue(task?.user_task_id === origin.identity.user_task_id && !["paused", "blocked", "cancelled", "completed"].includes(task.state),
+          requireValue(task?.user_task_id === origin.identity.user_task_id && (finalizingBlock || !["paused", "blocked", "cancelled", "completed"].includes(task.state)),
             "task_superseded", "Task no longer permits automatic execution");
           if (!origin.consumption) requireValue(task.control_epoch === origin.admission_basis.control_epoch,
             "task_superseded", "New user input superseded this automatic continuation");
         } else if (task) {
-          requireValue(!["paused", "blocked", "cancelled", "completed"].includes(task.state), "task_paused", "Task is not accepting automatic execution");
+          requireValue(finalizingBlock || !["paused", "blocked", "cancelled", "completed"].includes(task.state), "task_paused", "Task is not accepting automatic execution");
           if (!origin.consumption) requireValue(task.continuation.reservation?.submission_id === record.id
             && task.continuation.reservation.control_epoch === task.control_epoch,
           "task_superseded", "New user input superseded this automatic event");
@@ -242,6 +296,15 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
   }
   const controller = {
     inputOrigin: (record, ctx) => admission.origin(record, ctx),
+    async toolRestriction(ctx) {
+      const task = await getCurrent(ctx);
+      if (task?.execution_recovery?.phase !== "delivery") return null;
+      const live = await harness.snapshot(LiveDoc, conversation.id, ctx);
+      if (live?.run?.inputs[0] !== task.completion_submission_id) return null;
+      const record = await (await harness.submission(task.completion_submission_id, ctx)).status(ctx);
+      if ((await admission.origin(record, ctx))?.producer !== "task_controller") return null;
+      return "Delivery recovery permits read-only tools and the final response. Existing completion evidence is retained; do not repeat calculations, writes or external delivery.";
+    },
     async cancelJob({ job_id, request_id }, ctx) {
       requireValue(typeof request_id === "string" && request_id.length > 0, "request_id_required", "Job cancellation requires a stable request_id");
       await conversation.commit(async tx => {
@@ -271,9 +334,9 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       }
       return { events: eligible, basis: task ? { task_revision: task.revision, control_epoch: task.control_epoch } : {} };
     },
-    current: getCurrent, pauseInTransaction,
+    current: settleWait, pauseInTransaction,
     async binding(ctx) {
-      const task = await getCurrent(ctx);
+      const task = await settleWait(ctx);
       if (!task || terminal.has(task.state)) return null;
       requireValue(task.state === "active", "task_not_active", "Only an active user task may start new Jobs");
       return { user_task_id: task.user_task_id };
@@ -298,13 +361,13 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       return conversation.commit(tx => receipt(tx, requestId, params, async () => {
         const { index, task: existing } = await currentTx(tx);
         requireValue(!existing || terminal.has(existing.state), "task_already_exists", "This conversation already has a nonterminal user task; update it");
-        const id = `task_${hash([sessionId, requestId]).slice(0, 24)}`;
+        const { identifier: id } = await kernel.execute_command("research.allocate_task", { session_id: sessionId, request_id: requestId });
         const task = await tx.doc(UserTask, conversation.id, id, null);
         Object.assign(task, { schema_version: "coragent-user-task/2", user_task_id: id,
           workspace_id: workspaceId, session_id: sessionId, conversation_id: conversation.id,
           title: params.title, objective: params.objective, sources, criteria: params.criteria,
           state: "active", reason: null, revision: 1, control_epoch: 1, wait: null,
-          progress: null, progress_version: 0, completion: null,
+          progress: null, progress_version: 0, completion: null, execution_recovery: null,
           research: { entry_node_ids: [], focus_node_ids: [] }, progress_identities: [],
           event_inputs: [],
           continuation: { sequence: 0, reservation: null, no_progress: 0 }, audit: [],
@@ -337,15 +400,24 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         requireValue(task.user_task_id === basis?.user_task_id && task.control_epoch === basis.control_epoch,
           "task_superseded", "Task control changed while references were being verified");
         requireValue(task.state !== "paused", "task_paused", "Only the user may resume a paused task");
+        requireValue(task.state !== "blocked" || ["refine", "progress", "set_research", "block"].includes(params.action),
+          "task_blocked", "Resolve the blocker with refine and the new user submission ID before continuing work");
         if (params.action === "refine") {
-          if (task.state === "blocked") {
+          if (params.objective !== undefined || params.criteria !== undefined) {
             requireValue(sources.some(source => !task.sources.some(previous => previous.submission_id === source.submission_id)),
-              "task_source_required", "Revising a blocked task requires a new user instruction that resolves the blocker");
+              "task_source_required", "Changing the agreed scope requires a new user instruction; partial evidence does not reduce delivery criteria");
+          }
+          if (task.state === "blocked" || task.execution_recovery) {
+            requireValue(sources.some(source => !task.sources.some(previous => previous.submission_id === source.submission_id)),
+              "task_source_required", "Resuming blocked research or failed execution requires a new user instruction resolving the issue");
             task.state = "active"; task.reason = null; task.wait = null;
             task.continuation.no_progress = 0;
           }
           if (params.objective !== undefined) task.objective = params.objective;
           if (params.criteria !== undefined) task.criteria = params.criteria;
+          task.execution_recovery = null;
+          task.completion = null; delete task.completion_submission_id; delete task.completion_control_epoch;
+          if (task.state === "completing") task.state = "active";
           task.sources.push(...sources); task.control_epoch += 1;
         } else if (params.action === "progress") {
           recordProgress(task, identities);
@@ -356,7 +428,13 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           task.state = "waiting"; task.wait = params.wait;
         } else if (params.action === "block") {
           requireValue(params.reason, "task_reason_required", "A blocker needs an explanation");
-          task.state = "blocked"; task.reason = params.reason;
+          const live = await tx.doc(LiveDoc, conversation.id);
+          const finalization = await tx.doc(BlockFinalization, conversation.id, task.user_task_id, null);
+          // Generation task IDs change after tools; Pi input IDs identify the continuing run.
+          Object.assign(finalization, { submission_id: live.run?.inputs[0] ?? null,
+            submission_ids: live.run?.inputs ?? [], control_epoch: task.control_epoch });
+          task.state = "blocked"; task.reason = params.reason; task.wait = null;
+          task.execution_recovery = null; task.completion = null; delete task.completion_submission_id; delete task.completion_control_epoch;
         } else if (params.action === "propose_completion") {
           requireValue(task.criteria.length > 0 && task.criteria.every(criterion =>
             params.completion?.some(item => item.criterion_id === criterion.id && item.evidence_refs.length)),
@@ -364,7 +442,8 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           const live = await tx.doc(LiveDoc, conversation.id);
           requireValue(live.run?.inputs.length, "task_completion_run_required", "Completion must be delivered in an active model run");
           task.state = "completing"; task.wait = null; task.completion = params.completion;
-          task.completion_submission_id = live.run.inputs[0];
+          task.completion_submission_id = live.run.inputs[0]; task.completion_control_epoch = task.control_epoch;
+          task.execution_recovery = null;
         } else throw taskError("task_action_invalid", "Unknown task update action");
         changed(task, params.action, "agent", params.reason || null);
         return copy(task);
@@ -379,7 +458,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         if (message.role !== "toolResult" || message.isError || !substantive.has(message.toolName)) continue;
         const result = message.details.result;
         if (message.toolName === "research_result") { refs.push(result.result.id); identities.push(resultIdentity(result.result.id)); }
-        else if (message.toolName.startsWith("artifact_")) { refs.push(result.artifact_ref); identities.push(artifactIdentity(result)); }
+        else if (message.toolName.startsWith("artifact_")) { refs.push(result.artifact_id); identities.push(artifactIdentity(result)); }
         else if (result.accepted !== false) observations.push(result);
       }
       // Successful tool receipts already attest immutable products. Only Job
@@ -413,7 +492,16 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           task.state = action === "resume" ? "active" : action === "pause" ? "paused" : "cancelled";
           task.reason = action === "resume" ? null : `User requested ${action}`;
           index.automatic_suppressed = action !== "resume";
-          if (action === "resume") { task.continuation.no_progress = 0; task.wait = null; }
+          if (action === "resume") {
+            task.continuation.no_progress = 0; task.wait = null;
+            task.execution_recovery = null;
+            if (task.completion && task.completion_submission_id !== undefined) {
+              task.state = "completing"; task.completion_control_epoch = task.control_epoch;
+              task.execution_recovery = { state: "retrying", phase: "delivery", failures: 0,
+                submission_id: task.completion_submission_id, control_epoch: task.control_epoch,
+                reason: "user_resume", detail: null, next_retry_at: new Date(now()).toISOString() };
+            }
+          }
           if (action === "cancel") {
             task.cancel_jobs = { policy: jobs, pending: cancellationTargets, receipts: {}, uncertain: [], errors: {} };
             if (cancellationTargets.length) index.cancellation_tasks.push(task.user_task_id);
@@ -465,66 +553,102 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         catch (error) { lastError = { code: error.code || "job_cancellation_failed", message: error.message }; }
       }
       for (const id of index?.cancellation_tasks || []) await settleCancellations(await controller.read({ user_task_id: id }, ctx), ctx);
-      let task = await getCurrent(ctx);
+      let task = await settleWait(ctx);
       if (!enabled || !task || !["active", "waiting", "completing"].includes(task.state)) return;
       const [live, inbox] = await Promise.all([harness.snapshot(LiveDoc, conversation.id, ctx), harness.snapshot(InboxDoc, conversation.id, ctx)]);
       if (live?.run || inbox?.items.length) return;
       if (task.state === "completing") {
         const delivery = await (await harness.submission(task.completion_submission_id, ctx)).status(ctx);
+        if (!["done", "unanswered"].includes(delivery.status)) return;
         await conversation.commit(async tx => {
           const { task: current } = await currentTx(tx);
           if (current.revision !== task.revision || current.state !== "completing") return;
-          current.state = delivery.status === "done" ? "completed" : "blocked";
-          current.reason = delivery.status === "done" ? "Verified criteria and final response delivered" : "Completion response was not delivered; inspect the execution before resuming";
-          changed(current, current.state, "task_controller", current.reason);
+          if (delivery.status === "done") {
+            current.state = "completed"; current.execution_recovery = null;
+            current.reason = "Verified references and final response recorded";
+            changed(current, "completed", "task_controller", current.reason);
+          } else {
+            recordExecutionFailure(current, delivery, "delivery",
+              current.completion_control_epoch !== undefined && current.completion_control_epoch !== current.control_epoch);
+          }
+          if (current.continuation.reservation?.submission_id === delivery.id) current.continuation.reservation = null;
+        }, ctx);
+      } else {
+        if (task.state === "waiting") return;
+        await conversation.commit(async tx => {
+          const { task: current } = await currentTx(tx);
+          if (current.revision !== task.revision || current.state !== "active") return;
+          const reservation = current.continuation.reservation;
+          if (!reservation) return;
+          const record = await tx.submissionByRequest(conversation.id, reservation.request_id);
+          if (!["done", "unanswered"].includes(record?.status)) return;
+          if (reservation.control_epoch === current.control_epoch) {
+            if (record.status === "unanswered") recordExecutionFailure(current, record, "research");
+            else {
+              current.execution_recovery = null;
+              if (reservation.progress_version === current.progress_version) current.continuation.no_progress += 1;
+            }
+          }
+          current.continuation.reservation = null;
+          changed(current, "reconcile", "task_controller", current.reason);
+        }, ctx);
+      }
+      task = await getCurrent(ctx);
+      if (!["active", "completing"].includes(task.state)) return;
+      if (task.execution_recovery?.state === "retrying" && task.execution_recovery.failures > recoveryPolicy.maxRetries) {
+        await conversation.commit(async tx => {
+          const { task: current } = await currentTx(tx);
+          if (current.revision !== task.revision) return;
+          current.execution_recovery.state = "attention_required";
+          current.execution_recovery.next_retry_at = null;
+          changed(current, "recovery_budget", "task_controller", "The configured execution recovery budget is exhausted");
         }, ctx);
         return;
       }
-      if (task.state === "waiting") {
-        const statuses = await Promise.all(task.wait.job_ids.map(job_id => kernel.execute_command("job.status", { job_id })));
-        const ready = task.wait.mode === "any" ? statuses.some(job => jobFinished.has(job.state)) : statuses.every(job => jobFinished.has(job.state));
-        if (!ready) return;
-      }
-      await conversation.commit(async tx => {
-        const { task: current } = await currentTx(tx);
-        if (current.revision !== task.revision || !["active", "waiting"].includes(current.state)) return;
-        const reservation = current.continuation.reservation;
-        if (reservation) {
-          const record = await tx.submissionByRequest(conversation.id, reservation.request_id);
-          if (!["done", "unanswered"].includes(record?.status)) return;
-          if (record.status === "unanswered" && reservation.control_epoch === current.control_epoch) {
-            current.state = "blocked"; current.reason = `Execution ended unanswered: ${record.reason || record.detail || "inspect execution record"}`;
-          } else if (reservation.control_epoch === current.control_epoch && reservation.progress_version === current.progress_version) {
-            current.continuation.no_progress += 1;
-            if (current.continuation.no_progress >= 3) { current.state = "blocked"; current.reason = "Three automatic runs produced no new evidence; user review is required"; }
-          }
-          current.continuation.reservation = null;
+      if (task.execution_recovery && !recoveryReady(task.execution_recovery, task.control_epoch, now(), recoveryPolicy.maxRetries)) {
+        clearTimeout(recoveryTimer);
+        if (started && task.execution_recovery.state === "retrying" && task.execution_recovery.control_epoch === task.control_epoch) {
+          recoveryTimer = setTimeout(schedule, Math.max(1, Math.min(2147483647, Date.parse(task.execution_recovery.next_retry_at) - now())));
+          recoveryTimer.unref();
         }
-        if (current.state === "waiting") { current.state = "active"; current.wait = null; }
-        changed(current, "reconcile", "task_controller", current.reason);
-      }, ctx);
-      task = await getCurrent(ctx);
-      if (task.state !== "active") return;
+        return;
+      }
       const requestId = `task:${task.user_task_id}:continue:${task.continuation.sequence + 1}`;
       try {
         await admission.submitInternal({ requestId, producer: "task_controller", whenBusy: "reject",
           identity: { user_task_id: task.user_task_id, request_id: requestId },
           basis: { control_epoch: task.control_epoch, revision: task.revision, event_inputs: task.event_inputs },
-          content: "Continue the existing authorized user task using the runtime task snapshot. This is an internal continuation, not new user authorization. Work until verified completion, a concrete Job wait, or an explicit blocker. "
-            + (task.continuation.no_progress >= 2 ? "Repeated runs have produced no new evidence. Reassess the approach now and record a concrete blocker if progress is impossible." : "") }, ctx);
+          content: task.state === "completing"
+            ? "Recover only the final response for the existing completion proposal. Read the retained evidence if needed and deliver the final explanation. Do not repeat scientific calculations, writes, emails or other external deliveries. The runtime will complete the task after this response is recorded."
+            : "Continue the existing authorized user task using the runtime task snapshot. This is an internal continuation, not new user authorization. Work until verified completion, a concrete Job wait, or an explicit blocker. "
+            + (task.continuation.no_progress > 0 ? "Recent runs recorded no new evidence. Reassess the approach and remaining independent work; this count does not establish a research blocker. " : "")
+            + (task.execution_recovery ? "The previous execution failed. Inspect existing tool and Job receipts before continuing; do not replay completed or uncertain external actions." : "") }, ctx);
       } catch (error) {
-        if (!["busy", "task_superseded", "task_paused"].includes(error.code)) throw error;
+        if (!["busy", "task_superseded", "task_paused", "task_execution_recovery"].includes(error.code)) throw error;
       }
     },
-    async snapshot(ctx) { return { task: await getCurrent(ctx), automatic_continuation_enabled: enabled }; },
-    health: () => ({ automatic_continuation_enabled: enabled, error: lastError, checking: running, last_checked_at: lastCheckedAt, check_interval_ms: intervalMs }),
+    async snapshot(ctx) { return { task: await settleWait(ctx), automatic_continuation_enabled: enabled }; },
+    health: () => ({ automatic_continuation_enabled: enabled, error: lastError, checking: running, last_checked_at: lastCheckedAt, check_interval_ms: intervalMs, recovery_policy: { ...recoveryPolicy } }),
     start() {
       started = true;
       unsubscribe = harness.subscribeCommits(() => schedule());
       timer = setInterval(schedule, intervalMs); timer.unref(); schedule();
     },
-    async close() { stopped = true; clearInterval(timer); unsubscribe?.(); while (running) await new Promise(resolve => setTimeout(resolve, 5)); },
+    async close() { stopped = true; clearInterval(timer); clearTimeout(recoveryTimer); unsubscribe?.(); while (running) await new Promise(resolve => setTimeout(resolve, 5)); },
   };
+  function recordExecutionFailure(task, record, phase, superseded = false) {
+    const previous = task.execution_recovery;
+    if (previous?.submission_id === record.id) return;
+    const failures = (previous?.control_epoch === task.control_epoch ? previous.failures : 0) + 1;
+    const retry = !superseded && retryableSubmission(record) && failures <= recoveryPolicy.maxRetries;
+    const delay = Math.min(recoveryPolicy.maxDelayMs, recoveryPolicy.baseDelayMs * 2 ** Math.min(failures - 1, 30));
+    task.execution_recovery = { state: retry ? "retrying" : "attention_required", phase, failures,
+      submission_id: record.id, control_epoch: task.control_epoch,
+      reason: record.reason || "execution_failed", detail: record.detail || null,
+      next_retry_at: retry ? new Date(now() + delay).toISOString() : null };
+    changed(task, "execution_failure", "task_controller", retry
+      ? "Execution failed; bounded recovery is scheduled" : "Execution needs attention; research has not been marked blocked");
+  }
   function schedule() {
     if (!started || stopped || scheduled || running) return;
     scheduled = true;

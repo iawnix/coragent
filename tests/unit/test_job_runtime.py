@@ -28,7 +28,7 @@ def test_arbitrary_argv_job_collects_declared_output(tmp_path: Path) -> None:
     work = tmp_path / "work"
     work.mkdir()
     runtime = _runtime()
-    spec = JobSpec(
+    spec = JobSpec(job_id="job_1",
         command=(sys.executable, "-c", "from pathlib import Path; Path('result.txt').write_text('ok')"),
         cwd=work,
         outputs=(JobOutput("result.txt", required=True, media_type="text/plain"),),
@@ -50,7 +50,7 @@ def test_arbitrary_argv_job_collects_declared_output(tmp_path: Path) -> None:
 
 def test_job_probe_reports_missing_cwd_or_inputs_without_execution(tmp_path: Path) -> None:
     runtime = _runtime()
-    spec = JobSpec(command=(sys.executable, "-c", "raise SystemExit(99)"), cwd=tmp_path / "missing")
+    spec = JobSpec(job_id="job_1", command=(sys.executable, "-c", "raise SystemExit(99)"), cwd=tmp_path / "missing")
 
     probe = runtime.job_probe(spec)
 
@@ -60,7 +60,7 @@ def test_job_probe_reports_missing_cwd_or_inputs_without_execution(tmp_path: Pat
 
 def test_output_paths_cannot_escape_job_cwd(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="stay below cwd"):
-        JobSpec(command=(sys.executable,), cwd=tmp_path, outputs=(JobOutput("../outside"),))
+        JobSpec(job_id="job_1", command=(sys.executable,), cwd=tmp_path, outputs=(JobOutput("../outside"),))
 
 
 def test_job_runtime_preserves_research_identity_without_domain_parsing(tmp_path: Path) -> None:
@@ -69,16 +69,16 @@ def test_job_runtime_preserves_research_identity_without_domain_parsing(tmp_path
         command=(sys.executable, "-c", "print('raw evidence')"),
         cwd=tmp_path,
         workspace_id="ws_demo",
-        job_id="job_demo",
+        job_id="job_1",
     )
 
     receipt = runtime.job_start(request)
     status = _wait(runtime, receipt)
 
     assert status.state is JobState.SUCCEEDED
-    assert receipt.job_id == "job_demo"
+    assert receipt.job_id == "job_1"
     assert receipt.workspace_id == "ws_demo"
-    assert runtime.job_collect(receipt)["job_id"] == "job_demo"
+    assert runtime.job_collect(receipt)["job_id"] == "job_1"
 
 
 def test_job_config_wires_remote_environment_into_runtime(tmp_path: Path) -> None:
@@ -107,7 +107,7 @@ remote_root = \"/scratch/coragent\"
 
 def test_job_spec_separates_execution_target_from_process_environment(tmp_path: Path) -> None:
     spec = _spec(tmp_path, {
-        "job_id": "job_target",
+        'job_id': "job_1",
         "command": [sys.executable, "-c", "pass"],
         "environment": "cluster_1w",
         "env": {"SCIENTIFIC_RUNTIME": "configured"},

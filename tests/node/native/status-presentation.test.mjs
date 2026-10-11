@@ -8,7 +8,9 @@ import {activityStatus,contextMatches,createStatusPresentation,usageTotals} from
 import {createDocumentView} from '../../../apps/agent/terminal/renderers/document.mjs';
 import {createCommandPresentation} from '../../../apps/agent/terminal/commands/panel.mjs';
 import {subscribeMonitor} from '../../../apps/agent/terminal/status/monitor.mjs';
+import {stripVTControlCharacters} from 'node:util';
 const tui = await import(pathToFileURL(join(pinnedPiSource(),'packages/tui/src/index.ts')));
+const nativeTheme = await import(pathToFileURL(join(pinnedPiSource(),'packages/coding-agent/src/modes/interactive/theme/theme.ts')));
 const theme = {fg:(_,text)=>text,bold:text=>text};
 const agent={model:{provider:'fixture',modelId:'a'},thinkingLevel:'medium'};
 const view={entries:[{id:1}],docs:{'pi.agent':agent,'pi.usage':{models:{'fixture/a':{input:10,output:20,cacheRead:30,totalTokens:60}}}}};
@@ -17,14 +19,14 @@ const telemetry={entryId:1,firstEntryId:1,model:agent.model,contextTokens:48000,
 test('usage ledger survives compacted entries and model switch invalidates context',()=>{
  const status=createStatusPresentation({session:{workspaceId:'工作区',sessionId:'bb7a1aa2-d9c2-454e-9907-bbf519a28faf'},theme,...tui});
  status.update({view,telemetry});
- assert.match(status.footer.render(150).join('\n'),/48.0k\/200.0k \(24%\).*Total tokens: 60/);
+ assert.match(status.footer.render(150).join('\n'),/Context: 48.0k\/200.0k \(24%\).*Total tokens: 60/);
  for(const width of [12,30,60,100,180]) for(const line of status.footer.render(width)) assert.ok(tui.visibleWidth(line)<=width,line);
  assert.equal(usageTotals(view.docs['pi.usage']).reasoning,null);
  assert.equal(usageTotals({models:{a:{input:10},b:{}}}).input,null);
  const compacted={...view,entries:[{id:10,kind:'pi.compaction'},{id:1}]};
  assert.equal(contextMatches(compacted,telemetry),false);
  status.update({view:compacted});
- assert.match(status.footer.render(150).join('\n'),/Context Unknown.*Total tokens: 60/);
+ assert.match(status.footer.render(150).join('\n'),/Context: Unknown.*Total tokens: 60/);
  assert.equal(contextMatches({...view,docs:{...view.docs,'pi.agent':{model:{provider:'fixture',modelId:'b'}}}},telemetry),false);
 });
 
@@ -137,6 +139,43 @@ test('widening a wrapped line retains the same logical line',()=>{
  assert.match(doc.render(120)[2],/entry-1 /);
 });
 
+test('document fields use theme roles and repaint across themes without changing text or anchors',()=>{
+ const body='workspace id: 中文\nrevision: 18\ninput refs: []\nstate: blocked\ncontent omitted: false\n'
+   + 'Input: 10 · Output: 20\n' + Array.from({length:25},(_,i)=>`entry: line-${i}`).join('\n');
+ const make=monochrome=>createDocumentView({...tui,wrapText:tui.wrapTextWithAnsi,command:'research',title:'Research',
+   body,theme:()=>nativeTheme.theme,monochrome});
+ nativeTheme.initTheme('dark');
+ const doc=make(false);doc.setViewport(12);
+ const dark=doc.render(80).join('\n');
+ for(const [role,value] of [['accent','revision:'],['syntaxNumber','18'],['muted','[]'],['warning','blocked'],
+   ['syntaxKeyword','false'],['accent','Output:']]) assert.ok(dark.includes(nativeTheme.theme.fg(role,value)),value);
+ nativeTheme.initTheme('light');
+ const light=doc.render(80).join('\n');
+ assert.notEqual(dark,light);assert.equal(stripVTControlCharacters(dark),stripVTControlCharacters(light));
+ const plain=make(true);plain.setViewport(12);
+ assert.equal(stripVTControlCharacters(light),plain.render(80).join('\n'));
+ doc.handleInput('\x1b[C');const anchor=stripVTControlCharacters(doc.render(80)[2]);
+ nativeTheme.initTheme('dark');assert.equal(stripVTControlCharacters(doc.render(80)[2]),anchor);
+ for(const width of [20,32,80]) for(const line of doc.render(width)) assert.ok(tui.visibleWidth(line)<=width);
+});
+
+test('system prompt highlighting preserves Markdown source, fenced content and monochrome text',()=>{
+ nativeTheme.initTheme('dark');
+ const body='Working directory: /workspace\n# Role and instructions\nUse `task_read` to inspect.\n'
+   + '- Preserve evidence\n```text\n# literal heading\nstate: failed\n```\nSHA256: fixture';
+ const make=monochrome=>createDocumentView({...tui,wrapText:tui.wrapTextWithAnsi,command:'sys-prompt',title:'System prompt',
+   body,theme:()=>nativeTheme.theme,monochrome});
+ const doc=make(false);doc.setViewport(20);
+ const colored=doc.render(100).join('\n');
+ for(const [role,value] of [['accent','Working directory:'],['mdHeading','# Role and instructions'],
+   ['mdCode','`task_read`'],['mdCodeBlock','# literal heading'],['mdCodeBlock','state: failed']]) {
+   assert.ok(colored.includes(nativeTheme.theme.fg(role,value)),value);
+ }
+ const plain=make(true);plain.setViewport(20);
+ assert.equal(stripVTControlCharacters(colored),plain.render(100).join('\n'));
+ assert.equal(stripVTControlCharacters(colored).split('\n').slice(2,-1).map(line=>line.trimEnd().slice(1)).join('\n'),body);
+});
+
 test('usage and monitor details stay separate while disconnection overrides cached progress',()=>{
  const status=createStatusPresentation({session:{workspaceId:'w',sessionId:'s'},theme,...tui});
  status.update({view,telemetry,monitor:snapshot()});
@@ -165,16 +204,17 @@ test('monitor subscription refreshes on reconnect and cleans up its connection',
 });
 
 test('command panels distinguish current and focus, fit small terminals, and support monochrome',()=>{
+ nativeTheme.initTheme('dark');
  let rows=24, selected, cancelled=false;
  const items=Array.from({length:30},(_,i)=>({value:`id-${i}`,label:`模型 ${i}`,description:'e\u0301 中文 👩‍🔬 '+ 'long-id-'.repeat(20)}));
  for(const monochrome of [true,false]) {
   rows=24;
-  const presentation=createCommandPresentation({...tui,monochrome,rows:()=>rows});
+  const presentation=createCommandPresentation({...tui,theme:()=>nativeTheme.theme,monochrome,rows:()=>rows});
   const panel=presentation.selection({command:'model',title:'Select model',items,selectedValue:'id-0',onSelect:value=>{selected=value},onCancel:()=>{cancelled=true}});
   panel.render(80); panel.handleInput('\x1b[B'); panel.invalidate();
   let rendered=panel.render(80).join('\n');
   assert.match(rendered,/\[current\] 模型 0/); assert.match(rendered,/› 模型 1/);
-  assert.equal(rendered.includes('\x1b[48;2;122;162;247m'),!monochrome);
+  assert.equal(rendered !== stripVTControlCharacters(rendered), !monochrome);
   for(const [width,height] of [[80,24],[120,30],[32,12],[20,10]]) {
    rows=height;
    for(const component of [panel,presentation.feedback({command:'reload',kind:'error',message:'错误 '+ 'detail '.repeat(200)}),
@@ -189,5 +229,64 @@ test('command panels distinguish current and focus, fit small terminals, and sup
   }
   panel.handleInput('\r'); assert.equal(selected,'id-1');
   panel.handleInput('\x1b'); assert.equal(cancelled,true);
+ }
+});
+
+test('theme changes repaint open command surfaces without changing their selection',()=>{
+ nativeTheme.initTheme('dark');
+ const presentation=createCommandPresentation({...tui,theme:()=>nativeTheme.theme,monochrome:false});
+ const panel=presentation.selection({command:'model',title:'Select model',items:[
+  {value:'a',label:'Model A'},{value:'b',label:'Model B'},
+ ],selectedValue:'a',onSelect(){},onCancel(){}});
+ panel.handleInput('\x1b[B');
+ const dark=panel.render(80).join('\n');
+ nativeTheme.initTheme('light');
+ const light=panel.render(80).join('\n');
+ assert.notEqual(dark,light);
+ assert.equal(stripVTControlCharacters(dark),stripVTControlCharacters(light));
+ assert.match(stripVTControlCharacters(light),/› Model B/);
+ nativeTheme.initTheme('dark');
+});
+
+test('selector clicks retain their pressed item when the viewport recenters',()=>{
+ let selected;
+ const panel=createCommandPresentation({...tui,monochrome:true}).selection({
+  command:'model',title:'Select model',items:Array.from({length:20},(_,i)=>({value:String(i),label:`Model ${i}`})),
+  selectedValue:'0',onSelect:value=>{selected=value;},onCancel(){},
+ });
+ panel.setViewport(12); panel.render(80);
+ panel.handleMouse({type:'press',button:'left',y:8});
+ panel.render(80);
+ panel.handleMouse({type:'click',button:'left',y:8});
+ assert.equal(selected,'3');
+ panel.handleMouse({type:'wheel',wheelDelta:1});
+ assert.match(panel.render(80).join('\n'),/› Model 4/);
+ panel.handleMouse({type:'click',button:'left',y:0});
+ assert.equal(selected,'3');
+});
+
+test('long errors expose complete details while the feedback remains bounded',()=>{
+ const body='Missing task ID\nUsage: /monitor task pause <id>\n'+'A useful explanation. '.repeat(30);
+ const presentation=createCommandPresentation({...tui,monochrome:true,createDocument:options=>createDocumentView({
+  ...tui,wrapText:tui.wrapTextWithAnsi,monochrome:true,...options,
+ })});
+ const feedback=presentation.feedback({command:'monitor',kind:'error',message:body});
+ assert.match(feedback.render(60)[0],/F2 Details/);
+ const details=feedback.details(); details.setViewport(40); const rendered=details.render(120).join('\n');
+ assert.match(rendered,/Missing task ID/); assert.match(rendered,/Usage: \/monitor task pause/);
+ const plain=createStatusPresentation({session:{workspaceId:'w',sessionId:'s'},monochrome:true,theme:{fg(){throw Error('unexpected color');}},...tui});
+ assert.doesNotMatch(plain.footer.render(80).join('\n'),/\x1b\[/);
+});
+
+
+test('execution recovery is visible without claiming research is blocked', () => {
+ const base = { session_id: 'recovery', updated_at: new Date().toISOString(), jobs: { counts: { running: 1, queued: 0 } },
+   execution: { state: 'idle' }, automatic_continuation_enabled: true,
+   task_controller: { error: null, last_checked_at: new Date().toISOString(), check_interval_ms: 30000 } };
+ for (const [state,phase,label] of [['retrying','research','Recovering execution'], ['running','delivery','Recovering final response'],
+   ['attention_required','research','Execution needs attention']]) {
+   const task = { state: phase === 'delivery' ? 'completing' : 'active', execution_recovery: { state, phase } };
+   const status = activityStatus({ monitor: { ...base, task }, sessionId: 'recovery' });
+   assert.equal(status.reason, label); assert.doesNotMatch(status.text, /Task blocked/);
  }
 });

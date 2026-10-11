@@ -58,3 +58,5 @@ bash 命令只准备并校验 Job 请求；`prepared/gaussian.json` 是请求文
 确认。显式扫描输入可以执行，当前没有专门验证扫描完整性的内置验证器。
 
 详见 [Gaussian 科学验证](references/gaussian_validation.zh-CN.md)。
+
+- [二维弛豫扭转扫描](references/relaxed_scans.zh-CN.md)

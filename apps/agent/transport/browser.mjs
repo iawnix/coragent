@@ -90,7 +90,7 @@ async function main(args) {
   }
   const root = resolve(options.workspace);
   const manifest = JSON.parse(readFileSync(join(root, "workspace_manifest.json"), "utf8"));
-  if (manifest?.schema_version !== "research_workspace/2" || manifest.state !== "ready" || resolve(manifest.workspace_root || "") !== root) throw new Error("Gateway workspace manifest is invalid or not admitted");
+  if (manifest?.schema_version !== "research_workspace/3" || manifest.state !== "ready" || resolve(manifest.workspace_root || "") !== root) throw new Error("Gateway workspace manifest is invalid or not admitted");
   const identity = { workspace_id: require_workspace_id(manifest.workspace_id), session_id: options["session-id"] };
   const peer = await connectHost({ socketPath: options.connect.slice(7) });
   try {

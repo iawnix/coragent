@@ -26,11 +26,17 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
   let completed = false;
   let backend;
   let modelRequests = 0;
+  let modelRequest;
   const modelServer = createServer((_request, response) => {
-    modelRequests++;
-    response.writeHead(200, {'content-type':'text/event-stream'});
-    response.write(`data: ${JSON.stringify({id:'fixture',object:'chat.completion.chunk',created:1,model:'fixture',
-      choices:[{index:0,delta:{role:'assistant',content:'Local deterministic response'},finish_reason:null}]})}\n\n`);
+    let body = '';
+    _request.on('data', chunk => { body += chunk; });
+    _request.on('end', () => {
+      modelRequest = JSON.parse(body);
+      modelRequests++;
+      response.writeHead(200, {'content-type':'text/event-stream'});
+      response.write(`data: ${JSON.stringify({id:'fixture',object:'chat.completion.chunk',created:1,model:'fixture',
+        choices:[{index:0,delta:{role:'assistant',content:'Local deterministic response'},finish_reason:null}]})}\n\n`);
+    });
     // Keep this local stream open until the user aborts; no remote provider is used.
   });
   await new Promise(resolve => modelServer.listen(0, '127.0.0.1', resolve));
@@ -114,7 +120,7 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
       const terminal = new VirtualTerminal(100, 24);
       const ui = new TuiAltScreen(terminal);
       let quit = false;
-      let testUI, finishSlow, finishOperation, operationFinished=false;
+      let testUI, finishSlow, finishOperation, finishError, operationFinished=false;
       const { PresentationUI } = await fromSource('packages/coding-agent/src/experimental/services/presentation-ui.ts');
       const { SlashCommands: TestCommands } = await fromSource('packages/coding-agent/src/experimental/services/slash-commands.ts');
       const driver = testFacet({ id:'test-command-panels', setup(env) {
@@ -134,6 +140,10 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
             await new Promise(resolve=>{finishOperation=resolve});
             operationFinished=true;
             presentation.showStatus('STALE OPERATION',context,'success');
+          }}));
+          env.own(commands.replace({name:'delayed-error',description:'Delayed error',async run(_args,context){
+            await new Promise(resolve=>{finishError=resolve});
+            presentation.showStatus('Delayed fixture failure',context,'error');
           }}));
         });
       }});
@@ -161,7 +171,7 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
         }
         assert.fail(renderedText());
       };
-      const submit = (text) => { terminal.sendInput(text); terminal.sendInput("\r"); };
+      const submit = (text) => { terminal.sendInput('\x05'); terminal.sendInput('\x15'); terminal.sendInput(text); terminal.sendInput("\r"); };
       const frameAt = (width=100,height=24) => renderLayoutFrame(component.layoutRoot,width,height,()=>{});
       const monitorRow = frame => frame.lines.findIndex(line=>stripVTControlCharacters(line).trim().startsWith('Monitor '));
       const assertDock = (frame,height=24,inputRows=1) => {
@@ -184,7 +194,7 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
           await new Promise(resolve => setTimeout(resolve, 50));
           assert.notEqual(ui.getFocusedComponent().constructor.name, 'CustomEditor');
         };
-        await waitFor(() => !renderedText().includes("Context Unknown"));
+        await waitFor(() => !renderedText().includes("Context: Unknown"));
         assert.doesNotMatch(renderedText(), /Server:| entries|\/model ·/);
         assertDock(frameAt());
         terminal.sendInput('/mo');
@@ -318,6 +328,21 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
         terminal.sendInput('!');
         assert.match(renderedText(),/last line!/);
         terminal.sendInput('\x15');terminal.sendInput('\x7f');terminal.sendInput('\x15');terminal.sendInput('\x7f');terminal.sendInput('\x15');
+        submit('/monitor task pause');
+        await waitFor(()=>renderedText().includes('Missing task ID'));
+        assert.match(stripVTControlCharacters(frameAt().lines[20]),/\/monitor task pause/);
+        terminal.sendInput('\x1bOQ'); // F2 opens the complete error without losing the command.
+        await waitFor(()=>renderedText().includes('Command error'));
+        assert.match(renderedText(),/Usage:/);
+        terminal.sendInput('\x1b');
+        await new Promise(resolve=>setImmediate(resolve));
+        assert.match(stripVTControlCharacters(frameAt().lines[20]),/\/monitor task pause/);
+        submit('/delayed-error');
+        await waitFor(()=>typeof finishError==='function');
+        terminal.sendInput('new draft');finishError();
+        await waitFor(()=>renderedText().includes('Delayed fixture failure'));
+        assert.match(stripVTControlCharacters(frameAt().lines[20]),/new draft/);
+        assert.doesNotMatch(stripVTControlCharacters(frameAt().lines[20]),/delayed-error/);
         submit('/slow');
         await waitFor(()=>typeof finishSlow === 'function');
         assert.match(renderedText(),/\/slow · … Running/);
@@ -388,6 +413,12 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
         terminal.sendInput('\x1b[200~Run the local deterministic fixture\n'+'Local fixture line\n'.repeat(50)+'\x1b[201~'); terminal.sendInput('\r');
         assert.doesNotMatch(renderedText(),/Fixture completed/);
         await waitFor(()=>modelRequests===1,10000);
+        const toolNames = modelRequest.tools.map(tool => tool.function.name);
+        assert.ok(toolNames.includes('task_read'));
+        assert.ok(!toolNames.includes('system_prompt'), 'prompt diagnostics are not a model tool');
+        const systemMessages = modelRequest.messages.filter(message => message.role === 'system');
+        assert.match(JSON.stringify(systemMessages), /You are CoRAgent/);
+        assert.match(JSON.stringify(systemMessages), /<available_skills>/);
         await waitFor(()=>renderedText().includes('Working'),10000);
         const transcript=renderLayoutFrame(component.layoutRoot,100,24,()=>{}).primaryScrollView;
         transcript.scrollTo(5,{disableFollow:true});

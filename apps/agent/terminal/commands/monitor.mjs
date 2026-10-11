@@ -1,3 +1,5 @@
+import { formatFields } from '../renderers/fields.mjs';
+
 const STATES = {
   active: 'Researching', waiting: 'Waiting for compute', paused: 'Paused', blocked: 'Needs attention',
   completing: 'Preparing delivery', completed: 'Completed', cancelled: 'Cancelled', recovering: 'Checking recovery',
@@ -5,7 +7,7 @@ const STATES = {
 
 export const taskStateLabel = state => STATES[state] || 'Unknown';
 const text = value => value === null || value === undefined || value === '' ? '—' : String(value);
-const lines = value => value.length ? value.join('\n') : '(none)';
+const lines = value => value.length ? value.join('\n') : 'No entries';
 
 export function formatTask(task) {
   if (!task) return 'No current task';
@@ -13,6 +15,12 @@ export function formatTask(task) {
     `Task: ${task.title} · ${taskStateLabel(task.state)}`,
     `Goal: ${task.objective}`,
     `Progress: ${text(task.progress?.summary)}`,
+    ...(task.execution_recovery ? [
+      `Execution recovery: ${task.execution_recovery.state} · ${task.execution_recovery.phase}`,
+      `Failure: ${task.execution_recovery.reason} · ${text(task.execution_recovery.detail)}`,
+      ...(task.execution_recovery.next_retry_at ? [`Retry after: ${task.execution_recovery.next_retry_at}`] : []),
+      'Research evidence is retained. Inspect execution records before resuming.',
+    ] : []),
     ...(task.wait ? [`Waiting: ${task.wait.job_ids.join(', ')} (${task.wait.mode})`] : []),
     ...(task.reason ? [`Reason: ${task.reason}`] : []),
     `Delivery criteria:\n${lines(task.criteria.map(item => `• ${item.description}`))}`,
@@ -21,7 +29,7 @@ export function formatTask(task) {
     `/monitor jobs --task ${task.user_task_id}`,
     `/monitor runs --task ${task.user_task_id}`,
     ...(['active', 'waiting', 'blocked'].includes(task.state) ? [`/monitor task pause ${task.user_task_id}`] : []),
-    ...(['paused', 'blocked'].includes(task.state) ? [`/monitor task resume ${task.user_task_id}`] : []),
+    ...(['paused', 'blocked'].includes(task.state) || task.execution_recovery?.state === 'attention_required' ? [`/monitor task resume ${task.user_task_id}`] : []),
   ].join('\n');
 }
 
@@ -117,12 +125,4 @@ export function formatMonitor(method, response, params = {}) {
       return formatFields(response);
     default: throw new Error(`Unsupported Monitor view: ${method}`);
   }
-}
-
-// These views receive only bounded service-owned diagnostic projections.
-function formatFields(value, indent = '') {
-  if (value === null || typeof value !== 'object') return text(value);
-  if (Array.isArray(value)) return lines(value.map(item => `${indent}• ${formatFields(item, indent + '  ')}`));
-  return Object.entries(value).filter(([key]) => key !== 'schema_version').map(([key, item]) =>
-    `${indent}${key.replaceAll('_', ' ')}: ${item !== null && typeof item === 'object' ? '\n' + formatFields(item, indent + '  ') : text(item)}`).join('\n');
 }

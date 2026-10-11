@@ -77,7 +77,7 @@ def prepare(root, params):
                 raise ValueError('validator_input_requires_collected_output')
             result_ref = producer['latest_result_receipt_ref']
             import re
-            if not re.fullmatch(r'job_result_[0-9a-f]{64}', result_ref):
+            if not re.fullmatch(r'job_result_[1-9][0-9]*', result_ref):
                 raise ValueError('validator_input_receipt_invalid')
             result = json.loads((root / 'operations/results' / (result_ref + '.json')).read_text())
             if (producer.get('execution_conflict') or ref not in result['artifact_refs']

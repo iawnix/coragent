@@ -88,6 +88,31 @@ status line and leave the editor usable; no panel needs to be dismissed.
 that it was skipped, cancelled, or failed. The transcript shows a compacted
 context marker; it does not print the internal summary as an ordinary reply.
 
+Slash completion uses a stable viewport above the editor. Arrow keys select a
+candidate; Tab and clicks only complete it. Enter opens a command entry. Enter on
+an argument candidate only completes it; a subsequent Enter submits the command.
+Esc dismisses completion without clearing the input, and Tab reopens it. Monitor
+suggestions follow the current argument position and preserve case-sensitive IDs.
+Incomplete commands report the missing argument without executing an operation.
+
+Failed commands return to an untouched editor for correction; late failures never
+overwrite a newer draft. Press F2 on an error to read its complete message and
+usage, then Esc to return. Paths and multiline text starting with a slash remain
+ordinary messages. Pasting alone never executes a command.
+
+Command surfaces follow the active Pi theme. `›` marks keyboard focus and
+`[current]` marks the applied value; selectors support clicks and wheel navigation.
+Running and queued tools use the activity color, blocked tools use warning,
+failures use error, and cancellation uses secondary text. With `NO_COLOR` or
+`TERM=dumb`, command surfaces, completion, status and tool summaries keep text and
+symbol cues.
+
+Document views distinguish field labels, numbers, booleans and states. `/sys-prompt`
+colors Markdown headings, inline code and fenced blocks while preserving the source.
+Research and diagnostic fields show empty lists as `[]`, empty objects as `{}`,
+missing values as `—`, and empty strings as `""`. Empty collections stay beside their
+field labels. Empty Monitor lists show `No entries`; these are not error states.
+
 CoRAgent command names, arguments, and completions share one catalogue:
 
 - `/research`: read-only queries in the attached worker, for Memory context and records, including a remote workspace over SSH. Use the command help for supported selectors. Long results open a separate reading page.
@@ -122,6 +147,40 @@ takes priority over cached progress. Unknown counts display `—`; no progress
 percentage or completion time is inferred. The row remains visible while idle and
 while command panels are open. Background refreshes preserve focus, selection,
 reading position, and the input draft.
+
+The base task states are:
+
+| Task state | Display | Meaning |
+| --- | --- | --- |
+| `active` | Researching | The user task is still in progress |
+| `waiting` | Waiting for compute | Waiting for recorded compute conditions; adds Continues when ready when automatic continuation is on |
+| `paused` | Paused | Automatic continuation is paused |
+| `blocked` | Needs attention | The task is blocked; shows Responding · Task blocked while a model turn is running |
+| `completing` | Preparing delivery | Preparing the deliverable |
+| `completed` | Completed | The user task is complete |
+| `cancelled` | Cancelled | The user task was cancelled |
+| `recovering` | Checking recovery | Checking recovery state |
+
+The row can instead show operational or connection information:
+
+| Display | Condition |
+| --- | --- |
+| Checking status | No Monitor snapshot for this session yet |
+| No current task | No registered user task |
+| Checking recovery | The controller has not completed its first check |
+| Checking continuation / Preparing continuation | An active task is idle, without / with a continuation reservation |
+| Automatic continuation off | An active task is idle and automatic continuation is disabled |
+| Connection lost | A Monitor request or subscription failed |
+| Status is stale | Invalid snapshot timestamp or no update for over 30 seconds |
+| Continuation error: … | A task controller error |
+| Continuation check overdue | An active/waiting task has not been checked for the greater of 30 seconds or three check intervals |
+
+Connection, snapshot freshness and controller checks take priority over cached task
+progress. `jobs running` counts running compute jobs, excluding queued jobs; it does
+not indicate whether a model turn is running. Read `/monitor` → `Reason` for the cause
+of a blocked task. `✓` is the normal status symbol; the adjacent text determines
+whether the task is complete. `Ⅱ` means paused, `…` checking or preparing, `!` attention,
+and `×` a connection or controller error.
 
 `/monitor` is a live current-session overview. It displays the original objective,
 delivery criteria, latest recorded progress, concrete Job waits, control reason,

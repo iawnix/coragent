@@ -1,5 +1,6 @@
 """Explicit research links and evidence-backed citations, with one stored edge."""
-from .records import append_record, digest, now
+from .records import append_record, now
+from .operational_ids import allocate_id
 from research_agent.foundation.transactions import read_json, write_json
 from pathlib import Path
 
@@ -51,7 +52,7 @@ def change(root, node_id, additions=(), removals=(), *, author=None):
                 visited.add(candidate)
                 pending.extend(e['target'] for e in value['relations'].values()
                                if e['active'] and e['kind'] == kind and e['source'] == candidate)
-        ref = 'link_' + digest([source, kind, target])
+        ref = allocate_id(root, 'link', [source, kind, target])
         old = value['relations'].get(ref)
         if old and old['active'] and old['reason'] == reason:
             continue
@@ -68,7 +69,7 @@ def change(root, node_id, additions=(), removals=(), *, author=None):
 def cite(root, source, target, *, basis_ref, kind='cites', origin='agent'):
     """References preserve exact Result/material identity; reading creates no link."""
     value = graph(root)
-    ref = 'link_' + digest([source, kind, target, basis_ref])
+    ref = allocate_id(root, 'link', [source, kind, target, basis_ref])
     if ref not in value['relations']:
         edge = dict(id=ref, source=source, kind=kind, target=target, reason='', origin=origin,
                     basis_refs=[basis_ref], active=True, created_at=now())

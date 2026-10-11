@@ -6,7 +6,7 @@ import os
 import signal
 import subprocess
 import time
-import uuid
+import re
 import sys
 import threading
 from .worker import identity, supervisor_environment
@@ -86,7 +86,9 @@ class LocalProcessPlatform(ExecutionPlatform):
         if not probe["inputs_present"]:
             raise FileNotFoundError(f"job inputs missing: {probe['missing_inputs']}")
         spec.cwd.mkdir(parents=True, exist_ok=True)
-        job_id = spec.job_id or f"job_{uuid.uuid4().hex}"
+        job_id = spec.job_id
+        if not isinstance(job_id, str) or not re.fullmatch(r"job_[1-9][0-9]*", job_id):
+            raise ValueError("job_id must be allocated before dispatch")
         (spec.cwd / "logs").mkdir(exist_ok=True)
         if (spec.cwd / "receipt.json").exists() or (spec.cwd / "spec.json").exists():
             raise ValueError("job directory already contains an execution; reconcile instead of resubmitting")

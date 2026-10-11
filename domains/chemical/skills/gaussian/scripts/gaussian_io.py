@@ -688,6 +688,9 @@ def failure_diagnostics(lines: list[str], start_line: int = 1) -> dict[str, obje
         ("input_syntax", r"QPErr"),
         ("optimization_limit", r"Number of steps exceeded"),
         ("scf_convergence", r"Convergence failure"),
+        ("irc_corrector_limit", r"Maximum number of corrector steps exce(?:e)?ded"),
+        ("irc_hessian_missing", r"You must use ReadCartesianFC, FCCards, or CalcFC with IRC"),
+        ("coordinate_transform", r"RedCar/ORedCr failed for GTrans"),
         ("signal", r"segmentation violation"),
         ("execution_error", r"Error termination"),
     )
@@ -697,7 +700,7 @@ def failure_diagnostics(lines: list[str], start_line: int = 1) -> dict[str, obje
             if re.search(pattern, line, re.I):
                 events.append({"kind": kind, "line": start_line + index, "text": line.strip()})
                 break
-    explicit = [event for event in events if event["kind"] in {"input_syntax", "optimization_limit", "scf_convergence"}]
+    explicit = [event for event in events if event["kind"] not in {"signal", "execution_error"}]
     primary = (explicit or events or [None])[0]
     return {"primary_failure": primary, "diagnostics": events}
 

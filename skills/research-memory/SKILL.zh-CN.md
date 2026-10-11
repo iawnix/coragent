@@ -50,7 +50,7 @@ Node 很大时，单独读取准备修改的字段：
 `add_relations` 的每项包含 kind（requires / part_of / alternative_to）、target 及可选 reason。撤回关系用 `remove_relations` 中的返回关系 ID。反向查询和历史由框架维护，无需分别修改两端。
 
 ```json
-{"node_id":"node_comparison","note":"候选取得可比较的能量与连通性证据后进行比较。","add_relations":[{"kind":"requires","target":"node_candidate","reason":"需要候选的可比较结果"}]}
+{"node_id":"node_2","note":"候选取得可比较的能量与连通性证据后进行比较。","add_relations":[{"kind":"requires","target":"node_1","reason":"需要候选的可比较结果"}]}
 ```
 
 map 可以有反馈和备选路径。requires 表达研究意图，不是工具准入条件。实际材料使用和明确结果引用保留具体版本；读过、搜索过某份结果不等于采用了它。
@@ -60,7 +60,7 @@ map 可以有反馈和备选路径。requires 表达研究意图，不是工具�
 退出码为零不证明科学结论；新失败不覆盖旧证据。发布 Result 不强制关闭 Node；closed 表示停止主动推进，不表示假设成立。
 
 ```json
-{"node_id":"node_candidate","conclusion":"该候选的 IRC 未连接目标产物。","evidence_refs":["a7"],"limitations":"仅检查该候选，不能排除其他构型。"}
+{"node_id":"node_1","conclusion":"该候选的 IRC 未连接目标产物。","evidence_refs":["art_7"],"limitations":"仅检查该候选，不能排除其他构型。"}
 ```
 
 文件使用 `files: [{name, purpose?, artifact_ref}]` 引用已登记材料，不把可修改工作文件当成固定结果。修正旧结果时另发 Result 并明确 supersedes；普通新结果不自动替换综合判断。上游修正只产生复核提示，不自动替换旧输入或重新计算。
@@ -71,7 +71,7 @@ Monitor 事件包含 Job 及研究 Node。检查或收集执行后，在这里�
 
 ## 对象、检查与修订
 
-用 `subjects` 为不可变 Artifact 或 Result 引用指定角色，例如 `{"target":"a1","calculated":"a2"}`。Node 记录研究目标对象，Result 记录实际解释的对象。角色标签不证明身份正确；领域工具比较结构，Memory 不解析分子或裁定科学真伪。
+用 `subjects` 为不可变 Artifact 或 Result 引用指定角色，例如 `{"target":"art_1","calculated":"art_2"}`。Node 记录研究目标对象，Result 记录实际解释的对象。角色标签不证明身份正确；领域工具比较结构，Memory 不解析分子或裁定科学真伪。
 
 分开记录 `observation`、`conclusion` 和精确的 `check_refs`。检查失败、无法判断也可以保存和引用。检查回执分别记录执行、解析与有限范围的科学检查。
 

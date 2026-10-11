@@ -3,9 +3,35 @@ import test from "node:test";
 import { createTerminalCommands } from "../../../apps/agent/terminal/commands/facet.mjs";
 import { createClientQueries } from "../../../apps/agent/pi/services/queries.mjs";
 import { createTerminalSession, runTerminalSessions } from "../../../apps/agent/terminal/session.mjs";
-import { parseSlashCommand, SLASH_COMMAND_NAMES } from "../../../apps/agent/tools/commands.mjs";
+import { parseSlashCommand, slashCompletions, SLASH_COMMAND_NAMES } from "../../../apps/agent/tools/commands.mjs";
 
 const row = (id, workspace = "remote") => ({ session_id: id, workspace_id: workspace });
+
+test('slash completion follows argument positions and preserves case-sensitive IDs', () => {
+  const values = prefix => (slashCompletions('monitor', prefix) || []).map(item => item.value);
+  assert.deepEqual(values('ta'), ['tasks ', 'task ']);
+  assert.deepEqual(values('task '), ['task pause ', 'task resume ', 'task cancel ']);
+  assert.deepEqual(values('task pause '), []);
+  assert.deepEqual(values('task cancel TaskABC '), ['task cancel TaskABC --keep-jobs ', 'task cancel TaskABC --cancel-jobs ']);
+  assert.deepEqual(values('jobs --task '), []);
+  assert.deepEqual(values('jobs --task TaskABC '), ['jobs --task TaskABC --limit ', 'jobs --task TaskABC --cursor ']);
+  assert.deepEqual(values('run RunABC --limit 5 '), ['run RunABC --limit 5 --cursor ']);
+  assert.deepEqual(values('health '), []);
+  assert.deepEqual(values('jobs\n'), []);
+  assert.equal(slashCompletions('research', 'search some text'), null);
+  assert.ok(slashCompletions('monitor', 'jobs')[0].description);
+});
+
+test('command validation explains incomplete input without invoking any operation', () => {
+  const commands = createTerminalCommands({});
+  const monitor = commands.find(command => command.name === 'monitor');
+  assert.equal(monitor.validate(''), undefined);
+  assert.match(monitor.validate('task pause'), /Missing task ID/);
+  assert.match(monitor.validate('task cancel TaskABC'), /Choose --keep-jobs or --cancel-jobs/);
+  assert.match(monitor.validate('jobs --limit'), /Missing value for --limit/);
+  assert.match(monitor.validate('jobs --limit 200'), /integer from 1 to 100/);
+  assert.equal(monitor.validate('task pause TaskABC'), undefined);
+});
 
 test("worker queries bind identity and admit only read-only research arguments", async () => {
   const calls = [];
@@ -115,6 +141,24 @@ test("document commands pass complete text to the document surface", async () =>
   assert.equal(shown[0].title,"System prompt");
   assert.match(shown[0].body,/line 0\n/);
   assert.match(shown[0].body,/line 39/);
+});
+
+test('research and health details keep empty values and nested fields on their own rows', async () => {
+  const result = {nodes:[{id:'node_1',input_refs:[],progress:{},assessment_ref:null,
+    content_omitted:false,revision:0,plan:'First line\nSecond line',subjects:['中文','second']}],tasks:[]};
+  let body;
+  const commands = createTerminalCommands({
+    session:{sessionId:'one'},ui:{showStatus(message){assert.fail(message);}},
+    queries:{async research(){return {session_id:'one',result};}},
+    show:async (_title,value)=>{body=value;},
+  });
+  await commands.find(command=>command.name==='research').run('',{});
+  assert.equal(body, 'nodes:\n  • id: node_1\n    input refs: []\n    progress: {}\n    assessment ref: —\n'
+    + '    content omitted: false\n    revision: 0\n    plan: First line\n      Second line\n'
+    + '    subjects:\n      • 中文\n      • second\ntasks: []');
+  const {formatMonitor} = await import('../../../apps/agent/terminal/commands/monitor.mjs');
+  assert.equal(formatMonitor('monitor/health',result),body);
+  assert.match(formatMonitor('monitor/jobs',{items:[]}),/^No entries/);
 });
 
 test("usage and monitor use separate live panels while documents choose reading surfaces", async () => {

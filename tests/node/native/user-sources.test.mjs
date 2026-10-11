@@ -6,12 +6,12 @@ test("only actual durable user entries become original task records", async () =
   const records = {
     user: { id: "user", type: "input", entry: "e_user" },
     monitor: { id: "monitor", type: "input", entry: "e_monitor", requestId: "job-wake:event_1" },
-    monitorBatch: { id: "monitor_batch", type: "input", entry: "e_batch", requestId: "job-wake-batch:123" },
+    monitorBatch: { id: "monitor_1", type: "input", entry: "e_batch", requestId: "job-wake-batch:123" },
     generated: { id: "generated", type: "input", entry: "e_model" },
   };
   const calls = [];
   const options = {
-    admission: { origin: async record => ({ producer: record.id === "user" || record.id === "generated" ? "user" : "monitor", identity: {event_ids: record.id === "monitor" ? ["event_one"] : ["event_two"]} }) },
+    admission: { origin: async record => ({ producer: record.id === "user" || record.id === "generated" ? "user" : "monitor", identity: {event_ids: record.id === "monitor" ? ["event_1"] : ["event_2"]} }) },
     monitorAdmission: { validateConsumption: async () => {} },
     harness: { submission: async id => ({ status: async () => records[id] }) },
     api: { entry: async id => ({ byTaskId: id === "e_model" ? "task_1" : undefined,
@@ -20,7 +20,7 @@ test("only actual durable user entries become original task records", async () =
     recordedIds: new Set(),
     bridge: { execute_command: async (...args) => calls.push(args) },
   };
-  assert.deepEqual(await recordUserSources(options), {event_ids: ["event_one", "event_two"]});
+  assert.deepEqual(await recordUserSources(options), {event_ids: ["event_1", "event_2"]});
   assert.deepEqual(calls, [["research.source", { session_id: "session_1", message_id: "user", text: "Original user request" }]]);
   options.bridge.execute_command = async () => { throw new Error("bridge disconnected"); };
   await recordUserSources(options); // An already recorded source does not block diagnosis on later requests.

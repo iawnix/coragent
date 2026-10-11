@@ -250,6 +250,7 @@ test('native operating budget compacts far below a million-token model window', 
     const outcome=await (await fixture.conversation.submit({type:'input',content:'historical text '.repeat(600)},context)).wait(context);
     assert.notEqual(outcome.status,'unanswered');
   }
+  await fixture.conversation.waitForIdle(context);
   assert.ok(summaries>0,'compaction must occur at the operating budget');
   const view=await fixture.conversation.context(context);
   assert.ok(estimateContextTokens(view.messages).tokens<8192);

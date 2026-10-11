@@ -106,7 +106,7 @@ def synthetic_logs(row):
     log+=' Thermochemistry\n Normal termination of Gaussian\n'
     result={'ts':log}
     for direction,endpoint in [('forward',product),('reverse',endpoint_reactants)]:
-        route=f'#p M062X/6-31G** IRC=({direction.capitalize()},ReadFC,MaxPoints=80,StepSize=5) Geom=AllCheck Guess=Read SCF=Tight Int=UltraFine NoSymm'
+        route=f'#p M062X/6-31G** IRC=({direction.capitalize()},CalcFC,MaxPoints=80,StepSize=5) Geom=AllCheck Guess=Read SCF=Tight Int=UltraFine NoSymm'
         text=title+route+'\n ----------------\n Charge = 0 Multiplicity = 1\n'+orientation(saddle)+'\n'
         text+=f' Point Number 1 in {direction.upper()} path direction\n SCF Done: E(RM062X) = -270.1 A.U.\n Point Number: 1 Path Number: 1\n CURRENT STRUCTURE\n'
         for i,(symbol,*coords) in enumerate(endpoint,1):text+=f' {i} {Chem.GetPeriodicTable().GetAtomicNumber(symbol)} '+' '.join(f'{x:.9f}' for x in coords)+'\n'
@@ -214,13 +214,13 @@ def test_generic_jobs_execute_candidate_gaussian_and_registered_validators(tmp_p
     _,row=candidate(tmp_path);spec,logs=synthetic_logs(row)
     spec_record=artifact('register',{'root':str(tmp_path),'path':row['files']['spec.json']['path']})
     ref=spec_record['artifact_id']
-    mapping=run_job(tmp_path,{'job_id':'job_mapping','validator_id':'chemical.reaction_mapping', "validator_version": "1",'input_artifact_ids':[ref]})
+    mapping=run_job(tmp_path,{'request_id':'job_mapping','validator_id':'chemical.reaction_mapping', "validator_version": "1",'input_artifact_ids':[ref]})
     assert mapping['result_receipt']['validator_result']['verdict']=='pass'
     assert mapping['result_receipt']['validator_result']['bindings']['spec_artifact_id']==ref
     with pytest.raises(ValueError,match='collected_output'):
         prepare(tmp_path,{'validator_id':'chemical.gaussian_frequency', "validator_version": "1",'input_artifact_ids':[ref]})
     fixture=tmp_path/'fixture_solver.py'
-    fixture.write_text(f'#!{sys.executable}\nimport sys,json\nfrom pathlib import Path\nlogs=json.loads({json.dumps(json.dumps(logs))})\ntext=sys.stdin.read()\nkey="forward" if "IRC=(Forward" in text else "reverse" if "IRC=(Reverse" in text else "ts"\nPath(key+".chk").write_bytes(b"synthetic fixture checkpoint")\nprint(logs[key])\n')
+    fixture.write_text(f'#!{sys.executable}\nimport sys,json\nfrom pathlib import Path\nlogs=json.loads({json.dumps(json.dumps(logs))})\ntext=sys.stdin.read()\nassert "IRC=" not in text or any(option in text for option in ("CalcFC", "ReadCartesianFC", "FCCards")), "IRC requires a supported Hessian source"\nkey="forward" if "IRC=(Forward" in text else "reverse" if "IRC=(Reverse" in text else "ts"\nPath(key+".chk").write_bytes(b"synthetic fixture checkpoint")\nprint(logs[key])\n')
     fixture.chmod(0o755)
     def gaussian(gjf,job_id,validation,checkpoint=None):
         inputs=[{'source':str(SKILLS/'gaussian/scripts'),'destination':'skills/gaussian/scripts'},
@@ -230,10 +230,10 @@ def test_generic_jobs_execute_candidate_gaussian_and_registered_validators(tmp_p
         command=[sys.executable,'skills/gaussian/scripts/run.py','--input-gjf','input.gjf','--executable',str(fixture),
                  '--output-dir','results','--method','M062X','--basis','6-31G**','--threads','12','--memory-mb','4000','--validation',validation]
         outputs=[{'path':'results/'+name,'required':True} for name in ['gaussian.out','parsed.json','result.json']+(['ts.chk'] if validation=='saddle' else ['irc_path_summary.json','gaussian_endpoint.xyz'])]
-        return run_job(tmp_path,{'job_id':job_id,'command':command,'inputs':inputs,'outputs':outputs})
+        return run_job(tmp_path,{'request_id':job_id,'command':command,'inputs':inputs,'outputs':outputs})
     ts=gaussian(row['files']['ts.gjf']['path'],'job_ts','saddle')
     raw=selected(ts,'gaussian.out')['artifact_id']
-    validated=run_job(tmp_path,{'job_id':'job_saddle','validator_id':'chemical.gaussian_saddle', "validator_version": "1",'input_artifact_ids':[ref,raw]})
+    validated=run_job(tmp_path,{'request_id':'job_saddle','validator_id':'chemical.gaussian_saddle', "validator_version": "1",'input_artifact_ids':[ref,raw]})
     assert validated['result_receipt']['validator_result']['verdict']=='pass'
     proof = validated['result_receipt']['validator_result']
     assert proof['execution_status'] == 'succeeded'
@@ -245,7 +245,7 @@ def test_generic_jobs_execute_candidate_gaussian_and_registered_validators(tmp_p
     irc=helper.prepare_irc(Path(row['files']['spec.json']['path']),Path(checkpoint['location']),tmp_path/'irc')
     forwards=gaussian(irc['inputs'][0]['path'],'job_forward','irc',irc['checkpoint']['path'])
     reverse=gaussian(irc['inputs'][1]['path'],'job_reverse','irc',irc['checkpoint']['path'])
-    joined=run_job(tmp_path,{'job_id':'job_connectivity','validator_id':'chemical.gaussian_irc_connectivity', "validator_version": "1",
+    joined=run_job(tmp_path,{'request_id':'job_connectivity','validator_id':'chemical.gaussian_irc_connectivity', "validator_version": "1",
         'input_artifact_ids':[ref,raw,selected(forwards,'gaussian.out')['artifact_id'],selected(reverse,'gaussian.out')['artifact_id']]})
     proof=joined['result_receipt']['validator_result']
     assert proof['verdict']=='pass',proof
@@ -255,3 +255,19 @@ def test_generic_jobs_execute_candidate_gaussian_and_registered_validators(tmp_p
     Path(spec_record['location']).write_text('{}')
     with pytest.raises(ValueError,match='digest_mismatch'):
         prepare(tmp_path,{'validator_id':'chemical.reaction_mapping', "validator_version": "1",'input_artifact_ids':[ref]})
+
+
+def test_registered_mapping_reports_unsupported_aromatic_scope_as_inconclusive(tmp_path):
+    aromatic = '[CH2:1]=[CH:2][CH:3]=[CH2:4].[cH:5]1[cH:6][cH:7][cH:8][cH:9][cH:10]1'
+    value = {**SPEC, 'mapped_smiles': aromatic + '>>' + aromatic}
+    path = tmp_path / 'aromatic.json'
+    path.write_text(json.dumps(value))
+    manifest = {'inputs': [{'artifact_id': 'art_1', 'sha256': 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()}]}
+    result = validate('mapping', [path], manifest)
+    assert result['verdict'] == 'inconclusive'
+    assert result['scientific_verdict'] == 'not_assessed'
+    assert result['parsing']['status'] == 'completed'
+    assert 'unsupported DA candidate scope' in result['checks']['method_scope']['details']
+    with pytest.raises(ValueError, match='unsupported DA candidate scope'):
+        helper.prepare_candidates(path, tmp_path / 'unsupported')
+    assert not (tmp_path / 'unsupported').exists()

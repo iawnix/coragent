@@ -41,3 +41,7 @@ does not make the research method unavailable. Other methods can use shared runn
 explicit solver inputs or task scripts.
 Read [candidate_generation.md](references/candidate_generation.md) for method
 criteria and [ase_neb_executor.md](references/ase_neb_executor.md) for NEB availability and prerequisites.
+
+Read [Gaussian path preparation](references/gaussian_path.md) for checkpoint, atom mapping and IRC input conventions.
+
+The bundled DA path supports six neutral, non-aromatic carbon reaction centers. Aromatic, charged or heteroatom centers outside that scope are unassessed, not evidence against the proposed chemistry. RDKit perceives aromaticity again when parsing Kekule SMILES; rewriting the same graph cannot extend this helper. Use explicit bond-change checks and independently prepared candidates or another justified method. Generated IRC inputs use CalcFC to recompute the Hessian at the checkpoint geometry; include that cost in the budget.

@@ -6,7 +6,7 @@ from research_agent.foundation.path_safety import path_has_symlink
 
 
 def read_manifest(root, artifact_id):
-    if not isinstance(artifact_id, str) or not re.fullmatch(r"art_[a-f0-9]{64}", artifact_id):
+    if not isinstance(artifact_id, str) or not re.fullmatch(r"art_[1-9][0-9]*", artifact_id):
         raise ValueError("artifact_id_invalid")
     path = Path(root) / "artifacts" / artifact_id / "manifest.json"
     if path_has_symlink(path):

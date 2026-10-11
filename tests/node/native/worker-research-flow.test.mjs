@@ -45,7 +45,7 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     await writeFile(jobConfig, 'default_environment="local"\n[environments.local]\nkind="local"\nsupervisor="process"\n');
     process.env.CORAGENT_JOB_CONFIG = jobConfig;
     await execute(python, [join(packageRoot, "apps/agent-cli/workspace_mode.py"), "--root", workspace, "--workspace-id", "flow"]);
-    const fixtureJobId = "job_" + createHash("sha256").update("fixture_run").digest("hex").slice(0, 48);
+    const fixtureJobId = "job_1";
     const preparedPath = join(workspace, "prepared.json");
     const prepared = JSON.stringify({request_id:"fixture_run", work_id:"fixture_work", metadata:{skill:"fixture", configuration_sha256:"fixture"},
       command:[python,"-c","from pathlib import Path;Path('result.txt').write_text('fixture evidence')"],outputs:[{path:"result.txt",required:true,min_bytes:1}]});
@@ -182,8 +182,8 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     const result = JSON.parse(await readFile(join(workspace, "research/nodes", nodeId, "results", node.assessment_ref + ".json")));
     assert.match(result.conclusion, /fixture produced its required output/);
     const intent = JSON.parse(await readFile(join(workspace, `operations/jobs/${fixtureJobId}.json`)));
-    assert.equal(intent.prepared_ref, "p1", "Worker submits the file through Runtime's atomic preparation/dispatch boundary");
-    const preparedRecord = JSON.parse(await readFile(join(workspace, "operations/references/records/p1.json")));
+    assert.equal(intent.prepared_ref, "prepared_1", "Worker submits the file through Runtime's atomic preparation/dispatch boundary");
+    const preparedRecord = JSON.parse(await readFile(join(workspace, "operations/references/records/prepared_1.json")));
     assert.equal(preparedRecord.payload.source_sha256, createHash("sha256").update(prepared).digest("hex"));
     assert.ok(journal.records.some(r => r.kind === "material"));
     for (const request of requests) {

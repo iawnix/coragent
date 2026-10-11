@@ -1,11 +1,6 @@
 {
   "schema_version": "coragent-command-schemas/1",
   "tools": {
-    "systemPrompt": {
-      "type": "object",
-      "properties": {},
-      "additionalProperties": false
-    },
     "state": {
       "type": "object",
       "properties": {
@@ -507,7 +502,7 @@
             "additionalProperties": false
           },
           "maxItems": 128,
-          "description": "Files delivered with this Result. Register/create files as Artifacts or collect Job outputs first, then use their returned artifact_ref values. Mutable filesystem paths are not accepted as artifact_ref."
+          "description": "Files delivered with this Result. Register/create files as Artifacts or collect Job outputs first, then put their returned artifact_id values in artifact_ref. Mutable filesystem paths are not accepted as artifact_ref."
         },
         "supersedes": {
           "type": "string",
@@ -630,7 +625,7 @@
         },
         "prepared_ref": {
           "type": "string",
-          "pattern": "^p[1-9][0-9]*$",
+          "pattern": "^prepared_[1-9][0-9]*$",
           "description": "Previously returned prepared request reference. Alternative to request_file plus request_sha256, not a Job or Artifact reference. Execution fields are fixed; supply only node_id and optional timeout_seconds, repeat or root alongside it."
         },
         "request_sha256": {
@@ -944,7 +939,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 4096,
-          "description": "Existing file inside the current workspace, as an absolute or workspace-relative path. Imports its current bytes into a fixed Artifact; use the returned artifact_ref or artifact_id in research_result. Read an existing workspace file; this does not grant permission to edit the source or write directly into artifact storage."
+          "description": "Existing file inside the current workspace, as an absolute or workspace-relative path. Imports its current bytes into a fixed Artifact; use the returned artifact_id in research_result. Read an existing workspace file; this does not grant permission to edit the source or write directly into artifact storage."
         },
         "job_id": {
           "type": "string",
@@ -999,12 +994,8 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 256,
-          "description": "Exact returned Artifact ID. Select with artifact_id or artifact_ref; if both are supplied they must identify the same Artifact. Job IDs and collection receipts are not Artifact IDs."
-        },
-        "artifact_ref": {
-          "type": "string",
-          "pattern": "^a[1-9][0-9]*$",
-          "description": "Exact short Artifact reference returned by artifact_create, artifact_register or job_collect. Alternative to artifact_id, not a filesystem path or collection receipt."
+          "description": "Exact returned art_<number> Artifact ID. Job IDs and collection receipts are not Artifact IDs.",
+          "pattern": "^art_[1-9][0-9]*$"
         },
         "offset": {
           "type": "integer",
@@ -1022,17 +1013,8 @@
         }
       },
       "additionalProperties": false,
-      "anyOf": [
-        {
-          "required": [
-            "artifact_id"
-          ]
-        },
-        {
-          "required": [
-            "artifact_ref"
-          ]
-        }
+      "required": [
+        "artifact_id"
       ]
     },
     "taskBegin": {
@@ -1085,7 +1067,7 @@
             "additionalProperties": false
           },
           "maxItems": 32,
-          "description": "Concrete delivery criteria with distinct stable IDs. Completion must provide fixed Result/Artifact evidence for every criterion."
+          "description": "Concrete delivery criteria with distinct stable IDs. Completion must provide fixed Result/Artifact evidence for every criterion. Preserve the user-requested deliverables. Do not replace unfinished calculations or validation with an unsolicited alternative to explain limitations."
         }
       },
       "required": [
@@ -1124,7 +1106,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 2000,
-          "description": "Progress summary, audit explanation or blocker description. Required and nonempty for block."
+          "description": "Progress summary, audit explanation or blocker description. Required and nonempty for block. For block: identify the concrete unmet prerequisite or exhausted budget, the change needed to resume, and why no independent authorized work remains. Missing results or an unfinished turn alone are not blockers."
         },
         "objective": {
           "type": "string",
@@ -1169,7 +1151,7 @@
           "minItems": 1,
           "uniqueItems": true,
           "maxItems": 32,
-          "description": "refine only: actual user submission IDs as decimal strings in this conversation, not research user_* references."
+          "description": "refine only: actual user submission IDs as decimal strings in this conversation, not research user_* references. Actual user submission IDs. A new instruction resolving a blocker plus action=refine reactivates blocked work; a question alone does not. Changing objective or criteria requires a new user instruction."
         },
         "evidence_refs": {
           "type": "array",
@@ -1181,7 +1163,7 @@
           "minItems": 1,
           "uniqueItems": true,
           "maxItems": 64,
-          "description": "progress only: existing Result/Artifact references or Jobs owned by this task. Node/note/user references can provide context but do not establish new substantive progress. Job collection receipts are not accepted here; cite the Job or its collected Artifacts."
+          "description": "progress only: existing Result/Artifact references or Jobs owned by this task. Node/note/user references can provide context but do not establish new substantive progress. Job collection receipts are not accepted here; cite the Job or its collected Artifacts. Use owned job_id, Result or Artifact references. job_result_* receipts are not accepted here; use their job_id or collected Artifact references."
         },
         "wait": {
           "type": "object",
@@ -1209,7 +1191,7 @@
             "mode"
           ],
           "additionalProperties": false,
-          "description": "wait only: nonempty job_ids must belong to the current task. all waits for every listed Job, any for at least one; an unknown outcome wakes the task for reconciliation, not as scientific success."
+          "description": "wait only: nonempty job_ids must belong to the current task. all waits for every listed Job, any for at least one; an unknown outcome wakes the task for reconciliation, not as scientific success. Use only when no independent work remains. Completed Jobs release this wait without requiring the current model run to end."
         },
         "completion": {
           "type": "array",
@@ -1250,7 +1232,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "pattern": "^node_[a-f0-9]{32}$"
+                "pattern": "^node_[1-9][0-9]*$"
               },
               "uniqueItems": true,
               "maxItems": 128
@@ -1259,7 +1241,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "pattern": "^node_[a-f0-9]{32}$"
+                "pattern": "^node_[1-9][0-9]*$"
               },
               "uniqueItems": true,
               "maxItems": 16

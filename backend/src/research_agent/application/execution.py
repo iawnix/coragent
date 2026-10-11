@@ -1,5 +1,6 @@
 """Canonical command adapter for the generic Python job runtime."""
 from __future__ import annotations
+from research_agent.research.operational_ids import allocate_id
 
 import re
 import os
@@ -14,7 +15,7 @@ from research_agent.jobs.inputs import content_digest
 from research_agent.jobs import JobOutput, JobRuntime, JobSpec, platforms_from_config
 from research_agent.foundation.transactions import TransactionCoordinator, workspace_transaction, write_json
 
-_JOB_ID = re.compile(r"^job_[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$")
+_JOB_ID = re.compile(r"^job_[1-9][0-9]*$")
 
 
 _RUNTIMES: dict[tuple[str, str], JobRuntime] = {}
@@ -64,8 +65,6 @@ class JobSubmissionError(RuntimeError):
 
 def _job_id(params: dict[str, Any]) -> str:
     value = params.get("job_id")
-    if value is None and params.get("request_id"):
-        value = "job_" + hashlib.sha256(params["request_id"].encode()).hexdigest()[:48]
     if not isinstance(value, str) or not _JOB_ID.fullmatch(value):
         raise JobSelectionError("job_id_invalid", "use an exact job_id or event_id; query research_search")
     return value
@@ -236,9 +235,6 @@ def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
             preparation = read_prepared_file(root, params)
             request = preparation["request"]
         params = {**request, **controls, **transport}
-    if operation == "start" and params.get("input_artifact_ids"):
-        from research_agent.application.references import resolve_artifact_reference
-        params = {**params, "input_artifact_ids": [resolve_artifact_reference(root, ref) for ref in params["input_artifact_ids"]]}
     runtime = _runtime(root)
     if operation == "start":
         return _start(root, runtime, params, preparation=preparation)
@@ -310,9 +306,9 @@ def _commit_result(root, request):
         value["artifacts"] = list({a["artifact_id"]: a for a in value["artifacts"]}.values())
         manifest = [{"artifact_id": a["artifact_id"], "sha256": a["sha256"]} for a in value["artifacts"]]
         output_digest = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
-        result_id = 'job_result_' + hashlib.sha256(json.dumps([receipt.job_id, value.get('status'), output_digest], sort_keys=True).encode()).hexdigest()
+        result_id = allocate_id(root, 'job_result', [receipt.job_id, value.get('status'), output_digest])
         from .job_state import execution_observation
-        observation = execution_observation(receipt, value.get("status", {}))
+        observation = execution_observation(root, receipt, value.get("status", {}))
         result_receipt = {"schema_version": "job-result/2", "receipt_id": result_id,
             "workspace_id": receipt.workspace_id, "job_id": receipt.job_id,
             **receipt.metadata.get("research_binding", {"node_id": None, "node_revision": None}),
@@ -488,8 +484,11 @@ def _commit_dispatch(root, request):
 
 
 def _start(root, runtime, params, preparation=None):
+    if not params.get("request_id"):
+        raise ValueError("request_id_required: supply a stable request identity")
     coordinator = TransactionCoordinator(root)
     with coordinator.locked():
+        params = {**params, "job_id": allocate_id(root, "job", params["request_id"])}
         replay = _admit_start(root, params)
     if replay is not None:
         return replay

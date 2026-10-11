@@ -7,7 +7,7 @@ import { create_workspace_port } from "./ports.mjs";
 import { assert_workspace_mode } from "../contracts/session-mode.mjs";
 import { require_workspace_id } from "../contracts/workspace-id.mjs";
 
-export const WORKSPACE_MANIFEST_SCHEMA = "research_workspace/2";
+export const WORKSPACE_MANIFEST_SCHEMA = "research_workspace/3";
 export const WORKSPACE_STATES = Object.freeze(["ready", "admission_pending"]);
 const COMMON_DIRECTORIES = Object.freeze(["inputs", "artifacts", "runs", "logs"]);
 const RESEARCH_DIRECTORIES = Object.freeze(["research", "operations", "environments", "reports"]);
@@ -31,7 +31,7 @@ export function validate_workspace_manifest(manifest, root) {
   require_workspace_id(manifest.workspace_id);
   assert_workspace_mode(manifest.workspace_mode);
   for (const [field, expected] of [
-    ["profile_id", `${manifest.workspace_mode}_workspace_3`],
+    ["profile_id", `${manifest.workspace_mode}_workspace_4`],
     ["memory_profile", "session"],
     ["memory_scope", "session"],
     ["research_memory_scope", "workspace"],

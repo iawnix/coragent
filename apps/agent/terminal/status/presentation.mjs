@@ -1,4 +1,5 @@
 import { formatMonitor, taskStateLabel } from '../commands/monitor.mjs';
+import { stripVTControlCharacters } from 'node:util';
 
 /** Pure presentation of durable usage, current context and operational observations. */
 export const formatTokens = value => Number.isFinite(value)
@@ -44,6 +45,12 @@ export function activityStatus({ monitor, monitorError, sessionId, now = Date.no
   } else if (task.state === 'blocked') {
     symbol = '!'; color = 'warning'; reason = scoped.execution.state === 'running'
       ? 'Responding · Task blocked' : 'Needs attention';
+  } else if (['active', 'completing'].includes(task.state) && task.execution_recovery) {
+    const recovery = task.execution_recovery;
+    symbol = recovery.state === 'attention_required' ? '!' : '…';
+    color = recovery.state === 'attention_required' ? 'warning' : 'muted';
+    reason = recovery.state === 'attention_required' ? 'Execution needs attention'
+      : recovery.phase === 'delivery' ? 'Recovering final response' : 'Recovering execution';
   } else if (task.state === 'active' && !scoped.automatic_continuation_enabled && scoped.execution.state === 'idle') {
     symbol = '!'; color = 'warning'; reason = 'Automatic continuation off';
   } else if (task.state === 'active' && scoped.execution.state === 'idle') {
@@ -85,12 +92,13 @@ export function createStatusPresentation({ session, theme, truncateToWidth, visi
       const capacity = current ? telemetry.contextWindow : null;
       const percent = Number.isFinite(tokens) && capacity > 0 ? tokens / capacity * 100 : null;
       const icon = ring && percent !== null ? `${['○','◔','◑','◕','●'][Math.min(4, Math.round(percent / 25))]} ` : '';
-      const context = `${icon}Context ${tokens === null ? 'Unknown' : `${formatTokens(tokens)}`}/${formatTokens(capacity)}${percent === null ? '' : ` (${percent.toFixed(0)}%)`}`;
+      const context = `${icon}Context: ${tokens === null ? 'Unknown' : `${formatTokens(tokens)}`}/${formatTokens(capacity)}${percent === null ? '' : ` (${percent.toFixed(0)}%)`}`;
       const total = formatTokens(usageTotals(view?.docs?.['pi.usage'])?.totalTokens);
       const second = `${context} · Total tokens: ${total}`;
-      const short = `${icon}Ctx ${percent === null ? '?' : `${percent.toFixed(0)}%`} · Tokens: ${total}`;
+      const short = `${icon}Ctx: ${percent === null ? '?' : `${percent.toFixed(0)}%`} · Tokens: ${total}`;
       const color = percent >= 90 ? 'error' : percent >= 70 ? 'warning' : 'muted';
-      return [` ${theme.fg('muted',fit(first,w))}`, ` ${theme.fg(color,fit(visibleWidth(second) <= w ? second : short,w))}`];
+      const lines = [fit(first,w), fit(visibleWidth(second) <= w ? second : short,w)];
+      return lines.map((line, index) => ` ${monochrome ? stripVTControlCharacters(line) : theme.fg(index ? color : 'muted', line)}`);
     },
   };
   const activity = { invalidate() {}, render(width) {

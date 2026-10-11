@@ -10,7 +10,7 @@ from tests.unit.test_job_recovery import workspace
 def test_result_runtime_input_expansion_does_not_change_retry_identity(tmp_path):
     workspace(tmp_path)
     node = nodes.create(tmp_path, {'goal':'Analyze a computation'})['node']
-    artifact = 'art_' + 'a'*64
+    artifact = 'art_1'
     request = {'node_id':node['id'], 'conclusion':'Observed evidence', 'request_id':'publication',
         'inputs':[], 'evidence_refs':['job_fixture'],
         '_reference_details':{'job_fixture':{'kind':'job', 'research_binding':{'node_id':node['id'],'node_revision':1},

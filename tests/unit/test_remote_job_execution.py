@@ -56,7 +56,7 @@ print('123.fixture')
     return platform, calls, target
 
 
-def job(tmp_path, *, code='pass', job_id='job_test', resources=None, **kwargs):
+def job(tmp_path, *, code='pass', job_id='job_1', resources=None, **kwargs):
     cwd = tmp_path / 'local'
     cwd.mkdir(parents=True)
     return JobSpec(command=(sys.executable, '-c', code), cwd=cwd, job_id=job_id,
@@ -170,7 +170,7 @@ def test_raw_job_submission_resolves_defaults_before_recording_attempt(tmp_path,
     config.write_text('default_environment="local"\n[environments.local]\nkind="local"\nsupervisor="process"\n'
                       '[environments.local.submission.resources]\ncpus=1\nmemory_mb=256\nwalltime="00:00:15"\n')
     monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(config))
-    request = {'root': str(root), 'job_id': 'job_defaults',
+    request = {'root': str(root), 'request_id': 'job_1',
                'command': ['/bin/true'], 'metadata': {'resources': {'memory_mb': 128}}}
     result = dispatch('start', request)
     expected = {'cpus': 1, 'memory_mb': 128, 'walltime': '00:00:15'}

@@ -55,8 +55,8 @@
         ]
       },
       "resources": {
-        "skills/_shared/path_validation.py": "sha256:b3d9124c203302e2bb24ea5aa9dbc93953a46830a9ea41aa7cab710eb4098427",
-        "skills/_shared/reaction_checks.py": "sha256:65c920cdc943ea1c5c69a3a59541802297fefba128a95e2c8bad73cfbb3b5c2b",
+        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/reaction_checks.py": "sha256:f8e41515deb308404882c560b16eaa2030f51e9626eaf10ccb208fd5ab7ecaa3",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/cf22d/scripts/cli.py": "sha256:dac9108465e7fe6b4c555f9a7b1113c6e64a38412628fc16dc0274ad965e4699",
@@ -114,8 +114,8 @@
         "python": ">=3.11"
       },
       "resources": {
-        "skills/_shared/path_validation.py": "sha256:b3d9124c203302e2bb24ea5aa9dbc93953a46830a9ea41aa7cab710eb4098427",
-        "skills/_shared/reaction_checks.py": "sha256:65c920cdc943ea1c5c69a3a59541802297fefba128a95e2c8bad73cfbb3b5c2b",
+        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/reaction_checks.py": "sha256:f8e41515deb308404882c560b16eaa2030f51e9626eaf10ccb208fd5ab7ecaa3",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/xtb/scripts/cli.py": "sha256:c1dec3cb29f2e30a5bcc66180efc793e9f3dd30fa542bc215fd7ef850decc016",
@@ -171,12 +171,12 @@
         "python": ">=3.11"
       },
       "resources": {
-        "skills/_shared/path_validation.py": "sha256:b3d9124c203302e2bb24ea5aa9dbc93953a46830a9ea41aa7cab710eb4098427",
-        "skills/_shared/reaction_checks.py": "sha256:65c920cdc943ea1c5c69a3a59541802297fefba128a95e2c8bad73cfbb3b5c2b",
+        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/reaction_checks.py": "sha256:f8e41515deb308404882c560b16eaa2030f51e9626eaf10ccb208fd5ab7ecaa3",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/gaussian/scripts/cli.py": "sha256:b020439cd06a75962e9d75752b65b621264b7897d71ccea2167c49d5e0476bbc",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:0bb41a8fc88db5a837be5796c3019f6d9c9650dcb315d23abdaaa24748634fd6",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:6b3c2d04b32c773746042919927f641e296c4ede07dd3c06839ee715e791c462",
         "skills/gaussian/scripts/input_job.py": "sha256:4effba6319eb907e048295eb777897e24f143fe4b357a2875ffd11fa24515660",
         "skills/gaussian/scripts/run.py": "sha256:29dd77a8f9c6b653db58f7025ab89f4edcff79b07c025efc0e83873888669604"
       },
@@ -241,12 +241,12 @@
         "python": ">=3.11"
       },
       "resources": {
-        "skills/_shared/path_validation.py": "sha256:b3d9124c203302e2bb24ea5aa9dbc93953a46830a9ea41aa7cab710eb4098427",
-        "skills/_shared/reaction_checks.py": "sha256:65c920cdc943ea1c5c69a3a59541802297fefba128a95e2c8bad73cfbb3b5c2b",
+        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/reaction_checks.py": "sha256:f8e41515deb308404882c560b16eaa2030f51e9626eaf10ccb208fd5ab7ecaa3",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/gaussian/scripts/cli.py": "sha256:b020439cd06a75962e9d75752b65b621264b7897d71ccea2167c49d5e0476bbc",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:0bb41a8fc88db5a837be5796c3019f6d9c9650dcb315d23abdaaa24748634fd6",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:6b3c2d04b32c773746042919927f641e296c4ede07dd3c06839ee715e791c462",
         "skills/gaussian/scripts/input_job.py": "sha256:4effba6319eb907e048295eb777897e24f143fe4b357a2875ffd11fa24515660",
         "skills/gaussian/scripts/run.py": "sha256:29dd77a8f9c6b653db58f7025ab89f4edcff79b07c025efc0e83873888669604"
       },
@@ -290,8 +290,8 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/path_validation.py": "sha256:b3d9124c203302e2bb24ea5aa9dbc93953a46830a9ea41aa7cab710eb4098427",
-        "skills/_shared/reaction_checks.py": "sha256:65c920cdc943ea1c5c69a3a59541802297fefba128a95e2c8bad73cfbb3b5c2b",
+        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/reaction_checks.py": "sha256:f8e41515deb308404882c560b16eaa2030f51e9626eaf10ccb208fd5ab7ecaa3",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/chemical-input/scripts/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
@@ -342,8 +342,8 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/path_validation.py": "sha256:b3d9124c203302e2bb24ea5aa9dbc93953a46830a9ea41aa7cab710eb4098427",
-        "skills/_shared/reaction_checks.py": "sha256:65c920cdc943ea1c5c69a3a59541802297fefba128a95e2c8bad73cfbb3b5c2b",
+        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/reaction_checks.py": "sha256:f8e41515deb308404882c560b16eaa2030f51e9626eaf10ccb208fd5ab7ecaa3",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/chemical-input/scripts/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
@@ -390,8 +390,8 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/path_validation.py": "sha256:b3d9124c203302e2bb24ea5aa9dbc93953a46830a9ea41aa7cab710eb4098427",
-        "skills/_shared/reaction_checks.py": "sha256:65c920cdc943ea1c5c69a3a59541802297fefba128a95e2c8bad73cfbb3b5c2b",
+        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/reaction_checks.py": "sha256:f8e41515deb308404882c560b16eaa2030f51e9626eaf10ccb208fd5ab7ecaa3",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/chemical-input/scripts/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
@@ -446,8 +446,8 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/path_validation.py": "sha256:b3d9124c203302e2bb24ea5aa9dbc93953a46830a9ea41aa7cab710eb4098427",
-        "skills/_shared/reaction_checks.py": "sha256:65c920cdc943ea1c5c69a3a59541802297fefba128a95e2c8bad73cfbb3b5c2b",
+        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/reaction_checks.py": "sha256:f8e41515deb308404882c560b16eaa2030f51e9626eaf10ccb208fd5ab7ecaa3",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/chemical-input/scripts/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
@@ -494,8 +494,8 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/path_validation.py": "sha256:b3d9124c203302e2bb24ea5aa9dbc93953a46830a9ea41aa7cab710eb4098427",
-        "skills/_shared/reaction_checks.py": "sha256:65c920cdc943ea1c5c69a3a59541802297fefba128a95e2c8bad73cfbb3b5c2b",
+        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/reaction_checks.py": "sha256:f8e41515deb308404882c560b16eaa2030f51e9626eaf10ccb208fd5ab7ecaa3",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/chemical-input/scripts/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
@@ -551,13 +551,13 @@
         ]
       },
       "resources": {
-        "skills/_shared/path_validation.py": "sha256:b3d9124c203302e2bb24ea5aa9dbc93953a46830a9ea41aa7cab710eb4098427",
-        "skills/_shared/reaction_checks.py": "sha256:65c920cdc943ea1c5c69a3a59541802297fefba128a95e2c8bad73cfbb3b5c2b",
+        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/reaction_checks.py": "sha256:f8e41515deb308404882c560b16eaa2030f51e9626eaf10ccb208fd5ab7ecaa3",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/cli.py": "sha256:e211ca8905f3d2bbb88598f869d39f270aa0ed034676422b75bef24fb15d5112",
         "skills/candidate-generation/scripts/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
-        "skills/candidate-generation/scripts/gaussian_path_inputs.py": "sha256:0ac69ddf40c6018479836d71bcead2a246ef49b9f77f7feede8c193aec48e650",
+        "skills/candidate-generation/scripts/gaussian_path_inputs.py": "sha256:01d06478b50b86ab9f6555cbf0e392f23d74460dc078869620de53f7fed849d0",
         "skills/candidate-generation/scripts/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
         "skills/candidate-generation/scripts/prepare_path.py": "sha256:5a009a8916dfc9c5b7fbd23d1b1ab6c1706b1d406ac0618e2fc813b733043978"
@@ -614,13 +614,13 @@
         ]
       },
       "resources": {
-        "skills/_shared/path_validation.py": "sha256:b3d9124c203302e2bb24ea5aa9dbc93953a46830a9ea41aa7cab710eb4098427",
-        "skills/_shared/reaction_checks.py": "sha256:65c920cdc943ea1c5c69a3a59541802297fefba128a95e2c8bad73cfbb3b5c2b",
+        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/reaction_checks.py": "sha256:f8e41515deb308404882c560b16eaa2030f51e9626eaf10ccb208fd5ab7ecaa3",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/cli.py": "sha256:e211ca8905f3d2bbb88598f869d39f270aa0ed034676422b75bef24fb15d5112",
         "skills/candidate-generation/scripts/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
-        "skills/candidate-generation/scripts/gaussian_path_inputs.py": "sha256:0ac69ddf40c6018479836d71bcead2a246ef49b9f77f7feede8c193aec48e650",
+        "skills/candidate-generation/scripts/gaussian_path_inputs.py": "sha256:01d06478b50b86ab9f6555cbf0e392f23d74460dc078869620de53f7fed849d0",
         "skills/candidate-generation/scripts/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
         "skills/candidate-generation/scripts/prepare_path.py": "sha256:5a009a8916dfc9c5b7fbd23d1b1ab6c1706b1d406ac0618e2fc813b733043978"
@@ -656,8 +656,8 @@
         ]
       },
       "resources": {
-        "skills/_shared/path_validation.py": "sha256:b3d9124c203302e2bb24ea5aa9dbc93953a46830a9ea41aa7cab710eb4098427",
-        "skills/_shared/reaction_checks.py": "sha256:65c920cdc943ea1c5c69a3a59541802297fefba128a95e2c8bad73cfbb3b5c2b",
+        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/reaction_checks.py": "sha256:f8e41515deb308404882c560b16eaa2030f51e9626eaf10ccb208fd5ab7ecaa3",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/cf22d/scripts/cli.py": "sha256:dac9108465e7fe6b4c555f9a7b1113c6e64a38412628fc16dc0274ad965e4699",
@@ -726,8 +726,8 @@
         ]
       },
       "resources": {
-        "skills/_shared/path_validation.py": "sha256:b3d9124c203302e2bb24ea5aa9dbc93953a46830a9ea41aa7cab710eb4098427",
-        "skills/_shared/reaction_checks.py": "sha256:65c920cdc943ea1c5c69a3a59541802297fefba128a95e2c8bad73cfbb3b5c2b",
+        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/reaction_checks.py": "sha256:f8e41515deb308404882c560b16eaa2030f51e9626eaf10ccb208fd5ab7ecaa3",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/report/scripts/build.py": "sha256:d7fbff0400da3716ebda6d6e6a73edff5e58e2c9131c6d215876f81ef905f4ca",
@@ -782,8 +782,8 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/path_validation.py": "sha256:b3d9124c203302e2bb24ea5aa9dbc93953a46830a9ea41aa7cab710eb4098427",
-        "skills/_shared/reaction_checks.py": "sha256:65c920cdc943ea1c5c69a3a59541802297fefba128a95e2c8bad73cfbb3b5c2b",
+        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/reaction_checks.py": "sha256:f8e41515deb308404882c560b16eaa2030f51e9626eaf10ccb208fd5ab7ecaa3",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/chemical-input/scripts/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
@@ -826,15 +826,15 @@
       "resources": {
         "reaction_checks.py": {
           "path": "skills/_shared/reaction_checks.py",
-          "sha256": "sha256:65c920cdc943ea1c5c69a3a59541802297fefba128a95e2c8bad73cfbb3b5c2b"
+          "sha256": "sha256:f8e41515deb308404882c560b16eaa2030f51e9626eaf10ccb208fd5ab7ecaa3"
         },
         "path_validation.py": {
           "path": "skills/_shared/path_validation.py",
-          "sha256": "sha256:b3d9124c203302e2bb24ea5aa9dbc93953a46830a9ea41aa7cab710eb4098427"
+          "sha256": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a"
         },
         "gaussian_io.py": {
           "path": "skills/gaussian/scripts/gaussian_io.py",
-          "sha256": "sha256:0bb41a8fc88db5a837be5796c3019f6d9c9650dcb315d23abdaaa24748634fd6"
+          "sha256": "sha256:6b3c2d04b32c773746042919927f641e296c4ede07dd3c06839ee715e791c462"
         },
         "xyz.py": {
           "path": "skills/_shared/xyz.py",
@@ -879,15 +879,15 @@
       "resources": {
         "reaction_checks.py": {
           "path": "skills/_shared/reaction_checks.py",
-          "sha256": "sha256:65c920cdc943ea1c5c69a3a59541802297fefba128a95e2c8bad73cfbb3b5c2b"
+          "sha256": "sha256:f8e41515deb308404882c560b16eaa2030f51e9626eaf10ccb208fd5ab7ecaa3"
         },
         "path_validation.py": {
           "path": "skills/_shared/path_validation.py",
-          "sha256": "sha256:b3d9124c203302e2bb24ea5aa9dbc93953a46830a9ea41aa7cab710eb4098427"
+          "sha256": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a"
         },
         "gaussian_io.py": {
           "path": "skills/gaussian/scripts/gaussian_io.py",
-          "sha256": "sha256:0bb41a8fc88db5a837be5796c3019f6d9c9650dcb315d23abdaaa24748634fd6"
+          "sha256": "sha256:6b3c2d04b32c773746042919927f641e296c4ede07dd3c06839ee715e791c462"
         },
         "xyz.py": {
           "path": "skills/_shared/xyz.py",
@@ -942,15 +942,15 @@
       "resources": {
         "reaction_checks.py": {
           "path": "skills/_shared/reaction_checks.py",
-          "sha256": "sha256:65c920cdc943ea1c5c69a3a59541802297fefba128a95e2c8bad73cfbb3b5c2b"
+          "sha256": "sha256:f8e41515deb308404882c560b16eaa2030f51e9626eaf10ccb208fd5ab7ecaa3"
         },
         "path_validation.py": {
           "path": "skills/_shared/path_validation.py",
-          "sha256": "sha256:b3d9124c203302e2bb24ea5aa9dbc93953a46830a9ea41aa7cab710eb4098427"
+          "sha256": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a"
         },
         "gaussian_io.py": {
           "path": "skills/gaussian/scripts/gaussian_io.py",
-          "sha256": "sha256:0bb41a8fc88db5a837be5796c3019f6d9c9650dcb315d23abdaaa24748634fd6"
+          "sha256": "sha256:6b3c2d04b32c773746042919927f641e296c4ede07dd3c06839ee715e791c462"
         },
         "xyz.py": {
           "path": "skills/_shared/xyz.py",

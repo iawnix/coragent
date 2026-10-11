@@ -5,6 +5,10 @@ import re
 from rdkit import Chem
 
 
+class UnsupportedReactionScope(ValueError):
+    """Valid molecular input outside the bundled candidate/validator method."""
+
+
 def molecules(smiles):
     if not isinstance(smiles, str):
         raise ValueError('use a mapped reactants>>products SMILES string')
@@ -129,6 +133,10 @@ def reaction(smiles, transformation=None):
                     'product_graph_equivalent_but_atom_mapping_differs' if graph_matches else
                     'product_graph_differs' if graph_matches is False else 'reactant_does_not_match_declared_transformation',
                 comparison_scope='Product connectivity, charge and isotope ignoring atom-map labels and stereochemistry; not proof of atom correspondence')
+            if mapped and balanced and all(n in atoms for n in active) and not neutral_carbon:
+                checks['declared_transformation'].update(verdict='not_assessed',
+                    reason='unsupported_diels_alder_scope',
+                    supported_scope='Six neutral, non-aromatic carbon reaction centers only; use explicit bond changes for other substrates. Kekule SMILES do not bypass aromaticity perception.')
             checks['atom_hydrogen_changes']['verdict'] = 'pass' if mapped and not hchanges else 'fail'
         elif kind == 'explicit':
             expected = transformation.get('bond_changes')
@@ -165,6 +173,8 @@ def path_spec(value):
     if value.get('transformation', {}).get('kind') != 'diels_alder':
         raise ValueError('this candidate path supports a declared diels_alder transformation only')
     checked = reaction(value.get('mapped_smiles', ''), value['transformation'])
+    if checked['checks']['declared_transformation'].get('reason') == 'unsupported_diels_alder_scope':
+        raise UnsupportedReactionScope('unsupported DA candidate scope: neutral non-aromatic carbon centers required; use an independently prepared path and explicit transformation checks')
     if any(checked['checks'][key]['verdict'] != 'pass' for key in
            ('element_charge_balance', 'map_identity', 'declared_transformation', 'atom_hydrogen_changes')):
         raise ValueError('reaction does not match the declared diels_alder topology and hydrogen correspondence')

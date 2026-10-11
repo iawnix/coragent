@@ -58,16 +58,16 @@ requires = ["node", "python", "pi"]
 timeout = 2400
 
 [suites.live-eval]
-kind = "scenario"
+kind = "unavailable"
 environment = "authorized external provider"
-description = "External model evaluation requires explicit data authorization."
+description = "Legacy research-decision-context/2 scenario; incompatible with current research-snapshot/3. Not current-version acceptance."
 paths = ["tests/scenarios/t003_live_eval.mjs"]
 external = true
 
 [suites.live-recovery]
-kind = "scenario"
+kind = "unavailable"
 environment = "authorized external provider"
-description = "External model recovery requires explicit data authorization."
+description = "Legacy interpretation/State tool scenario; retired APIs. Current recovery coverage uses deterministic real Worker tests."
 paths = ["tests/scenarios/t003_live_recovery.mjs"]
 external = true
 

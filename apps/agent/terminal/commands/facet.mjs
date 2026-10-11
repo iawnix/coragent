@@ -5,12 +5,13 @@ import { createStatusPresentation } from "../status/presentation.mjs";
 import { createDocumentView } from "../renderers/document.mjs";
 import { createCommandPresentation } from "./panel.mjs";
 import { formatMonitor } from "./monitor.mjs";
+import { formatFields } from '../renderers/fields.mjs';
 
 /** Presentation-only commands; all scientific reads execute in the worker. */
 export async function createCoRAgentNativeClientFacet({ sourceRoot, session } = {}) {
   if (typeof sourceRoot !== "string" || !sourceRoot) throw new TypeError("sourceRoot is required");
 
-  const [{ defineFacet, defineService }, { SlashCommands }, { PresentationUI }, components, { Transcript }, { theme }, { BACKGROUND_CONTEXT, withAbortSignal }] = await Promise.all([
+  const [{ defineFacet, defineService }, { SlashCommands }, { PresentationUI }, components, { Transcript }, themeModule, { BACKGROUND_CONTEXT, withAbortSignal }] = await Promise.all([
     loadPi("chord", sourceRoot),
     loadPi("slashCommands", sourceRoot),
     loadPi("presentationUI", sourceRoot),
@@ -28,7 +29,12 @@ export async function createCoRAgentNativeClientFacet({ sourceRoot, session } = 
       const queries = env.use(queriesService);
       const transcript = env.use(Transcript);
       env.onActivate(() => {
-        ui.setCommandPresentation(createCommandPresentation({ ...components, scope: 'Session' }));
+        const theme = new Proxy({}, { get: (_, key) => {
+          const value = themeModule.theme[key];
+          return typeof value === 'function' ? value.bind(themeModule.theme) : value;
+        } });
+        const document = options => createDocumentView({ ...components, wrapText: components.wrapTextWithAnsi, theme, ...options });
+        ui.setCommandPresentation(createCommandPresentation({ ...components, theme, scope: 'Session', createDocument: document }));
         const status = createStatusPresentation({ session, theme, ...components, ring: process.env.TERM !== "dumb" && process.env.CORAGENT_TUI_RING !== "0" });
         const lifetime = new AbortController();
         const queryContext = withAbortSignal(lifetime.signal, BACKGROUND_CONTEXT);
@@ -63,8 +69,7 @@ export async function createCoRAgentNativeClientFacet({ sourceRoot, session } = 
           status.update({monitorError:"Monitor unavailable"}); redraw();
         }));
         env.own(() => { stopped = true; lifetime.abort(); clearTimeout(timer); ui.setFooter(undefined); ui.setActivity(undefined); ui.setCommandPresentation(undefined); });
-        const show = (title, body, context, command, scope, mode) => ui.showDocument(createDocumentView({ title, body, command, scope, mode,
-          ...components, wrapText: components.wrapTextWithAnsi }), context);
+        const show = (title, body, context, command, scope, mode) => ui.showDocument(document({ title, body, command, scope, mode }), context);
         for (const command of createTerminalCommands({ ui, queries, session, show, usage: () => status.usageDetails(), monitor: (value) => {
           if (value) status.update({monitor:value, monitorError:null});
           return status.monitorDetails();
@@ -82,6 +87,10 @@ export function createTerminalCommands({ ui, queries, session, show, usage, moni
     description: definition.description,
     argumentHint: definition.name === "monitor" ? "[command]" : definition.usage.replace(`/${definition.name}`, "").trim(),
     getArgumentCompletions(prefix) { return slashCompletions(definition.name, prefix) || []; },
+    validate(args) {
+      try { parseSlashCommand(definition.name, args); }
+      catch (error) { return error.message; }
+    },
     async run(args, context) {
       try {
         const invocation = parseSlashCommand(definition.name, args);
@@ -137,20 +146,12 @@ function formatPrompt(manifest) {
 }
 
 function formatResearch(value) {
-  if (value?.schema_version !== 'research-summary/1') return formatValue(value);
+  if (value?.schema_version !== 'research-summary/1') return formatFields(value);
   const sections = [
     ['Research overview', { workspace: value.workspace_id, revision: value.revision, state: value.lifecycle_state, progress: value.progress }],
     ['Current focus', value.focus], ['Phases and goals', value.phases], ['Claims', value.claims],
     ['Research nodes', value.nodes], ['Findings', value.findings], ['Gates', value.gates],
   ];
-  return sections.map(([title, content]) => `${title}\n${'─'.repeat(title.length)}\n${formatValue(content)}`).join('\n\n')
+  return sections.map(([title, content]) => `${title}\n${'─'.repeat(title.length)}\n${formatFields(content)}`).join('\n\n')
     + '\n\nFull item: /research detail <kind> <id>';
-}
-
-function formatValue(value, indent = "") {
-  if (value === null || typeof value !== "object") return String(value ?? "—");
-  if (Array.isArray(value)) return value.length ? value.map((item) => `${indent}• ${formatValue(item, `${indent}  `)}`).join("\n") : "(none)";
-  return Object.entries(value).filter(([key]) => key !== "schema_version").map(([key, item]) =>
-    `${indent}${key.replaceAll("_", " ")}: ${item !== null && typeof item === "object" ? `\n${formatValue(item, `${indent}  `)}` : String(item ?? "—")}`,
-  ).join("\n");
 }

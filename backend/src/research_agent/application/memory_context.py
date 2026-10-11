@@ -47,7 +47,6 @@ def read(root, *, ref=None, offset=0, limit=16000, session_id=None, event_ids=()
 
 
 def reference_details(root, request):
-    from .references import resolve_artifact_reference
     from research_agent.artifacts.registry import read_manifest
     details = {}
     refs = request.get('input_refs', []) + request.get('inputs', []) + request.get('evidence_refs', [])
@@ -66,7 +65,7 @@ def reference_details(root, request):
             continue
         if ref.startswith(('node_', 'result_', 'note_', 'user_')):
             continue
-        if re.fullmatch(r'job_result_[a-f0-9]{64}', ref):
+        if re.fullmatch(r'job_result_[1-9][0-9]*', ref):
             path = Path(root) / 'operations/results' / (ref + '.json')
             if path_has_symlink(path):
                 raise ValueError('reference_symlink')
@@ -75,7 +74,7 @@ def reference_details(root, request):
             details[ref] = {'kind': 'collection_receipt', 'research_binding': execution.get('metadata', {}).get('research_binding'),
                             'validation': receipt.get('validator_result'),
                             'input_refs': list(execution.get('metadata', {}).get('input_evidence_basis', {}))}
-        elif re.fullmatch(r'job_[A-Za-z0-9_.:-]{1,200}', ref):
+        elif re.fullmatch(r'job_[1-9][0-9]*', ref):
             path = Path(root) / 'operations/executions' / (ref + '.json')
             if path_has_symlink(path):
                 raise ValueError('reference_symlink')
@@ -83,7 +82,7 @@ def reference_details(root, request):
             details[ref] = {'kind': 'job', 'research_binding': execution.get('metadata', {}).get('research_binding'),
                             'input_refs': list(execution.get('metadata', {}).get('input_evidence_basis', {}))}
         else:
-            identity = resolve_artifact_reference(root, ref)
+            identity = ref
             material = read_manifest(root, identity)
             provenance = material.get('provenance', {})
             binding = {k: provenance[k] for k in ('node_id', 'node_revision') if k in provenance}
