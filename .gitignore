@@ -1,5 +1,8 @@
 __pycache__/
 /local_debug/
+# Local CoRHub planning drafts.
+/docs/CORHUB_CLIENT_PLAN.zh-CN.md
+/docs/CORHUB_MONITOR_PAGE_PLAN.zh-CN.md
 # Private installation inputs; only *.example.* templates belong in Git.
 /config/models.json
 /config/auth.json
