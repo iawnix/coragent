@@ -20,7 +20,8 @@ helper 只封装当前计算，计算顺序由 Agent 决定，数值检查须结
 Python 依赖由安装阶段创建的 Conda 环境隔离，并通过 job.toml 的结构化 python 绑定选择：backend.python 优先，否则继承 environment.python。用 "$CORAGENT_PYTHON" 执行本地准备 helper；远程 runner 使用配置的 Conda prefix，不猜 python3、不用 --python 覆盖。CF22D 使用 backends.pyscf.python，不再同时指定 Python command。缺失环境交由安装维护处理，不在研究回合临时 pip install。
 
 
-在 `--` 前传 `--output <workspace>/prepared/<cell>.json` 保存完整请求。脚本输出
+任务脚本与准备请求放在研究 Node 返回的 `work_dir` 下。
+在 `--` 前传 `--output <work_dir>/<cell>.json` 保存完整请求。脚本输出
 request_file/request_sha256，直接交给 job_start，只补可选 timeout_seconds；
 不要手抄 command/inputs。相同输入与配置保留 work_id/request_id，主动重新计算才用
 --work-id 指定新身份。修改请求文件后必须重新核对并计算摘要。
@@ -29,6 +30,21 @@ request_file/request_sha256，直接交给 job_start，只补可选 timeout_seco
 通过 `--dependency <源>=<目标>` 暂存依赖、`--collect <相对输出>` 声明结果。
 脚本和依赖会固定摘要并在所选 Python 绑定内执行。已登记输入用
 `--input-artifact <id或引用>`；Runtime 核对其真实字节已暂存，并把来源关联到收集结果。
+
+例如，本地 RDKit 脚本使用已配置的 `structure` 绑定：
+
+```bash
+"$CORAGENT_PYTHON" -m research_agent.application.executors \
+  --config "$CORAGENT_JOB_CONFIG" --environment local \
+  --script <work_dir>/analysis.py --backend structure \
+  --collect analysis.json --output <work_dir>/analysis-request.json
+```
+
+脚本须相对 Job cwd 实际写出 `analysis.json`。把返回的 `request_file`、`request_sha256`
+连同目标 `node_id` 交给 `job_start`。`--collect`/`outputs` 只声明收集要求，不创建文件或
+重定向标准输出；`print()` 被保存到 `logs/stdout.log`，不会生成 `stdout.txt`。
+`platform=local` 只选择执行目标；直接执行 `bash -lc "python ..."` 不会解析 `structure`
+绑定。使用其它科学库或远端执行时，选择相应已配置的 backend 与 environment。
 
 远程 job.toml 的 environment 或 backend 必须明确配置 submission.queue；
 submission.resources 保存 CPU、内存、walltime，backend 覆盖环境默认值。

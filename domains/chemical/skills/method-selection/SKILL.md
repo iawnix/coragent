@@ -33,6 +33,12 @@ environment. Other studies may use explicitly chosen fixed geometries and TS/Fre
 cell is unavailable, block that cell explicitly; do not silently substitute a
 method or stop independent cells.
 
+For a custom Python script that imports scientific libraries, use the
+[script preparation example](references/request_preparation.md) to select its backend.
+`job_start.platform` selects the execution target; it does not activate a scientific
+Python environment. After an import failure, diagnose the selected binding before
+retrying or declaring the method unavailable.
+
 ## References
 
 - [method_selection.md](references/method_selection.md): scientific criteria.

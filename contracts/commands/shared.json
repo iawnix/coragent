@@ -654,7 +654,7 @@
           },
           "minItems": 1,
           "maxItems": 256,
-          "description": "Direct submission only: executable and arguments as an argv array, not a shell command string. Declare staged inputs and outputs. Omit with request_file or prepared_ref; submit their pinned command unchanged."
+          "description": "Direct submission only: executable and arguments as an argv array, not a shell command string. Declare staged inputs and outputs. Omit with request_file or prepared_ref; submit their pinned command unchanged. Direct commands do not select a scientific Python/backend automatically. For a scientific Python script, prepare with executors --script <file.py> --backend <binding> and submit the returned request file/digest."
         },
         "cwd": {
           "type": "string",
@@ -742,7 +742,7 @@
             "additionalProperties": false
           },
           "maxItems": 256,
-          "description": "Direct submission only: files/directories the command will produce, relative to Job cwd. job_collect registers available declared outputs with producer provenance. Prepared requests already contain this field."
+          "description": "Direct submission only: files/directories the command will produce, relative to Job cwd. job_collect registers available declared outputs with producer provenance. Prepared requests already contain this field. Declarations do not create files or redirect stdout. print() goes to logs/stdout.log; write a result file explicitly before declaring it."
         },
         "timeout_seconds": {
           "type": "integer",
@@ -754,7 +754,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Direct submission only: configured execution environment name, such as local. Prepared requests already select their environment."
+          "description": "Direct submission only: configured execution environment name, such as local. Prepared requests already select their environment. Selects the execution target, not a Conda environment or software backend; local does not make scientific libraries available to bare python."
         },
         "root": {
           "type": "string"

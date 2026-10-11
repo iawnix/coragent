@@ -26,6 +26,10 @@ description: 选择科学方法并准备命名计算环境；用户已经指定�
 其它研究可选择明确的固定几何或 TS/Freq/IRC/scan 输入，由 Agent 定义计算依赖。
 某个矩阵单元不可用时只阻塞该单元，不能静默替换方法或停止其他独立单元。
 
+自定义 Python 脚本需要科学库时，按[脚本准备示例](references/request_preparation.zh-CN.md)
+选择 backend。`job_start.platform` 只选择执行目标，不激活科学 Python 环境。导入失败后先诊断
+所选绑定，再决定重试或报告方法不可用。
+
 ## 参考资料
 
 - [method_selection.zh-CN.md](references/method_selection.zh-CN.md)：科学判据。
