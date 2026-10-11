@@ -19,14 +19,14 @@ const telemetry={entryId:1,firstEntryId:1,model:agent.model,contextTokens:48000,
 test('usage ledger survives compacted entries and model switch invalidates context',()=>{
  const status=createStatusPresentation({session:{workspaceId:'工作区',sessionId:'bb7a1aa2-d9c2-454e-9907-bbf519a28faf'},theme,...tui});
  status.update({view,telemetry});
- assert.match(status.footer.render(150).join('\n'),/48.0k\/200.0k \(24%\).*Total tokens: 60/);
+ assert.match(status.footer.render(150).join('\n'),/Context: 48.0k\/200.0k \(24%\).*Total tokens: 60/);
  for(const width of [12,30,60,100,180]) for(const line of status.footer.render(width)) assert.ok(tui.visibleWidth(line)<=width,line);
  assert.equal(usageTotals(view.docs['pi.usage']).reasoning,null);
  assert.equal(usageTotals({models:{a:{input:10},b:{}}}).input,null);
  const compacted={...view,entries:[{id:10,kind:'pi.compaction'},{id:1}]};
  assert.equal(contextMatches(compacted,telemetry),false);
  status.update({view:compacted});
- assert.match(status.footer.render(150).join('\n'),/Context Unknown.*Total tokens: 60/);
+ assert.match(status.footer.render(150).join('\n'),/Context: Unknown.*Total tokens: 60/);
  assert.equal(contextMatches({...view,docs:{...view.docs,'pi.agent':{model:{provider:'fixture',modelId:'b'}}}},telemetry),false);
 });
 
@@ -137,6 +137,43 @@ test('widening a wrapped line retains the same logical line',()=>{
  for(let i=0;i<8;i++) doc.handleInput('\x1b[B');
  doc.render(24);
  assert.match(doc.render(120)[2],/entry-1 /);
+});
+
+test('document fields use theme roles and repaint across themes without changing text or anchors',()=>{
+ const body='workspace id: 中文\nrevision: 18\ninput refs: []\nstate: blocked\ncontent omitted: false\n'
+   + 'Input: 10 · Output: 20\n' + Array.from({length:25},(_,i)=>`entry: line-${i}`).join('\n');
+ const make=monochrome=>createDocumentView({...tui,wrapText:tui.wrapTextWithAnsi,command:'research',title:'Research',
+   body,theme:()=>nativeTheme.theme,monochrome});
+ nativeTheme.initTheme('dark');
+ const doc=make(false);doc.setViewport(12);
+ const dark=doc.render(80).join('\n');
+ for(const [role,value] of [['accent','revision:'],['syntaxNumber','18'],['muted','[]'],['warning','blocked'],
+   ['syntaxKeyword','false'],['accent','Output:']]) assert.ok(dark.includes(nativeTheme.theme.fg(role,value)),value);
+ nativeTheme.initTheme('light');
+ const light=doc.render(80).join('\n');
+ assert.notEqual(dark,light);assert.equal(stripVTControlCharacters(dark),stripVTControlCharacters(light));
+ const plain=make(true);plain.setViewport(12);
+ assert.equal(stripVTControlCharacters(light),plain.render(80).join('\n'));
+ doc.handleInput('\x1b[C');const anchor=stripVTControlCharacters(doc.render(80)[2]);
+ nativeTheme.initTheme('dark');assert.equal(stripVTControlCharacters(doc.render(80)[2]),anchor);
+ for(const width of [20,32,80]) for(const line of doc.render(width)) assert.ok(tui.visibleWidth(line)<=width);
+});
+
+test('system prompt highlighting preserves Markdown source, fenced content and monochrome text',()=>{
+ nativeTheme.initTheme('dark');
+ const body='Working directory: /workspace\n# Role and instructions\nUse `task_read` to inspect.\n'
+   + '- Preserve evidence\n```text\n# literal heading\nstate: failed\n```\nSHA256: fixture';
+ const make=monochrome=>createDocumentView({...tui,wrapText:tui.wrapTextWithAnsi,command:'sys-prompt',title:'System prompt',
+   body,theme:()=>nativeTheme.theme,monochrome});
+ const doc=make(false);doc.setViewport(20);
+ const colored=doc.render(100).join('\n');
+ for(const [role,value] of [['accent','Working directory:'],['mdHeading','# Role and instructions'],
+   ['mdCode','`task_read`'],['mdCodeBlock','# literal heading'],['mdCodeBlock','state: failed']]) {
+   assert.ok(colored.includes(nativeTheme.theme.fg(role,value)),value);
+ }
+ const plain=make(true);plain.setViewport(20);
+ assert.equal(stripVTControlCharacters(colored),plain.render(100).join('\n'));
+ assert.equal(stripVTControlCharacters(colored).split('\n').slice(2,-1).map(line=>line.trimEnd().slice(1)).join('\n'),body);
 });
 
 test('usage and monitor details stay separate while disconnection overrides cached progress',()=>{

@@ -86,10 +86,10 @@ export function createStatusPresentation({ session, theme, truncateToWidth, visi
       const capacity = current ? telemetry.contextWindow : null;
       const percent = Number.isFinite(tokens) && capacity > 0 ? tokens / capacity * 100 : null;
       const icon = ring && percent !== null ? `${['○','◔','◑','◕','●'][Math.min(4, Math.round(percent / 25))]} ` : '';
-      const context = `${icon}Context ${tokens === null ? 'Unknown' : `${formatTokens(tokens)}`}/${formatTokens(capacity)}${percent === null ? '' : ` (${percent.toFixed(0)}%)`}`;
+      const context = `${icon}Context: ${tokens === null ? 'Unknown' : `${formatTokens(tokens)}`}/${formatTokens(capacity)}${percent === null ? '' : ` (${percent.toFixed(0)}%)`}`;
       const total = formatTokens(usageTotals(view?.docs?.['pi.usage'])?.totalTokens);
       const second = `${context} · Total tokens: ${total}`;
-      const short = `${icon}Ctx ${percent === null ? '?' : `${percent.toFixed(0)}%`} · Tokens: ${total}`;
+      const short = `${icon}Ctx: ${percent === null ? '?' : `${percent.toFixed(0)}%`} · Tokens: ${total}`;
       const color = percent >= 90 ? 'error' : percent >= 70 ? 'warning' : 'muted';
       const lines = [fit(first,w), fit(visibleWidth(second) <= w ? second : short,w)];
       return lines.map((line, index) => ` ${monochrome ? stripVTControlCharacters(line) : theme.fg(index ? color : 'muted', line)}`);

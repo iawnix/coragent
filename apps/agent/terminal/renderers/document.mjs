@@ -1,11 +1,13 @@
 import { createPanelPainter } from '../commands/panel.mjs';
+import { styleDocument } from './document-style.mjs';
 
 /** A document with a fixed viewport and logical anchors across refreshes and resizing. */
-export function createDocumentView({ title, command, scope = 'Session', body, mode = 'auto', wrapText, truncateToWidth, visibleWidth, monochrome, theme, matchesKey = () => false, rows = () => process.stdout.rows || 24 }) {
+export function createDocumentView({ title, command, scope = 'Session', body, mode = 'auto', wrapText, truncateToWidth, visibleWidth,
+  monochrome = process.env.TERM === 'dumb' || 'NO_COLOR' in process.env, theme, matchesKey = () => false, rows = () => process.stdout.rows || 24 }) {
   const paint = createPanelPainter({ truncateToWidth, visibleWidth, monochrome, theme });
   let offset = 0, pageSize = 1, viewport, fullPage = false, lastWidth = 0, lastBody, lines = [], positions = [];
   function layout(width) {
-    const text = typeof body === 'function' ? body() : body;
+    const text = styleDocument(typeof body === 'function' ? body() : body, { theme, monochrome, markdown: command === 'sys-prompt' });
     if (lastWidth !== width || lastBody !== text) {
       const anchor = positions[offset] || { line: 0, part: 0 };
       lastWidth = width; lastBody = text;
@@ -39,9 +41,9 @@ export function createDocumentView({ title, command, scope = 'Session', body, mo
       const hint = scrollable
         ? width < 55 ? ' Esc Back · ↑↓ Scroll · ←→ Page' : ' Esc Back · ↑↓ Scroll · ←→/PgUp/PgDn Page · Home/End'
         : ' Esc Back';
-      return [paint(` /${command} · ${title}`, width),
-        paint(` ── ${scope}${scrollable ? ` · ${offset + 1}–${Math.min(lines.length, offset + pageSize)}/${lines.length}` : ''}`, width),
-        ...content.map(line => paint(` ${line}`, width)), paint(hint, width)];
+      return [paint(` /${command} · ${title}`, width, false, 'accent'),
+        paint(` ── ${scope}${scrollable ? ` · ${offset + 1}–${Math.min(lines.length, offset + pageSize)}/${lines.length}` : ''}`, width, false, 'muted'),
+        ...content.map(line => paint(` ${line}`, width)), paint(hint, width, false, 'muted')];
     },
     handleInput(data) {
       if (['\x1b[C', '\x1b[6~', ' '].includes(data) || matchesKey(data, 'right') || matchesKey(data, 'pageDown')) offset += pageSize;

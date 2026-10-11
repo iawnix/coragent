@@ -5,6 +5,7 @@ import { createStatusPresentation } from "../status/presentation.mjs";
 import { createDocumentView } from "../renderers/document.mjs";
 import { createCommandPresentation } from "./panel.mjs";
 import { formatMonitor } from "./monitor.mjs";
+import { formatFields } from '../renderers/fields.mjs';
 
 /** Presentation-only commands; all scientific reads execute in the worker. */
 export async function createCoRAgentNativeClientFacet({ sourceRoot, session } = {}) {
@@ -145,20 +146,12 @@ function formatPrompt(manifest) {
 }
 
 function formatResearch(value) {
-  if (value?.schema_version !== 'research-summary/1') return formatValue(value);
+  if (value?.schema_version !== 'research-summary/1') return formatFields(value);
   const sections = [
     ['Research overview', { workspace: value.workspace_id, revision: value.revision, state: value.lifecycle_state, progress: value.progress }],
     ['Current focus', value.focus], ['Phases and goals', value.phases], ['Claims', value.claims],
     ['Research nodes', value.nodes], ['Findings', value.findings], ['Gates', value.gates],
   ];
-  return sections.map(([title, content]) => `${title}\n${'─'.repeat(title.length)}\n${formatValue(content)}`).join('\n\n')
+  return sections.map(([title, content]) => `${title}\n${'─'.repeat(title.length)}\n${formatFields(content)}`).join('\n\n')
     + '\n\nFull item: /research detail <kind> <id>';
-}
-
-function formatValue(value, indent = "") {
-  if (value === null || typeof value !== "object") return String(value ?? "—");
-  if (Array.isArray(value)) return value.length ? value.map((item) => `${indent}• ${formatValue(item, `${indent}  `)}`).join("\n") : "(none)";
-  return Object.entries(value).filter(([key]) => key !== "schema_version").map(([key, item]) =>
-    `${indent}${key.replaceAll("_", " ")}: ${item !== null && typeof item === "object" ? `\n${formatValue(item, `${indent}  `)}` : String(item ?? "—")}`,
-  ).join("\n");
 }

@@ -194,7 +194,7 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
           await new Promise(resolve => setTimeout(resolve, 50));
           assert.notEqual(ui.getFocusedComponent().constructor.name, 'CustomEditor');
         };
-        await waitFor(() => !renderedText().includes("Context Unknown"));
+        await waitFor(() => !renderedText().includes("Context: Unknown"));
         assert.doesNotMatch(renderedText(), /Server:| entries|\/model ·/);
         assertDock(frameAt());
         terminal.sendInput('/mo');

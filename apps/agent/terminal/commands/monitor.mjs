@@ -1,3 +1,5 @@
+import { formatFields } from '../renderers/fields.mjs';
+
 const STATES = {
   active: 'Researching', waiting: 'Waiting for compute', paused: 'Paused', blocked: 'Needs attention',
   completing: 'Preparing delivery', completed: 'Completed', cancelled: 'Cancelled', recovering: 'Checking recovery',
@@ -5,7 +7,7 @@ const STATES = {
 
 export const taskStateLabel = state => STATES[state] || 'Unknown';
 const text = value => value === null || value === undefined || value === '' ? '—' : String(value);
-const lines = value => value.length ? value.join('\n') : '(none)';
+const lines = value => value.length ? value.join('\n') : 'No entries';
 
 export function formatTask(task) {
   if (!task) return 'No current task';
@@ -117,12 +119,4 @@ export function formatMonitor(method, response, params = {}) {
       return formatFields(response);
     default: throw new Error(`Unsupported Monitor view: ${method}`);
   }
-}
-
-// These views receive only bounded service-owned diagnostic projections.
-function formatFields(value, indent = '') {
-  if (value === null || typeof value !== 'object') return text(value);
-  if (Array.isArray(value)) return lines(value.map(item => `${indent}• ${formatFields(item, indent + '  ')}`));
-  return Object.entries(value).filter(([key]) => key !== 'schema_version').map(([key, item]) =>
-    `${indent}${key.replaceAll('_', ' ')}: ${item !== null && typeof item === 'object' ? '\n' + formatFields(item, indent + '  ') : text(item)}`).join('\n');
 }

@@ -143,6 +143,24 @@ test("document commands pass complete text to the document surface", async () =>
   assert.match(shown[0].body,/line 39/);
 });
 
+test('research and health details keep empty values and nested fields on their own rows', async () => {
+  const result = {nodes:[{id:'node_1',input_refs:[],progress:{},assessment_ref:null,
+    content_omitted:false,revision:0,plan:'First line\nSecond line',subjects:['中文','second']}],tasks:[]};
+  let body;
+  const commands = createTerminalCommands({
+    session:{sessionId:'one'},ui:{showStatus(message){assert.fail(message);}},
+    queries:{async research(){return {session_id:'one',result};}},
+    show:async (_title,value)=>{body=value;},
+  });
+  await commands.find(command=>command.name==='research').run('',{});
+  assert.equal(body, 'nodes:\n  • id: node_1\n    input refs: []\n    progress: {}\n    assessment ref: —\n'
+    + '    content omitted: false\n    revision: 0\n    plan: First line\n      Second line\n'
+    + '    subjects:\n      • 中文\n      • second\ntasks: []');
+  const {formatMonitor} = await import('../../../apps/agent/terminal/commands/monitor.mjs');
+  assert.equal(formatMonitor('monitor/health',result),body);
+  assert.match(formatMonitor('monitor/jobs',{items:[]}),/^No entries/);
+});
+
 test("usage and monitor use separate live panels while documents choose reading surfaces", async () => {
   const shown=[];
   let usage='Total tokens: 10', monitor='Running: 1';
