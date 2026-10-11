@@ -19,4 +19,4 @@ image is a candidate, not a validated transition state.
 
 For existing execution paths, consult the [Gaussian Skill](../../gaussian/SKILL.md)
 for explicit TS/scan/QST inputs and [chemical-input](../../chemical-input/SKILL.md)
-for molecular seed preparation. The [mapped DA path](gaussian_path.md) supplies bounded QST2/IRC preparation; no automatic NEB implementation is provided.
+for molecular seed preparation. For execution and task-script guidance across reaction hypotheses, see [candidate generation](candidate_generation.md).

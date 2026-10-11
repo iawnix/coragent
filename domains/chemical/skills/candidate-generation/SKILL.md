@@ -24,9 +24,17 @@ structure as a verified saddle point. Record useful candidates as facts about
 the generated structure and failed or distorted searches as issues only when
 they inform the research question.
 
-For an explicit DA hypothesis, [prepare_path.py](scripts/prepare_path.py) generates
-QST2 candidates and IRC inputs with stable atom order. Follow [gaussian_path.md](references/gaussian_path.md)
-for the executable path and registered validators; it does not establish exhaustive mechanism coverage. A Skill without local scripts may use another Skill's runner
-or installed software; check those routes before declaring the method unavailable.
+Describe each proposed step through mapped endpoints, bond changes and relevant
+coordinates or constraints. Choose a candidate-generation method from those inputs;
+reaction names do not select a mandatory script or validator. New reaction classes
+do not require new tools or Skill sections. Use explicit solver inputs or a bounded
+task script through the existing Job interface, preserving atom correspondence and
+checking each method's prerequisites. For Gaussian QST/TS and IRC inputs, use the
+[Gaussian Skill](../gaussian/SKILL.md).
+
+Bundled helpers can encode narrower chemical assumptions. Check their
+[documented scope](references/gaussian_path.md) before reuse; a helper's unsupported
+input does not make the research method unavailable. A Skill without local scripts
+may use shared runners or installed software.
 Read [candidate_generation.md](references/candidate_generation.md) for method
 criteria and [ase_neb_executor.md](references/ase_neb_executor.md) for NEB availability and prerequisites.

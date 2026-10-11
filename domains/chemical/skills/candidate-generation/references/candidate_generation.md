@@ -15,6 +15,25 @@ endpoint preparation/optimization status, conformational compatibility, and that
 structures describe one elementary step. Record why this interpolation tests
 the proposed step.
 
+## Execution without a reaction-specific recipe
+
+Express the hypothesis as mapped reactant/product structures, the complete proposed
+bond changes, charge/spin and relevant geometric coordinates. Preserve atom identity
+and order through endpoint preparation, candidate construction and solver input.
+Reaction labels may explain the hypothesis but are not execution prerequisites.
+
+For QST2/QST3, prepare explicit Gaussian inputs from compatible endpoints (and a
+candidate TS geometry for QST3), then use chemical.gaussian-input through the existing
+prepare/start/collect workflow. For scans, direct TS optimization or NEB, select the
+appropriate solver interface and declare its actual inputs and outputs. If construction
+or analysis needs custom code, use a bounded task script with the configured scientific
+environment; registering a new executor for each reaction class is not required.
+
+Choose mode-displacement and endpoint checks from the proposed transformation.
+Do not apply a bundled helper's fixed bond count, topology or electronic-state rules
+to unrelated reactions. Generic execution does not guarantee a successful search or
+a valid scientific result; retain unsupported checks and failed attempts as evidence.
+
 ## Recording
 
 Continue the existing Node for this question, or create an independent branch with research_create. Put the question in goal and the candidate hypothesis in proposal.

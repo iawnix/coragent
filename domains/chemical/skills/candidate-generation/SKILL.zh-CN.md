@@ -17,8 +17,13 @@ description: 通过化学构造、扫描、QST、NEB 或构象与取向采样生
 不要把扫描极大值、NEB 图像、插值结构或受限结构当作已验证鞍点。候选结构本身可记录
 为事实；失败或畸变的搜索只有在影响研究问题时才记录为研究记录。
 
-显式 DA假设可用 [prepare_path.py](scripts/prepare_path.py) 生成原子顺序绑定的 QST2 候选与 IRC 输入。
-可执行步骤与注册验证器见 [gaussian_path.zh-CN.md](references/gaussian_path.zh-CN.md)，不代表机理覆盖完备。Skill 本身没有脚本时仍可能使用共享 runner 或已安装软件，
-先检查这些入口再判断方法是否不可用。
+用映射端点、键变化及相关坐标或约束表达所提出的步骤，再据此选择候选生成方法。
+反应名称不决定必须调用哪个脚本或验证器；新增反应类型不要求新增工具或 Skill 分支。
+通过现有 Job 接口运行显式求解器输入或有界任务脚本，保留原子对应关系，并核验所选
+方法的前提。Gaussian QST/TS 和 IRC 输入见 [Gaussian Skill](../gaussian/SKILL.zh-CN.md)。
+
+随包 helper 可能包含更窄的化学假设，复用前先核对其[适用范围](references/gaussian_path.zh-CN.md)。
+helper 不支持某种输入，不等于该研究方法不可用；Skill 本身没有脚本时仍可使用共享
+runner 或已安装软件。
 方法判据见 [candidate_generation.zh-CN.md](references/candidate_generation.zh-CN.md)，
 NEB 可用性与前提见 [ase_neb_executor.zh-CN.md](references/ase_neb_executor.zh-CN.md)。

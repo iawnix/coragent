@@ -1,4 +1,10 @@
-# 可执行的映射 DA 路径
+# 可选专用 helper：映射 Diels–Alder 种子
+
+本文记录一个已有专用 helper，不是候选生成的通用流程。只有其化学假设与所提出步骤
+一致时才适用。其他反应使用映射端点、合适的求解器输入或任务脚本，经同一个 Job 接口
+执行，不要求配套的反应专用 helper 或验收 profile。参见[通用候选生成](candidate_generation.zh-CN.md)。
+prepare_path.py 及其路径验证器的实现仍然是专用的，修改反应名称或传入另一种拓扑
+不会使它们成为通用工具。
 
 `../scripts/prepare_path.py` 实现一条有界路径：显式中性碳 Diels–Alder 拓扑、原子映射绑定的
 反应物/产物种子、Gaussian QST2+Freq，以及从收集的 TS checkpoint 出发的正反 IRC。
@@ -21,10 +27,10 @@
 }
 ```
 
-下列命令使用系统列出的真实 Skill 路径和工作区路径：
+使用系统列出的真实 Skill 路径；<work_dir> 替换为 research_create/research_read 返回的 Node 草稿目录，未关联时使用工作区内的 research/work/：
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.path-candidates --version 1 --input spec=<workspace>/spec.json --input-artifact <spec-ref> --output <workspace>/candidates-request.json -- --enumerate-stereo --conformers 2
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.path-candidates --version 1 --input spec=<work_dir>/spec.json --input-artifact <spec-ref> --output <work_dir>/candidates-request.json -- --enumerate-stereo --conformers 2
 ```
 
 将返回的 request_file/request_sha256 提交并收集后，再检查候选。入口使用目标 structure 绑定，每个生成文件均保留 Job 来源。
@@ -40,7 +46,7 @@
 使用既有 method-selection helper 准备 TS 请求：
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config <installation>/job.toml --environment local --executor chemical.gaussian-input --version 1 --input input=<branch>/ts.gjf --collect results/ts.chk --output <workspace>/ts-request.json -- --method M062X --basis '6-31G**' --threads 12 --memory-mb 4000 --validation saddle
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config <installation>/job.toml --environment local --executor chemical.gaussian-input --version 1 --input input=<branch>/ts.gjf --collect results/ts.chk --output <work_dir>/ts-request.json -- --method M062X --basis '6-31G**' --threads 12 --memory-mb 4000 --validation saddle
 ```
 
 将返回的 `request_file` 和 `request_sha256`  交给 `job_start`，在 Job 终止后收集结果。
@@ -49,7 +55,7 @@ runner 成功不是科学结论：可用已注册鞍点验证器检查收集的�
 当选择 IRC 作为下一步时，从该 Job 收集的 `ts.chk` 准备正反 IRC 输入：
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.path-irc --version 1 --input spec=<branch>/spec.json --input checkpoint=<collected-ts.chk> --input-artifact <spec-ref> --input-artifact <checkpoint-ref> --output <workspace>/irc-request.json
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.path-irc --version 1 --input spec=<branch>/spec.json --input checkpoint=<collected-ts.chk> --input-artifact <spec-ref> --input-artifact <checkpoint-ref> --output <work_dir>/irc-request.json
 ```
 
 先提交并收集 IRC 输入准备 Job，再使用其生成的输入和检查点。

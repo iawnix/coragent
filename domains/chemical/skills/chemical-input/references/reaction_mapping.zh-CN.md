@@ -11,6 +11,18 @@ inspect that correspondence rather than treating implicit H as mapped evidence.
 用 artifact_register 保存 JSON 后，引用返回的 Artifact ID 记录有依据的研究记录。
 将映射、XYZ 原子顺序、构象/立体化学和 IRC 端点身份分别核对。
 
+## 声明变换
+
+通过 `--transformation <file.json>` 传入 `kind: "explicit"`，用完整的 `bond_changes`
+列表声明预期变化：每项含映射原子对 `atoms`、键级 `before` 和 `after`，0 表示无键。
+可选 `hydrogen_changes` 用 `atom`、`before` 和 `after` 声明逐原子氢计数变化。
+这只是核对输入假设与映射图，不生成机理。新反应名称不要求新增 transformation kind
+或注册验证器。省略变换声明时仍可核验映射与守恒，目标变换则保持未评估。
+
+## 可选的命名拓扑检查
+
+以下字段属于已有的专用拓扑检查，其他反应假设不要求使用它们。
+
 对于声明的 Diels–Alder 变换，`declared_transformation.product_graph_matches` 将声明键变化
 生成的产物与输入产物比较，忽略 atom-map 标签及立体化学，但保留电荷和同位素。`null` 表示
 反应物键型不满足声明，无法进行该比较。图相同不会将失败的精确映射判定改为通过：对称等价
