@@ -33,7 +33,7 @@
 
 ## 环境与进程归属
 
-job.toml 所选后端提供程序、Python 绑定、激活脚本及资源默认值。结构生成使用化学扩展的 `structure` 后端，化学验证器使用 `validation`；各目标须配置自己的依赖。执行入口与验证器可以声明 `requirements`，其中 `python` 和 `packages` 使用 Python 版本约束，`imports` 列出需要实际导入的模块；原生入口不声明 Python 依赖。
+job.toml 所选后端提供程序、Python 绑定、激活脚本及资源默认值。结构/材料分析及通用科学检查执行器使用化学扩展的 `structure` 后端，注册的 validator 配方使用 `validation`；各目标须配置自己的依赖。执行入口与验证器可以声明 `requirements`，其中 `python` 和 `packages` 使用 Python 版本约束，`imports` 列出需要实际导入的模块；原生入口不声明 Python 依赖。
 
 准备器在选定本地或 SSH 目标上核验解释器前缀、Conda 显式锁、pip 固定版本、安装回执、包清单，以及程序和激活文件摘要。请求身份包含这次观测；新提交时复查，真正运行时由暂存并固定摘要的检查程序再次复查。激活文件先检查再加载。变化导致拒绝执行，既有 Job 的查询和重试仍返回原身份。核验保证环境与记录一致，科学能力仍须由实际求解与验证证明。
 
@@ -53,16 +53,30 @@ job.toml 所选后端提供程序、Python 绑定、激活脚本及资源默认�
 
 Job 文件位于 `runs/jobs/<job_id>`。收集把声明文件登记为生产 Job 的 Artifact；显式 recursive 输出目录中的文件逐个保留来源。Agent 结合领域方法解释证据，在对应 Node 中记事并按需发布 Result。退出码为零或报告已生成不足以证明科学成功。
 
-随包执行入口覆盖 CF22D、xTB、Gaussian 输入、结构与图检查、映射 DA 候选、IRC 输入准备及 CF22D 就绪检查。Gaussian 显式输入入口也执行所支持的 TS/Freq/IRC 路由。CREST/QBICS 指导和 NEB 讨论不表示存在随包 runner；可使用已验证的安装程序或明确绑定的任务脚本，并说明实际覆盖范围。
+[当前能力清单](../domains/chemical/skills/method-selection/references/capabilities.zh-CN.md)
+列出可独立调用的执行器、后端和科学边界。随包模块覆盖：
 
-xTB 的便捷封装接受 `sp/opt/opt-sp`；频率、扫描和动力学使用原生命令与通用 Job，
-详见 [xTB Skill](../domains/chemical/skills/xtb/SKILL.zh-CN.md)。专用反应路径检查不适用于所有反应，
-通用判据见[过渡态验证](../domains/chemical/skills/validation/SKILL.zh-CN.md)。
+- 名称/SMILES/XYZ 材料、映射候选、张量重排与构象比较。
+- CF22D、xTB、Gaussian 计算，以及有界 CREST 构象集合和刚性片段复合物采样。
+- xTB/Gaussian 弛豫扫描、QST2/QST3 准备、梯度与 NumPy NEB 候选搜索。
+- 通用驻点、模式与 IRC 检查，以及热化学、构象自由能与能量剖面。
+- 多步路径检查、条件 TST、共同前体竞争分支与质量作用动力学网络。
+- 有限范围的 Gaussian 指定自旋基态和单重 TD/TDA 计算、给定张量的态跟踪、不同自旋表面的局部交叉搜索与检查。
+
+xTB 的便捷封装仍接受 `sp/opt/opt-sp`；有界扫描和 NEB 使用独立执行器。
+频率和分子动力学使用原生命令与通用 Job，详见 [xTB Skill](../domains/chemical/skills/xtb/SKILL.zh-CN.md)。
+可选 `path` 环境 profile 绑定 `path_xtb` / `path_gaussian`，复用 RDKit/NumPy；
+不安装原生求解器，也不默认运行科学冒烟计算，见[环境配置](../domains/chemical/environments/README.zh-CN.md)。
+
+内置 NEB 算法不使用 ASE。QBICS 仍需明确核实外部命令或脚本；内置交叉搜索使用
+Gaussian 与本地 NumPy 算法。态跟踪需要提供 AO 密度/重叠张量，尚未实现从 Gaussian
+检查点自动提取。经典 TS/IRC 检查不认证跨态或激发态连续性。旧 DA 验证器为显式专用
+选项，其它反应使用[通用检查](../domains/chemical/skills/validation/references/general_checks.zh-CN.md)。
 报告整理包含分子图、数据表和能量曲线，做法与证据要求见[报告 Skill](../domains/chemical/skills/report/SKILL.zh-CN.md)。
 
 ## 验证
 
-用 `tools/test/runner.py` 选择源码、Native 与发行检查。真实求解器和远端验收使用隔离工作区及明确绑定。合成 Gaussian 测试验证解析与证据关联，不能证明真实过渡态搜索一定收敛。
+用 `tools/test/runner.py` 选择源码、Native 与发行检查。真实求解器和远端验收使用隔离工作区及明确绑定。合成日志、解析势和确定性求解器替身验证合同、数值算法、解析与本地 Job 生命周期，不证明真实求解精度或自主机理发现。A–J 模块已通过确定性验收，真实求解器科学基准与真实模型研究验收尚未执行。
 
 原生程序的前置探测只解析并固定所配置可执行文件的摘要，不运行求解器，也不证明许可、
 收敛或科学结论成立。`environment_executable_missing` 表示所选命令无法执行；

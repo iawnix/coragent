@@ -1,6 +1,6 @@
 # 领域科学回归
 
-本组回归覆盖研究执行中会改变科学判断的边界：几何与立体化学、Gaussian 证据选择、失败后修正的结果归属，以及实际软件可用性。样例来自公开源码中的固定分子、人工构造日志和本地确定性程序，不使用 t005 私有运行材料，也不请求远程模型或计算平台。
+本组回归覆盖研究执行中会改变科学判断的边界：几何与立体化学、Gaussian 证据选择、失败后修正的结果归属，以及实际软件可用性。样例来自公开源码中的固定分子、人工构造日志和本地确定性程序，不使用私有研究材料，也不请求远程模型或计算平台。
 
 ## 几何、对称性与原子对应
 
@@ -15,7 +15,7 @@
 | 丁二烯与丙烯的声明反应图 | 区分同一产物的等价编号、错误的原子轨迹、真正不同的连接异构体 |
 | 非有限坐标 | 作为无法解释的输入处理，不能生成支持或否定机理的结论 |
 
-修复了整数坐标居中计算失败、端点检查遗漏双键立体化学的问题。反应检查现在同时报告产物连接图是否等价与声明映射是否成立；连接图等价不会自动通过严格原子对应检查。没有增加第二个比较工具或自动重映射路径。
+修复了整数坐标居中计算失败、端点检查遗漏双键立体化学的问题。反应检查现在同时报告产物连接图是否等价与声明映射是否成立；连接图等价不会自动通过严格原子对应检查。原有身份检查不自动重映射；有界映射候选、构象比较与张量重排由下面列出的独立模块覆盖。
 
 ## Gaussian 的最终证据
 
@@ -61,6 +61,26 @@
 
 没有新增能力注册表、协议别名或探测失败后的自动替代后端。
 
+## 通用化学模块回归
+
+A–J 新增模块的执行合同见[能力清单](../domains/chemical/skills/method-selection/references/capabilities.zh-CN.md)，
+实施范围与当时的测试计数见[实施记录](GENERAL_CHEMISTRY_CAPABILITY_PLAN.zh-CN.md)。
+
+| 测试入口（位于 `tests/unit/`） | 主要覆盖 |
+| --- | --- |
+| `test_chemical_materials.py` | 原文/坐标保真、原子身份、显式 H/同位素、未知声明与材料 Job |
+| `test_structure_analysis.py` | 有界映射、对称与镜像、复合物对齐、张量往返 |
+| `test_general_evidence_checks.py` | 驻点自由度、模式响应、IRC 端点、缺证据与来源绑定 |
+| `test_crest_ensembles.py` | 构象输出一致性、聚类/筛选、复合物采样、超时清理 |
+| `test_path_search.py` | QST2/3、扫描续算、梯度有限差分、解析势 NEB、失败材料 |
+| `test_energetics.py` | 标准态、热校正、组合能量、低频近似、集合自由能与剖面 |
+| `test_kinetics_pathways.py` | Eyring 公式、共同前体分支、解析动力学解、守恒、多步路径与缺口 |
+| `test_electronic_crossing.py` | ground/TD/TDA 解析、态特征重叠、Gaussian 梯度/NEB、交叉驻点/曲率与预算 |
+
+这些测试包含真实本地 Job 准备、执行与收集，但原生求解器使用确定性替身。
+Worker 的等待、恢复与持续推进另由 `tests/node/native/worker-research-flow.test.mjs`
+和 `worker-task-continuation.test.mjs` 覆盖，模型为本地确定性提供方。
+
 ## 运行与范围
 
 所有测试使用统一入口，环境、缓存、临时文件与证据留在 `local_debug/`，运行结束必须清理服务：
@@ -76,4 +96,4 @@ python3 -B tools/test/runner.py check --files \
 
 领域脚本有内容摘要；修改后先运行 `python3 -B scripts/update_resources.py`。完整回归使用 `python3 -B tools/test/runner.py verify`，wheel 安装环境使用 `source` 套件。
 
-这组测试验证软件实现的判据和证据流，不替代真实 Gaussian/集群计算、方法精度校准或对 t005 科学结论的重新计算。CoRHub 页面仍未纳入本次工作。
+这组测试验证软件实现的判据、数值算法和证据流，不替代真实 Gaussian/集群计算、方法精度校准或真实模型自主研究验收。CoRHub 客户端互操作由独立 `phone` 套件覆盖，范围见[测试运行器](../tools/test/README.md)。

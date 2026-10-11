@@ -2,7 +2,7 @@
 
 [English](README.md) | 简体中文
 
-从安装与终端使用开始。本目录只维护当前使用和开发文档；已被替代的方案、迁移清单及一次性验收报告可通过 Git 历史查询。
+从安装与终端使用开始。本目录维护当前使用、开发文档及索引中列出的实施记录。实施记录保留原始基线和当时的测试结果；当前支持范围以能力清单为准。已被替代的文档可通过 Git 历史查询。
 
 | 需求 | 文档 |
 | --- | --- |
@@ -12,12 +12,13 @@
 | Workspace、Node、Result、Agent Server 与 Monitor | [架构](ARCHITECTURE.zh-CN.md) |
 | 研究存储、工具与证据 | [Research Memory Skill](../skills/research-memory/SKILL.zh-CN.md)、[证据架构](RESEARCH_EVIDENCE_ARCHITECTURE.zh-CN.md) |
 | 执行职责与材料来源 | [执行边界（英文）](ARCHITECTURE_BOUNDARIES.md)、[Artifact Store 与视图（英文）](ARTIFACT_PROVIDERS.md) |
-| 科学计算方法与执行 | [科学能力运维](SCIENTIFIC_CAPABILITIES_OPERATIONS.zh-CN.md) |
+| 科学计算方法与执行 | [科学能力运维](SCIENTIFIC_CAPABILITIES_OPERATIONS.zh-CN.md)、[当前能力清单](../domains/chemical/skills/method-selection/references/capabilities.zh-CN.md) |
+| 通用化学模块、合同与实施范围 | [A–J 实施记录](GENERAL_CHEMISTRY_CAPABILITY_PLAN.zh-CN.md) |
 | 几何、Gaussian 与证据流的固定样例回归 | [领域科学回归](SCIENTIFIC_REGRESSIONS.zh-CN.md) |
 | 终端、Phone、浏览器 | [终端](TERMINAL.zh-CN.md)、[CoRAgent Link](CORAGENT_LINK.zh-CN.md) |
 | Monitor、用户任务持续推进与执行诊断 | [Task Controller 实施记录](MONITOR_TASK_CONTROLLER_PLAN.zh-CN.md) |
 | Node 划分、研究规划、回溯与持续推进 | [研究问题图与实施方案](RESEARCH_NODE_PLANNING_PLAN.zh-CN.md) |
-| 维护、测试、打包 | [维护指南](MAINTAINER_GUIDE.zh-CN.md)、[贡献指南](../CONTRIBUTING.md) |
+| 维护、测试、打包 | [维护指南](MAINTAINER_GUIDE.zh-CN.md)、[贡献指南](../CONTRIBUTING.zh-CN.md) |
 | 测试环境、选择与清理 | [测试运行器（英文）](../tools/test/README.md) |
 | 固定 Pi 运行时的维护 | [Pi 补丁（英文）](PI_RUNTIME_PATCHES.md) |
 | 当前手机协议的配套切换 | [Phone 协议说明](CORAGENT_PHONE_PROTOCOL_MIGRATION.zh-CN.md) |

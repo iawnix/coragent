@@ -194,7 +194,7 @@ At launch, `-c` selects the latest writable SQLite durable session and
 `--session-id <id>` selects an exact session. Startup `-r`/`--resume` is
 rejected because the Host-mediated client must obtain an exact connection
 descriptor before starting the TUI; open the terminal and use `/resume`
-instead. Phone and Web prompts are submitted through Host `input/send` with a
+instead. Phone and browser-gateway prompts are submitted through Host `input/send` with a
 durable request receipt and a stable `client_message_id`.
 
 Prompt history is restored from the selected session's active transcript and remains
@@ -214,7 +214,9 @@ Phone clients must implement the versioned `coragent-host/2` NDJSON methods thro
 Relay transports opaque frames and does not own sessions or research state.
 Phone and the terminal receive the same Pi snapshot and events. The optional
 browser gateway attaches to one existing session over loopback HTTP/SSE; it
-does not start Pi or a worker.
+does not start Pi or a worker. This transport gateway is separate from
+[CoRAgent Web](../components/coragent-web/README.md), the read-only research browser
+that does not submit prompts.
 
 Host accepts only `initialize` with `protocol: "coragent-host/2"`. Version 1 clients
 must be updated. Capability names are the callable slash-separated methods.

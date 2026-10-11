@@ -451,7 +451,7 @@ If CoRAgent Web was selected, start it with:
 ```
 
 Use `--web-host 0.0.0.0 --allow-remote` only with an authenticated token file;
-the installer rejects a non-loopback bind without both explicit settings. TS
+the installer rejects a non-loopback bind without both explicit settings. CoRAgent
 Web is read-only and does not own Pi sessions. Its bearer token is separate
 from CoRAgent Link Host and device credentials.
 

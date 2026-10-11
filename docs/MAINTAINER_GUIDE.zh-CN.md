@@ -8,7 +8,7 @@ CoRAgent 使用 Pi 原生 Harness。Host 绑定工作区、认证输入和持久
 
 安装固定 Pi 源码，通过 `python3 tools/test/runner.py prepare` 安装独立测试环境。
 测试使用 `tools/test/environment.lock.txt`，默认位于 `/home/iaw/project/TSPi/local_debug`，
-可用 `CORAGENT_TEST_ENV_ROOT` 设置。根目录的 `environment.lock.txt` 仅用于最小 Host，
+可用 `CORAGENT_TEST_ENV_ROOT` 选择该私有目录下的子目录；本地运行拒绝目录外的路径。根目录的 `environment.lock.txt` 仅用于最小 Host，
 不含科学依赖或 pytest。修改包布局前运行：
 
 ```bash
@@ -18,17 +18,21 @@ npm run lint:public
 ```
 
 完整 Python 套件使用 `python3 tools/test/runner.py source -- -q`。原生 lane 覆盖 Harness
-Host、Pi 原生 client、history 隔离与导入、Monitor 投递、CoRAgent Link 以及固定 Pi 的
-extension/provider 边界。运行时必须使用与
-`config/pi-source.json` commit 一致的准备好 checkout：
+Host、Pi 原生 client、会话历史隔离、Monitor 投递、CoRAgent Link 以及固定 Pi 的
+extension/provider 边界。统一运行器选择私有测试目录中准备好的固定依赖：
 
 ```bash
-export CORAGENT_TEST_PI_RUNTIME_ROOT=/path/to/prepared/pi
-npm run test:native-pi
+python3 tools/test/runner.py prepare
+python3 tools/test/runner.py check --changed
+python3 tools/test/runner.py native-pi
+python3 tools/test/runner.py verify
 ```
 
-Native Pi Harness 不需要 tmux，也是唯一支持的运行时。不提供后端选择开关。不要用未固定或被修改的 Pi checkout 迁就测试。远端 smoke 和真实模型评测是显式 opt-in lane，需要外部
-配置，不属于默认测试套件。
+运行器在 `local_debug/` 创建不可变源码快照、隔离工作区和进程清单；确定性测试禁止
+外连，失败证据留在本机，结束时清理全部自有服务。不得上传其中的文件、日志或凭据。
+`replay --run <id> --failed` 重放已记录的源码与依赖；`gc --dry-run` 预览可清理内容。
+
+Native Pi Harness 不需要 tmux，也是唯一支持的运行时。不提供后端选择开关。不要用未固定或被修改的 Pi checkout 迁就测试。清单当前将 `remote-smoke`、`live-eval` 和 `live-recovery` 标为不可用：remote smoke 尚无可执行场景，live 场景使用已退役合同。仅补充配置不能启用；后续真实模型/远端验收需要当前合同的场景及明确的外部测试授权。
 
 权威测试清单是 `tools/test/manifest.toml`，由 `tools/test/runner.py` 调度。
 Python 测试按 `tests/unit/`、`tests/contract/` 和 `tests/integration/` 分组；Node

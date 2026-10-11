@@ -151,7 +151,7 @@ Pi generation/tool Task 仅出现在执行详情中，不混入用户任务列�
 
 启动时，`-c` 选择当前 workspace 最近的可写 SQLite durable session，`--session-id <id>` 选择
 指定 session。顶层 `-r`/`--resume` 会被明确拒绝，因为 Host-mediated client 必须先取得
-确定的连接 descriptor 才能启动 TUI；请先进入终端，再执行 `/resume`。Phone/Web 的
+确定的连接 descriptor 才能启动 TUI；请先进入终端，再执行 `/resume`。Phone/browser gateway 的
 prompt 通过 Host `input/send` 进入同一个 lane，并使用持久回执和稳定的
 `client_message_id`。
 
@@ -167,7 +167,8 @@ prompt 通过 Host `input/send` 进入同一个 lane，并使用持久回执和�
 
 Phone 客户端必须通过 CoRAgent Link 使用版本化 `coragent-host/2` NDJSON 方法。Relay 只转发不透明
 帧，不拥有 session 或 Research Memory。可选 browser gateway 只附着一个已经存在的会话，
-通过 loopback HTTP/SSE 提供 snapshot 和事件，不启动 Pi 或 worker。
+通过 loopback HTTP/SSE 提供 snapshot 和事件，不启动 Pi 或 worker。这个传输 gateway
+与只读的 [CoRAgent Web](../components/coragent-web/README.zh-CN.md) 研究浏览器分开，后者不提交 prompt。
 
 Host 握手仅接受 `protocol: "coragent-host/2"`，v1 客户端必须更新。能力列表与调用方法统一用斜杠。
 会话读取和附着只接受 `after_cursor: {epoch, sequence}`；Host epoch 改变时返回当前快照，

@@ -19,8 +19,17 @@ This file records user-visible changes. Current architecture is documented in
   and request admission with the new context API and token estimator.
 - Research tool cards display recorded execution time, including after reconnect;
   Job submission time remains distinct from the background computation duration.
-- Added Gaussian relaxed-scan capability documentation and Gaussian-backed ASE
-  NEB support.
+- Added general chemistry materials, mapping/conformer comparison, CREST ensembles,
+  complex sampling, xTB/Gaussian scans and NumPy NEB, QST2/QST3 preparation, and
+  reaction-independent stationary-point/mode/IRC checks.
+- Added thermochemistry and conformer free energies, multistep pathway checks,
+  conditional TST/branching, and mass-action kinetic networks.
+- Added bounded Gaussian TD/TDA calculations, supplied-tensor state tracking, and
+  local different-spin crossing searches with independent numerical checks.
+  Deterministic acceptance does not substitute for real-solver scientific benchmarks;
+  see the [capability inventory](domains/chemical/skills/method-selection/references/capabilities.md).
+- Improved terminal slash completion, focus/draft preservation, semantic field colors,
+  system-prompt rendering, and task/connection status in the Monitor row.
 - Removed the retired ordinary-Pi runtime from the supported package surface;
   Native Pi Harness is the only runtime entrypoint.
 - Clarified the Research Memory, bounded turn context, capability catalog, and

@@ -16,7 +16,7 @@
 | Structure identity | `chemical.compare` | Graph, charge, isotopes and specified stereochemistry; XYZ bond orders are inferred; not full conformer/state comparison |
 | Stationary/mode/IRC checks | `chemical.stationary-check`, `chemical.mode-check`, `chemical.irc-check` | Independent normalized evidence checks for unconstrained ground-state single surfaces; retain small modes, truncation and ambiguous endpoint conformers; no wavefunction continuity or mechanism uniqueness proof |
 | Gaussian evidence adapter | `chemical.gaussian-evidence` | Selected raw section to bound stationary/IRC evidence in current HF/DFT SCF scope; constraints require declaration, explicit isotope masses unassessed; no fabricated endpoint minima |
-| xTB SP/optimization | `chemical.xtb` | Bundled GFN2-xTB sp/opt/opt-sp; native Hessian/scan/MD requires a generic Job and analysis |
+| xTB SP/optimization | `chemical.xtb` | Bundled GFN2-xTB sp/opt/opt-sp; Hessian/MD uses generic Jobs; bounded scan/gradient/NEB has separate entries below |
 | Gaussian SP/optimization | `chemical.gaussian` | XYZ sp/opt/opt-sp; target energy interpretation has the HF/DFT SCF boundary below |
 | Gaussian TS/frequency/QST/IRC/scan | `chemical.gaussian-input` | Explicit GJF execution and limited checks; termination/frequency count does not prove the target path; no complete scan validator |
 | CF22D | `chemical.cf22d`, `chemical.cf22d-doctor` | PySCF sp/opt/opt-sp/ts/freq/thermo/opt_freq/ts_freq and diagnostics; includes RRHO, not IRC/NEB/crossings |

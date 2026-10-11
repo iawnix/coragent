@@ -3,8 +3,10 @@
 [English](README.md) | [简体中文](README.zh-CN.md)
 
 Start with installation and terminal usage. This directory contains current user
-and maintainer documentation. Superseded plans, migration inventories and one-off
-validation reports are available in Git history.
+and maintainer documentation, alongside linked implementation records. Those
+records retain their original baselines and dated test results; use the current
+capability inventory for supported operations. Superseded documents are available
+in Git history.
 
 | Need | Read |
 | --- | --- |
@@ -14,7 +16,8 @@ validation reports are available in Git history.
 | Workspace, Node, Result, Agent Server and Monitor ownership | [Architecture](ARCHITECTURE.md) |
 | Research storage, tools and evidence | [Research Memory Skill](../skills/research-memory/SKILL.md), [Evidence architecture (Chinese)](RESEARCH_EVIDENCE_ARCHITECTURE.zh-CN.md) |
 | Execution ownership and material provenance | [Execution boundaries](ARCHITECTURE_BOUNDARIES.md), [Artifact Store and views](ARTIFACT_PROVIDERS.md) |
-| Scientific methods and execution | [Scientific operations](SCIENTIFIC_CAPABILITIES_OPERATIONS.md) |
+| Scientific methods and execution | [Scientific operations](SCIENTIFIC_CAPABILITIES_OPERATIONS.md), [Current capability inventory](../domains/chemical/skills/method-selection/references/capabilities.md) |
+| General chemistry modules, contracts and implementation scope | [A–J implementation record (Chinese)](GENERAL_CHEMISTRY_CAPABILITY_PLAN.zh-CN.md) |
 | Deterministic geometry, Gaussian and evidence regressions | [Scientific regressions (Chinese)](SCIENTIFIC_REGRESSIONS.zh-CN.md) |
 | Terminal, Phone and browser | [Terminal](TERMINAL.md), [CoRAgent Link](CORAGENT_LINK.md) |
 | Monitor, persistent user tasks and execution diagnostics | [Task Controller implementation record (Chinese)](MONITOR_TASK_CONTROLLER_PLAN.zh-CN.md) |

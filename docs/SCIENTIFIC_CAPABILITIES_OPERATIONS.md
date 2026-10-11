@@ -42,7 +42,7 @@ from `job_probe` and software dependency checks are distinct.
 
 ## Environments and ownership
 
-The selected job.toml backend provides the command, Python binding, activation and resource defaults. Structure generation uses the chemical extension's `structure` backend; registered chemical validators use `validation`. Executors and validators can declare `requirements`: Python version specifiers in `python` and `packages`, and modules to actually import in `imports`. Native entries do not declare Python dependencies.
+The selected job.toml backend provides the command, Python binding, activation and resource defaults. Structure/material analysis and the general scientific-check executors use the chemical extension's `structure` backend; registered validator recipes use `validation`. Executors and validators can declare `requirements`: Python version specifiers in `python` and `packages`, and modules to actually import in `imports`. Native entries do not declare Python dependencies.
 
 Preparation probes the selected local or SSH target: interpreter prefix, explicit Conda lock, pinned pip versions, installation receipt, package inventory, executable and activation file digests. This observation contributes to request identity. New submissions recheck it, and the staged, digest-pinned guard checks again when execution begins. Activation is verified before sourcing. Drift prevents execution; retries of an existing Job still return its original identity. Environment agreement does not itself prove a scientific method works.
 
@@ -62,18 +62,36 @@ Submission disables scheduler mail and automatic reruns; the research workflow o
 
 Job files live below `runs/jobs/<job_id>`. Collection registers declared files as Artifacts belonging to their producing Job, including all files in an explicitly declared recursive output directory. The Agent applies domain methods, records interpretation in the corresponding Node and publishes useful Results. Exit zero or a formatted report alone does not establish scientific success.
 
-Bundled executable entries cover CF22D, xTB, Gaussian inputs, structure/graph preparation, mapped DA candidates, IRC-input preparation and CF22D readiness. Gaussian's explicit-input runner also handles supported TS/Freq/IRC routes. CREST/QBICS guidance and NEB discussion do not imply a bundled callable runner: use a verified installed program or an explicitly bound task script and describe its actual scope.
+The [current capability inventory](../domains/chemical/skills/method-selection/references/capabilities.md)
+lists independent executors, their backends and scientific limits. Bundled modules cover:
 
-The xTB convenience wrapper accepts `sp/opt/opt-sp`; frequencies, scans, and dynamics
-use native commands through generic Jobs. See the [xTB Skill](../domains/chemical/skills/xtb/SKILL.md).
-Specialized reaction-path checks do not cover every reaction; use the general
-[transition-state criteria](../domains/chemical/skills/validation/SKILL.md).
+- Name/SMILES/XYZ materials, mapping candidates, tensor reordering and conformer comparison.
+- CF22D, xTB and Gaussian calculations; bounded CREST ensembles and rigid-fragment complex sampling.
+- xTB/Gaussian relaxed scans, QST2/QST3 preparation, gradients and NumPy NEB candidate searches.
+- General stationary-point, mode and IRC checks; thermochemistry, conformer free energies and energy profiles.
+- Multistep pathway checks, conditional TST, common-precursor branching and mass-action networks.
+- Limited Gaussian ground-spin and singlet TD/TDA calculations, supplied-tensor state tracking, and local different-spin crossing searches/checks.
+
+The xTB convenience wrapper still accepts `sp/opt/opt-sp`; bounded scans and NEB
+have separate executors. Frequencies and dynamics use native commands through
+generic Jobs. See the [xTB Skill](../domains/chemical/skills/xtb/SKILL.md).
+The optional `path` environment profile binds `path_xtb` / `path_gaussian` and
+reuses RDKit/NumPy; it does not install native solvers or run a default scientific
+smoke calculation. See [environment setup](../domains/chemical/environments/README.md).
+
+The bundled NEB algorithm does not use ASE. QBICS remains an external, explicitly
+verified command/script route; the bundled crossing search uses Gaussian and a
+local NumPy algorithm. State tracking requires supplied AO density/overlap tensors;
+automatic extraction from Gaussian checkpoints is not implemented. Classical
+TS/IRC checks do not certify crossings or excited-state continuity. Legacy DA
+validators are explicit specialized options; other reactions use the
+[general checks](../domains/chemical/skills/validation/references/general_checks.md).
 See the [report Skill](../domains/chemical/skills/report/SKILL.md) for molecular images,
 data tables, energy plots, and their evidence requirements.
 
 ## Validation
 
-Use `tools/test/runner.py` to select the source, Native and package lanes. Real solver and remote acceptance use isolated workspaces and configured bindings. Synthetic Gaussian fixtures verify parsing and evidence linkage; they do not establish that a real transition-state search converges.
+Use `tools/test/runner.py` to select the source, Native and package lanes. Real solver and remote acceptance use isolated workspaces and configured bindings. Synthetic logs, analytic potentials and deterministic solver substitutes verify contracts, numerical algorithms, parsing and local Job lifecycles. They do not establish real solver accuracy or autonomous mechanism discovery. The A–J modules have passed deterministic acceptance; their real-solver scientific benchmarks and real-model research acceptance remain unperformed.
 
 A native prerequisite probe resolves and hashes the configured executable; it
 does not run the solver or verify a license, convergence, or a scientific result.

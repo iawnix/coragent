@@ -6,7 +6,8 @@ CoRAgent uses native Pi Harness. Host binds workspaces, authenticated input and 
 
 Install the pinned Pi source and the separate test environment with
 `python3 tools/test/runner.py prepare`. It uses `tools/test/environment.lock.txt`
-under `/home/iaw/project/TSPi/local_debug` (override with `CORAGENT_TEST_ENV_ROOT`).
+under `/home/iaw/project/TSPi/local_debug`. `CORAGENT_TEST_ENV_ROOT` can select a
+subdirectory of that private root; local runs reject paths outside it.
 The root `environment.lock.txt` belongs to the minimal Host and does not include
 scientific or pytest dependencies. Run the fast test suite before changing package layout:
 
@@ -17,7 +18,7 @@ npm run lint:public
 
 The full suite uses `python3 tools/test/runner.py source -- -q`. Use
 `python3 tools/test/runner.py list` to inspect all lanes. The native lane
-exercises the Harness Host, native Pi client, history isolation/import, Monitor
+exercises the Harness Host, native Pi client, session-history isolation, Monitor
 delivery, CoRAgent Link, and the pinned Pi extension/provider boundaries. Use the pinned dependencies prepared in the private test root:
 
 ```bash
@@ -31,9 +32,10 @@ The runner creates immutable source snapshots, isolated workspaces and process l
 
 The Native Pi Harness path does not require tmux and is the only supported
 runtime. Backend selection is not configurable. Do not
-substitute an unpinned or modified Pi checkout to make the lane pass. Remote smoke and live
-model evaluation are opt-in lanes; they require explicit external configuration
-and are never part of the default suite.
+substitute an unpinned or modified Pi checkout to make the lane pass. The manifest currently marks `remote-smoke`, `live-eval` and `live-recovery`
+as unavailable: remote smoke has no executable scenario, and the live scenarios
+use retired contracts. Configuration alone does not enable them. A future real-model
+or remote acceptance run needs a current scenario and explicit external-test authorization.
 
 The authoritative lane and path definition is `tools/test/manifest.toml`,
 dispatched by `tools/test/runner.py`. Python tests are grouped under

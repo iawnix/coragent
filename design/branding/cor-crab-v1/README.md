@@ -1,6 +1,6 @@
 # CoR 螃蟹标志优化提案 v1
 
-基于 TS Phone 当前正式 PNG 螃蟹角色重新绘制的矢量方案。此目录是设计提案，未接入应用或替换现有品牌资产。
+基于 CoRHub 前身的 PNG 螃蟹角色重新绘制的矢量设计源。主标志已用于 [CoRAgent Web](../../../components/coragent-web/static/logo.svg)，并以相同 SVG 保存到 [README 随包资源](../../../assets/branding/coragent.svg)。本目录保留设计源和对照展示；移动端资源的实际接入状态以 CoRHub 仓库为准。
 
 ## 设计方向
 
@@ -30,7 +30,7 @@ PNG 主资产均为 1024 × 1024。标志画布留白用于应用图标安全区
 
 ## 复现
 
-在 TSPi 根目录执行：
+在本仓库根目录执行（需要下述本地环境与原图仓库）：
 
 ```sh
 local_debug/brand-design/venv/bin/python design/branding/cor-crab-v1/generate.py
@@ -38,4 +38,4 @@ local_debug/brand-design/venv/bin/python design/branding/cor-crab-v1/generate.py
 
 依赖为 CairoSVG 和 Pillow，环境位于本机私有 `local_debug/brand-design/`；该目录不是交付物。生成器从同级 `ts-phone` 仓库读取当前原图，仅用于对照展示。
 
-该提案尚未进行 Android/iOS 启动器实机验收；平台图标适配与正式资源替换属于后续集成工作。
+本仓库未记录 Android/iOS 启动器实机验收。更新主标志时需同步 Web 与 README 的 SVG 副本；README 资源置于 `assets/`，随 Agent 安装包分发。

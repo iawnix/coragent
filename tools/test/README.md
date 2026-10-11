@@ -29,6 +29,11 @@ python3 tools/test/runner.py gc --dry-run
 python3 tools/test/runner.py gc --apply
 ```
 
+`remote-smoke`, `live-eval` and `live-recovery` are currently marked unavailable
+in the manifest. Remote smoke has no executable scenario; the live scenarios use
+retired contracts. They are not runnable acceptance commands until current
+scenarios and explicit external-test authorization are in place.
+
 `prepare` is the only dependency installation stage. It uses repository locks,
 Pi pin and patches, per-key preparation locks, and completion receipts. Tests
 never choose an arbitrary Python installation or install missing dependencies.

@@ -16,7 +16,7 @@
 | 结构身份比较 | `chemical.compare` | 分子图、电荷、同位素和指定立体化学；XYZ 键级为推断；不是完整构象/电子态比较 |
 | 驻点/模式/IRC 检查 | `chemical.stationary-check`、`chemical.mode-check`、`chemical.irc-check` | 无约束、ground 态单势能面的规范化证据独立检查；保留小负频、路径截断与端点构象歧义；不证明波函数连续性或机理唯一性 |
 | Gaussian 证据转换 | `chemical.gaussian-evidence` | 当前 HF/DFT SCF 范围内，将原始指定 section 转为绑定材料的驻点/IRC 证据；约束需声明，显式同位素质量未评估，不虚构端点极小点 |
-| xTB 单点与优化 | `chemical.xtb` | 内置 GFN2-xTB 的 sp/opt/opt-sp；原生 Hessian/扫描/MD 需通用 Job 和对应分析 |
+| xTB 单点与优化 | `chemical.xtb` | 内置 GFN2-xTB 的 sp/opt/opt-sp；Hessian/MD 使用通用 Job，有界扫描/梯度/NEB 使用下方独立入口 |
 | Gaussian 单点与优化 | `chemical.gaussian` | XYZ 的 sp/opt/opt-sp；能量解释受下述 HF/DFT SCF 解析边界限制 |
 | Gaussian TS、频率、QST、IRC、扫描 | `chemical.gaussian-input` | 显式 GJF 执行及有限检查；不能从正常终止或虚频数直接认定目标路径；无完整扫描验收器 |
 | CF22D | `chemical.cf22d`、`chemical.cf22d-doctor` | PySCF 的 sp/opt/opt-sp/ts/freq/thermo/opt_freq/ts_freq 及环境诊断；已有 RRHO，不包含 IRC、NEB、交叉点 |

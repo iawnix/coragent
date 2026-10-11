@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/branding/coragent.svg" alt="CoRAgent 标志" width="180" height="180">
+</p>
+
 # CoRAgent
 
 [English](README.md) | [简体中文](README.zh-CN.md)
@@ -18,7 +22,8 @@ CoRAgent（Computational Research Agent，计算科研智能体）是一个 AI �
 
 ## 安装
 
-准备 Git、Python 3.11+、Node.js 22.19+、Conda/Mamba 和模型访问凭据，然后运行：
+在使用 systemd 的 Linux 上，准备 Git、Python 3.11+、Node.js 22.19+、Conda/Mamba、
+`rg`（ripgrep）、`fd`（或 `fdfind`）和模型访问凭据，然后运行：
 
 ```bash
 git clone https://github.com/iawnix/coragent.git
@@ -57,6 +62,7 @@ cd coragent
 - [文档索引](docs/README.zh-CN.md)
 - [Skill 目录与加载语言](skills/README.zh-CN.md)
 - [科学计算与远程执行](docs/SCIENTIFIC_CAPABILITIES_OPERATIONS.zh-CN.md)
+- [已实现的化学能力与范围](domains/chemical/skills/method-selection/references/capabilities.zh-CN.md)
 - [模型兼容性](docs/MODEL_COMPATIBILITY.zh-CN.md)
 - [架构](docs/ARCHITECTURE.zh-CN.md)（[English](docs/ARCHITECTURE.md)）与[维护者指南](docs/MAINTAINER_GUIDE.zh-CN.md)（[English](docs/MAINTAINER_GUIDE.md)）
 

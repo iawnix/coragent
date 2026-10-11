@@ -1,8 +1,8 @@
 {
   "schema_version": "coragent-resources/1",
   "files": {
-    "skills/README.md": "sha256:fee91880b93ac9999eefbdc4b8df423a92dcc4ee5578702329d6d91969c1497f",
-    "skills/README.zh-CN.md": "sha256:8f2dac067e35dc5a8c4d44e2a0e1009d7abbfcfb4b85df8e096d400aab7ef561",
+    "skills/README.md": "sha256:b39c522fab7fef09d6698d3a5f2a1d07503ea58303c7811d85fc1120a465c0d9",
+    "skills/README.zh-CN.md": "sha256:0680c792245f60e8742ce32f27cf3d615702a6513d7854cf9ae75a7683feb4e0",
     "skills/email/SKILL.md": "sha256:58ef5e329e44d5aa50fb81f15ddae29308f2c7d59362b94a6b7c42c236e8b94d",
     "skills/email/SKILL.zh-CN.md": "sha256:b0fccc924d1ef3632673e5ac81921bf7ab160cdca64c2e9bc83ac85e4304f7ee",
     "skills/email/references/email_delivery.md": "sha256:25a0843018874efc919be26c801bbeeab9fd087f47708909e819a7f20e75be28",
@@ -172,8 +172,8 @@
     "domains/chemical/skills/method-selection/SKILL.zh-CN.md": "sha256:25e846b2d82a47036bdd4731c74f389ffbe26c9cd7d7fea16f295792128e766d",
     "domains/chemical/skills/method-selection/references/backend_contract.md": "sha256:0dabff0cb56738015bf6425883039d2ddd362edca737acc15ac55f369f96e74e",
     "domains/chemical/skills/method-selection/references/backend_contract.zh-CN.md": "sha256:77892c12f05f7f8198931a2abd20245dee191a107917a5cf650ba9e2d642f638",
-    "domains/chemical/skills/method-selection/references/capabilities.md": "sha256:0872eb365b8f13d5aad586ba776f1515f1c15db8ef343e4024fae7c81119eed1",
-    "domains/chemical/skills/method-selection/references/capabilities.zh-CN.md": "sha256:5552f32e26e8a234a5a4ecf90704b95d554ce9eb4b7a75d7547e3634cf8f4243",
+    "domains/chemical/skills/method-selection/references/capabilities.md": "sha256:d8679ad45ca3619c758371f97a4a99b41b9e454b1cfdfbd19a60a6aea72db273",
+    "domains/chemical/skills/method-selection/references/capabilities.zh-CN.md": "sha256:52846300ca78fcb4b7549eecc13538d10afcf346f42951e42f8d24d6e1207eb1",
     "domains/chemical/skills/method-selection/references/job_probes.md": "sha256:5b0db379a525d7a65d014446fea0a45d7c0b5cadbb6d21a8c04d3b2084173d10",
     "domains/chemical/skills/method-selection/references/job_probes.zh-CN.md": "sha256:3bbd60eeedb7b57015229c85d5b3472eb49b07157a6fa4c93950ce28a9ac11a8",
     "domains/chemical/skills/method-selection/references/method_selection.md": "sha256:139869728b2946f0a7fd98456891855ffaaae767939ad924667bc84ca67b2e6d",

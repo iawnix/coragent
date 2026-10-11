@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/branding/coragent.svg" alt="CoRAgent logo" width="180" height="180">
+</p>
+
 # CoRAgent
 
 [English](README.md) | [简体中文](README.zh-CN.md)
@@ -20,7 +24,8 @@ with the [Scientific operations guide](docs/SCIENTIFIC_CAPABILITIES_OPERATIONS.m
 
 ## Install
 
-Prepare Git, Python 3.11+, Node.js 22.19+, Conda/Mamba, and model credentials, then run:
+On Linux with systemd, prepare Git, Python 3.11+, Node.js 22.19+, Conda/Mamba,
+`rg` (ripgrep), `fd` (or `fdfind`), and model credentials, then run:
 
 ```bash
 git clone https://github.com/iawnix/coragent.git
@@ -61,6 +66,7 @@ for session controls and [CoRAgent Link](docs/CORAGENT_LINK.md) for phone access
 - [Documentation index](docs/README.md)
 - [Skill catalog and loading language](skills/README.md)
 - [Scientific and remote execution](docs/SCIENTIFIC_CAPABILITIES_OPERATIONS.md)
+- [Implemented chemistry capabilities and limits](domains/chemical/skills/method-selection/references/capabilities.md)
 - [Model compatibility](docs/MODEL_COMPATIBILITY.md)
 - [Architecture](docs/ARCHITECTURE.md) ([简体中文](docs/ARCHITECTURE.zh-CN.md)) and [Maintainer guide](docs/MAINTAINER_GUIDE.md)
 
