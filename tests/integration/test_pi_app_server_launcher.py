@@ -1,7 +1,6 @@
 from __future__ import annotations
 from research_agent.foundation.layout import paths as layout_paths
 
-import hashlib
 import json
 import os
 import shutil
@@ -63,7 +62,6 @@ def _installation(tmp_path: Path) -> launcher.Installation:
         runtime_manifest=root / "var/state/installation/python/env.json",
         env_root=root / ".agents/envs/coragent",
         process_cache_root=root / "var/cache",
-        model_icons_config=root / "etc/model-icons.json",
     )
 
 
@@ -246,60 +244,6 @@ def test_resolve_installation_explains_stale_standalone_agent(tmp_path: Path) ->
     assert "launcher=" in message
     assert "selected=" in message
     assert "restart coragent.service" in message
-
-
-def test_model_icon_marker_enables_research_agent_style_and_preserves_explicit_style(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    installation = _installation(tmp_path)
-    font = tmp_path / "fonts/CoRAgent-Model-Icons.ttf"
-    font.parent.mkdir()
-    font.write_bytes(b"font fixture")
-    marker = installation.model_icons_config
-    assert marker is not None
-    marker.parent.mkdir(parents=True)
-    marker.write_text(
-        json.dumps(
-            {
-                "schema_version": launcher.MODEL_ICON_CONFIG_SCHEMA,
-                "enabled": True,
-                "font_path": str(font),
-                "sha256": hashlib.sha256(font.read_bytes()).hexdigest(),
-            }
-        ),
-        encoding="utf-8",
-    )
-    monkeypatch.delenv("CORAGENT_ICON_STYLE", raising=False)
-
-    assert launcher.configure_model_icon_environment(installation) is True
-    assert os.environ["CORAGENT_ICON_STYLE"] == "coragent"
-
-    monkeypatch.setenv("CORAGENT_ICON_STYLE", "unicode")
-    assert launcher.configure_model_icon_environment(installation) is False
-    assert os.environ["CORAGENT_ICON_STYLE"] == "unicode"
-
-
-def test_invalid_model_icon_marker_does_not_enable_research_agent_style(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    installation = _installation(tmp_path)
-    marker = installation.model_icons_config
-    assert marker is not None
-    marker.parent.mkdir(parents=True)
-    marker.write_text(
-        json.dumps(
-            {
-                "schema_version": launcher.MODEL_ICON_CONFIG_SCHEMA,
-                "enabled": True,
-                "font_path": str(tmp_path / "missing.ttf"),
-                "sha256": "0" * 64,
-            }
-        ),
-        encoding="utf-8",
-    )
-    monkeypatch.delenv("CORAGENT_ICON_STYLE", raising=False)
-
-    assert launcher.configure_model_icon_environment(installation) is False
-    assert "CORAGENT_ICON_STYLE" not in os.environ
 
 
 def test_host_command_owns_installation_state_and_workspace_root(

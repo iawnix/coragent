@@ -45,7 +45,6 @@ try:
     from .install_from_github import install_uninstaller, validate_commit, validate_ref, validate_repo
     from ._component_release import validate_install_root
     from .link_relay_discovery import discover_link_relay
-    from .model_icons import install_model_icon_font
     from . import _job_install
 except ImportError:
     from _credentials import provision_service_credentials
@@ -65,7 +64,6 @@ except ImportError:
     from install_from_github import install_uninstaller, validate_commit, validate_ref, validate_repo
     from _component_release import validate_install_root
     from link_relay_discovery import discover_link_relay
-    from model_icons import install_model_icon_font
     import _job_install
 
 
@@ -217,20 +215,6 @@ def parse_args(argv: list[str] | None = None, *, use_environment: bool = True) -
     web.add_argument("--with-web", dest="with_web", action="store_true", help="Install CoRAgent Web.")
     web.add_argument("--without-web", dest="with_web", action="store_false", help="Skip CoRAgent Web installation.")
     parser.set_defaults(with_web=None)
-    icons = parser.add_mutually_exclusive_group()
-    icons.add_argument(
-        "--with-model-icons",
-        dest="with_model_icons",
-        action="store_true",
-        help="Install the optional CoRAgent model icon font.",
-    )
-    icons.add_argument(
-        "--without-model-icons",
-        dest="with_model_icons",
-        action="store_false",
-        help="Do not install the optional CoRAgent model icon font.",
-    )
-    parser.set_defaults(with_model_icons=None)
     parser.add_argument("--web-port", type=int, help="CoRAgent Web HTTP port.")
     parser.add_argument("--web-host", default="127.0.0.1", help="CoRAgent Web listen address.")
     parser.add_argument("--allow-remote", action="store_true", help="Allow CoRAgent Web to listen on a non-loopback address.")
@@ -357,8 +341,6 @@ def interactive_options(args: argparse.Namespace) -> argparse.Namespace:
             args.allow_remote = ask_yes_no("Allow remote CoRAgent Web clients", False)
         if args.web_auth_token is None and ask_yes_no("Use a custom CoRAgent Web access token", False):
             args.web_auth_token = _ask_web_auth_token()
-    if args.with_model_icons is None:
-        args.with_model_icons = ask_yes_no("Install CoRAgent model icon font", True)
     section("Job platforms")
     args.job_config = ask(
         "Job platform TOML path (blank preserves existing configuration)",
@@ -407,13 +389,6 @@ def _load_existing_menu_defaults(args: argparse.Namespace) -> None:
         args.with_web = (root / "coragent-web").exists() or not (root / "var/state/installation/install-state.json").is_file()
     if args.web_port is None:
         args.web_port = 8766
-    if args.with_model_icons is None:
-        marker = root / "etc/model-icons.json"
-        try:
-            document = json.loads(marker.read_text(encoding="utf-8"))
-            args.with_model_icons = bool(document.get("enabled")) if isinstance(document, dict) else False
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-            args.with_model_icons = not (root / "var/state/installation/install-state.json").is_file()
     if args.phone_access is None:
         args.phone_access = "link" if _existing_link_configuration(root) or _discover_relay(args) else "disabled"
     if args.link_url is None:
@@ -515,10 +490,9 @@ def _menu_choice(args: argparse.Namespace) -> str:
     print("  4) Phone connection")
     print("  5) Runtime and services")
     print("  6) Email notifications")
-    print("  7) Model icon font")
-    print("  8) Review and install")
-    print("  9) Quit")
-    return ask("Select a configuration area", "8").strip()
+    print("  7) Review and install")
+    print("  8) Quit")
+    return ask("Select a configuration area", "7").strip()
 
 
 def _configure_menu_web(args: argparse.Namespace) -> None:
@@ -625,9 +599,9 @@ def interactive_menu_options(args: argparse.Namespace) -> argparse.Namespace:
     _initialize_interactive_menu(args)
     while True:
         choice = _menu_choice(args)
-        if choice in {"8", ""}:
+        if choice in {"7", ""}:
             return args
-        if choice == "9":
+        if choice == "8":
             args._installer_cancelled = True
             return args
         if choice == "1":
@@ -661,10 +635,8 @@ def interactive_menu_options(args: argparse.Namespace) -> argparse.Namespace:
             _configure_menu_runtime(args)
         elif choice == "6":
             configure_email_interactively(args, force=True)
-        elif choice == "7":
-            args.with_model_icons = ask_yes_no("Install CoRAgent model icon font", bool(args.with_model_icons))
         else:
-            note("Choose a menu number from 1 to 9.", tone="warning")
+            note("Choose a menu number from 1 to 8.", tone="warning")
 
 
 def configure_email_interactively(args: argparse.Namespace, *, force: bool = False) -> None:
@@ -762,11 +734,6 @@ def show_install_plan(args: argparse.Namespace, installation: dict[str, str | No
         if getattr(args, "_defer_link_enrollment", False):
             field("Host enrollment", "request after core installation", tone="warning")
         field("Phone tool access", "same Agent and tools as terminal", tone="success")
-    field(
-        "Model icon font",
-        "install optional CoRAgent font" if args.with_model_icons else "use Nerd Font/Unicode fallback",
-        tone="success" if args.with_model_icons else "muted",
-    )
 
     root = Path(args.install_root)
     section("Core")
@@ -935,8 +902,6 @@ def validate_options(args: argparse.Namespace) -> None:
         args.link_url = existing_link[0]
     if args.with_web is None:
         args.with_web = True
-    if args.with_model_icons is None:
-        args.with_model_icons = False
     if args.web_auth_token is not None:
         if not args.with_web:
             raise ValueError("--web-auth-token requires --with-web")
@@ -1885,26 +1850,6 @@ def collect_deferred_link_enrollment(args: argparse.Namespace) -> None:
     args._defer_link_enrollment = False
 
 
-def configure_model_icons(args: argparse.Namespace, installed: dict[str, object]) -> dict[str, object]:
-    package_root_value = installed.get("package_root")
-    if not isinstance(package_root_value, str) or not package_root_value:
-        raise RuntimeError("installed package did not report a package root for model icons")
-    package_root = Path(package_root_value).expanduser().resolve()
-    agent_root = package_root / "agent"
-    font_home: Path | None = None
-    if args.service_scope == "system" and args.service_user:
-        try:
-            font_home = Path(pwd.getpwnam(args.service_user).pw_dir)
-        except KeyError as error:
-            raise RuntimeError(f"service user does not exist for model icon font: {args.service_user}") from error
-    return install_model_icon_font(
-        agent_root,
-        Path(args.install_root),
-        enabled=bool(args.with_model_icons),
-        font_home=font_home,
-    )
-
-
 def snapshot_active_release(root: Path) -> dict[str, object] | None:
     package_home = root
     current = package_home / "current"
@@ -1925,16 +1870,11 @@ def snapshot_active_release(root: Path) -> dict[str, object] | None:
             runtime_manifest = (manifest_path, Path(manifest_path).read_bytes())
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         pass
-    model_icon_marker = root / "etc/model-icons.json"
-    marker_snapshot: bytes | None = None
-    if model_icon_marker.is_file() and not model_icon_marker.is_symlink():
-        marker_snapshot = model_icon_marker.read_bytes()
     return {
         "current": os.readlink(current),
         "state": state_bytes,
         "launchers": launchers,
         "runtime_manifest": runtime_manifest,
-        "model_icon_marker": marker_snapshot,
     }
 
 
@@ -1966,7 +1906,6 @@ def snapshot_install_configuration(root: Path, args: argparse.Namespace) -> dict
         "var/state/host/link.json",
         "var/state/host/host.token",
         "etc/web/auth.token",
-        "etc/model-icons.json",
         "etc/pi/models.json",
         "etc/pi/auth.json",
         "etc/email.toml",
@@ -2227,26 +2166,6 @@ def restore_active_release(root: Path, snapshot: dict[str, object] | None) -> No
                 if descriptor != -1:
                     os.close(descriptor)
                 temporary.unlink(missing_ok=True)
-    marker_path = root / "etc/model-icons.json"
-    marker_snapshot = snapshot.get("model_icon_marker")
-    if isinstance(marker_snapshot, bytes):
-        marker_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        descriptor, temporary_name = tempfile.mkstemp(prefix=f".{marker_path.name}.rollback.", dir=marker_path.parent)
-        temporary = Path(temporary_name)
-        try:
-            os.fchmod(descriptor, 0o600)
-            with os.fdopen(descriptor, "wb") as handle:
-                descriptor = -1
-                handle.write(marker_snapshot)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary, marker_path)
-        finally:
-            if descriptor != -1:
-                os.close(descriptor)
-            temporary.unlink(missing_ok=True)
-    elif marker_path.exists() or marker_path.is_symlink():
-        marker_path.unlink()
 
 
 def prepare_app_server_runtime(root: Path, *, suite_root: Path | None = None, bind=True) -> Path:
@@ -3007,7 +2926,6 @@ def build_component_summary(
     credentials: dict[str, dict[str, str]],
     backend_configs: dict[str, dict[str, str]] | None = None,
     phone_connection: dict[str, object] | None = None,
-    model_icons: dict[str, object] | None = None,
     model_configuration: dict[str, object] | None = None,
 ) -> dict[str, object]:
     root = Path(args.install_root)
@@ -3055,11 +2973,6 @@ def build_component_summary(
             "relay_url": args.link_url,
             "protocol": "coragent-link.v1",
             "tool_access": "same_as_terminal",
-        },
-        "model_icons": model_icons or {
-            "status": "disabled",
-            "enabled": False,
-            "config_path": str(root / "etc/model-icons.json"),
         },
         "models": model_configuration or {
             "status": "not_configured",
@@ -3125,16 +3038,6 @@ def show_installed_summary(
         f"{runtime['status']} - {runtime.get('environment') or 'unavailable'}",
         tone="success" if runtime["status"] == "ready" else "warning",
     )
-    model_icons = components.get("model_icons")
-    if isinstance(model_icons, dict):
-        icon_status = str(model_icons.get("status", "disabled"))
-        icon_enabled = bool(model_icons.get("enabled"))
-        icon_detail = model_icons.get("font_path") or model_icons.get("config_path") or "not configured"
-        field(
-            "Model icon font",
-            f"{icon_status} - {icon_detail}",
-            tone="success" if icon_enabled else "muted",
-        )
     models = components.get("models")
     if isinstance(models, dict):
         model_status = str(models.get("status", "not_configured"))
@@ -3384,8 +3287,6 @@ def main(argv: list[str] | None = None) -> int:
         with Spinner("Finalizing installation", stream=sys.stderr, enabled=not args.json) as activity:
             activity.update("Importing Pi model configuration")
             model_configuration = provision_pi_agent_configuration(args)
-            activity.update("Configuring the model icon font")
-            model_icons = configure_model_icons(args, installed)
             activity.update("Configuring the workspace root")
             workspace_config = configure_workspace_root(args)
             activity.update("Recording the App Server service scope")
@@ -3433,7 +3334,6 @@ def main(argv: list[str] | None = None) -> int:
             credentials,
             backend_configs,
             phone_connection,
-            model_icons,
             model_configuration,
         )
         if args.start_services:
@@ -3461,7 +3361,6 @@ def main(argv: list[str] | None = None) -> int:
             "service_config": service_config,
             "remote_host_config": remote_host_config,
             "phone_connection": phone_connection,
-            "model_icons": model_icons,
             "model_configuration": model_configuration,
             "verified_release": verified["release_id"],
             "readiness": readiness,
@@ -3481,7 +3380,6 @@ def main(argv: list[str] | None = None) -> int:
             f"job_config={backend_configs.get('job', {}).get('status', 'not_configured')}",
             f"name_resolver_config={backend_configs.get('name_resolver', {}).get('status', 'not_configured')}",
             f"phone_manifest={phone_connection.get('manifest', '') if isinstance(phone_connection, dict) else ''}",
-            f"model_icons={model_icons.get('status', 'unknown') if isinstance(model_icons, dict) else 'unknown'}",
             f"model_configuration={model_configuration.get('status', 'unknown') if isinstance(model_configuration, dict) else 'unknown'}",
             f"web_token_file={credentials.get('web_http', {}).get('path', '') if isinstance(credentials.get('web_http'), dict) else ''}",
             "status=success",

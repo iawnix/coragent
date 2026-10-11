@@ -68,8 +68,6 @@ SMTP_PRESETS = {
 }
 SMTP_SECURITY = {"ssl", "starttls"}
 WORKSPACE_ROOT_SCHEMA = "coragent-workspace-root/1"
-MODEL_ICON_CONFIG_SCHEMA = "coragent-model-icons/1"
-MODEL_ICON_CONFIG_RELATIVE = Path("etc/model-icons.json")
 SERVICE_CONFIG_SCHEMA = "coragent-service/1"
 SERVICE_CONFIG_RELATIVE = Path("etc/installation.json")
 REMOTE_HOST_CONFIG_SCHEMA = "coragent-remote-host/1"
@@ -137,7 +135,6 @@ class Installation:
     env_root: Path
     process_cache_root: Path
     job_config_default: Path | None = None
-    model_icons_config: Path | None = None
     service_scope: str = "user"
     host_runtime_dir: Path | None = None
     remote_host_config: Path | None = None
@@ -365,7 +362,6 @@ def resolve_installation(package_root: str | Path, install_root: str | Path) -> 
         env_root=layout.env_root,
         process_cache_root=root / "var/cache",
         job_config_default=root / "etc/job.toml",
-        model_icons_config=root / MODEL_ICON_CONFIG_RELATIVE,
         service_scope=service_scope,
         host_runtime_dir=host_runtime_dir,
         remote_host_config=root / REMOTE_HOST_CONFIG_RELATIVE,
@@ -900,40 +896,6 @@ def _require_config_file(value: str, label: str) -> Path:
     if not path.is_absolute() or path.is_symlink() or not path.is_file() or not os.access(path, os.R_OK):
         raise CoRAgentHostError(f"invalid {label}: {path}")
     return path.resolve()
-
-
-def configure_model_icon_environment(installation: Installation) -> bool:
-    """Enable the optional model icon font when its installer marker is valid."""
-    if "CORAGENT_ICON_STYLE" in os.environ:
-        return False
-    marker = installation.model_icons_config
-    if marker is None or marker.is_symlink() or not marker.is_file():
-        return False
-    try:
-        document = json.loads(marker.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        return False
-    if (
-        not isinstance(document, dict)
-        or document.get("schema_version") != MODEL_ICON_CONFIG_SCHEMA
-        or document.get("enabled") is not True
-    ):
-        return False
-    font_value = document.get("font_path")
-    digest_value = document.get("sha256")
-    if not isinstance(font_value, str) or not isinstance(digest_value, str):
-        return False
-    font_path = Path(font_value).expanduser()
-    if not font_path.is_absolute() or font_path.is_symlink() or not font_path.is_file():
-        return False
-    try:
-        digest = hashlib.sha256(font_path.read_bytes()).hexdigest()
-    except OSError:
-        return False
-    if digest != digest_value:
-        return False
-    os.environ["CORAGENT_ICON_STYLE"] = "coragent"
-    return True
 
 
 def configure_process_environment(installation: Installation, workspace: Path, workspace_name: str) -> None:
@@ -1651,7 +1613,6 @@ def launch(argv: list[str], *, package_root: str | Path, install_root: str | Pat
     if request.remote_host is not None and (request.host or request.gateway):
         raise CoRAgentHostError("SSH terminal options are only valid for the default workspace client", exit_code=2)
     os.environ["CORAGENT_INSTALL_ROOT"] = str(installation.root)
-    configure_model_icon_environment(installation)
     try:
         require_guarded_installation(installation.root)
     except SessionGuardError as exc:

@@ -143,7 +143,7 @@ def installation(tmp_path, monkeypatch):
     monkeypatch.setattr(wizard._job_install, 'prepare', prepare_jobs)
     monkeypatch.setattr(wizard._job_install, 'publish', lambda *_a: {'job': {'path': str(job_config), 'status':'configured'}})
     monkeypatch.setattr(wizard,'install_uninstaller',lambda *_a:None)
-    for name in ('provision_pi_agent_configuration','configure_model_icons','configure_workspace_root',
+    for name in ('provision_pi_agent_configuration','configure_workspace_root',
                  'configure_service_runtime','configure_remote_host','configure_phone_connection',
                  'provision_service_credentials','configure_notification_config','configure_backend_configs'):
         monkeypatch.setattr(wizard,name,lambda *_a,**_k:{})

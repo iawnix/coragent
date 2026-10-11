@@ -11,7 +11,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from fontTools.ttLib import TTFont
 
 from scripts import install_wizard as wizard
 from scripts import _terminal_ui as terminal_ui
@@ -40,7 +39,6 @@ def _options(tmp_path: Path):
 def test_non_interactive_options_select_only_web_as_optional_component(tmp_path: Path) -> None:
     args = _options(tmp_path)
     assert args.with_web is True
-    assert args.with_model_icons is False
     assert args.web_port == 8766
     assert not hasattr(args, "with_phone")
 
@@ -129,7 +127,7 @@ def test_interactive_menu_can_edit_multiple_sections_before_install(
     root = tmp_path / "install"
     workspace = tmp_path / "research"
     args = wizard.parse_args(["--install-root", str(root)])
-    choices = iter(("1", str(workspace), "2", "8777", "127.0.0.1", "8"))
+    choices = iter(("1", str(workspace), "2", "8777", "127.0.0.1", "7"))
     monkeypatch.setattr(wizard.sys.stdin, "isatty", lambda: True)
     monkeypatch.setattr(wizard.sys.stdout, "isatty", lambda: True)
     monkeypatch.setattr(wizard, "ask", lambda _prompt, default="": next(choices))
@@ -149,7 +147,7 @@ def test_review_decline_returns_to_menu_instead_of_exiting(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     args = wizard.parse_args(["--install-root", str(tmp_path / "install")])
-    choices = iter(("8", "9"))
+    choices = iter(("7", "8"))
     prepared: list[object] = []
 
     monkeypatch.setattr(wizard.sys.stdin, "isatty", lambda: True)
@@ -176,7 +174,7 @@ def test_main_does_not_snapshot_or_install_after_review_decline(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root = tmp_path / "install"
-    choices = iter(("8", "9"))
+    choices = iter(("7", "8"))
 
     monkeypatch.setattr(wizard.sys.stdin, "isatty", lambda: True)
     monkeypatch.setattr(wizard.sys.stdout, "isatty", lambda: True)
@@ -205,7 +203,7 @@ def test_review_decline_preserves_edits_for_next_review(
     root = tmp_path / "install"
     workspace = tmp_path / "research"
     args = wizard.parse_args(["--install-root", str(root)])
-    choices = iter(("8", "1", str(workspace), "8"))
+    choices = iter(("7", "1", str(workspace), "7"))
     confirmations = iter((False, True))
     reviewed_workspaces: list[str] = []
 
@@ -236,7 +234,7 @@ def test_review_validation_error_returns_to_menu_for_correction(
 ) -> None:
     args = wizard.parse_args(["--install-root", str(tmp_path / "install")])
     workspace = tmp_path / "research"
-    choices = iter(("8", "1", str(workspace), "8"))
+    choices = iter(("7", "1", str(workspace), "7"))
     attempts = 0
 
     monkeypatch.setattr(wizard.sys.stdin, "isatty", lambda: True)
@@ -271,7 +269,7 @@ def test_review_does_not_reload_email_defaults_after_disable(
     config.parent.mkdir(parents=True)
     config.write_text("[notifications.email]\nenabled = true\n", encoding="utf-8")
     args = wizard.parse_args(["--install-root", str(root)])
-    choices = iter(("6", "8", "8"))
+    choices = iter(("6", "7", "7"))
     answers = iter((False, True, False, True))
     reviewed_email: list[tuple[object, object]] = []
 
@@ -307,9 +305,6 @@ def test_interactive_integer_prompt_retries_invalid_values(monkeypatch: pytest.M
 def test_menu_defaults_read_existing_configuration(tmp_path: Path) -> None:
     root = tmp_path / "install"
     workspace = tmp_path / "research"
-    marker = root / "etc/model-icons.json"
-    marker.parent.mkdir(parents=True)
-    marker.write_text(json.dumps({"enabled": True}), encoding="utf-8")
     layout_paths(root).initialize().update_config(workspace_root=str(workspace))
     (root / "coragent-web").write_text("launcher", encoding="utf-8")
     args = wizard.parse_args(["--install-root", str(root)])
@@ -318,7 +313,6 @@ def test_menu_defaults_read_existing_configuration(tmp_path: Path) -> None:
 
     assert args.workspace_root == str(workspace)
     assert args.with_web is True
-    assert args.with_model_icons is True
 
 
 def test_interactive_menu_can_disable_existing_email_configuration(
@@ -402,80 +396,6 @@ def test_interactive_smtp_uses_sender_as_from_without_a_redundant_prompt(
     assert args.email_username == "sender@qq.com"
     assert not hasattr(args, "email_from")
     assert not any("From email" in prompt for prompt in prompts)
-
-
-def test_model_icon_options_are_mutually_exclusive(tmp_path: Path) -> None:
-    root = tmp_path / "install"
-    with_icons = wizard.parse_args(["--install-root", str(root), "--with-model-icons", "--non-interactive"])
-    without_icons = wizard.parse_args(["--install-root", str(root), "--without-model-icons", "--non-interactive"])
-
-    assert with_icons.with_model_icons is True
-    assert without_icons.with_model_icons is False
-    with pytest.raises(SystemExit):
-        wizard.parse_args([
-            "--install-root",
-            str(root),
-            "--with-model-icons",
-            "--without-model-icons",
-            "--non-interactive",
-        ])
-
-
-def test_bundled_model_icon_font_avoids_the_nerd_font_private_use_range() -> None:
-    with TTFont(ROOT / "assets/fonts/coragent-model-icons.ttf") as font:
-        codepoints = set(font.getBestCmap() or {})
-        revision = font["head"].fontRevision
-
-    assert codepoints == set(range(0xF0000, 0xF0005))
-    assert not codepoints.intersection(range(0xE000, 0xF900))
-    assert revision == 2.0
-
-
-def test_model_icon_font_install_writes_private_marker_and_handles_missing_fc_cache(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    package = tmp_path / "package"
-    source = package / "assets/fonts/coragent-model-icons.ttf"
-    source.parent.mkdir(parents=True)
-    source.write_bytes(b"font fixture")
-    install_root = tmp_path / "install"
-    install_root.mkdir()
-    data_home = tmp_path / "xdg-data"
-    monkeypatch.setenv("XDG_DATA_HOME", str(data_home))
-    monkeypatch.setattr(wizard.shutil, "which", lambda _name: None)
-
-    result = wizard.install_model_icon_font(package, install_root, enabled=True)
-
-    target = data_home / "fonts/coragent/CoRAgent-Model-Icons.ttf"
-    marker = install_root / "etc/model-icons.json"
-    assert result["status"] == "installed_cache_unavailable"
-    assert result["enabled"] is True
-    assert target.read_bytes() == source.read_bytes()
-    assert stat.S_IMODE(target.stat().st_mode) == 0o644
-    assert stat.S_IMODE(marker.stat().st_mode) == 0o600
-    assert stat.S_IMODE(marker.parent.stat().st_mode) == 0o700
-    document = json.loads(marker.read_text(encoding="utf-8"))
-    assert document["enabled"] is True
-    assert document["font_path"] == str(target)
-    assert document["sha256"] == result["sha256"]
-
-
-def test_model_icon_font_can_be_disabled_without_removing_shared_font(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    package = tmp_path / "package"
-    source = package / "assets/fonts/coragent-model-icons.ttf"
-    source.parent.mkdir(parents=True)
-    source.write_bytes(b"font fixture")
-    install_root = tmp_path / "install"
-    install_root.mkdir()
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg-data"))
-    wizard.install_model_icon_font(package, install_root, enabled=True)
-
-    result = wizard.install_model_icon_font(package, install_root, enabled=False)
-
-    assert result["status"] == "disabled"
-    assert (tmp_path / "xdg-data/fonts/coragent/CoRAgent-Model-Icons.ttf").is_file()
-    assert json.loads((install_root / "etc/model-icons.json").read_text(encoding="utf-8"))["enabled"] is False
 
 
 def test_update_preserves_workspace_root_and_link_defaults(tmp_path: Path) -> None:

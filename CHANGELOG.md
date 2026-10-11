@@ -5,6 +5,9 @@ This file records user-visible changes. Current architecture is documented in
 
 ## Unreleased
 
+- Remove optional model icon font installation, bundled font assets and launcher
+  activation. Terminal icons use existing fonts; previously installed fonts are untouched.
+
 - Persist natural-language user pause/resume/cancel instructions in the Task Controller,
   preventing automatic continuation after research stops. Cancel task scheduling before
   contacting Job backends; retry pending cleanup without waking the model.

@@ -71,25 +71,7 @@ Phone/Relay 不会自动启用。需要本机 Relay 时，显式传入 `--with-l
 只有选中的 release 会暴露给 `coragent` 启动器；安装器记录校验和，不执行该 release
 之外的源码。
 
-### 可选模型图标字体
-
-可选模型图标字体可通过 `--with-model-icons` 安装，使用
-`--without-model-icons` 禁用。字体属于用户数据目录，不是科学运行时依赖；
-`CORAGENT_ICON_STYLE=unicode` 或 `nerd` 可显式覆盖选择。模型字形使用补充私用区，避免被
-终端主 Nerd Font 中已有的同码位字形遮蔽。
-
-交互安装默认询问并选择启用；非交互安装默认禁用，明确传入参数才会安装：
-
-```bash
-./install.sh --non-interactive --yes --with-model-icons \
-  --install-root "$HOME/.local/share/coragent"
-```
-
-字体安装在用户数据目录（`$XDG_DATA_HOME/fonts/coragent` 或
-`$HOME/.local/share/fonts/coragent`），所选 release 在
-`<install>/etc/model-icons.json` 保存私有标记。无需另装 Nerd Font；其他图标沿用
-已有 Nerd Font，设置 `CORAGENT_ICON_STYLE=unicode` 时回退到普通 Unicode。安装器在可用时刷新
-fontconfig 缓存；已打开的终端可能需要重启才能加载回退字体。
+终端使用常规图标和已有字体，CoRAgent 不再安装独立的模型图标字体。以前安装的字体保留在原处。
 
 ## 受管 Python 运行时
 

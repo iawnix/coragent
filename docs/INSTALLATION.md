@@ -82,29 +82,7 @@ The package is selected atomically through:
 Only the selected release is exposed by the `coragent` launcher. The installer
 records checksums and never executes source outside that release.
 
-### Optional model icon font
-
-The installer can add the small CoRAgent Model Icons font for branded model icons
-in the terminal status bar. Interactive installs ask this question (default
-yes); non-interactive installs keep the font disabled unless explicitly
-requested:
-
-```bash
-./install.sh --non-interactive --yes --with-model-icons \
-  --install-root "$HOME/.local/share/coragent"
-```
-
-Use `--without-model-icons` to leave the optional component disabled. The font
-is installed under the user data directory (`$XDG_DATA_HOME/fonts/coragent`, or
-`$HOME/.local/share/fonts/coragent`) and the selected release records a private
-marker at `<install>/etc/model-icons.json`. It is not necessary to install
-Nerd Font: CoRAgent falls back to the existing Nerd Font glyphs for other icons and
-to ordinary Unicode when `CORAGENT_ICON_STYLE=unicode` is set. An explicit
-`CORAGENT_ICON_STYLE=nerd` or `unicode` always overrides the installer choice.
-Model glyphs use the supplementary private-use range so glyphs already present
-in a terminal's primary Nerd Font cannot shadow the CoRAgent font.
-The installer refreshes the fontconfig cache when `fc-cache` is available;
-already-open terminals may need to be restarted to reload their fallback fonts.
+The terminal uses its regular icons and the terminal’s existing fonts. CoRAgent does not install a separate model icon font. Previously installed fonts are left in place.
 
 ## Managed Python Runtime
 

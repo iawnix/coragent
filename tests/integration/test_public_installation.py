@@ -39,7 +39,7 @@ def test_public_package_install_accepts_jobs_reuses_environment_and_uninstalls(t
     command = [sys.executable,'-S','-B',str(ROOT/'scripts/installer.py'),'install','--source','package',
                '--package-manifest',built['manifest'],'--install-root',str(root),'--conda-root',str(Path(conda).parent.parent),
                '--job-profile','local:structure','--job-software-root','local='+str(tmp_path/'scientific'),
-               '--job-offline','--service-scope','none','--without-web','--without-model-icons',
+               '--job-offline','--service-scope','none','--without-web',
                '--agent-config-dir',str(agent_config),
                '--phone-access','disabled','--non-interactive','--yes','--allow-dirty','--json']
     subprocess.run([*command,'--job-config',str(config)],env=environment,check=True)
