@@ -32,6 +32,16 @@ backend. `check_failed` includes the actual binding/dependency/probe error.
 consult the method Skill and check its backend, native command or task script.
 The recipe index never determines software availability.
 
+An import error from a direct Job identifies a failure in that command's Python,
+not in every configured backend. Inspect the failed Job's command and
+`metadata.execution_binding`; when absent, inspect `job.toml` for the intended
+backend and run the targeted check with `--backend <binding> --runtime python`.
+For a verified binding, prepare the script with `--script` and `--backend` and
+submit a new request. Do not repeat the same bare-Python command. Record recovery
+with the new Job evidence while preserving the failed Job. Report an installation
+block only when the selected binding actually fails its check; script-specific
+imports still need verification in that binding.
+
 Preparation checks the selected target and fixes input, script and environment
 identities. Submission and execution recheck that identity. A missing binding,
 dependency or verified receipt is an installation gap, not permission to run

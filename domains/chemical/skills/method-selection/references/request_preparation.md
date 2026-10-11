@@ -21,7 +21,8 @@ and interprets numerical checks using the Gaussian Skill.
 Python dependencies are installation-owned Conda environments configured in job.toml. Run preparation helpers with "$CORAGENT_PYTHON"; target runners use the resolved Conda binding. Missing environments require installation maintenance, not ad-hoc pip installs during a research turn.
 
 
-Save helper output with `--output <workspace>/prepared/<cell>.json` (before `--`).
+Use `<workspace>/research/nodes/<node_id>/work` as `<work_dir>` for task scripts and prepared requests.
+Save helper output with `--output <work_dir>/<cell>.json` (before `--`).
 The helper prints `request_file` and `request_sha256`; pass these unchanged to
 `job_start`, adding only optional `timeout_seconds`. Do not copy
 individual command/input fields. Inspect the file if needed; changing it requires
@@ -34,6 +35,23 @@ instead of executor/version, with `--dependency <source>=<destination>` and
 and execute in the selected Python binding. Use `--input-artifact <id-or-ref>`
 for registered inputs: Runtime checks that their exact bytes are actually staged
 and carries their provenance into collected outputs.
+
+For example, a local RDKit script uses the configured `structure` backend:
+
+```bash
+"$CORAGENT_PYTHON" -m research_agent.application.executors \
+  --config "$CORAGENT_JOB_CONFIG" --environment local \
+  --script <work_dir>/analysis.py --backend structure \
+  --collect analysis.json --output <work_dir>/analysis-request.json
+```
+
+The script must actually write `analysis.json` relative to its Job cwd. Submit the
+returned `request_file` and `request_sha256` with the intended `node_id` to
+`job_start`. `--collect`/`outputs` declare collection; they do not create files or
+redirect stdout. `print()` is captured in `logs/stdout.log`, not `stdout.txt`.
+`platform=local` selects the target only; a direct `bash -lc "python ..."` command
+does not resolve the `structure` backend. For other libraries or remote execution,
+choose the corresponding configured backend and environment.
 
 Remote preparation requires an explicit `submission.queue` in the environment
 or backend's job.toml table. `submission.resources` supplies CPU/memory/walltime;

@@ -127,15 +127,25 @@ def test_prepared_native_entry_cannot_replace_its_bound_executable(tmp_path, mon
         check_binding(request, probe=False)
 
 
-def test_task_specific_script_uses_explicit_binding_and_pinned_dependencies(tmp_path, monkeypatch):
+@pytest.mark.parametrize('write_output', [True, False])
+def test_task_specific_script_uses_explicit_binding_and_pinned_dependencies(tmp_path, monkeypatch, write_output):
     import os
+    import tomllib
+    settings = tomllib.loads(Path(os.environ['CORAGENT_JOB_CONFIG']).read_text())
+    prefix = Path(settings['environments']['local']['backends']['structure']['python']['prefix'])
+    # This dependency exists only in the selected target, not the control Python.
+    site = next(prefix.glob('lib/python*/site-packages'))
+    (site / 'target_only_analysis.py').write_text('def transform(text): return text.upper()\n')
     script = tmp_path / "analysis.py"
-    script.write_text("from pathlib import Path\nPath('output.txt').write_text(Path('input.txt').read_text().upper())\n")
+    script.write_text(
+        "from pathlib import Path\nimport json, sys\nfrom target_only_analysis import transform\n"
+        "result = json.dumps({'value': transform(Path('input.txt').read_text()), 'prefix': sys.prefix})\n"
+        "print(result)\n" + ("Path('output.json').write_text(result)\n" if write_output else ""))
     source = tmp_path / "data.txt"
     source.write_text("new research method")
-    request = prepare_script(os.environ["CORAGENT_JOB_CONFIG"], "local", "validation", script,
-                             dependencies=[str(source) + "=input.txt"], collect=["output.txt"])
-    assert request["metadata"]["execution_binding"]["backend"] == "validation"
+    request = prepare_script(os.environ["CORAGENT_JOB_CONFIG"], "local", "structure", script,
+                             dependencies=[str(source) + "=input.txt"], collect=["output.json"])
+    assert request["metadata"]["execution_binding"]["backend"] == "structure"
     assert "executor" not in request["metadata"]
     assert request["metadata"]["script"]["sha256"] == "sha256:" + hashlib.sha256(script.read_bytes()).hexdigest()
     root = tmp_path / "workspace"
@@ -151,8 +161,13 @@ def test_task_specific_script_uses_explicit_binding_and_pinned_dependencies(tmp_
             break
         time.sleep(.01)
     assert status["state"] == "succeeded"
-    assert (Path(receipt["cwd"]) / "output.txt").read_text() == "NEW RESEARCH METHOD"
-    assert execute("job.collect", root, {"job_id": receipt["job_id"]})["output_validation"]["complete"]
+    expected = {'value': 'NEW RESEARCH METHOD', 'prefix': str(prefix)}
+    assert json.loads((Path(receipt['cwd']) / 'logs/stdout.log').read_text()) == expected
+    output = Path(receipt['cwd']) / 'output.json'
+    assert output.exists() == write_output
+    if write_output:
+        assert json.loads(output.read_text()) == expected
+    assert execute("job.collect", root, {"job_id": receipt["job_id"]})["output_validation"]["complete"] == write_output
 
 
 def test_validator_on_remote_default_uses_remote_python_and_selected_resources(tmp_path, monkeypatch, mock_environment_probe):
