@@ -1,12 +1,11 @@
 # 可选专用 helper：映射 Diels–Alder 种子
 
-本文记录一个已有专用 helper，不是候选生成的通用流程。只有其化学假设与所提出步骤
-一致时才适用。其他反应使用映射端点、合适的求解器输入或任务脚本，经同一个 Job 接口
-执行，不要求配套的反应专用 helper 或验收 profile。参见[通用候选生成](candidate_generation.zh-CN.md)。
-prepare_path.py 及其路径验证器的实现仍然是专用的，修改反应名称或传入另一种拓扑
-不会使它们成为通用工具。
+本文记录可选 DA 几何策略及其已有专用验证器。[通用映射路径准备器](path_preparation.zh-CN.md)
+接收显式变换与映射端点几何，无需命名反应配方。DA 构造已独立到 `../scripts/da_geometry.py`，
+`prepare_path.py` 对旧 diels_alder spec 沿用此策略。其科学验收 profile 仍仅适用于 DA，
+不能用来验收其他通用准备任务。
 
-`../scripts/prepare_path.py` 实现一条有界路径：显式中性碳 Diels–Alder 拓扑、原子映射绑定的
+该策略实现一条有界路径：显式中性碳 Diels–Alder 拓扑、原子映射绑定的
 反应物/产物种子、Gaussian QST2+Freq，以及从收集的 TS checkpoint 出发的正反 IRC。
 当前支持无同位素特定质量的闭壳层单重态。反应物立体化学必须明确；产物未指定立体化学可枚举，
 最多 16 个变体。不实现 NEB、穷尽构象搜索或完整机理发现。

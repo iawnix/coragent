@@ -216,7 +216,7 @@ supervisor="process"
         prepare_validator(tmp_path, {**params, "platform": "local"})
 
 
-@pytest.mark.parametrize("kind", ["seed", "path-candidates"])
+@pytest.mark.parametrize("kind", ["seed", "path-candidates", "generic-path-candidates"])
 def test_structure_generation_collects_every_output_with_binding_and_attempt(tmp_path, kind):
     import os
     from tests.unit.test_chemical_path_execution import SPEC
@@ -227,13 +227,14 @@ def test_structure_generation_collects_every_output_with_binding_and_attempt(tmp
         arguments = ["--smiles", "O", "--charge", "0", "--multiplicity", "1"]
         expected = "results/seeds/seed-1.xyz"
     else:
+        from tests.unit.test_generic_path_preparation import RING_OPENING
         spec = tmp_path / "input.json"
-        spec.write_text(json.dumps(SPEC))
+        spec.write_text(json.dumps(RING_OPENING if kind == "generic-path-candidates" else SPEC))
         registered = evidence("register", {"root": str(tmp_path), "path": str(spec)})
         inputs, refs = {"spec": spec}, [registered["artifact_id"]]
         arguments = ["--enumerate-stereo", "--conformers", "1"]
         expected = "results/candidate-1-1/ts.gjf"
-    request = prepare(os.environ["CORAGENT_JOB_CONFIG"], "local", "chemical." + kind, "1", inputs, arguments, input_artifact_ids=refs)
+    request = prepare(os.environ["CORAGENT_JOB_CONFIG"], "local", "chemical." + kind.removeprefix("generic-"), "1", inputs, arguments, input_artifact_ids=refs)
     path = tmp_path / "request.json"
     path.write_text(json.dumps(request))
     receipt = execute("job.start", tmp_path, {"request_file": str(path),

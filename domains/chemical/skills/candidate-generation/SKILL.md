@@ -32,9 +32,12 @@ task script through the existing Job interface, preserving atom correspondence a
 checking each method's prerequisites. For Gaussian QST/TS and IRC inputs, use the
 [Gaussian Skill](../gaussian/SKILL.md).
 
-Bundled helpers can encode narrower chemical assumptions. Check their
-[documented scope](references/gaussian_path.md) before reuse; a helper's unsupported
-input does not make the research method unavailable. A Skill without local scripts
-may use shared runners or installed software.
+The [mapped path preparer](references/path_preparation.md) accepts explicit bond
+changes and either automatically embedded single-fragment endpoints or supplied
+mapped geometries. It writes QST2 and bidirectional IRC inputs through the existing
+Job recipes. Its optional geometry strategies do not define the scientific verdict.
+Check the input and validation scope before reuse; an unsupported preparation case
+does not make the research method unavailable. Other methods can use shared runners,
+explicit solver inputs or task scripts.
 Read [candidate_generation.md](references/candidate_generation.md) for method
 criteria and [ase_neb_executor.md](references/ase_neb_executor.md) for NEB availability and prerequisites.

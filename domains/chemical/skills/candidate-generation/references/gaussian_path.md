@@ -1,14 +1,13 @@
 # Optional helper: mapped Diels–Alder seeds
 
-This reference documents an existing specialized helper, not the general
-candidate-generation workflow. Use it only when its chemical assumptions match the
-proposed step. Other reactions use mapped endpoints and appropriate solver inputs
-or task scripts through the same Job interface; no corresponding reaction-specific
-helper or acceptance profile is required. See [general candidate generation](candidate_generation.md).
-The implementation of prepare_path.py and its path validators remains specialized;
-renaming the reaction or supplying another topology does not generalize it.
+This reference documents the optional DA geometry strategy and its existing
+specialized validators. The general [mapped path preparer](path_preparation.md)
+accepts explicit transformations and supplied endpoint geometries without a named
+reaction recipe. DA construction is isolated in `../scripts/da_geometry.py`;
+`prepare_path.py` selects it for legacy diels_alder specs. Its scientific acceptance
+profile remains DA-specific and does not validate unrelated generic preparations.
 
-`../scripts/prepare_path.py` implements one bounded path: explicit neutral-carbon
+This strategy implements one bounded path: explicit neutral-carbon
 Diels–Alder topology, mapped reactant/product seeds, Gaussian QST2+Freq, and
 forward/reverse IRC from the collected TS checkpoint. It supports closed-shell
 singlets without isotope-specific masses. Specify reactant stereochemistry;

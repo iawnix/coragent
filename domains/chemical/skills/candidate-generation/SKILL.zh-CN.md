@@ -22,8 +22,9 @@ description: 通过化学构造、扫描、QST、NEB 或构象与取向采样生
 通过现有 Job 接口运行显式求解器输入或有界任务脚本，保留原子对应关系，并核验所选
 方法的前提。Gaussian QST/TS 和 IRC 输入见 [Gaussian Skill](../gaussian/SKILL.zh-CN.md)。
 
-随包 helper 可能包含更窄的化学假设，复用前先核对其[适用范围](references/gaussian_path.zh-CN.md)。
-helper 不支持某种输入，不等于该研究方法不可用；Skill 本身没有脚本时仍可使用共享
-runner 或已安装软件。
+[映射路径准备器](references/path_preparation.zh-CN.md) 接收显式键变化，支持单片段端点
+自动构象生成或用户提供的映射几何，通过已有 Job 配方生成 QST2 与双向 IRC 输入。
+可选几何策略不决定科学验收结论，使用前核对输入与验证范围。准备器不支持某种输入
+不等于研究方法不可用；其他方法仍可使用共享 runner、显式求解器输入或任务脚本。
 方法判据见 [candidate_generation.zh-CN.md](references/candidate_generation.zh-CN.md)，
 NEB 可用性与前提见 [ase_neb_executor.zh-CN.md](references/ase_neb_executor.zh-CN.md)。

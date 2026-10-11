@@ -6,11 +6,15 @@ from rdkit import Chem
 
 
 def molecules(smiles):
+    if not isinstance(smiles, str):
+        raise ValueError('use a mapped reactants>>products SMILES string')
     parts = smiles.split('>>')
     if len(parts) != 2:
         raise ValueError('use reactants>>products with explicit atom-map numbers')
-    sides = [Chem.MolFromSmiles(part) for part in parts]
-    if any(mol is None for mol in sides):
+    parser = Chem.SmilesParserParams()
+    parser.removeHs = False  # Explicit mapped H atoms must retain their identity across a transfer.
+    sides = [Chem.MolFromSmiles(part, parser) for part in parts]
+    if any(mol is None or mol.GetNumAtoms() == 0 for mol in sides):
         raise ValueError('invalid reaction SMILES')
     for mol in sides:
         ids = [a.GetAtomMapNum() for a in mol.GetAtoms()]
@@ -143,7 +147,8 @@ def reaction(smiles, transformation=None):
                             'Implicit hydrogen correspondence is counted per mapped atom; individual H transfer needs explicit H maps.']}
 
 
-def path_spec(value):
+def calculation_spec(value):
+    """Common path schema and Gaussian settings, without a reaction topology rule."""
     if not isinstance(value, dict) or value.get('schema_version') != 'chemical-path-spec/1':
         raise ValueError('chemical-path-spec/1 required')
     for key in ('method', 'basis'):
@@ -152,6 +157,11 @@ def path_spec(value):
     for key in ('charge', 'multiplicity', 'threads', 'memory_mb'):
         if type(value.get(key)) is not int or key != 'charge' and value[key] < 1:
             raise ValueError('explicit charge, multiplicity, threads and memory_mb required')
+
+
+def path_spec(value):
+    """Legacy DA validator contract; generic input preparation has a separate scope."""
+    calculation_spec(value)
     if value.get('transformation', {}).get('kind') != 'diels_alder':
         raise ValueError('this candidate path supports a declared diels_alder transformation only')
     checked = reaction(value.get('mapped_smiles', ''), value['transformation'])
