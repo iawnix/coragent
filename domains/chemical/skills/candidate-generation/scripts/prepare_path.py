@@ -149,7 +149,7 @@ def prepare_irc(spec_file, checkpoint, output, max_points=80):
     rows=[]
     for direction in ('forward','reverse'):
         name = direction+'.gjf'
-        route=f'IRC=({direction.capitalize()},ReadFC,MaxPoints={max_points},StepSize=5) Geom=AllCheck Guess=Read SCF=Tight Int=UltraFine NoSymm'
+        route=f'IRC=({direction.capitalize()},CalcFC,MaxPoints={max_points},StepSize=5) Geom=AllCheck Guess=Read SCF=Tight Int=UltraFine NoSymm'
         (output/name).write_text(header(spec, direction+'.chk',route,old='ts.chk')+'\n')
         rows.append({'direction':direction,'path':str(output/name),'sha256':digest(output/name)})
     result={'schema_version':'chemical-irc-inputs/1','spec_sha256':digest(spec_file),

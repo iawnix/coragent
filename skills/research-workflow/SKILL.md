@@ -23,9 +23,15 @@ On a Monitor wake, check the latest user instructions, existing conclusions, and
 
 For delivery, read the installed email Skill and its configuration check. Report actual results, missing work and limitations. Retain send receipts: failure to update Memory after sending must not resend mail. Node status is not delivery authorization.
 
-Before proposing task completion, match each delivery criterion to immutable Results or materials and identify any remaining Jobs. Partial reports and negative findings may be useful progress; only the agreed delivery scope determines completion. Node closure, notes and plan edits do not establish delivery or reset the no-progress allowance. Keep scientific records in Memory and task control in the task tools; no per-turn checkpoint is required.
+Before proposing task completion, match each delivery criterion to immutable Results or materials and identify any remaining Jobs. Partial reports and negative findings may be useful progress; only the agreed delivery scope determines completion. Node closure, notes and plan edits do not establish delivery or establish new evidence. Keep scientific records in Memory and task control in the task tools; no per-turn checkpoint is required.
 
 - [Tools and execution](references/tools.md)
 - [Exact Skill resource paths](references/skills.md)
 - [Generated public contract](references/public_contract.md)
 - [中文说明](SKILL.zh-CN.md)
+
+Treat missing calculations, missing validation and an unfinished reply as remaining work. Enter `wait` only after runnable independent work is exhausted, then end the reply. A `block` reason must name the unmet prerequisite or budget, what must change to resume, and why other authorized approaches cannot proceed. After recording it, deliver that explanation. Do not weaken a requested calculation into “calculate or explain limitations”; partial reports remain progress unless the user changes scope. Runtime reference checks cannot establish scientific completeness.
+
+For recovery, read `task_read` and the new `actual_user_submission_ids` from the runtime snapshot. If the user supplies the missing input or explicitly requests a viable alternative, call `task_update` with `action="refine"`, the current `expected_revision` and those `source_submission_ids`; omit objective/criteria when scope is unchanged. Continue after the returned state is active. `progress` and Node status edits do not reactivate blocked tasks. On revision conflict, reread before retrying. Cite `job_…` or collected Artifacts/Results in task evidence, not `job_result_…` receipts.
+
+Execution failures use execution_recovery, independently of research blocked. Runs without new evidence are a replanning signal, not a fixed stopping threshold. Inspect prior receipts after a failed run; never blindly repeat completed or uncertain side effects. During final-response recovery, use the saved completion evidence and deliver the explanation without new calculations or external sends. If execution needs attention, explain the failure; a new instruction resolving it can use refine, or the user can explicitly resume in Monitor.

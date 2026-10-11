@@ -42,3 +42,15 @@
 `--job-software-root remote=/目标/专用目录` 与 `--job-conda remote=/目标/bin/conda`。
 这些路径在目标机器上解释。名称服务配置与 Python 环境绑定分开，PubChem/OPSIN
 网络不可用不会阻止离线安装验收。完整说明见 `docs/INSTALLATION.zh-CN.md`。
+
+## 自动运行恢复
+
+Host/Worker 启动环境可配置以下执行恢复参数，修改后重启 Host 生效：
+
+| 变量 | 默认值 | 含义 |
+| --- | --- | --- |
+| `CORAGENT_TASK_RECOVERY_MAX_RETRIES` | `2` | Pi 请求级重试最终失败后，最多追加的恢复运行次数；`0` 关闭自动恢复 |
+| `CORAGENT_TASK_RECOVERY_BASE_DELAY_MS` | `30000` | 首次恢复等待毫秒数，必须大于零 |
+| `CORAGENT_TASK_RECOVERY_MAX_DELAY_MS` | `300000` | 指数退避的最大等待，不能小于初始等待 |
+
+次数和截止时间持久保存，重启不会重新获得重试额度。该额度只约束执行恢复，不判断科学任务是否无解；Pi 自身的请求级重试仍由其 retry 设置控制。只自动恢复可识别的临时模型服务错误；配置、权限、请求钩子、中止和未知故障保留为执行待处理。Monitor 展示原因、阶段和重试时间；排除故障后用 `/monitor task resume <task-id>`，或以新用户指令配合 `task_update refine` 恢复。询问故障不会重置额度或自动解除待处理状态。最终回复恢复只允许读取证据和输出回复，不能重发邮件或重做计算。无新证据轮数仅供模型重新评估方法，不触发固定三轮停止。

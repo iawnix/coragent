@@ -38,3 +38,5 @@ M062X/6-31G**、Opt=Tight 或 SP、SCF=Tight、Int=UltraFine。完整显式
 确认。显式扫描输入可以执行，当前没有专门验证扫描完整性的内置验证器。
 
 详见 [Gaussian 科学验证](references/gaussian_validation.zh-CN.md)。
+
+- [二维弛豫扭转扫描](references/relaxed_scans.zh-CN.md)

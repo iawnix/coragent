@@ -44,3 +44,5 @@ endpoint identities with the connectivity validator and supporting evidence.
 A scan input can execute, but scan-specific completeness has no bundled validator.
 
 See [Gaussian scientific validation](references/gaussian_validation.md).
+
+- [Two-dimensional relaxed torsion scans](references/relaxed_scans.md)

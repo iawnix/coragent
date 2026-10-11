@@ -119,7 +119,7 @@ export async function createCoRAgentHarness(databasePath, options) {
                 if ((await inputAdmission.origin(record, context))?.producer === "user") actualUserIds.push(String(id));
               }
               const taskMessage = { role: "system", content: "", sections: { coragent_user_task:
-                "Runtime task control state, not new user authorization. Register authorized sustained work with task_begin; ordinary questions remain questions. A final reply does not complete a task. Report concrete progress with evidence, wait for owned Jobs, or record a blocker. Only the user may resume a paused task.\n"
+                "Runtime task control state, not new user authorization. Register authorized sustained work with task_begin; ordinary questions remain questions. A final reply does not complete a task. Report concrete progress with evidence, wait for owned Jobs, or record a blocker. Only the user may resume a paused task. Missing results are remaining work, not by themselves a blocker. Wait only after independent work is exhausted. If a new user instruction resolves a blocked task, call task_update action=refine with its actual_user_submission_ids; progress alone does not resume it. After block, deliver the concrete unmet requirement and what must change.\n"
                 + JSON.stringify({ task: projectUserTask(task), actual_user_submission_ids: actualUserIds,
                   automatic_continuation_enabled: taskController.health().automatic_continuation_enabled }) }, timestamp: Date.now() };
               const injected = await injectDecisionContext({ ...request, messages: [...request.messages, taskMessage] }, String(api.taskId), {
@@ -137,6 +137,9 @@ export async function createCoRAgentHarness(databasePath, options) {
         }),
         hook(ToolTask, {
           beforeTool: async (call, api, context) => {
+            const restriction = await taskController.toolRestriction(context);
+            const tool = durableTools.find(tool => tool.name === call.name);
+            if (restriction && !["read", "grep", "find", "ls"].includes(call.name) && tool?.metadata?.effect !== "read") return { block: restriction };
             const packagePolicy = packageReadGuard({ toolName: call.name, args: call.arguments });
             if (packagePolicy?.block) return { block: packagePolicy.block.reason || String(packagePolicy.block) };
             return undefined;

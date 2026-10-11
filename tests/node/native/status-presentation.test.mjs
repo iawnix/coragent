@@ -277,3 +277,16 @@ test('long errors expose complete details while the feedback remains bounded',()
  const plain=createStatusPresentation({session:{workspaceId:'w',sessionId:'s'},monochrome:true,theme:{fg(){throw Error('unexpected color');}},...tui});
  assert.doesNotMatch(plain.footer.render(80).join('\n'),/\x1b\[/);
 });
+
+
+test('execution recovery is visible without claiming research is blocked', () => {
+ const base = { session_id: 'recovery', updated_at: new Date().toISOString(), jobs: { counts: { running: 1, queued: 0 } },
+   execution: { state: 'idle' }, automatic_continuation_enabled: true,
+   task_controller: { error: null, last_checked_at: new Date().toISOString(), check_interval_ms: 30000 } };
+ for (const [state,phase,label] of [['retrying','research','Recovering execution'], ['running','delivery','Recovering final response'],
+   ['attention_required','research','Execution needs attention']]) {
+   const task = { state: phase === 'delivery' ? 'completing' : 'active', execution_recovery: { state, phase } };
+   const status = activityStatus({ monitor: { ...base, task }, sessionId: 'recovery' });
+   assert.equal(status.reason, label); assert.doesNotMatch(status.text, /Task blocked/);
+ }
+});

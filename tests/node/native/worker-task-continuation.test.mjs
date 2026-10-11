@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createServer } from "node:http";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { execFile } from "node:child_process";
@@ -11,30 +11,41 @@ import { TEST_ROOT, TEST_SOCKET_ROOT, managedPython, pinnedPiSource, assertInsta
 const execute = promisify(execFile);
 const packageRoot = resolve(process.env.CORAGENT_TEST_PACKAGE_ROOT || process.cwd());
 
-for (const scenario of ["single", "branches"]) test(`real Worker continues ${scenario} research after a partial answer and completes one durable delivery`, { timeout: 60_000 }, async () => {
+for (const scenario of ["single", "branches", "block-resume", "execution-recovery", "delivery-recovery"]) test(`real Worker continues ${scenario} research after a partial answer and completes one durable delivery`, { timeout: 60_000 }, async () => {
   await assertInstalledRuntime(packageRoot);
   const root = await mkdtemp(join(TEST_ROOT, "task-flow-"));
   const socketRoot = join(TEST_SOCKET_ROOT, "t");
   await mkdir(socketRoot);
   const saved = { ...process.env };
-  let backend, server, requests = 0, fixtureError;
+  let backend, server, requests = 0, fixtureError, failureRequests = 0, recoveryRestarted = false, blockedWrite = false;
   const observedRequests = [];
   const tools = [];
   try {
     const agentDir = join(root, "agent"), workspaceRoot = join(root, "workspaces");
     await mkdir(agentDir); await mkdir(workspaceRoot);
     Object.assign(process.env, { PI_CODING_AGENT_DIR: agentDir, PI_AGENT_DIR: agentDir,
-      CORAGENT_PYTHON: managedPython(), PYTHONDONTWRITEBYTECODE: "1" });
+      CORAGENT_PYTHON: managedPython(), PYTHONDONTWRITEBYTECODE: "1",
+      CORAGENT_TASK_RECOVERY_BASE_DELAY_MS: "500", CORAGENT_TASK_RECOVERY_MAX_DELAY_MS: "500" });
     await execute(managedPython(), [join(packageRoot, "apps/agent-cli/workspace_mode.py"),
       "--root", join(workspaceRoot, "task-flow"), "--workspace-id", "task-flow"]);
     server = createServer(async (req, res) => {
       try {
         let body = ""; for await (const part of req) body += part;
         const request = JSON.parse(body); observedRequests.push(request);
+        if (failureRequests === 0 && ((scenario === "execution-recovery" && requests === 4)
+          || (scenario === "delivery-recovery" && requests === 7))) {
+          failureRequests++;
+          res.writeHead(503, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: { message: "503 Service Unavailable", type: "server_error" } }));
+          return;
+        }
         const results = request.messages.filter(message => message.role === "tool").map(message => {
+          if (scenario === "delivery-recovery" && message.content.includes("Delivery recovery permits read-only tools")) {
+            blockedWrite = true; return null;
+          }
           assert.match(message.content, /^\s*[\[{]/, "fixture tools must return their structured success result");
           return JSON.parse(message.content);
-        });
+        }).filter(Boolean);
         const injectedTask = request.messages.map(message => message.content).join("\n")
           .match(/\{"task":.*,"actual_user_submission_ids":.*,"automatic_continuation_enabled":(?:true|false)\}/);
         assert.ok(injectedTask, "every request must carry the current task projection");
@@ -103,7 +114,18 @@ for (const scenario of ["single", "branches"]) test(`real Worker continues ${sce
             completion: [{ criterion_id: "comparison", evidence_refs: [synthesis?.id] }] } },
           "Both derivations and the approximation bounds are retained. The comparison is complete.",
         ];
-        const steps = scenario === "single" ? singleSteps : branchSteps;
+        const blockSteps = [
+          ...singleSteps.slice(0, 5),
+          { name: "task_update", arguments: { expected_revision: task?.revision, action: "block",
+            reason: "The required boundary value is missing; independent analysis is exhausted. Supply the boundary value to resume." } },
+          "Research is blocked pending the required boundary value.",
+          { name: "task_update", arguments: { expected_revision: task?.revision, action: "refine", source_submission_ids: userIds } },
+          ...singleSteps.slice(5),
+        ];
+        const deliverySteps = [...singleSteps.slice(0, 7),
+          { name: "bash", arguments: { command: "touch forbidden-delivery-write" } }, singleSteps[7]];
+        const steps = scenario === "branches" ? branchSteps : scenario === "block-resume" ? blockSteps
+          : scenario === "delivery-recovery" ? deliverySteps : singleSteps;
         const step = steps[requests++];
         assert.ok(step, "completed research must not trigger another model request");
         if (typeof step !== "string") tools.push(step.name);
@@ -128,6 +150,7 @@ for (const scenario of ["single", "branches"]) test(`real Worker continues ${sce
       models: [{ id: "fixture", name: "Fixture", reasoning: false, input: ["text"],
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 4096 }],
     } } }));
+    await writeFile(join(agentDir, "settings.json"), JSON.stringify({ retry: { enabled: false } }));
     const { createCoRAgentHarnessBackend } = await import(pathToFileURL(join(packageRoot, "apps/agent/pi/backend.mjs")));
     const options = { sourceRoot: pinnedPiSource(), packageRoot, workspaceRoot,
       serverDirectory: socketRoot, sessionDir: join(root, "sessions"), stateRoot: join(root, "state"),
@@ -139,26 +162,86 @@ for (const scenario of ["single", "branches"]) test(`real Worker continues ${sce
     await backend.sendInput({ ...scope, client_message_id: "start-fixture-task", request_id: "start-fixture-task",
       text: "Perform the local fixture research and report the completed finding. Do not send anything externally.", mode: "auto" });
     let overview;
+    if (scenario === "block-resume") {
+      let blockedRuns;
+      for (let attempt = 0; attempt < 200; attempt++) {
+        assert.ifError(fixtureError);
+        overview = await backend.monitor("monitor/overview", scope);
+        if (overview.task?.state === "blocked" && requests === 7) {
+          blockedRuns = await backend.monitor("monitor/runs", { ...scope, user_task_id: overview.task.user_task_id });
+          if (blockedRuns.items.length === 2 && blockedRuns.items.every(run => run.state === "done")) break;
+        }
+        await new Promise(done => setTimeout(done, 100));
+      }
+      assert.equal(overview.task?.state, "blocked");
+      assert.equal(requests, 7, "automatic block must deliver its final explanation");
+      assert.ok(blockedRuns?.items.every(run => run.state === "done"), "block explanation must finish delivery before restart");
+      for (const run of blockedRuns.items) {
+        const detail = await backend.monitor("monitor/run/read", { ...scope, run_id: run.run_id });
+        assert.ok(detail.items.every(item => item.error === null));
+      }
+      await backend.close(); backend = await createCoRAgentHarnessBackend(options);
+      assert.equal((await backend.monitor("monitor/overview", scope)).task.state, "blocked");
+      await new Promise(done => setTimeout(done, 150));
+      assert.equal(requests, 7, "restart must not resume a blocked task");
+      await backend.sendInput({ ...scope, client_message_id: "resolve-blocker", request_id: "resolve-blocker",
+        text: "Use boundary value zero and continue the research to completion.", mode: "auto" });
+    }
     for (let attempt = 0; attempt < 200; attempt++) {
       assert.ifError(fixtureError);
       await assert.doesNotReject(async () => { overview = await backend.monitor("monitor/overview", scope); });
+      if (scenario.endsWith("-recovery") && overview.task?.execution_recovery?.state === "retrying" && !recoveryRestarted) {
+        assert.equal(overview.task.execution_recovery.failures, 1);
+        assert.equal(overview.task.state, scenario === "delivery-recovery" ? "completing" : "active");
+        await backend.close(); backend = await createCoRAgentHarnessBackend(options); recoveryRestarted = true;
+      }
       if (overview.task?.state === "completed") break;
       await new Promise(done => setTimeout(done, 100));
     }
     assert.equal(overview.task?.state, "completed");
-    assert.equal(requests, scenario === "single" ? 8 : 17);
+    assert.equal(requests, scenario === "branches" ? 17 : scenario === "block-resume" ? 11 : scenario === "delivery-recovery" ? 9 : 8);
+    if (scenario.endsWith("-recovery")) {
+      assert.equal(failureRequests, 1); assert.equal(recoveryRestarted, true);
+      assert.equal(overview.task.execution_recovery, null);
+      assert.equal(tools.filter(name => name === "research_result").length, 1, "recovery must not repeat the completed evidence write");
+      if (scenario === "delivery-recovery") {
+        assert.equal(blockedWrite, true);
+        await assert.rejects(readFile(join(workspaceRoot, "task-flow", "forbidden-delivery-write")), { code: "ENOENT" });
+      }
+    }
     if (scenario === "single") assert.deepEqual(tools, ["task_begin", "research_create", "task_update", "task_read", "research_result", "task_update"]);
-    else assert.equal(tools.filter(name => name === "research_create").length, 4);
+    else if (scenario === "branches") assert.equal(tools.filter(name => name === "research_create").length, 4);
     assert.equal(overview.jobs.counts.total, 0, "continued analysis must not require a compute event");
     const runs = await backend.monitor("monitor/runs", { ...scope, user_task_id: overview.task.user_task_id });
-    assert.equal(runs.items.length, 2);
+    assert.equal(runs.items.length, scenario === "block-resume" || scenario.endsWith("-recovery") ? 3 : 2);
     assert.deepEqual(new Set(runs.items.map(run => run.producer)), new Set(["user", "task_controller"]));
     for (const run of runs.items) {
-      const detail = await backend.monitor("monitor/run/read", { ...scope, run_id: run.run_id });
-      assert.ok(detail.items.some(item => item.kind === "pi.generation"));
+      const detail = { items: [] }; let cursor;
+      do {
+        const page = await backend.monitor("monitor/run/read", { ...scope, run_id: run.run_id, limit: 100, ...(cursor ? { cursor } : {}) });
+        detail.items.push(...page.items); cursor = page.next_cursor;
+      } while (cursor);
+      if (scenario.endsWith("-recovery")) {
+        if (run.state === "unanswered") {
+          assert.ok(run.generation_count > 0, "failed run has an indexed generation");
+          assert.ok(detail.items.length > 0, "failed run records survive restart");
+          assert.ok(detail.items.some(item => item.kind === "pi.generation"), "failed generation is visible");
+        } else if (run.producer === "user") {
+          assert.ok(detail.items.some(item => item.kind === "pi.generation"), "initial user generation survives restart");
+          assert.ok(detail.items.some(item => item.kind === "pi.tool"), "initial user tools survive restart");
+        } else {
+          assert.ok(detail.items.some(item => item.kind === "pi.generation"), "recovery generation is visible");
+          assert.ok(detail.items.some(item => item.kind === "pi.tool"), "recovery tools are visible");
+        }
+      } else assert.ok(detail.items.some(item => item.kind === "pi.generation"));
+      if (run.state === "unanswered") {
+        assert.ok(scenario.endsWith("-recovery"));
+        assert.ok(detail.items.some(item => item.error !== null));
+        continue;
+      }
       assert.ok(detail.items.some(item => item.kind === "pi.tool"));
       assert.ok(detail.items.some(item => item.kind === "pi.tool" && tools.includes(item.tool_name)));
-      assert.ok(detail.items.every(item => item.error === null), "successful research has no execution errors");
+      if (scenario !== "delivery-recovery") assert.ok(detail.items.every(item => item.error === null), "successful research has no execution errors");
     }
     const count = requests;
     const research = await backend.monitor("monitor/task/read", { ...scope, user_task_id: overview.task.user_task_id });
@@ -174,7 +257,7 @@ for (const scenario of ["single", "branches"]) test(`real Worker continues ${sce
     assert.deepEqual(restored.task.research, overview.task.research, "restart retains the same research identities");
     await new Promise(done => setTimeout(done, 100));
     assert.equal(requests, count, "restart and read-only Monitor queries cannot repeat delivery");
-    const objective = scenario === "single" ? "Record a reproducible fixture finding" : "Compare independent derivations";
+    const objective = scenario !== "branches" ? "Record a reproducible fixture finding" : "Compare independent derivations";
     assert.ok(observedRequests.slice(3).every(request => JSON.stringify(request.messages).includes(objective)));
   } finally {
     try { await backend?.close(); }

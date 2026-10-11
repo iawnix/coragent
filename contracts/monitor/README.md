@@ -82,6 +82,17 @@ type UserTask = {
   event_inputs: { submission_id: number; request_id: string; event_ids: string[] }[];
   completion: CompletionEvidence[] | null;
   completion_submission_id?: number;
+  completion_control_epoch?: number;
+  execution_recovery?: {
+    state: "retrying" | "running" | "attention_required";
+    phase: "research" | "delivery";
+    failures: number;
+    submission_id: number;
+    control_epoch: number;
+    reason: string;
+    detail: string | null;
+    next_retry_at: string | null;
+  } | null;
   cancel_jobs?: {
     policy: "keep" | "cancel";
     pending: string[];
@@ -97,7 +108,7 @@ type UserTask = {
       control_epoch: number;
       progress_version: number;
     } | null;
-    no_progress: number;
+    no_progress: number; // advisory; never automatically blocks research
   };
   audit: { action: string; actor: string; reason: string | null; revision: number; at: string }[];
   created_at: string;
@@ -147,6 +158,7 @@ type ControllerHealth = {
   checking: boolean;
   last_checked_at: string | null;
   check_interval_ms: number;
+  recovery_policy: { maxRetries: number; baseDelayMs: number; maxDelayMs: number };
 };
 type Health = {
   task_controller: ControllerHealth;

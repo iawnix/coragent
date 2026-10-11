@@ -22,3 +22,15 @@ test("canonical command adapters reject obsolete fields instead of dropping them
   assert.equal(called, false);
   assert.deepEqual(commandArguments("job.collect", { job_id: "job_1" }), ["--job-id", "job_1"]);
 });
+
+test("public research_search type reaches the canonical search command as kind", async () => {
+  const { createResearchTools } = await import("../../apps/agent/tools/research/tools.mjs");
+  const calls = [];
+  const tool = createResearchTools({ commandBridge: { execute_command: async (command, params) => {
+    calls.push({ command, params }); return { matches: [] };
+  } } }).find(tool => tool.name === "research_search");
+  for (const type of ["node", "result", "record"]) {
+    await tool.execute({ query: "fixture", type }, { coragent: { workspace_root: "/unused" } }, {});
+    assert.deepEqual(calls.at(-1), { command: "research.search", params: { query: "fixture", kind: type } });
+  }
+});

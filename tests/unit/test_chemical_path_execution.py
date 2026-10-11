@@ -106,7 +106,7 @@ def synthetic_logs(row):
     log+=' Thermochemistry\n Normal termination of Gaussian\n'
     result={'ts':log}
     for direction,endpoint in [('forward',product),('reverse',endpoint_reactants)]:
-        route=f'#p M062X/6-31G** IRC=({direction.capitalize()},ReadFC,MaxPoints=80,StepSize=5) Geom=AllCheck Guess=Read SCF=Tight Int=UltraFine NoSymm'
+        route=f'#p M062X/6-31G** IRC=({direction.capitalize()},CalcFC,MaxPoints=80,StepSize=5) Geom=AllCheck Guess=Read SCF=Tight Int=UltraFine NoSymm'
         text=title+route+'\n ----------------\n Charge = 0 Multiplicity = 1\n'+orientation(saddle)+'\n'
         text+=f' Point Number 1 in {direction.upper()} path direction\n SCF Done: E(RM062X) = -270.1 A.U.\n Point Number: 1 Path Number: 1\n CURRENT STRUCTURE\n'
         for i,(symbol,*coords) in enumerate(endpoint,1):text+=f' {i} {Chem.GetPeriodicTable().GetAtomicNumber(symbol)} '+' '.join(f'{x:.9f}' for x in coords)+'\n'
@@ -220,7 +220,7 @@ def test_generic_jobs_execute_candidate_gaussian_and_registered_validators(tmp_p
     with pytest.raises(ValueError,match='collected_output'):
         prepare(tmp_path,{'validator_id':'chemical.gaussian_frequency', "validator_version": "1",'input_artifact_ids':[ref]})
     fixture=tmp_path/'fixture_solver.py'
-    fixture.write_text(f'#!{sys.executable}\nimport sys,json\nfrom pathlib import Path\nlogs=json.loads({json.dumps(json.dumps(logs))})\ntext=sys.stdin.read()\nkey="forward" if "IRC=(Forward" in text else "reverse" if "IRC=(Reverse" in text else "ts"\nPath(key+".chk").write_bytes(b"synthetic fixture checkpoint")\nprint(logs[key])\n')
+    fixture.write_text(f'#!{sys.executable}\nimport sys,json\nfrom pathlib import Path\nlogs=json.loads({json.dumps(json.dumps(logs))})\ntext=sys.stdin.read()\nassert "IRC=" not in text or any(option in text for option in ("CalcFC", "ReadCartesianFC", "FCCards")), "IRC requires a supported Hessian source"\nkey="forward" if "IRC=(Forward" in text else "reverse" if "IRC=(Reverse" in text else "ts"\nPath(key+".chk").write_bytes(b"synthetic fixture checkpoint")\nprint(logs[key])\n')
     fixture.chmod(0o755)
     def gaussian(gjf,job_id,validation,checkpoint=None):
         inputs=[{'source':str(SKILLS/'gaussian/scripts'),'destination':'skills/gaussian/scripts'},
@@ -255,3 +255,19 @@ def test_generic_jobs_execute_candidate_gaussian_and_registered_validators(tmp_p
     Path(spec_record['location']).write_text('{}')
     with pytest.raises(ValueError,match='digest_mismatch'):
         prepare(tmp_path,{'validator_id':'chemical.reaction_mapping', "validator_version": "1",'input_artifact_ids':[ref]})
+
+
+def test_registered_mapping_reports_unsupported_aromatic_scope_as_inconclusive(tmp_path):
+    aromatic = '[CH2:1]=[CH:2][CH:3]=[CH2:4].[cH:5]1[cH:6][cH:7][cH:8][cH:9][cH:10]1'
+    value = {**SPEC, 'mapped_smiles': aromatic + '>>' + aromatic}
+    path = tmp_path / 'aromatic.json'
+    path.write_text(json.dumps(value))
+    manifest = {'inputs': [{'artifact_id': 'art_1', 'sha256': 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()}]}
+    result = validate('mapping', [path], manifest)
+    assert result['verdict'] == 'inconclusive'
+    assert result['scientific_verdict'] == 'not_assessed'
+    assert result['parsing']['status'] == 'completed'
+    assert 'unsupported DA candidate scope' in result['checks']['method_scope']['details']
+    with pytest.raises(ValueError, match='unsupported DA candidate scope'):
+        helper.prepare_candidates(path, tmp_path / 'unsupported')
+    assert not (tmp_path / 'unsupported').exists()

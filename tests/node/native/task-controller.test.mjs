@@ -16,7 +16,7 @@ import { createToolExecutionContext } from "../../../apps/agent/tools/context.mj
 import { projectUserTask } from "../../../apps/agent/tasks/projection.mjs";
 
 const { admitSubmission } = await import(pathToFileURL(join(pinnedPiSource(), "packages/durable/src/harness/submissions.ts")).href);
-async function fixture(t, storage = new MemoryStorage()) {
+async function fixture(t, storage = new MemoryStorage(), controllerOptions = {}) {
   const faux = fauxProvider(), models = createModels(); models.setProvider(faux.provider);
   let harness, admission, controller;
   const registry = createRegistry();
@@ -26,11 +26,11 @@ async function fixture(t, storage = new MemoryStorage()) {
       for (const id of live.run.inputs) {
         const record = await (await harness.submission(id, ctx)).status(ctx);
         const origin = await admission.origin(record, ctx);
-        if (origin.producer === "task_controller") await controller.validateConsumption(record, origin, ctx);
+        if (origin.producer !== "user") await controller.validateConsumption(record, origin, ctx);
       }
     },
   })] }));
-  harness = await Harness.open(storage, { models, registry, settings: {} }, context);
+  harness = await Harness.open(storage, { models, registry, settings: { retry: { enabled: false } } }, context);
   const conversation = await harness.root(context, { agent: { model: { provider: "faux", modelId: "faux-1" } } });
   admission = createInputAdmission({ harness, conversation, LiveDoc, InboxDoc, admitSubmission });
   const jobStates = new Map(), calls = [], artifacts = new Map();
@@ -49,7 +49,8 @@ async function fixture(t, storage = new MemoryStorage()) {
       sha256: artifacts.get(params.artifact_id) };
     throw new Error(`Unexpected test command ${command}`);
   } };
-  controller = createTaskController({ harness, conversation, admission, LiveDoc, InboxDoc, kernel, workspaceId: "workspace", sessionId: "session", context });
+  const openController = () => createTaskController({ harness, conversation, admission, LiveDoc, InboxDoc, kernel, workspaceId: "workspace", sessionId: "session", context, ...controllerOptions });
+  controller = openController();
   const session = createSessionAdmission({ harness, conversation, LiveDoc, taskController: controller });
   const native = bindUserInputConversation(conversation, admission, harness, session);
   t.after(async () => { await controller.close(); await harness.close(context); });
@@ -61,17 +62,18 @@ async function fixture(t, storage = new MemoryStorage()) {
       source_submission_ids: [String(source.id)], criteria: [{ id: "report", description: "Report supported by evidence" }] }, "begin", context);
     return task;
   };
-  return { harness, conversation, admission, controller, native, faux, begin, jobStates, calls, kernel, session, artifacts };
+  return { harness, conversation, admission, get controller() { return controller; }, native, faux, begin, jobStates, calls, kernel, session, artifacts,
+    reopen: async () => { await controller.close(); controller = openController(); } };
 }
 
-test("idle active tasks continue without Jobs and stop after bounded lack of progress", async t => {
+test("idle active tasks continue beyond three evidence-free runs and explicit blockers remain recoverable", async t => {
   const { controller, conversation, faux, begin, admission } = await fixture(t);
   const task = await begin();
   assert.match(task.user_task_id, /^task_/);
   assert.equal(task.schema_version, "coragent-user-task/2");
   assert.deepEqual(task.research, { entry_node_ids: [], focus_node_ids: [] });
   assert.match(task.sources[0].text, /evidence-backed/);
-  for (let round = 0; round < 3; round++) {
+  for (let round = 0; round < 4; round++) {
     faux.setResponses([fauxAssistantMessage("Another partial summary")]);
     await Promise.all([controller.reconcile(), controller.reconcile()]);
     await conversation.waitForIdle(context);
@@ -79,6 +81,10 @@ test("idle active tasks continue without Jobs and stop after bounded lack of pro
     const input = await admission.status(`task:${task.user_task_id}:continue:${round + 1}`, context);
     assert.equal((await admission.origin(input, context)).producer, "task_controller");
   }
+  let blocking = await controller.current(context);
+  assert.equal(blocking.state, "active");
+  await controller.update({ action: "block", expected_revision: blocking.revision,
+    reason: "The required boundary data must be supplied before further analysis" }, "explicit-block", context);
   await controller.reconcile();
   assert.equal((await controller.current(context)).state, "blocked");
   assert.equal((await controller.current(context)).continuation.no_progress, 3);
@@ -89,7 +95,7 @@ test("idle active tasks continue without Jobs and stop after bounded lack of pro
   await controller.reconcile();
   let current = await controller.current(context);
   assert.equal(current.state, "blocked", "ordinary input must not restart automatic work");
-  assert.equal(current.continuation.sequence, 3);
+  assert.equal(current.continuation.sequence, 4);
   await assert.rejects(controller.update({ action: "refine", expected_revision: current.revision,
     source_submission_ids: [task.sources[0].submission_id] }, "old-sources", context), { code: "task_source_required" });
 
@@ -106,14 +112,14 @@ test("idle active tasks continue without Jobs and stop after bounded lack of pro
   assert.equal(revised.continuation.no_progress, 0);
   assert.equal(revised.progress_version, current.progress_version, "new instructions are not scientific evidence");
   assert.deepEqual(await controller.update(params, "revise-blocked", context), revised);
-  assert.ok(revised.audit.some(item => item.actor === "task_controller" && item.reason?.includes("Three automatic runs")));
+  assert.ok(revised.audit.some(item => item.actor === "agent" && item.action === "block"));
 
   faux.setResponses([fauxAssistantMessage("Continuing with the revised method")]);
   await controller.reconcile();
   await conversation.waitForIdle(context);
   current = await controller.current(context);
   assert.equal(current.state, "active");
-  assert.equal(current.continuation.sequence, 4);
+  assert.equal(current.continuation.sequence, 5);
   await controller.control({ user_task_id: task.user_task_id, action: "pause", expected_revision: current.revision,
     request_id: "pause-revised" }, context);
   current = await controller.current(context);
@@ -251,9 +257,12 @@ test("new planning records and changing evidence combinations cannot hide an idl
     task = await controller.current(context);
     await controller.update({ action: "progress", expected_revision: task.revision, evidence_refs: [nodeId(n), `note_${n}`] }, `planning-${n}`, context);
   }
-  await controller.reconcile();
+  faux.setResponses([fauxAssistantMessage("Reassess the method without inventing evidence")]);
+  await controller.reconcile(); await conversation.waitForIdle(context);
   const task = await controller.current(context);
-  assert.equal(task.state, "blocked"); assert.equal(task.progress_version, 0);
+  assert.equal(task.state, "active"); assert.equal(task.progress_version, 0);
+  assert.equal(task.continuation.no_progress, 3);
+  assert.equal(task.continuation.sequence, 4);
   await assert.rejects(controller.update({ action: "propose_completion", expected_revision: task.revision,
     completion: [{ criterion_id: "report", evidence_refs: [nodeId(1)] }] }, "node-completion", context), { code: "task_completion_evidence_invalid" });
 });
@@ -483,4 +492,247 @@ test("read-only task listing never retries a pending cancellation; reconciliatio
   const result = await controller.cancelJob({ job_id: "job_1", request_id: "cancel-single" }, context);
   assert.equal(result.job.state, "cancelled");
   assert.equal(attempts, 2);
+});
+
+for (const mode of ["all", "any"]) test(`completed ${mode} waits release Job binding during the same live run`, async t => {
+  const { controller, conversation, faux, begin, jobStates, harness } = await fixture(t);
+  await begin();
+  let entered, finish;
+  const ready = new Promise(resolve => { entered = resolve; });
+  faux.setResponses([() => new Promise(resolve => { entered(); finish = () => resolve(fauxAssistantMessage("Independent work can now continue")); })]);
+  await controller.reconcile(); await ready;
+  try {
+    jobStates.set("job_1", "running"); jobStates.set("job_2", "running");
+    let task = await controller.current(context);
+    await controller.update({ action: "wait", expected_revision: task.revision,
+      wait: { job_ids: ["job_1", "job_2"], mode } }, "wait-live", context);
+    await assert.rejects(controller.binding(context), { code: "task_not_active" });
+    jobStates.set("job_1", "succeeded");
+    if (mode === "all") {
+      await assert.rejects(controller.binding(context), { code: "task_not_active" });
+      jobStates.set("job_2", "failed");
+    }
+    await controller.reconcile();
+    assert.ok((await harness.snapshot(LiveDoc, conversation.id, context)).run);
+    task = await controller.current(context);
+    assert.equal(task.state, "active"); assert.equal(task.wait, null);
+    assert.deepEqual(await controller.binding(context), { user_task_id: task.user_task_id });
+    assert.equal(task.continuation.sequence, 1, "settling wait must not submit another run");
+  } finally { finish(); }
+  await conversation.waitForIdle(context);
+});
+
+test("pause wins while completed waits are being observed", async t => {
+  const { controller, begin, jobStates, kernel } = await fixture(t);
+  let task = await begin(); jobStates.set("job_1", "running");
+  task = await controller.update({ action: "wait", expected_revision: task.revision,
+    wait: { job_ids: ["job_1"], mode: "all" } }, "wait", context);
+  let entered, finish;
+  const ready = new Promise(resolve => { entered = resolve; });
+  const execute = kernel.execute_command;
+  kernel.execute_command = async (command, params) => command === "job.status"
+    ? new Promise(resolve => { entered(); finish = () => resolve({ job_id: "job_1", state: "succeeded" }); })
+    : execute(command, params);
+  const binding = controller.binding(context);
+  const rejected = assert.rejects(binding, { code: "task_not_active" });
+  await ready;
+  await controller.control({ user_task_id: task.user_task_id, expected_revision: task.revision,
+    action: "pause", request_id: "pause-wait" }, context);
+  finish(); await rejected;
+  assert.equal((await controller.current(context)).state, "paused");
+});
+
+for (const producer of ["task_controller", "monitor"]) for (const control of [null, "pause", "cancel", "user"]) test(`${producer} blocked run finalization respects ${control || "its consumed run identity"}`, async t => {
+  const { controller, begin, conversation, faux, admission, harness } = await fixture(t);
+  let task = await begin();
+  let entered, finish;
+  const ready = new Promise(resolve => { entered = resolve; });
+  faux.setResponses([() => new Promise(resolve => { entered(); finish = () => resolve(fauxAssistantMessage("Need a missing input from the user")); })]);
+  const requestId = producer === "monitor" ? "monitor-block" : `task:${task.user_task_id}:continue:1`;
+  if (producer === "monitor") await admission.submitInternal({ requestId, producer, content: "Review the completed fixture Job",
+    identity: { event_ids: ["event_fixture"] }, basis: { task_revision: task.revision,
+      control_epoch: task.control_epoch, task_owners: [task.user_task_id] } }, context);
+  else await controller.reconcile();
+  await ready;
+  const record = await admission.status(requestId, context);
+  const origin = await admission.origin(record, context);
+  try {
+    task = await controller.current(context);
+    task = await controller.update({ action: "block", expected_revision: task.revision,
+      reason: "Missing required boundary data; no independent analysis remains" }, "block", context);
+    await controller.assertExecutionAllowed(record, origin, context);
+    await assert.rejects(controller.assertExecutionAllowed(record, { ...origin, consumption: null }, context));
+    await assert.rejects(controller.binding(context), { code: "task_not_active" });
+    if (control === "user") {
+      faux.setResponses([fauxAssistantMessage("The blocker still requires a missing input")]);
+      await admission.submitUser({ requestId: "new-question", content: "Explain the blocker" }, context);
+      await assert.rejects(controller.assertExecutionAllowed(record, origin, context));
+    } else if (control) {
+      await controller.control({ user_task_id: task.user_task_id, expected_revision: task.revision,
+        action: control, request_id: control, ...(control === "cancel" ? { jobs: "keep" } : {}) }, context);
+      await assert.rejects(controller.assertExecutionAllowed(record, origin, context));
+    }
+  } finally { finish(); }
+  await conversation.waitForIdle(context);
+  await assert.rejects(controller.assertExecutionAllowed(record, origin, context), undefined,
+    "the finalization permission expires with the live run");
+  await controller.reconcile();
+  assert.equal((await controller.current(context)).continuation.sequence, 1);
+});
+
+test("Job receipts produce actionable evidence errors without masquerading as owned Jobs", async t => {
+  const { controller, begin, jobStates } = await fixture(t);
+  const task = await begin(); jobStates.set("job_1", "succeeded");
+  await assert.rejects(controller.update({ action: "progress", expected_revision: task.revision,
+    evidence_refs: ["job_result_1"] }, "receipt", context), /cite the owning job_id/);
+  await assert.rejects(controller.update({ action: "progress", expected_revision: task.revision,
+    evidence_refs: ["job_2"] }, "foreign", context), /must belong/);
+  const updated = await controller.update({ action: "progress", expected_revision: task.revision,
+    evidence_refs: ["job_1"] }, "owned", context);
+  assert.equal(updated.progress_version, 1);
+});
+
+test("scope cannot be weakened by reusing the original instruction", async t => {
+  const { controller, begin } = await fixture(t);
+  const task = await begin();
+  await assert.rejects(controller.update({ action: "refine", expected_revision: task.revision,
+    source_submission_ids: [task.sources[0].submission_id],
+    criteria: [{ id: "partial", description: "Explain missing work instead" }] }, "weaken", context),
+  { code: "task_source_required" });
+  assert.deepEqual((await controller.current(context)).criteria, task.criteria);
+});
+
+test("transient wait status failure preserves user access and can recover", async t => {
+  const { controller, begin, jobStates, kernel } = await fixture(t);
+  let task = await begin(); jobStates.set("job_1", "running");
+  task = await controller.update({ action: "wait", expected_revision: task.revision,
+    wait: { job_ids: ["job_1"], mode: "all" } }, "wait-unavailable", context);
+  const execute = kernel.execute_command;
+  kernel.execute_command = async (command, params) => {
+    if (command === "job.status") throw new Error("Fixture status service unavailable");
+    return execute(command, params);
+  };
+  assert.equal((await controller.current(context)).state, "waiting");
+  assert.equal(controller.health().error.code, "task_wait_observation_failed");
+  await assert.rejects(controller.binding(context), { code: "task_not_active" });
+  kernel.execute_command = execute; jobStates.set("job_1", "succeeded");
+  assert.deepEqual(await controller.binding(context), { user_task_id: task.user_task_id });
+});
+
+const transientFailure = () => ({ ...fauxAssistantMessage(""), stopReason: "error", errorMessage: "503 Service Unavailable" });
+const recoveryOptions = clock => ({ recoveryPolicy: { maxRetries: 2, baseDelayMs: 100, maxDelayMs: 200 }, now: () => clock.value });
+
+test("transient execution recovers once after its durable delay without blocking research", async t => {
+  const clock = { value: 1000 }, env = await fixture(t, new MemoryStorage(), recoveryOptions(clock));
+  const task = await env.begin();
+  env.faux.setResponses([transientFailure()]);
+  await env.controller.reconcile(); await env.conversation.waitForIdle(context);
+  await env.controller.reconcile();
+  let current = await env.controller.current(context);
+  assert.equal(current.state, "active");
+  assert.equal(current.execution_recovery.state, "retrying");
+  assert.equal(current.execution_recovery.failures, 1);
+  assert.equal(Date.parse(current.execution_recovery.next_retry_at), 1100);
+  const original = await env.admission.status(`task:${task.user_task_id}:continue:1`, context);
+  assert.equal(original.status, "unanswered");
+  await env.reopen();
+  await env.controller.reconcile();
+  assert.equal((await env.controller.current(context)).continuation.sequence, 1);
+  clock.value = 1100;
+  env.faux.setResponses([fauxAssistantMessage("Continue analysis from the retained evidence")]);
+  await Promise.all([env.controller.reconcile(), env.controller.reconcile()]);
+  await env.conversation.waitForIdle(context);
+  assert.equal((await env.controller.current(context)).continuation.sequence, 2);
+  assert.equal((await env.admission.status(original.requestId, context)).status, "unanswered");
+  // Hold independent work to inspect the successful recovery settlement without launching another reply.
+  let entered, finish;
+  const ready = new Promise(resolve => { entered = resolve; });
+  env.faux.setResponses([() => new Promise(resolve => { entered(); finish = () => resolve(fauxAssistantMessage("Continuing")); })]);
+  await env.controller.reconcile(); await ready;
+  try { assert.equal((await env.controller.current(context)).execution_recovery, null); }
+  finally { finish(); }
+  await env.conversation.waitForIdle(context);
+});
+
+test("recovery budget survives restart, ignores new evidence, and rejects Monitor bypass", async t => {
+  const clock = { value: 1000 }, env = await fixture(t, new MemoryStorage(), recoveryOptions(clock));
+  await env.begin();
+  for (let failure = 1; failure <= 3; failure++) {
+    env.faux.setResponses([transientFailure()]);
+    await env.controller.reconcile(); await env.conversation.waitForIdle(context);
+    let current = await env.controller.current(context);
+    await env.controller.update({ action: "progress", expected_revision: current.revision,
+      evidence_refs: [`result_${failure}`] }, `evidence-${failure}`, context);
+    await env.controller.reconcile();
+    current = await env.controller.current(context);
+    assert.equal(current.execution_recovery.failures, failure);
+    assert.equal(current.state, "active");
+    assert.equal(current.execution_recovery.state, failure < 3 ? "retrying" : "attention_required");
+    await assert.rejects(env.admission.submitInternal({ requestId: `event-${failure}`, producer: "monitor",
+      identity: { event_ids: ["event_1"] }, content: "A Job finished", basis: { task_revision: current.revision,
+        control_epoch: current.control_epoch, task_owners: [current.user_task_id] } }, context), { code: "task_execution_recovery" });
+    await env.reopen();
+    clock.value += failure === 1 ? 100 : 200;
+  }
+  await env.controller.reconcile();
+  assert.equal((await env.controller.current(context)).continuation.sequence, 3);
+  const current = await env.controller.current(context);
+  env.faux.setResponses([fauxAssistantMessage("The provider has recovered")]);
+  await env.controller.control({ user_task_id: current.user_task_id, action: "resume", request_id: "resume-execution",
+    expected_revision: current.revision }, context);
+  await env.controller.reconcile(); await env.conversation.waitForIdle(context);
+  assert.equal((await env.controller.current(context)).continuation.sequence, 4);
+});
+
+for (const control of ["pause", "cancel", "user"]) test(`${control} supersedes pending execution recovery`, async t => {
+  const clock = { value: 1000 }, env = await fixture(t, new MemoryStorage(), recoveryOptions(clock));
+  await env.begin(); env.faux.setResponses([transientFailure()]);
+  await env.controller.reconcile(); await env.conversation.waitForIdle(context); await env.controller.reconcile();
+  let task = await env.controller.current(context);
+  if (control === "user") {
+    env.faux.setResponses([fauxAssistantMessage("A transient execution failure occurred")]);
+    const input = await env.admission.submitUser({ requestId: "ask", content: "Why did execution stop?" }, context);
+    await env.conversation.waitForIdle(context);
+    clock.value = 2000; await env.controller.reconcile();
+    task = await env.controller.current(context);
+    assert.equal(task.execution_recovery.state, "attention_required");
+    assert.equal(task.continuation.sequence, 1);
+    const resumed = await env.controller.update({ action: "refine", expected_revision: task.revision,
+      source_submission_ids: [String(input.id)] }, "refine-recovery", context);
+    assert.equal(resumed.execution_recovery, null);
+  } else {
+    await env.controller.control({ user_task_id: task.user_task_id, action: control, request_id: control,
+      expected_revision: task.revision, ...(control === "cancel" ? { jobs: "keep" } : {}) }, context);
+    clock.value = 2000; await env.controller.reconcile();
+    assert.equal((await env.controller.current(context)).continuation.sequence, 1);
+    assert.equal((await env.controller.current(context)).state, control === "pause" ? "paused" : "cancelled");
+  }
+});
+
+test("an unclassified execution fault requires attention without declaring a research blocker", async t => {
+  const env = await fixture(t);
+  await env.begin(); env.faux.setResponses([() => { throw new Error("Malformed execution state"); }]);
+  await env.controller.reconcile(); await env.conversation.waitForIdle(context); await env.controller.reconcile();
+  const task = await env.controller.current(context);
+  assert.equal(task.state, "active");
+  assert.equal(task.execution_recovery.state, "attention_required");
+  assert.equal(task.execution_recovery.next_retry_at, null);
+  await env.controller.reconcile();
+  assert.equal((await env.controller.current(context)).continuation.sequence, 1);
+});
+
+
+test("disabling recovery prevents a pending retry after restart", async t => {
+  const clock = { value: 1000 }, options = recoveryOptions(clock);
+  const env = await fixture(t, new MemoryStorage(), options);
+  await env.begin(); env.faux.setResponses([transientFailure()]);
+  await env.controller.reconcile(); await env.conversation.waitForIdle(context); await env.controller.reconcile();
+  assert.equal((await env.controller.current(context)).execution_recovery.state, "retrying");
+  options.recoveryPolicy.maxRetries = 0;
+  await env.reopen(); clock.value = 2000;
+  await env.controller.reconcile();
+  const task = await env.controller.current(context);
+  assert.equal(task.state, "active");
+  assert.equal(task.execution_recovery.state, "attention_required");
+  assert.equal(task.continuation.sequence, 1);
 });

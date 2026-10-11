@@ -33,11 +33,15 @@ export function projectUserTask(task) {
     progress: task.progress ? { summary: text(task.progress.summary ?? null, 512), at: task.progress.at,
       evidence_refs: task.progress.evidence_refs.slice(0, 8).map(ref => text(ref, 128)),
       evidence_omitted: Math.max(0, task.progress.evidence_refs.length - 8) } : null,
+    execution_recovery: task.execution_recovery ? { ...task.execution_recovery,
+      detail: text(task.execution_recovery.detail ?? null, 512) } : null,
+    completion: task.completion?.slice(0, 8).map(item => ({ criterion_id: text(item.criterion_id, 128),
+      evidence_refs: item.evidence_refs.slice(0, 8).map(ref => text(ref, 128)) })) ?? null,
     continuation: { sequence: task.continuation.sequence, no_progress: task.continuation.no_progress },
   };
   projection.projection_truncated = truncated || projection.sources_omitted > 0 || projection.criteria_omitted > 0
     || projection.research.entry_nodes_omitted > 0 || projection.research.focus_nodes_omitted > 0
     || (projection.wait?.jobs_omitted || 0) > 0 || (projection.progress?.evidence_omitted || 0) > 0;
-  projection.required_action = "Full original requirements, criteria, and evidence remain in task_read. Read omitted details before revising scope or claiming completion; excerpts never relax authorization limits.";
+  projection.required_action = "Execution recovery is distinct from a research blocker; no_progress is an observation, not a stop condition. Full original requirements, criteria, and evidence remain in task_read. Read omitted details before revising scope or claiming completion; excerpts never relax authorization limits.";
   return projection;
 }

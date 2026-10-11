@@ -30,3 +30,5 @@ for the executable path and registered validators; it does not establish exhaust
 or installed software; check those routes before declaring the method unavailable.
 Read [candidate_generation.md](references/candidate_generation.md) for method
 criteria and [ase_neb_executor.md](references/ase_neb_executor.md) for NEB availability and prerequisites.
+
+The bundled DA path supports six neutral, non-aromatic carbon reaction centers. Aromatic, charged or heteroatom centers outside that scope are unassessed, not evidence against the proposed chemistry. RDKit perceives aromaticity again when parsing Kekule SMILES; rewriting the same graph cannot extend this helper. Use explicit bond-change checks and independently prepared candidates or another justified method. Generated IRC inputs use CalcFC to recompute the Hessian at the checkpoint geometry; include that cost in the budget.

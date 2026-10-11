@@ -146,3 +146,16 @@ def test_actual_runner_keeps_program_success_separate_from_final_evidence(tmp_pa
     assert result['check_status'] == ('satisfied' if passes else 'not_satisfied')
     assert result['checks_passed'] is passes
     assert result['scientific_validation'] == 'not_assessed'
+
+
+@pytest.mark.parametrize('message,kind', [
+    ('Maximum number of corrector steps exceded.', 'irc_corrector_limit'),
+    ('Maximum number of corrector steps exceeded.', 'irc_corrector_limit'),
+    ('You must use ReadCartesianFC, FCCards, or CalcFC with IRC.', 'irc_hessian_missing'),
+    ('RedCar/ORedCr failed for GTrans.', 'coordinate_transform'),
+])
+def test_specific_failure_precedes_secondary_termination_signals(tmp_path, message, kind):
+    result = parse(tmp_path, message + '\n Error termination via Lnk1e\n segmentation violation\n')
+    summary = result['summary']
+    assert summary['primary_failure']['kind'] == kind
+    assert {event['kind'] for event in summary['diagnostics']} >= {kind, 'signal', 'execution_error'}

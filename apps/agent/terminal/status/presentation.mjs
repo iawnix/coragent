@@ -45,6 +45,12 @@ export function activityStatus({ monitor, monitorError, sessionId, now = Date.no
   } else if (task.state === 'blocked') {
     symbol = '!'; color = 'warning'; reason = scoped.execution.state === 'running'
       ? 'Responding · Task blocked' : 'Needs attention';
+  } else if (['active', 'completing'].includes(task.state) && task.execution_recovery) {
+    const recovery = task.execution_recovery;
+    symbol = recovery.state === 'attention_required' ? '!' : '…';
+    color = recovery.state === 'attention_required' ? 'warning' : 'muted';
+    reason = recovery.state === 'attention_required' ? 'Execution needs attention'
+      : recovery.phase === 'delivery' ? 'Recovering final response' : 'Recovering execution';
   } else if (task.state === 'active' && !scoped.automatic_continuation_enabled && scoped.execution.state === 'idle') {
     symbol = '!'; color = 'warning'; reason = 'Automatic continuation off';
   } else if (task.state === 'active' && scoped.execution.state === 'idle') {

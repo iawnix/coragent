@@ -15,6 +15,12 @@ export function formatTask(task) {
     `Task: ${task.title} · ${taskStateLabel(task.state)}`,
     `Goal: ${task.objective}`,
     `Progress: ${text(task.progress?.summary)}`,
+    ...(task.execution_recovery ? [
+      `Execution recovery: ${task.execution_recovery.state} · ${task.execution_recovery.phase}`,
+      `Failure: ${task.execution_recovery.reason} · ${text(task.execution_recovery.detail)}`,
+      ...(task.execution_recovery.next_retry_at ? [`Retry after: ${task.execution_recovery.next_retry_at}`] : []),
+      'Research evidence is retained. Inspect execution records before resuming.',
+    ] : []),
     ...(task.wait ? [`Waiting: ${task.wait.job_ids.join(', ')} (${task.wait.mode})`] : []),
     ...(task.reason ? [`Reason: ${task.reason}`] : []),
     `Delivery criteria:\n${lines(task.criteria.map(item => `• ${item.description}`))}`,
@@ -23,7 +29,7 @@ export function formatTask(task) {
     `/monitor jobs --task ${task.user_task_id}`,
     `/monitor runs --task ${task.user_task_id}`,
     ...(['active', 'waiting', 'blocked'].includes(task.state) ? [`/monitor task pause ${task.user_task_id}`] : []),
-    ...(['paused', 'blocked'].includes(task.state) ? [`/monitor task resume ${task.user_task_id}`] : []),
+    ...(['paused', 'blocked'].includes(task.state) || task.execution_recovery?.state === 'attention_required' ? [`/monitor task resume ${task.user_task_id}`] : []),
   ].join('\n');
 }
 

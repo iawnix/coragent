@@ -949,7 +949,8 @@
             ],
             "additionalProperties": false
           },
-          "maxItems": 32
+          "maxItems": 32,
+          "description": "Preserve the user-requested deliverables. Do not replace unfinished calculations or validation with an unsolicited alternative to explain limitations."
         }
       },
       "required": [
@@ -985,7 +986,8 @@
         "reason": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 2000
+          "maxLength": 2000,
+          "description": "For block: identify the concrete unmet prerequisite or exhausted budget, the change needed to resume, and why no independent authorized work remains. Missing results or an unfinished turn alone are not blockers."
         },
         "objective": {
           "type": "string",
@@ -1026,7 +1028,8 @@
           },
           "minItems": 1,
           "uniqueItems": true,
-          "maxItems": 32
+          "maxItems": 32,
+          "description": "Actual user submission IDs. A new instruction resolving a blocker plus action=refine reactivates blocked work; a question alone does not. Changing objective or criteria requires a new user instruction."
         },
         "evidence_refs": {
           "type": "array",
@@ -1037,7 +1040,8 @@
           },
           "minItems": 1,
           "uniqueItems": true,
-          "maxItems": 64
+          "maxItems": 64,
+          "description": "Use owned job_id, Result or Artifact references. job_result_* receipts are not accepted here; use their job_id or collected Artifact references."
         },
         "wait": {
           "type": "object",
@@ -1064,7 +1068,8 @@
             "job_ids",
             "mode"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "Use only when no independent work remains. Completed Jobs release this wait without requiring the current model run to end."
         },
         "completion": {
           "type": "array",

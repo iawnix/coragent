@@ -17,6 +17,10 @@ export function createResearchTools({ commandBridge }) {
     async execute(params, api, context) {
       const root = boundWorkspaceRoot(params, api.coragent);
       const {root: _root, ...request} = params;
+      if (operation === "search" && request.type !== undefined) {
+        request.kind = request.type;
+        delete request.type;
+      }
       const writing = ["create", "update", "result"].includes(operation);
       if (operation !== "search") request.session_id = api.coragent?.session_id;
       if (writing) {

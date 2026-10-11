@@ -125,7 +125,7 @@ test("pause before first automatic consumption can resume past the invalidated r
   assert.equal((await env.controller.current(context)).continuation.sequence, 2);
 });
 
-test("failed final delivery leaves evidence and a blocker instead of completing", async t => {
+test("failed final delivery retains completion evidence and supports delivery-only recovery", async t => {
   const env = await fixture(t), entered = gate(), fail = gate();
   env.faux.setResponses([async () => { entered.resolve(); await fail.promise; throw new Error("Final delivery rejected"); }]);
   await env.controller.reconcile(context); await entered.promise;
@@ -135,9 +135,24 @@ test("failed final delivery leaves evidence and a blocker instead of completing"
   fail.resolve(); await env.conversation.waitForIdle(context);
   await env.reopen(); await env.controller.reconcile(context);
   const recovered = await env.controller.current(context);
-  assert.equal(recovered.state, "blocked");
+  assert.equal(recovered.state, "completing");
   assert.equal(recovered.completion[0].criterion_id, "report");
-  assert.match(recovered.reason, /not delivered/);
+  assert.equal(recovered.execution_recovery.state, "attention_required");
+  assert.equal(recovered.execution_recovery.phase, "delivery");
+  const finishing = gate(), release = gate();
+  env.faux.setResponses([async () => { finishing.resolve(); await release.promise; return fauxAssistantMessage("The report is complete"); }]);
+  await env.controller.control({ user_task_id: recovered.user_task_id, action: "resume", request_id: "resume-delivery",
+    expected_revision: recovered.revision }, context);
+  await env.controller.reconcile(); await finishing.promise;
+  try {
+    assert.match(await env.controller.toolRestriction(context), /read-only/);
+    await assert.rejects(env.controller.binding(context), { code: "task_not_active" });
+  } finally { release.resolve(); }
+  await env.conversation.waitForIdle(context); await env.controller.reconcile();
+  const delivered = await env.controller.current(context);
+  assert.equal(delivered.state, "completed");
+  assert.deepEqual(delivered.completion, recovered.completion);
+  assert.equal(delivered.execution_recovery, null);
 });
 
 test("mixed historical and current Job batches retain identity without driving the new task from old facts", async t => {
