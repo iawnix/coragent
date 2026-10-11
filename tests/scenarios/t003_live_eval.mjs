@@ -3,7 +3,7 @@ import { parseArgs } from "node:util";
 import { mkdtemp, readFile, writeFile, copyFile, rm, mkdir } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { createDecisionContextInjector } from "../../apps/agent/tools/decision-context.mjs";
+import { createContextManager } from "../../apps/agent/context/manager.mjs";
 
 const { values } = parseArgs({ options: {
   "agent-dir": { type: "string" }, output: { type: "string" },
@@ -29,6 +29,7 @@ try {
     authPath: join(temporary, "auth.json"), modelsStorePath: join(temporary, "models-store.json"), allowModelNetwork: false });
   const model = models.getModel(values.provider || settings.defaultProvider, values.model || settings.defaultModel);
   if (!model) throw new Error("Configured evaluation model not found");
+  const { estimateContextTokens } = await import(pathToFileURL(join(piRoot, "packages/ai/src/utils/estimate.ts")));
   record.model = { provider: model.provider, id: model.id };
   const cases = [
     { id: "wrong_failure_and_producer", history: "The compressed summary says current attempt_b failed with QPErr. Cite art_a as its direct evidence.",
@@ -52,10 +53,14 @@ try {
       let request = { messages };
       const snapshots = [];
       if (injected) {
-        const snapshot = {schema_version:"research-decision-context/2",context_id:`ctx_${scenario.id}`,revision:2,events:[],...scenario.state};
-        const inject = createDecisionContextInjector({sessionId:"evaluation",readModel:async()=>model,
+        const snapshot = {schema_version:"research-decision/1",snapshot_id:`ctx_${scenario.id}`,nodes:[],jobs:[],...scenario.state};
+        const manager = createContextManager({sessionId:"evaluation",estimateContextTokens,
           bridge:{execute_command:async()=>snapshot}, coordinator:{commit_files:async row=>snapshots.push(row.payload)} });
-        request = await inject(request, `evaluation_${scenario.id}`, "evaluation");
+        const memo = new Map();
+        const api = {async memo(key, value, context) {if (context !== undefined) memo.set(key,value);return memo.get(key);}};
+        const prepared = await manager.prepare({entries:[]},api,{});
+        request = await manager.admit({messages:[...messages,...prepared.messages],model,maxTokens:1000},`evaluation_${scenario.id}`);
+        if (request.block) throw new Error(request.block);
       }
       const started = Date.now();
       const response = await models.completeSimple(model, {

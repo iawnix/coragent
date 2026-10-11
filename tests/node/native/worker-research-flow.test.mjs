@@ -73,6 +73,7 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
       "Waiting for the fixture Job.",
       call("job_status", {job_id:fixtureJobId}),
       call("job_collect", {job_id:fixtureJobId}),
+      () => call("research_read", {ref:nodeId}),
       () => call("research_result", {node_id:nodeId, conclusion:"The fixture produced its required output. User delivery remains unrequested.", evidence_refs:[fixtureJobId], files:[{name:"result.txt",artifact_ref:outputArtifact}], as_assessment:true}),
       "Fixture evidence collected.",
     ];
@@ -186,22 +187,25 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     assert.equal(preparedRecord.payload.source_sha256, createHash("sha256").update(prepared).digest("hex"));
     assert.ok(journal.records.some(r => r.kind === "material"));
     for (const request of requests) {
-      const snapshots = request.messages.filter(m => JSON.stringify(m.content).includes("<research_memory_snapshot>"));
+      const snapshots = request.messages.filter(m => JSON.stringify(m.content).includes("<runtime_control"));
       assert.equal(snapshots.length, 1, "each real provider request has exactly one current projection");
-      assert.ok(["system", "developer"].includes(snapshots[0].role), "runtime facts must not impersonate user input on the provider wire");
-      assert.match(JSON.stringify(snapshots[0].content), /not a user message or a new turn/);
+      assert.equal(snapshots[0].role, "user", "runtime data must remain after history on the provider wire");
+      assert.equal(request.messages.at(-1), snapshots[0]);
+      assert.match(snapshots[0].content, /origin="runtime"/);
+      assert.ok(request.messages.filter(m => ["system", "developer"].includes(m.role))
+        .every(m => !String(m.content).includes('"schema_version":"research-decision/1"')));
     }
-    const snapshotOf = request => JSON.stringify(request.messages.find(m => JSON.stringify(m.content).includes("<research_memory_snapshot>")));
-    const lastSnapshot = snapshotOf(requests.at(-1));
     const truncated = toolResults.find(result => String(result.content).includes("Historical artifact metadata"));
     assert.ok(truncated, "actual Native read result must reach the provider");
     assert.match(String(truncated.content), /Showing lines|truncated/);
     assert.doesNotMatch(String(truncated.content), /TAIL_MUST_BE_TRUNCATED/);
     const afterTruncation = requests[steps.findIndex(step => step?.name === "read" && step.arguments.path.endsWith("large-history.txt")) + 1];
-    assert.match(snapshotOf(afterTruncation), /Exercise the local fixture/);
-    assert.match(lastSnapshot, /Exercise the local fixture/);
-    assert.match(lastSnapshot, /succeeded/);
-    assert.equal(read.snapshot.messages.some(m => JSON.stringify(m).includes("<research_memory_snapshot>")), false, "projection must not enter durable transcript");
+    assert.match(JSON.stringify(afterTruncation.messages), /Exercise the local fixture/);
+    assert.match(JSON.stringify(requests.at(-1).messages), /Exercise the local fixture/);
+    assert.match(JSON.stringify(requests.at(-1).messages), /fixture produced its required output/);
+    assert.equal(read.snapshot.messages.some(m => JSON.stringify(m).includes("<runtime_control")), false, "projection must not enter durable transcript");
+    const researchEntries = requests.at(-1).messages.filter(m => String(m.content).startsWith('<research_context origin="runtime">'));
+    assert.equal(researchEntries.length, 1, "ordinary tool rounds and Monitor events reuse one durable orientation");
     assert.ok((await readdir(join(workspace, "operations/contexts"))).length > 0);
     assert.ok(journal.records.filter(r => r.origin === "agent").length >= 3);
     const email = JSON.parse(await readFile(join(workspace, "reports/email-check.json")));

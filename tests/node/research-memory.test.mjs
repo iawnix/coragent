@@ -93,6 +93,7 @@ test('tool schemas express research choices without exposing receipt and executi
   assert.throws(()=>validate('search',{type:'result'}));
   assert.throws(()=>validate('update',{node_id:'node_1',note:'fake',read_basis:'forged'}));
   assert.throws(()=>validate('state',{event_ids:['event_forged']}));
+  assert.throws(()=>validate('state',{view:'decision',waited_job_ids:['job_forged']}));
   assert.throws(()=>validate('state',{entry_node_ids:['node_A'],focus_node_ids:['node_A']}));
   assert.throws(()=>validate('update',{content:'old notebook protocol'}));
   assert.doesNotThrow(()=>validate('jobStart',{command:['true'],node_id:'node_1'}));

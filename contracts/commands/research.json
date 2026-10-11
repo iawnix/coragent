@@ -59,6 +59,17 @@
               "type": "string"
             },
             "description": "Internal task navigation roots. Does not authorize or schedule research work."
+          },
+          "view": {
+            "const": "decision",
+            "description": "Internal request-only orientation. Omit for full snapshots and explicit reads; not a model parameter."
+          },
+          "waited_job_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Internal task waits to retain even outside research focus."
           }
         },
         "required": [],

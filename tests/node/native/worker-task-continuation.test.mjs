@@ -35,10 +35,10 @@ for (const scenario of ["single", "branches"]) test(`real Worker continues ${sce
           assert.match(message.content, /^\s*[\[{]/, "fixture tools must return their structured success result");
           return JSON.parse(message.content);
         });
-        const injectedTask = request.messages.map(message => message.content).join("\n")
-          .match(/\{"task":.*,"actual_user_submission_ids":.*,"automatic_continuation_enabled":(?:true|false)\}/);
-        assert.ok(injectedTask, "every request must carry the current task projection");
-        const taskContext = JSON.parse(injectedTask[0]);
+        const envelope = request.messages.findLast(message =>
+          typeof message.content === "string" && message.content.startsWith('<runtime_control origin="runtime">'));
+        assert.ok(envelope, "every request must carry runtime context at the tail");
+        const taskContext = JSON.parse(envelope.content.split("\n")[1]);
         const task = taskContext.task;
         const node = results.find(result => result?.node)?.node;
         const result = results.find(result => result?.result)?.result;
@@ -47,18 +47,15 @@ for (const scenario of ["single", "branches"]) test(`real Worker continues ${sce
         const published = new Map(results.filter(result => result?.result).map(result => [result.result.conclusion, result.result]));
         const rootNode = latestNodes.get("Compare derivations"), shared = latestNodes.get("Approximation bounds");
         const branchA = latestNodes.get("Derivation A"), branchB = latestNodes.get("Derivation B");
-        const snapshotText = request.messages.map(message => message.content).join("\n").match(/<research_memory_snapshot>[\s\S]*?\n(\{[^\n]+\})\n<\/research_memory_snapshot>/);
-        assert.ok(snapshotText, "every request carries the current research snapshot");
-        const snapshot = JSON.parse(snapshotText[1]);
-        assert.equal(snapshot.schema_version, "research-snapshot/3");
-        if (task?.research.entry_node_ids.length) {
-          assert.deepEqual(snapshot.research.entry_node_ids, task.research.entry_node_ids);
-          assert.deepEqual(snapshot.research.focus_node_ids, task.research.focus_node_ids);
-          assert.ok(task.research.focus_node_ids.every(id => snapshot.research.nodes.some(node => node.id === id)));
+        const researchEnvelope = request.messages.findLast(message => typeof message.content === "string" && message.content.startsWith('<research_context origin="runtime">'));
+        const snapshot = JSON.parse(researchEnvelope.content.split("\n")[1]).research;
+        assert.equal(snapshot.schema_version, "research-decision/1");
+        if (snapshot.scope.focus_count) {
+          assert.ok(snapshot.nodes.some(node => node.selection === "explicit_focus"));
         }
-        if (scenario === "branches" && task?.research.entry_node_ids.length) {
-          assert.ok(snapshot.research.relations.some(edge => edge.source === branchA.id && edge.target === rootNode.id && edge.kind === "part_of"));
-          assert.ok(snapshot.research.nodes.some(node => node.id === rootNode.id && node.plan));
+        if (scenario === "branches" && snapshot.scope.entry_count) {
+          assert.ok(snapshot.nodes.some(node => node.id === rootNode.id && node.plan));
+          assert.ok(snapshot.relations.some(edge => edge.source === branchA.id && edge.target === rootNode.id && edge.kind === "part_of"));
         }
         const bind = (entry, focus) => ({ name: "task_update", arguments: { expected_revision: task?.revision,
           action: "set_research", research: { entry_node_ids: entry, focus_node_ids: focus } } });

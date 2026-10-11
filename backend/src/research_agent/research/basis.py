@@ -6,8 +6,9 @@ from .records import digest, now
 EDIT_FIELDS = frozenset({'goal', 'title', 'proposal', 'plan', 'progress', 'status', 'assessment_ref', 'relations', 'subjects'})
 
 
-def issue(root, nodes, session_id=None, fields=None, segments=None):
-    entries = {node['id']: {'revision': node['revision'], 'fields': sorted(EDIT_FIELDS if fields is None else fields)} for node in nodes}
+def issue(root, nodes, session_id=None, fields=None, segments=None, fields_by_node=None):
+    entries = {node['id']: {'revision': node['revision'], 'fields': sorted(
+        fields_by_node[node['id']] if fields_by_node is not None else EDIT_FIELDS if fields is None else fields)} for node in nodes}
     for node_id, entry in entries.items():
         if 'relations' in entry['fields'] or segments and 'relations' in segments:
             entry['relations_digest'] = relation_digest(root, node_id)

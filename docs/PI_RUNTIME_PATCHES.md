@@ -23,6 +23,7 @@ all pending patches can be checked before changing files.
 | 007-client-status | Independent footer/activity display, expiring command feedback and dismissible documents | Native status, timer, focus, Esc interruption, resize, session-switch and disposal tests |
 | 008-request-admission | Fail-closed generation hooks and one bounded compaction attempt | Request admission failure, context budget and compaction outcome tests |
 | 009-input-identity | Native clients supply stable request IDs; AgentController preserves them and specific admission errors | Real native-controller and common input-admission tests |
+| 010-context-lifecycle | Atomic passive context preparation, pinned summary supplements and an operating input budget | Native context persistence, compaction, recovery and budget tests |
 
 Application integration lives outside these patches. The worker publishes the
 `coragent.client-queries` service, bound to its workspace, session, kernel bridge, and
@@ -46,8 +47,9 @@ directory for a new commit; existing session directories retain their layout.
 
 Pi 1.1.0 takes the historical cutoff as `runtime.context(id, context, { at })`;
 patch 008 preserves request admission on this API. The upstream context cache
-uses its default idle retention (ten minutes); research snapshots are still
-rebuilt for each request and are not persisted in the transcript. The estimator
+uses its default idle retention (ten minutes). Patch 010 persists research orientation
+with the request cutoff and carries historical scope metadata through native
+compaction. Only current control data remains request-only. The estimator
 now uses 3.5 characters per token, so budget admission may compact earlier.
 
 Research tool cards show Pi's recorded `durationMs` for final results, including

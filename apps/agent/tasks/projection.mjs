@@ -41,3 +41,21 @@ export function projectUserTask(task) {
   projection.required_action = "Full original requirements, criteria, and evidence remain in task_read. Read omitted details before revising scope or claiming completion; excerpts never relax authorization limits.";
   return projection;
 }
+
+/** Historical orientation facts, not a second authored summary. Preserve original
+ * requirements; final request admission handles oversized constraints.
+ * The bounded Monitor projection above remains a separate browsing contract.
+ */
+export function projectDecisionTask(task) {
+  if (!task) return null;
+  const { user_task_id, revision, state, objective, criteria } = task;
+  const result = { user_task_id, revision, state, objective, criteria };
+  if (task.title !== objective) result.title = task.title;
+  if (task.reason) result.reason = task.reason;
+  result.sources = task.sources.map(({ submission_id, entry_id, text }) => ({
+    submission_id, entry_id, ...(text === objective ? { same_as: "objective" } : { text }),
+  }));
+  if (task.wait) result.wait = { mode: task.wait.mode, job_ids: task.wait.job_ids };
+  if (task.progress) result.progress = { summary: task.progress.summary, evidence_refs: task.progress.evidence_refs };
+  return result;
+}

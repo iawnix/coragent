@@ -9,7 +9,8 @@ export default function fixture(pi: ExtensionAPI) {
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 1024 }],
     streamSimple(model, context) {
       const stream = createAssistantMessageEventStream();
-      const user = context.messages.findLast((message) => message.role === "user");
+      const user = context.messages.findLast((message) => message.role === "user"
+        && !(typeof message.content === "string" && (message.content.startsWith('<runtime_control origin="runtime">') || message.content.startsWith('<research_context origin="runtime">'))));
       const text = typeof user?.content === "string" ? user.content : user?.content.map((block) => block.type === "text" ? block.text : "").join("") || "";
       const output: any = { role: "assistant", content: [], api: model.api, provider: model.provider, model: model.id,
         usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },

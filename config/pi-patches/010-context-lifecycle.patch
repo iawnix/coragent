@@ -1,0 +1,102 @@
+--- a/packages/durable/src/harness/types.ts
++++ b/packages/durable/src/harness/types.ts
+@@ -394,2 +394,4 @@
+ 	backgroundTokens: number;
++	/** Optional operating input budget, independent of the provider context window. */
++	maxInputTokens?: number;
+ };
+@@ -649,2 +651,10 @@
+ 	afterTools(assistant: EntryId, results: readonly EntryId[], api: HookApi, context: Context): void | Promise<void>;
++	/** Prepare passive context at a generation boundary. Committed with the request cutoff;
++	 * never admitted as user input. Use memo for immutable external reads across recovery.
++	 * Throws fail closed. Entries must be data messages, not head markers or context edits. */
++	prepareContext(
++		view: ContextView,
++		api: HookApi,
++		context: Context,
++	): HookResult<{ readonly key: string; readonly messages: readonly Message[]; readonly data?: JsonValue }>;
+ }
+@@ -686,2 +696,9 @@
+ 	): HookResult<{ readonly decline: true } | { readonly summary: string }>;
+-}
++	/** Supplements bound to the selected old range, persisted before the summary call.
++	 * Metadata is stored with the summary, never grants tool read/write permissions. */
++	prepareSummary(
++		compaction: { readonly entries: readonly EntryRecord[]; readonly firstKept: EntryId },
++		api: HookApi,
++		context: Context,
++	): HookResult<{ readonly instructions?: string; readonly metadata?: JsonValue }>;
++}
+--- a/packages/durable/src/harness/generation.ts
++++ b/packages/durable/src/harness/generation.ts
+@@ -166,4 +166,23 @@
+ 			}
++			const prepared: { key: string; messages: readonly Message[]; data?: JsonValue }[] = [];
++			let preparationError: string | undefined;
++			await runtime.hooks.each("prepareContext", async (hook) => {
++				if (preparationError !== undefined) return;
++				try {
++					const item = await hook(view, runtime, context);
++					if (item !== undefined) prepared.push(structuredClone(item));
++				} catch (error) {
++					runtime.signal.throwIfAborted();
++					preparationError = `context_prepare_failed: ${String(error)}`;
++				}
++			});
++			if (preparationError !== undefined) return failRequest(runtime, preparationError, context, "request_blocked");
+ 			await runtime.commit(async (tx) => {
+ 				let cutoff = (await tx.scanEntries({ conversationId }, 1)).items[0]?.id;
++				for (const item of prepared) {
++					cutoff = (await tx.appendEntry(conversationId, {
++						kind: "pi.context", model: item.messages,
++						data: { key: item.key, value: item.data ?? null },
++					})).id;
++				}
+ 				for (const entry of entries) cutoff = (await tx.appendEntry(SystemEntry, conversationId, entry)).id;
+@@ -362,3 +381,3 @@
+ 	);
+-	const blocking = contextWindow - policy.reserveTokens;
++	const blocking = Math.min(contextWindow - policy.reserveTokens, policy.maxInputTokens ?? Number.POSITIVE_INFINITY);
+ 	const background = blocking - policy.backgroundTokens;
+--- a/packages/durable/src/harness/compaction.ts
++++ b/packages/durable/src/harness/compaction.ts
+@@ -1,2 +1,2 @@
+-import type { Context, Draft } from "@earendil-works/chord";
++import type { Context, Draft, JsonValue } from "@earendil-works/chord";
+ import type { AssistantMessage, Message, ModelThinkingLevel, SimpleStreamOptions } from "@earendil-works/pi-ai";
+@@ -43,2 +43,4 @@
+ 	firstKept: EntryId;
++	/** Selected once, immutable over provider retries and recovery. */
++	supplements?: { instructions?: string; metadata?: JsonValue }[];
+ };
+@@ -133,3 +135,17 @@
+ 			if (decision !== undefined) return place(runtime, firstKept, decision.summary, context);
++			const supplements: { instructions?: string; metadata?: JsonValue }[] = [];
++			let supplementError: string | undefined;
++			await runtime.hooks.each("prepareSummary", async (hook) => {
++				if (supplementError !== undefined) return;
++				try {
++					const supplement = await hook({ entries: compaction.entries, firstKept }, runtime, context);
++					if (supplement !== undefined) supplements.push(structuredClone(supplement));
++				} catch (error) {
++					runtime.signal.throwIfAborted();
++					supplementError = `summary_prepare_failed: ${String(error)}`;
++				}
++			});
++			if (supplementError !== undefined) throw new Error(supplementError);
+ 			const request: SummaryRequest = {
++				supplements,
+ 				attempt: 1,
+@@ -160,3 +176,3 @@
+ 					role: "user",
+-					content: [{ type: "text", text: summaryPrompt(summarizedMessages(view, cut), task.input.instructions) }],
++					content: [{ type: "text", text: summaryPrompt(summarizedMessages(view, cut), [task.input.instructions, ...(request.supplements ?? []).map(item => item.instructions)].filter(Boolean).join("\n\n")) }],
+ 					timestamp: now,
+@@ -420,3 +436,6 @@
+ 		model: [{ role: "user", content: [{ type: "text", text }], timestamp: runtime.now() }],
+-		data: { reason: current.input.reason },
++		data: { reason: current.input.reason,
++			...(current.state.checkpoint.phase !== "select" && current.state.checkpoint.supplements
++				? { metadata: current.state.checkpoint.supplements.flatMap(item => item.metadata === undefined ? [] : [item.metadata]) } : {}),
++		},
+ 	} satisfies EntryDraft;

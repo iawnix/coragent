@@ -19,6 +19,9 @@ export async function checkCommandResultTypes(bridge: RuntimeBridge) {
   if (read.schema_version === "research-snapshot/3") {
     const sequence: number = read.sequence;
     void sequence;
+  } else if (read.schema_version === "research-decision/1") {
+    const snapshot: string = read.snapshot_id;
+    void snapshot;
   } else {
     const offset: number = read.offset;
     void offset;

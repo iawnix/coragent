@@ -9,7 +9,7 @@ import { validateToolArguments } from "@earendil-works/pi-ai";
 import { create_workspace_initializer } from "../../apps/agent/host/workspace.mjs";
 import { create_python_runtime_bridge } from "../../apps/agent/bridge/transport.mjs";
 import { createStateTool, createResearchDecisionTools } from "../../apps/agent/tools/registry.mjs";
-import { createDecisionContextInjector } from "../../apps/agent/tools/decision-context.mjs";
+import { createContextManager } from "../../apps/agent/context/manager.mjs";
 
 const { values } = parseArgs({ options: { "agent-dir": { type: "string" }, output: { type: "string" }, runs: { type: "string", default: "2" } } });
 const testRoot = resolve(process.env.CORAGENT_TEST_ROOT || "/home/iaw/project/TSPi/local_debug");
@@ -83,11 +83,17 @@ try {
           usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } },
         { role: "toolResult", toolCallId: invalid.id, toolName: invalid.name, isError: true, content: [{ type: "text", text: rejection }], timestamp: Date.now() },
       ];
-      const inject = createDecisionContextInjector({ sessionId: "recovery", readModel: async () => model, bridge,
+      const { estimateContextTokens } = await import(pathToFileURL(join(process.env.CORAGENT_TEST_PI_RUNTIME_ROOT, "packages/ai/src/utils/estimate.ts")));
+      const manager = createContextManager({ sessionId: "recovery", estimateContextTokens, bridge,
         coordinator: { commit_files: async () => {} } });
+      const memo = new Map();
+      const api = {async memo(key, value, context) {if (context !== undefined) memo.set(key,value);return memo.get(key);}};
+      const prepared = await manager.prepare({entries:[]},api,{});
+      messages.push(...prepared.messages);
       let queried = false;
       for (let turn = 0; turn < 5; turn++) {
-        const request = await inject({ messages }, `recovery_${run}_${turn}`, "recovery");
+        const request = await manager.admit({ messages, model, maxTokens:1600 }, `recovery_${run}_${turn}`);
+        if (request.block) throw new Error(request.block);
         const response = await runtime.completeSimple(model, { systemPrompt: "Use current Research State and exact tool-returned identities. A rejected write is not persisted. Recover by reading evidence, then submit a valid interpretation. Do not invent IDs or claim scientific completion.", messages: request.messages, tools },
           { maxTokens: 1600, reasoning: "minimal", signal: AbortSignal.timeout(90_000) });
         messages.push(response);

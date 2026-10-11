@@ -1,12 +1,11 @@
 import { loadPi } from "./source.mjs";
-import { createDecisionContextInjector } from "../tools/decision-context.mjs";
+import { createContextManager, contextPolicy } from "../context/manager.mjs";
 import { recordUserSources } from "../tools/user-sources.mjs";
 import { createInputAdmission, createInputService, bindUserInputConversation, INPUT_ADMISSION_SERVICE_ID } from "../host/admission/input.mjs";
 import { createMonitorAdmission, MONITOR_ADMISSION_SERVICE_ID } from "../host/admission/monitor.mjs";
 import { createSessionAdmission, SESSION_ADMISSION_SERVICE_ID } from "../host/admission/session.mjs";
 import { createTaskController } from "../tasks/controller.mjs";
 import { createTaskTools } from "../tasks/tools.mjs";
-import { projectUserTask } from "../tasks/projection.mjs";
 import { createMonitorService, recordRun, MONITOR_SERVICE_ID } from "../tasks/service.mjs";
 import { wakeMessage } from "../host/monitor/worker.mjs";
 import { CLIENT_QUERIES_SERVICE_ID, createClientQueries } from "./services/queries.mjs";
@@ -15,7 +14,7 @@ import { readFile } from "node:fs/promises";
 import { createStaticFacetLoader, defineFacet, defineService } from "@earendil-works/chord";
 import {
   Harness, createRegistry, defineExtension, hook, section,
-  GenerationTask, ToolTask, LiveDoc, InboxDoc,
+  GenerationTask, CompactionTask, ToolTask, LiveDoc, InboxDoc,
 } from "@earendil-works/pi-durable";
 import { createCodingTools } from "./coding-tools.mjs";
 import { loadProductSkills } from "../resources/skills.mjs";
@@ -71,8 +70,9 @@ export async function createCoRAgentHarness(databasePath, options) {
 
     });
     const systemPromptTool = createSystemPromptTool(promptManifest);
-    const injectDecisionContext = createDecisionContextInjector({ bridge: commandBridge, coordinator: transactionCoordinator,
-      sessionId, estimateContextTokens,
+    const harnessSettings = contextPolicy(createHarnessSettings(settingsManager));
+    const contextManager = createContextManager({ bridge: commandBridge, coordinator: transactionCoordinator,
+      sessionId, estimateContextTokens, inputTokens: harnessSettings.compaction.maxInputTokens,
     });
     const packageReadGuard = createPackageSourceReadGuard({ packageRoot: loadedSkills.packageRoot, cwd,
       publicKnowledgeRoots: loadedSkills.skills.map(skill => dirname(skill.filePath)),
@@ -105,13 +105,19 @@ export async function createCoRAgentHarness(databasePath, options) {
       sections: [section("research_agent_system_prompt", () => promptManifest.effective, { tag: false })],
       hooks: [
         hook(GenerationTask, {
+          prepareContext: async (view, api, context) => {
+            const live = await api.snapshot(LiveDoc, api.conversationId, context);
+            await recordUserSources({ harness, admission: inputAdmission, monitorAdmission, taskController, api, context,
+              inputIds: live?.run?.inputs, bridge: commandBridge, sessionId, recordedIds: recordedUserSources });
+            return contextManager.prepare(view, api, context, { task: await taskController.current(context), input_ids: live?.run?.inputs || [] });
+          },
           afterTools: async (_assistant, results, api, context) => {
             await taskController.observeToolResults(await Promise.all(results.map(id => api.entry(id, context))), context);
           },
           beforeRequest: (request, api, context) => {
             return (async () => {
               const live = await api.snapshot(LiveDoc, api.conversationId, context);
-              const inputContext = await recordUserSources({ harness, admission: inputAdmission, monitorAdmission, taskController, api, context, inputIds: live?.run?.inputs,
+              await recordUserSources({ harness, admission: inputAdmission, monitorAdmission, taskController, api, context, inputIds: live?.run?.inputs,
                 bridge: commandBridge, sessionId, recordedIds: recordedUserSources });
               const task = await taskController.current(context);
               await recordRun({ conversation, api, inputIds: live?.run?.inputs || [], userTaskId: task?.user_task_id ?? null, context });
@@ -120,12 +126,9 @@ export async function createCoRAgentHarness(databasePath, options) {
                 const record = await (await harness.submission(id, context)).status(context);
                 if ((await inputAdmission.origin(record, context))?.producer === "user") actualUserIds.push(String(id));
               }
-              const taskMessage = { role: "system", content: "", sections: { coragent_user_task:
-                "Runtime task control state, not new user authorization. Register authorized sustained work with task_begin; ordinary questions remain questions. A final reply does not complete a task. Report concrete progress with evidence, wait for owned Jobs, or record a blocker. Only the user may resume a paused task.\n"
-                + JSON.stringify({ task: projectUserTask(task), actual_user_submission_ids: actualUserIds,
-                  automatic_continuation_enabled: taskController.health().automatic_continuation_enabled }) }, timestamp: Date.now() };
-              const injected = await injectDecisionContext({ ...request, messages: [...request.messages, taskMessage] }, String(api.taskId), {
-                ...inputContext, ...(task ? task.research : {}),
+              const admitted = await contextManager.admit(request, String(api.taskId), {
+                task, actual_user_submission_ids: actualUserIds,
+                automatic_continuation_enabled: taskController.health().automatic_continuation_enabled,
               });
               // Recheck after external projection IO, immediately before Pi sends the request.
               for (const id of live?.run?.inputs || []) {
@@ -133,10 +136,11 @@ export async function createCoRAgentHarness(databasePath, options) {
                 const origin = await inputAdmission.origin(record, context);
                 if (origin.producer !== "user") await taskController.assertExecutionAllowed(record, origin, context);
               }
-              return injected;
+              return admitted;
             })();
           },
         }),
+        hook(CompactionTask, { prepareSummary: input => contextManager.prepareSummary(input) }),
         hook(ToolTask, {
           beforeTool: async (call, api, context) => {
             const packagePolicy = packageReadGuard({ toolName: call.name, args: call.arguments });
@@ -149,7 +153,7 @@ export async function createCoRAgentHarness(databasePath, options) {
     harness = await Harness.open(await openNodeSqliteStorage(databasePath), {
       models: modelRuntime,
       registry,
-      settings: createHarnessSettings(settingsManager),
+      settings: harnessSettings,
       env: executionEnvs.env,
       onReport: (error) => { if (process.env.CORAGENT_DEBUG === "1") console.error(error); },
     }, PI_TODO_CONTEXT);
