@@ -4,6 +4,10 @@ Connectivity asks whether a candidate path reaches the reactant and product
 basins declared by a hypothesis. It is distinct from stationary-point and
 imaginary-mode checks.
 
+`chemical.irc-check@1` implements independent checks against explicit reference
+conformers; read [general_checks.md](general_checks.md) for path/endpoint contracts
+and ambiguity handling. Its connectivity result does not replace mode character.
+
 ## Checklist
 
 For each direction, inspect normal program termination, path completion, the

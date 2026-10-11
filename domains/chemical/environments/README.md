@@ -10,7 +10,7 @@ optimized for the maintainer's CPU. Other targets need their own verified lock.
 
 | Lock | Bindings | Contents |
 | --- | --- | --- |
-| wrapper.lock | Gaussian/xTB Python wrappers | Python 3.11 and packaging tools; native solvers are installed separately |
+| wrapper.lock | Gaussian/xTB/CREST Python wrappers | Python 3.11 and packaging tools; native solvers are installed separately |
 | structure.lock | structure, validation | RDKit and NumPy |
 | cf22d.lock | pyscf | PySCF, geomeTRIC and PySCF dispersion, all from Conda |
 | render.lock + render.requirements.txt | render | RDKit, Cairo, Matplotlib, xyzrender and its rendering dependencies |
@@ -34,7 +34,7 @@ Configure the remote target, queue and native solver paths in `job.toml` first.
 Remote paths belong to that target. Provisioning uses SSH and requires Python
 3.11+, Conda, `timeout`, Linux x86_64 and the declared glibc; execution uses the
 configured PBS/Torque scheduler and rsync. No controller Python path is copied
-to the target. `wrapper` prepares Python for already configured Gaussian/xTB
+to the target. `wrapper` prepares Python for already configured Gaussian/xTB/CREST
 backends; their native binaries remain operator-provided.
 
 The installer stores pinned locks and immutable, versioned prefixes in a
@@ -81,3 +81,11 @@ in an isolated environment using `CONDA_OVERRIDE_ARCHSPEC=x86_64`, export
 calculations before publishing the new lock. Fixed pip entries must include
 the hashes of their upstream artifacts. Do not export credentials, add a
 local-only wheel, or replace the lock of a running installation in place.
+
+The optional `path` profile reuses structure.lock for explicitly configured
+`path_xtb` / `path_gaussian` native bindings. It provides RDKit/NumPy for scans,
+gradients and NEB without changing the existing lightweight wrappers. For example,
+configure `[environments.local.backends.path_xtb]` with `command = "/opt/xtb/bin/xtb"`
+(and activation_script if needed), then select `--job-profile local:path`.
+This profile has no default native scientific smoke calculation; the selected
+recipe's environment check and an explicit bounded scientific Job are separate.

@@ -45,3 +45,13 @@ criteria and [ase_neb_executor.md](references/ase_neb_executor.md) for NEB avail
 Read [Gaussian path preparation](references/gaussian_path.md) for checkpoint, atom mapping and IRC input conventions.
 
 The bundled DA path supports six neutral, non-aromatic carbon reaction centers. Aromatic, charged or heteroatom centers outside that scope are unassessed, not evidence against the proposed chemistry. RDKit perceives aromaticity again when parsing Kekule SMILES; rewriting the same graph cannot extend this helper. Use explicit bond-change checks and independently prepared candidates or another justified method. Generated IRC inputs use CalcFC to recompute the Hessian at the checkpoint geometry; include that cost in the budget.
+
+For supplied material endpoints, use `chemical.qst-prepare@1` for QST2/QST3.
+For bounded 1D/2D grids use `chemical.scan-xtb@1` or `chemical.scan-gaussian@1`;
+for xTB gradients/NEB use `chemical.gradient-xtb@1` and `chemical.neb-xtb@1`.
+Read [material-based path operations](references/path_search.md) for schemas,
+optional path environment bindings, resume rules and actual calculator limits.
+
+Ground-spin Gaussian gradients and NEB are also available as `chemical.gradient-gaussian@1`
+and `chemical.neb-gaussian@1`; their separate electronic settings and scope are in
+[path operations](references/path_search.md).

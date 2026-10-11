@@ -249,7 +249,7 @@ def parse_args(argv: list[str] | None = None, *, use_environment: bool = True) -
         help="Deterministic chemical name resolver TOML to install as etc/name-resolver.toml.",
     )
     parser.add_argument("--conda-root")
-    parser.add_argument('--job-profile', action='append', metavar='TARGET:PROFILE', help='Prepare a domain environment (structure, pyscf, render, wrapper). Repeat for multiple targets.')
+    parser.add_argument('--job-profile', action='append', metavar='TARGET:PROFILE', help='Prepare a domain environment (structure, pyscf, render, wrapper, path). Repeat for multiple targets.')
     parser.add_argument('--job-software-root', action='append', metavar='TARGET=PATH', help='Dedicated target directory for managed scientific environments.')
     parser.add_argument('--job-conda', action='append', metavar='TARGET=PATH', help='Target-local Conda executable; required when provisioning a new remote target.')
     parser.add_argument('--verify-job-target', action='append', metavar='TARGET', help='Also verify this remote target through real scheduled Jobs.')
@@ -644,7 +644,7 @@ def interactive_menu_options(args: argparse.Namespace) -> argparse.Namespace:
                 args.name_resolver_config or "",
             ).strip() or None
             args.job_profile = [value.strip() for value in ask(
-                'Environment selections, comma separated (TARGET:structure/pyscf/render/wrapper; blank preserves defaults)',
+                'Environment selections, comma separated (TARGET:structure/pyscf/render/wrapper/path; blank preserves defaults)',
                 ','.join(args.job_profile or [])).split(',') if value.strip()]
             args.verify_job_target = [value.strip() for value in ask(
                 'Remote targets to verify through the scheduler, comma separated (blank skips remote verification)',

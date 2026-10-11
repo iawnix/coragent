@@ -27,3 +27,8 @@ description: 使用明确的物种身份、原子映射、基元步骤、替代�
   [mechanism_reflection.zh-CN.md](references/mechanism_reflection.zh-CN.md)。
 - 重复或意外结果后的重新框定见
   [strategy_reflection.zh-CN.md](references/strategy_reflection.zh-CN.md)。
+
+条件化探索决策与多步材料见[路径检查合同](references/pathway_execution.zh-CN.md)。
+chemical.pathway-check@1 使用 structure 环境与 input 角色，保留假设、产物猜测、
+观察、原子/计量连续性和缺失步骤。可选绑定的经典模式/IRC 证据会重新检查，缺证据
+不会变成通过。竞争产物用 energetics Skill 分开比较热力学、条件 TST 分支与显式可逆网络。

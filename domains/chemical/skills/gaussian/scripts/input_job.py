@@ -5,8 +5,8 @@ import shutil
 import subprocess
 from pathlib import Path, PurePosixPath
 
-from gaussian_io import parse_log, parse_irc_log, write_irc_parse_artifacts, write_xyz
-from science import digest, write_json, finite_energy, new_result, finish
+from gaussian_io import parse_log, parse_irc_log, write_irc_parse_artifacts, write_xyz, require_supported_energy
+from science import digest, write_json, new_result, finish
 
 
 def local_reference(value):
@@ -94,9 +94,10 @@ def run_input(args):
         stage = 'checks'
         if not summary['route_expectation'].get('matched'):
             raise ValueError('Gaussian route readback differs from the supplied input')
-        energy = finite_energy(summary['electronic_energy_hartree'])
-        result['steps'].append({'task': args.validation, 'energy_hartree': energy, 'summary': summary})
+        result['energy_evidence'] = summary['energy_evidence']
         if parsed['atoms']: write_xyz(out/'geometry.xyz', parsed['atoms'], 'Gaussian final geometry')
+        energy = require_supported_energy(summary)
+        result['steps'].append({'task': args.validation, 'energy_hartree': energy, 'summary': summary})
         if args.validation in {'opt', 'saddle'} and not (summary['stationary_point_found'] and summary['final_convergence_satisfied']):
             raise ValueError('missing converged stationary point evidence')
         if args.validation in {'frequency', 'minimum', 'saddle'}:

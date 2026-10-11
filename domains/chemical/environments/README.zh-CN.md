@@ -9,7 +9,7 @@ glibc >=2.28。CF22D 选择通用 x86_64 PySCF 构建，不绑定维护者的 CP
 
 | 锁文件 | 绑定 | 内容 |
 | --- | --- | --- |
-| wrapper.lock | Gaussian/xTB 包装脚本 | Python 3.11 与安装工具；原生求解器单独安装 |
+| wrapper.lock | Gaussian/xTB/CREST 包装脚本 | Python 3.11 与安装工具；原生求解器单独安装 |
 | structure.lock | structure、validation | RDKit 与 NumPy |
 | cf22d.lock | pyscf | PySCF、geomeTRIC 和 dispersion，全部由 Conda 安装 |
 | render.lock + render.requirements.txt | render | RDKit、Cairo、Matplotlib、xyzrender 及其依赖 |
@@ -30,7 +30,7 @@ xyzrender 上游要求，只安装在渲染目标中。这些环境均不安装 
 先在 `job.toml` 配置远端、队列与原生求解器路径。远端路径属于目标机器。准备阶段
 通过 SSH 执行，目标需要 Python 3.11+、Conda、`timeout`、Linux x86_64 及声明的
 glibc；执行阶段使用已配置的 PBS/Torque 和 rsync。本机 Python 路径不会复制给远端。
-`wrapper` 只为已配置的 Gaussian/xTB 后端准备 Python，原生程序仍由管理员提供。
+`wrapper` 只为已配置的 Gaussian/xTB/CREST 后端准备 Python，原生程序仍由管理员提供。
 
 安装器把固定锁和不可变的版本化环境保存在专用受管目录，本机默认是
 `~/soft/coragent/job-envs/<installation-id>`，再将绝对路径写入 `etc/job.toml`。
@@ -63,3 +63,10 @@ RDKit、Job 内的解析器配置路径和乙醇结构生成；其他环境执�
 记录的根依赖，使用 `conda list --explicit --sha256` 导出，并在全新安装及实际计算
 通过后发布。pip 条目必须附上游产物的摘要。不要导出凭据、引入仅本机存在的 wheel，
 或就地替换正在使用的安装锁。
+
+可选 `path` profile 为显式配置的 `path_xtb` / `path_gaussian` 原生绑定复用
+structure.lock，提供扫描、梯度与 NEB 所需 RDKit/NumPy，不改变旧轻量包装器。
+例如为 `[environments.local.backends.path_xtb]` 配置
+`command = "/opt/xtb/bin/xtb"`（需要时加 activation_script），再选择
+`--job-profile local:path`。该 profile 不默认进行原生科学计算冒烟测试；
+选定入口的环境检查与显式有界科学 Job 需要分别验收。

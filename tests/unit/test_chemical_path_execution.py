@@ -124,6 +124,41 @@ def direct_validate(tmp_path, row, kind, texts):
     return validate(kind,paths,manifest)
 
 
+@pytest.mark.parametrize('kind', ['mapping', 'saddle', 'irc'])
+@pytest.mark.parametrize('change', ['explicit', 'multiplicity', 'isotope'])
+def test_specialized_validators_report_scope_without_rejecting_other_chemistry(tmp_path, kind, change):
+    spec = copy.deepcopy(SPEC)
+    if change == 'explicit':
+        spec['transformation'] = {'kind': 'explicit', 'bond_changes': []}
+    elif change == 'multiplicity':
+        spec['multiplicity'] = 3
+    else:
+        spec['mapped_smiles'] = spec['mapped_smiles'].replace('[CH2:1]', '[13CH2:1]')
+    path = tmp_path / 'spec.json'
+    path.write_text(json.dumps(spec))
+    manifest = {'inputs': [{'artifact_id': 'art_spec',
+                           'sha256': 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()}]}
+    # A scope decision needs no fictitious solver output for an unsupported method.
+    result = validate(kind, [path], manifest)
+    assert result['verdict'] == 'inconclusive'
+    assert result['scientific_verdict'] == 'not_assessed'
+    assert result['parsing']['status'] == 'completed'
+    assert result['checks']['method_scope']['verdict'] == 'inconclusive'
+
+
+def test_unsupported_irc_energy_remains_reference_only(tmp_path):
+    from gaussian_io import parse_irc_log
+    _, row = candidate(tmp_path)
+    _, logs = synthetic_logs(row)
+    path = tmp_path / 'irc.out'
+    path.write_text(logs['forward'].replace('M062X/6-31G**', 'MP2/6-31G**'))
+    parsed = parse_irc_log(path)
+    assert parsed['summary']['energy_evidence']['status'] == 'unsupported'
+    assert parsed['points'][0]['reference_scf_energy_hartree'] == -270.1
+    assert parsed['points'][0]['electronic_energy_hartree'] is None
+    assert parsed['atoms'], 'endpoint geometry remains available for separate analysis'
+
+
 def test_scientific_checks_reject_method_mode_missing_origin_and_wrong_endpoint(tmp_path):
     _,row=candidate(tmp_path);spec,logs=synthetic_logs(row)
     passed=direct_validate(tmp_path,row,'saddle',[logs['ts']])

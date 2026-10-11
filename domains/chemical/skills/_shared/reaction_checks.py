@@ -170,8 +170,11 @@ def calculation_spec(value):
 def path_spec(value):
     """Legacy DA validator contract; generic input preparation has a separate scope."""
     calculation_spec(value)
-    if value.get('transformation', {}).get('kind') != 'diels_alder':
-        raise ValueError('this candidate path supports a declared diels_alder transformation only')
+    transformation = value.get('transformation')
+    if not isinstance(transformation, dict) or not isinstance(transformation.get('kind'), str):
+        raise ValueError('an explicit transformation kind is required')
+    if transformation['kind'] != 'diels_alder':
+        raise UnsupportedReactionScope('this specialized validator assesses diels_alder only; use reaction-independent analysis for other transformations')
     checked = reaction(value.get('mapped_smiles', ''), value['transformation'])
     if checked['checks']['declared_transformation'].get('reason') == 'unsupported_diels_alder_scope':
         raise UnsupportedReactionScope('unsupported DA candidate scope: neutral non-aromatic carbon centers required; use an independently prepared path and explicit transformation checks')
@@ -182,9 +185,9 @@ def path_spec(value):
     if any(Chem.GetFormalCharge(m) != value['charge'] for m in sides):
         raise ValueError('requested charge differs from the molecular graphs')
     if any(a.GetIsotope() or a.GetNumRadicalElectrons() for mol in sides for a in mol.GetAtoms()):
-        raise ValueError('first DA candidate path excludes isotope-specific and open-shell structures')
+        raise UnsupportedReactionScope('DA candidate path excludes isotope-specific and open-shell structures')
     if value['multiplicity'] != 1:
-        raise ValueError('first DA candidate path supports closed-shell singlets only')
+        raise UnsupportedReactionScope('DA candidate path supports closed-shell singlets only')
     if len(Chem.GetMolFrags(sides[0])) != 2 or len(Chem.GetMolFrags(sides[1])) != 1:
-        raise ValueError('first DA candidate path requires two reactant fragments and one product')
+        raise UnsupportedReactionScope('DA candidate path requires two reactant fragments and one product')
     return checked, sides

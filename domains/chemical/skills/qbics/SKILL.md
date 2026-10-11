@@ -24,3 +24,7 @@ continue independent authorized work. Record unknown capability as unverified;
 a missing script in this Skill alone is not an execution failure or scientific result.
 
 For a task-specific wrapper, use the generic preparer with `--script` and an explicit `--backend`, as described in [method selection](../method-selection/SKILL.md). That path records scripts, environment, inputs and outputs. This Skill supplies scientific guidance; a bundled executable for this method is not currently provided.
+
+A separate bundled projected-gradient implementation is available through
+[surface-crossing](../surface-crossing/SKILL.md). It is not a QBICS wrapper and
+must not be described as verified QBICS availability.

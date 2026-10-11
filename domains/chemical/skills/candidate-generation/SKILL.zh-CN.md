@@ -32,3 +32,11 @@ NEB 可用性与前提见 [ase_neb_executor.zh-CN.md](references/ase_neb_executo
 checkpoint、原子映射与 IRC 输入约定见 [Gaussian 路径准备](references/gaussian_path.zh-CN.md)。
 
 内置 DA 路线只支持六个中性、非芳香碳反应中心。芳香、带电或杂原子中心超出适用范围时属于未评估，不是对反应的反证。RDKit 读取 Kekule SMILES 会重新识别芳香性，重写同一分子不能扩展封装能力。改用显式键变化检查和独立准备的候选，或其它有依据的方法。生成的 IRC 输入用 CalcFC 在 checkpoint 几何上重算 Hessian，预算应包含这项成本。
+
+已有材料端点的 QST2/QST3 使用 `chemical.qst-prepare@1`；有界一维/二维扫描使用
+`chemical.scan-xtb@1` 或 `chemical.scan-gaussian@1`；xTB 梯度与 NEB 使用
+`chemical.gradient-xtb@1`、`chemical.neb-xtb@1`。输入合同、可选路径环境绑定、
+续算规则及 calculator 实际边界见[材料路径操作](references/path_search.zh-CN.md)。
+
+基态自旋 Gaussian 梯度与 NEB 另有 chemical.gradient-gaussian@1、chemical.neb-gaussian@1，
+独立电子设置与范围见[路径操作](references/path_search.zh-CN.md)。

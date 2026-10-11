@@ -14,6 +14,11 @@ and converts multiplicity to PySCF spin or xTB unpaired electrons internally.
 Broken-symmetry and other states not determined by this convention need an
 explicitly supported method/input; do not infer them from a multiplicity alone.
 
+Gaussian records typed `energy_evidence` and a separate `reference_scf_energy_hartree`.
+Only supported target energies enter successful steps. Unsupported/missing target
+energies leave raw output available and fail the runner check, including with
+`--validation none`. See [energy interpretation and capability scope](capabilities.md).
+
 `opt-sp` uses the optimized geometry for its single point. Check that the SP
 input digest equals the optimization geometry digest, and that both steps
 completed. Independent SP and optimization calls need an explicit Artifact dependency.

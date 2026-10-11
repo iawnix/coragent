@@ -34,3 +34,17 @@ description: 根据研究证据编写图文报告，包含分子结构、能量�
 整理已有结果可用文件和脚本工具；额外科学计算通过 `job_*` 执行。绘图需使用实际可用的绘图库，
 渲染 Job 使用配置的环境。交付前打开最终文档与图像，核对链接、坐标轴、图注、单位、表格和来源。
 将报告及依赖的图表、数据、脚本登记为材料，并在研究结论中引用。只有得到发送授权后才使用 email Skill 交付。
+
+## 能量分析数据
+
+对于已收集的 chemical-thermochemistry-result/1、chemical-free-energy-ensemble-result/1、
+chemical-energy-profile-result/1、chemical-scan-slice-result/1，联合读取 JSON 与配套 CSV，
+见[能量合同](../energetics/references/energy_execution.zh-CN.md)。缺失量标为不可用；
+保留 E/H/G 类型、条件与参考，并引用来源摘要/Artifact。只绘制成功扫描点，排除点
+保留空缺；剖面标明离散状态或采样势能切片。活化能比较和集合布居都不证明 TS 连通性、
+网络选择性或穷尽采样。
+
+动力学报告须标出 TST 假设、共同前体分支范围及网络温度、初始浓度、守恒/误差诊断、
+终态 status；部分轨迹不能证明请求终点的产率。动力学预测与产物 G 排序分别报告。
+电子态/交叉报告区分目标与参考能量、态特征连续性、数值驻点和曲率；未验证态身份或
+缺 Hessian 必须保留在结论中。

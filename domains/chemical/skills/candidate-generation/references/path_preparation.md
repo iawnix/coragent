@@ -99,8 +99,9 @@ output and mode evidence before preparing IRC from the collected checkpoint:
 
 IRC preparation supports the same explicit transformation contract regardless of
 endpoint geometry strategy. It retains checkpoint bytes and digest and writes
-forward.gjf/reverse.gjf with ReadFC and Geom=AllCheck. It does not parse the binary
-checkpoint: verify its atom order, method, charge/spin, Hessian and producer evidence.
+forward.gjf/reverse.gjf with CalcFC and Geom=AllCheck, recalculating the Hessian at
+the checkpoint geometry. It does not parse the binary checkpoint: verify its atom
+order, method, charge/spin and producer evidence; it does not reuse a stored Hessian.
 Submit and collect the preparation Job, then run each generated input using the
 Gaussian Skill, staging ts.chk and selecting `--validation irc`.
 
@@ -109,3 +110,9 @@ chemical.gaussian_irc_connectivity path validators and chemical.diels_alder_path
 acceptance profile still use the specialized DA contract. Generic preparation does
 not make those checks applicable. Use collected outputs with suitable analysis for
 the declared bond changes, mode and endpoints; record unassessed criteria explicitly.
+
+For independent fragment assembly or perturbation of a supplied complex, use
+`chemical.complex-sample@1`; for CREST and ensemble screening use the
+[ensemble contract](../../crest/references/crest_ensemble.md). Exported seeds
+need explicit mapping to the endpoint atom keys above and separate refinement;
+complex sampling does not establish an elementary step or a TS.

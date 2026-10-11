@@ -10,6 +10,10 @@ defaults are M062X/6-31G**, Opt=Tight or SP, SCF=Tight, and Int=UltraFine.
 Use `chemical.gaussian-input@1` for a complete explicit Gaussian input.
 Both use the target's `gaussian` binding.
 
+After collection, `chemical.gaussian-evidence@1` can normalize a raw log section
+for independent [stationary, mode and IRC checks](../validation/references/general_checks.md).
+These analysis Jobs use `structure` and do not rerun Gaussian or certify a TS from termination alone.
+
 Choose the input mode before preparing arguments:
 
 | Executor | Preparer input | Arguments after `--` |
@@ -56,11 +60,33 @@ be relative staged paths. Collect checkpoints needed by subsequent calculations.
 
 `--validation opt/sp/frequency/minimum/saddle/irc/none` selects runner checks only for this explicit GJF mode; it does not add calculation keywords to the GJF route.
 `saddle` requires stationary-point convergence and one imaginary frequency;
-inspect its mode direction and use the registered saddle validator for the
-specified transformation. IRC produces path and endpoint artifacts; establish
-endpoint identities with the connectivity validator and supporting evidence.
+inspect mode direction against the actual reaction coordinates. IRC produces path
+and endpoint artifacts; establish endpoint identities with suitable analysis.
+The registered `chemical.gaussian_saddle` and `chemical.gaussian_irc_connectivity`
+validators are DA-specific despite their names, not default checks for other reactions.
 A scan input can execute, but scan-specific completeness has no bundled validator.
+
+The bundled parser distinguishes reference SCF from supported target energy. It does
+not certify excited-state or arbitrary correlated-method energies; `--validation none`
+does not bypass this boundary. Preserve raw output and use appropriate analysis for
+unsupported quantities. See [capabilities and energy fields](../method-selection/references/capabilities.md).
 
 See [Gaussian scientific validation](references/gaussian_validation.md).
 
 - [Two-dimensional relaxed torsion scans](references/relaxed_scans.md)
+
+For QST2/QST3 from embedded material endpoints or a bounded ModRedundant
+scan grid, see [material-based path operations](../candidate-generation/references/path_search.md).
+The Gaussian scan adapter retains the HF/DFT SCF energy boundary; it is not a
+Gaussian gradient/NEB calculator; those use the separate state-aware entrypoints below.
+
+## Bound electronic-state calculations
+
+`chemical.electronic-gaussian@1` provides a separate typed adapter for bounded
+ground-spin HF/DFT and closed-shell singlet TDDFT/TDHF/TDA SP/optimization.
+`chemical.state-tracking@1` compares supplied AO transition-density characters
+with explicit cross-geometry overlap metrics; it detects root changes/ambiguity.
+Read [electronic state contracts](references/electronic_states.md). Native fixed-root
+optimization retains unverified state continuity until independent character
+information is available. Existing generic Gaussian energy guards remain in force.
+For different-spin crossings, use [surface-crossing](../surface-crossing/SKILL.md).

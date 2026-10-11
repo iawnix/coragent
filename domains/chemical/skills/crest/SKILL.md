@@ -1,33 +1,37 @@
 ---
 name: crest
-description: Run and assess CREST conformer searches and preserve ensemble membership, energies, settings, provenance, and selection rationale.
+description: Run bounded CREST conformer searches, import and screen ensembles, sample rigid-fragment complexes, and export members for independent refinement.
 ---
 
-# CoRAgent CREST
+# CoRAgent CREST and ensembles
 
 [Chinese version](SKILL.zh-CN.md)
 
-Use this Skill for CREST conformer searches through an installed command. CREST
-owns ensemble exploration; xTB calculations outside a CREST search belong to
-`xtb`.
+Use this Skill for independent conformer or complex preparation; R/P and a
+reaction name are not required. Read [the ensemble contract](references/crest_ensemble.md)
+for input schemas, Job examples, limits and interpretation.
 
-This package has no bundled CREST runner. Inspect the selected environment's
-command and documented options, then stage a generic `job_start` request if
-available; a missing Skill script alone does not prove CREST is unavailable.
+Choose the operation that matches the available evidence:
 
-Do not treat a normal process exit or a non-empty ensemble as scientific
-evidence until the primary files, member counts, and selected-structure
-identity have been checked.
+- `chemical.crest@1`: bounded CREST 3.0.2 GFN1/GFN2 search of an explicit
+  ground-state material with known charge, multiplicity and coordinates.
+- `chemical.crest-ensemble@1`: import the run receipt and exact source material;
+  retain member identity inference, energy consistency and partial-result status.
+- `chemical.ensemble-select@1`: bounded symmetry-aware geometric clustering and
+  comparable electronic-energy screening, recording every member's decision.
+- `chemical.complex-sample@1`: sample rigid orientations/placements from separate
+  materials or perturb a supplied complex; preserve original coordinates and lineage.
 
-Bind one XYZ Artifact and explicit charge, unpaired electrons, xTB method,
-search and optimization levels, threads, and solvent settings. Validate normal
-termination and the complete primary output set. Check that conformer and
-energy-table counts agree and that each reused member preserves atom count,
-order, and identity.
+Prepare and submit each operation through the existing Job lifecycle. CREST uses
+the `crest` backend with a configured native executable and Python wrapper
+binding. Import, selection and complex sampling use `structure` (RDKit/NumPy).
+Other verified CREST versions/features remain available through generic Jobs;
+this versioned wrapper does not establish their compatibility.
 
-Record ensemble size, relative-energy table, selected geometry, and selection
-rationale as distinct facts. A scheduler success with missing primary outputs
-is an operational failure, not an empty ensemble. Read
-[crest_ensemble.md](references/crest_ensemble.md).
-
-For a task-specific wrapper, use the generic preparer with `--script` and an explicit `--backend`, as described in [method selection](../method-selection/SKILL.md). That path records scripts, environment, inputs and outputs. This Skill supplies scientific guidance; a bundled executable for this method is not currently provided.
+Inspect primary files and per-member evidence before reuse. A complete search
+receipt is not an exhaustive search, minimum certification or verified identity.
+Unknown identity/state stays unresolved; mixed methods/solvents are not ranked.
+Retain the source ensemble, decisions, exported XYZ/materials and refinement
+manifest. Submit selected members to explicit compatible SP/optimization Jobs;
+do not silently change solvent, state or method. Sampling constraints do not
+carry into subsequent optimization. CREST energies are not free energies.

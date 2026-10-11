@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -485,6 +486,7 @@ def parse_irc_path(lines: list[str], route: str | None = None) -> dict[str, obje
     """Parse Gaussian IRC path points; point 0 is a coordinate-free TS marker."""
 
     points: list[dict[str, object]] = []
+    energy_evidence = electronic_energy_evidence(lines, route)['energy_evidence']
     last_scf_energy: float | None = None
     point_zero_marker_present = False
     direction = None
@@ -511,7 +513,8 @@ def parse_irc_path(lines: list[str], route: str | None = None) -> dict[str, obje
                 "point_number": point_number,
                 "path_number": path_number,
                 "reaction_coordinate": reaction_coordinate,
-                "electronic_energy_hartree": last_scf_energy,
+                "reference_scf_energy_hartree": last_scf_energy,
+                "electronic_energy_hartree": last_scf_energy if energy_evidence['status'] == 'supported' else None,
                 "atoms": atoms,
             }
         )
@@ -527,11 +530,12 @@ def parse_irc_path(lines: list[str], route: str | None = None) -> dict[str, obje
     if not isinstance(endpoint_atoms, list):
         raise TypeError("internal parser error: IRC endpoint atoms have unexpected shape")
     compact_points = [
-        {key: point[key] for key in ("point_number", "path_number", "reaction_coordinate", "electronic_energy_hartree")}
+        {key: point[key] for key in ("point_number", "path_number", "reaction_coordinate", "electronic_energy_hartree", "reference_scf_energy_hartree")}
         for point in points
     ]
     return {
         "schema_version": "gaussian-irc-path/1",
+        "energy_evidence": energy_evidence,
         "direction": direction,
         "point_zero_policy": "coordinate_free_ts_marker_excluded",
         "point_zero_marker_present": point_zero_marker_present,
@@ -648,12 +652,78 @@ def write_irc_parse_artifacts(parsed: dict[str, object], output_dir: Path, log_s
     write_xyz(output_dir / f"{log_stem}_endpoint.xyz", atoms, f"IRC endpoint extracted from {log_name}")
 
 
+def electronic_energy_evidence(lines: list[str], route: str | None = None) -> dict[str, object]:
+    """Keep a reference SCF value separate from a supported target energy.
+
+    This parser supports matching HF/DFT SCF energies, not arbitrary energies
+    executable by Gaussian. Route and output evidence must both agree. Missing
+    or unsupported evidence remains available for method-specific analysis.
+    """
+    route = route if route is not None else extract_log_route(lines)
+    text = "\n".join(lines)
+    records = re.findall(r"SCF Done:\s+E\(([^)]+)\)\s*=\s*([^\s]+)", text, re.I)
+    label, raw = records[-1] if records else (None, None)
+    reference = None
+    if raw is not None:
+        try:
+            value = float(raw.replace('D', 'E').replace('d', 'e'))
+            reference = value if math.isfinite(value) else None
+        except ValueError:
+            pass
+    normalized = compact_route(route or '')
+    methods = re.findall(r'(?:^|\s)([a-z][a-z0-9+*(),._-]*)\s*/', normalized)
+    method = methods[0] if len(methods) == 1 else None
+    # These modifiers change the target energy even when a reference SCF is printed.
+    unsupported_route = re.search(
+        r'\b(?:td|tda|cis|eom\w*|cas\w*|sac\w*|oniom|ircmax|counterpoise|'
+        r'cbs\w*|g[1-4]\w*|w1\w*|mp[2-5]\w*|ccsd\w*|qcisd\w*|bd|'
+        r'b2\w*|dsd\w*|pwpb95|mpw2\w*|xyg\w*|b2gpplyp|iop)\b', normalized)
+    unsupported_output = re.search(
+        r'Excited State\s+\d+\s*:|Total Energy,\s*E\([^)]*\)\s*=|'
+        r'\bE(?:[RU]?MP[2-5]|CCSD(?:\(T\))?|QCISD(?:\(T\))?|2?PLYP)\s*=|'
+        r'\bCCSD\(T\)\s*=|ONIOM:\s*extrapolated energy|Counterpoise corrected energy', text, re.I)
+    # Gaussian omits punctuation in some functional labels (e.g. wB97X-D).
+    canonical = lambda value: re.sub(r'[^a-z0-9]', '', value.lower())
+    target = canonical(method) if method else None
+    actual = canonical(label) if label else None
+    labels = {target, 'r' + target, 'u' + target, 'ro' + target} if target else set()
+    if unsupported_route or unsupported_output:
+        status, reason = 'unsupported', 'target_energy_requires_method_specific_parser'
+    elif method is None:
+        status, reason = 'unresolved', 'missing_or_ambiguous_method_in_output_route'
+    elif not records:
+        status, reason = 'missing', 'missing_scf_energy'
+    elif reference is None:
+        status, reason = 'unresolved', 'invalid_final_scf_energy'
+    elif actual not in labels:
+        status, reason = 'unsupported', 'scf_label_does_not_match_target_method'
+    else:
+        status, reason = 'supported', 'matching_scf_method_without_unsupported_target_evidence'
+    return {
+        'reference_scf_energy_hartree': reference,
+        'electronic_energy_hartree': reference if status == 'supported' else None,
+        'energy_evidence': {'status': status, 'reason': reason, 'requested_method': method,
+                            'scf_method': label, 'source': 'SCF Done' if records else None,
+                            'quantity': 'scf_electronic_energy' if status == 'supported' else None,
+                            'scope': 'Matching HF/DFT SCF energy only; does not certify electronic-state identity or convergence'},
+    }
+
+
+def require_supported_energy(summary: dict[str, object]) -> float:
+    evidence = summary.get('energy_evidence', {})
+    if evidence.get('status') != 'supported':
+        raise ValueError('Gaussian target energy not assessed: ' + str(evidence.get('reason', 'missing_energy_type_evidence')))
+    value = summary.get('electronic_energy_hartree')
+    if not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ValueError('missing or non-finite target electronic energy')
+    return value
+
+
 def parse_thermochemistry(lines: list[str]) -> dict[str, object]:
     """Read thermochemical quantities from an already selected job section."""
     text = "\n".join(lines)
     numeric = r"([-+]?\d+(?:\.\d*)?(?:[DdEe][-+]?\d+)?)"
     patterns = {
-        "electronic_energy_hartree": rf"SCF Done:.*?=\s*{numeric}",
         "zero_point_correction_hartree": rf"Zero-point correction=\s*{numeric}",
         "thermal_energy_correction_hartree": rf"Thermal correction to Energy=\s*{numeric}",
         "thermal_enthalpy_correction_hartree": rf"Thermal correction to Enthalpy=\s*{numeric}",
@@ -680,6 +750,15 @@ def parse_thermochemistry(lines: list[str]) -> dict[str, object]:
             except ValueError:
                 pass
             in_table = False
+    result.update(electronic_energy_evidence(lines))
+    # Log totals remain observable, but cannot be presented as target-method
+    # thermochemistry when that method's electronic energy has not been parsed.
+    totals = ('electronic_plus_zpe_hartree', 'electronic_plus_thermal_enthalpy_hartree',
+              'electronic_plus_thermal_free_energy_hartree')
+    result['reported_thermochemical_totals'] = {key: result[key] for key in totals}
+    if result['energy_evidence']['status'] != 'supported':
+        for key in totals:
+            result[key] = None
     return result
 
 
@@ -840,6 +919,11 @@ def parse_scan_log(
     section_text = "\n".join(section_lines)
     route = extract_log_route(section_lines)
     points = _scan_energy_points(section_lines)
+    energy = electronic_energy_evidence(section_lines, route)
+    for point in points:
+        point['reference_scf_energy_hartree'] = point['energy_hartree']
+        if energy['energy_evidence']['status'] != 'supported':
+            point['energy_hartree'] = None
     normal_termination = "Normal termination of Gaussian" in section_text
     route_scan = bool(route_settings(route).get("has_scan"))
     step_scan = bool(SCAN_STEP_RE.search(section_text))
@@ -872,13 +956,14 @@ def parse_scan_log(
             isinstance(point.get("energy_hartree"), (int, float))
             for point in points
         ),
-        "electronic_energy_hartree": points[-1]["energy_hartree"] if points else None,
+        **energy,
     }
     return {
         "summary": summary,
         "profile": {
             "schema_version": "gaussian-scan-profile/1",
             "energy_unit": "hartree",
+            "energy_evidence": energy['energy_evidence'],
             "points": points,
         },
     }

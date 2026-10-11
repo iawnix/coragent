@@ -9,6 +9,10 @@ XYZ 的 `sp`、`opt`、`opt-sp` 使用 `chemical.gaussian@1`，默认采用
 M062X/6-31G**、Opt=Tight 或 SP、SCF=Tight、Int=UltraFine。完整显式
 输入使用 `chemical.gaussian-input@1`，两者都采用目标的 `gaussian` 绑定。
 
+收集后可用 `chemical.gaussian-evidence@1` 规范化原始日志 section，供独立的
+[驻点、模式与 IRC 检查](../validation/references/general_checks.zh-CN.md)使用。
+这些分析 Job 使用 structure，不重跑 Gaussian，也不从正常终止直接认证 TS。
+
 准备参数前先选择输入模式：
 
 | Executor | 准备入口的输入 | `--` 后面的参数 |
@@ -53,10 +57,29 @@ bash 命令只准备并校验 Job 请求；`prepared/gaussian.json` 是请求文
 ```
 
 `--validation opt/sp/frequency/minimum/saddle/irc/none` 仅用于此显式 GJF 模式，选择 runner 检查，不会替 GJF route 添加计算关键词。
-`saddle` 检查驻点收敛和一个虚频；还需检查模式方向，并使用注册的鞍点验证器
-核对指定转化。IRC 输出路径与端点材料，端点归属通过连通性验证器及关联证据
-确认。显式扫描输入可以执行，当前没有专门验证扫描完整性的内置验证器。
+`saddle` 检查驻点收敛和一个虚频；还需按实际反应坐标分析模式方向。IRC 输出路径与
+端点材料，使用适用分析确认端点身份。注册的 `chemical.gaussian_saddle` 和
+`chemical.gaussian_irc_connectivity` 虽然名称通用，实际是 DA 专用检查，不能默认用于其它反应。
+显式扫描输入可以执行，当前没有专门验证扫描完整性的内置验证器。
+
+内置解析器区分参考 SCF 与受支持的目标能量，不认证激发态或任意相关方法的能量；
+`--validation none` 也不绕过此边界。保留原始输出，对未支持的量使用适用分析，见
+[能力范围与能量字段](../method-selection/references/capabilities.zh-CN.md)。
 
 详见 [Gaussian 科学验证](references/gaussian_validation.zh-CN.md)。
 
 - [二维弛豫扭转扫描](references/relaxed_scans.zh-CN.md)
+
+嵌入材料端点的 QST2/QST3 准备与有界 ModRedundant 扫描网格见
+[材料路径操作](../candidate-generation/references/path_search.zh-CN.md)。
+Gaussian 扫描适配沿用 HF/DFT SCF 能量范围。梯度/NEB 另用 chemical.gradient-gaussian@1、
+chemical.neb-gaussian@1，设置见路径操作中的电子态适配说明。
+
+## 明确电子态的计算
+
+chemical.electronic-gaussian@1 提供独立的类型化适配器，支持有限范围的基态自旋
+HF/DFT 与闭壳层单重激发 TDDFT/TDHF/TDA 单点/优化。chemical.state-tracking@1
+用提供的 AO 跃迁密度及跨几何重叠度量比较特征，识别 root 改变和歧义。
+先读[电子态合同](references/electronic_states.zh-CN.md)。原生固定 root 优化在缺少
+独立特征信息时保留态连续性未验证。既有 Gaussian 通用能量保护继续有效。
+不同自旋交叉使用 [surface-crossing](../surface-crossing/SKILL.zh-CN.md)。

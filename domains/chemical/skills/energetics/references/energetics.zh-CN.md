@@ -1,9 +1,12 @@
 # 热化学、基元动力学与网络
 
-本参考定义科学检查，不是可调用的分析能力目录。当前包没有内置热化学、势垒、TST、
-分支比或反应网络执行器。通过 Job Runtime 执行具体分析脚本，并登记输入输出；
-`artifact_derive` 只记录描述。[Gaussian runner](../../gaussian/SKILL.zh-CN.md) 解析电子能
+[独立分析执行器](energy_execution.zh-CN.md) 已支持热化学来源组合、标准态转换、
+有限构象集合自由能、守恒计量剖面与成功扫描点导出。CF22D 提供底层 RRHO 计算。
+[动力学执行器](kinetics_execution.zh-CN.md) 提供有限经典 TST、共同前体分支与封闭质量作用积分。通过 Job Runtime 执行计算并登记
+输入输出；`artifact_derive` 只记录描述。[Gaussian runner](../../gaussian/SKILL.zh-CN.md) 解析电子能
 和可用热校正，必须检查实际输出字段及缺失值。
+使用目标能量和热化学总量前核对 `energy_evidence`；`reference_scf_energy_hartree`
+和 `reported_thermochemical_totals` 本身不证明目标方法/态能量，见[当前能力](../../method-selection/references/capabilities.zh-CN.md)。
 
 显式保留物种身份、量（`E`、`E+ZPE`、`H`、`G`）、单位、方法/基组、电子态、驻点
 归属和条件。电子能与热校正来自不同来源时，结构和原子顺序必须兼容，并声明复合处理。

@@ -3,6 +3,9 @@
 过渡态验证把程序完成、驻点证据、振动模式归属、结构身份 与科学解释分开。任何单一
 解析器标记都不能同时建立这些结论。
 
+规范化证据可使用独立[驻点与模式检查](general_checks.zh-CN.md)，并有原始 Gaussian 日志
+转换入口。各项结论有明确范围，保留小负频、缺失证据与不支持的势能面假设。
+
 [Gaussian runner](../../gaussian/SKILL.zh-CN.md) 使用 `gaussian_io.py::parse_log` 写出
 `parsed.json`，提取终止、收敛、驻点标记、频率、几何及最终谐振表的笛卡尔模式向量。
 其 `section_index` 参数从零开始。选择相关 section，并把输出 route、电荷、多重度、

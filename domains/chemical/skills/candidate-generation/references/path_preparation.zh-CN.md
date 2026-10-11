@@ -88,11 +88,16 @@
 ```
 
 IRC 准备接收相同的显式变换契约，不依赖端点几何策略。它保留检查点原始字节及摘要，
-用 ReadFC 和 Geom=AllCheck 写 forward.gjf/reverse.gjf，不解析二进制检查点。必须核对
-检查点的原子顺序、方法、电荷/自旋、Hessian 和生产证据。先提交并收集输入准备 Job，
+用 CalcFC 和 Geom=AllCheck 写 forward.gjf/reverse.gjf，在检查点几何上重新计算 Hessian，
+不解析二进制检查点，也不复用存储的 Hessian。必须核对检查点的原子顺序、方法、电荷/自旋
+和生产证据。先提交并收集输入准备 Job，
 再按 Gaussian Skill 分别运行两方向输入，暂存 ts.chk，使用 `--validation irc`。
 
 已有 chemical.reaction_mapping、chemical.gaussian_saddle、chemical.gaussian_irc_connectivity
 路径验证器和 chemical.diels_alder_path 验收 profile 仍使用 DA 专用契约。通用准备成功
 不会扩展这些检查的适用范围。应针对声明键变化、模式和端点，用适当分析检查收集的输出，
 明确记录尚未评估的条件。
+
+独立片段组装或已有复合物扰动使用 `chemical.complex-sample@1`；CREST 和集合筛选
+见[集合合同](../../crest/references/crest_ensemble.zh-CN.md)。导出种子需显式对应到本文
+端点原子键，并另行精修；复合物采样本身不确定基元步骤或过渡态。

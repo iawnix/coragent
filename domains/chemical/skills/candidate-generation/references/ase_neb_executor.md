@@ -1,7 +1,9 @@
-# ASE NEB availability
+# NEB availability
 
-The current package does not provide a registered ASE NEB workflow or a bundled
-NEB runner. The former `ase.neb@1` interface is not a callable capability.
+The package provides `chemical.neb-xtb@1`: a bounded NumPy NEB engine with an
+xTB 6.7.1 energy/gradient adapter. See [the path contract](path_search.md) for
+settings, the optional path environment and convergence/partial-output semantics.
+It is not an ASE implementation. The former `ase.neb@1` interface is not callable.
 Installing ASE or finding xTB/Gaussian alone does not establish an executable NEB path.
 
 If the selected environment supplies a documented NEB script, inspect its actual

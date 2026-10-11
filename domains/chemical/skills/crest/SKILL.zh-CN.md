@@ -1,27 +1,33 @@
 ---
 name: crest
-description: 运行和评估 CREST 构象搜索，并保存构象集合、能量、设置、来源与选择理由。
+description: 执行有界 CREST 构象搜索、导入和筛选集合、采样刚性片段复合物，并导出成员供独立精修。
 ---
 
-# CoRAgent CREST
+# CoRAgent CREST 与构象集合
 
 [English version](SKILL.md)
 
-使用本 Skill 通过已安装命令处理 CREST 构象搜索。CREST 负责构象集合探索；
-CREST 搜索之外的 xTB 计算由 `xtb` 负责。
+独立构象或复合物准备不要求反应物/产物配对或反应名称。输入合同、Job 示例、
+限制与解释见[集合合同](references/crest_ensemble.zh-CN.md)。
 
-当前包没有内置 CREST runner。核实所选环境的命令和文档参数，可用时暂存通用
-`job_start` 请求；Skill 缺少脚本本身不代表 CREST 不可用。
+根据已有材料选择独立操作：
 
-不要把进程正常退出或非空构象集合直接当作科学证据；必须先核对主要文件、成员数量和所选
-结构身份。
+- `chemical.crest@1`：针对有坐标、已知电荷/多重度且明确声明 ground 态的材料，
+  执行有界 CREST 3.0.2 GFN1/GFN2 搜索。
+- `chemical.crest-ensemble@1`：导入运行回执及其精确来源材料，保留成员身份推断、
+  能量一致性与部分结果状态。
+- `chemical.ensemble-select@1`：有界、对称感知的几何聚类及可比电子能筛选，
+  逐成员记录选择理由。
+- `chemical.complex-sample@1`：组装独立片段的刚性取向/位置，或扰动用户复合物；
+  保留原始坐标和原子来源。
 
-绑定一个 XYZ Artifact，并显式给出电荷、未成对电子数、xTB 方法、搜索与优化级别、线程和
-溶剂设置。核验正常终止与完整的主要输出集，检查构象数和能量表行数一致，并确保后续使用
-的每个成员保持原子数、顺序与身份。
+每项通过现有 Job 生命周期准备、提交和收集。CREST 使用 `crest` 后端，
+需同时配置原生命令与 Python wrapper 环境；导入、筛选和复合物采样使用
+`structure`（RDKit/NumPy）。其它经核实的 CREST 版本/功能仍可走通用 Job，
+此封装不代表它们已经适配。
 
-将集合大小、相对能量表、所选几何和选择理由记录为不同事实。调度器成功但缺失主要输出
-属于运行故障，不是空构象集合。详见
-[crest_ensemble.zh-CN.md](references/crest_ensemble.zh-CN.md)。
-
-临时包装脚本通过通用准备器的 `--script` 和明确的 `--backend` 提交，见[方法选择](../method-selection/SKILL.zh-CN.md)。此路径记录脚本、环境、输入和输出。本 Skill 提供科学方法指导，当前没有内置该方法的执行入口。
+使用成员前检查原始文件和逐成员证据。完整搜索回执不等于搜索穷尽、极小点认证或
+身份认证。身份/态未知时保留未决；不同方法/溶剂不作能量混排。保留来源集合、
+选择记录、导出的 XYZ/material 和精修清单，再以明确相容的方法、溶剂和态提交
+独立单点/优化 Job，不能静默切换设置。采样约束不会自动用于后续优化；
+CREST 电子能不是自由能。

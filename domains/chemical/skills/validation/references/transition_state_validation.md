@@ -4,6 +4,10 @@ Transition-state validation separates program completion, stationary-point
 evidence, mode assignment, structure identity, and scientific interpretation.
 No single parser flag establishes all of them.
 
+Use the independent [stationary and mode checks](general_checks.md) for normalized
+evidence, including a Gaussian raw-log adapter. Their separate scoped results
+retain small negative modes, missing evidence and unsupported surface assumptions.
+
 The [Gaussian runner](../../gaussian/SKILL.md) writes `parsed.json` using
 `gaussian_io.py::parse_log`. The parser extracts termination, convergence,
 stationary markers, frequencies, geometry and Cartesian normal-mode vectors

@@ -125,7 +125,8 @@
       "lock": "wrapper.lock",
       "backends": [
         "gaussian",
-        "xtb"
+        "xtb",
+        "crest"
       ],
       "auto_bind": false,
       "checks": [
@@ -170,6 +171,26 @@
       },
       "resources": {
         "wrapper.lock": "sha256:ee54a7a2686e1c68ba6d1591096806e5855ddc1dadd74f6853d61baf81f19874"
+      }
+    },
+    "path": {
+      "lock": "structure.lock",
+      "backends": [
+        "path_xtb",
+        "path_gaussian"
+      ],
+      "auto_bind": false,
+      "checks": [],
+      "platform": {
+        "system": "Linux",
+        "machines": [
+          "x86_64",
+          "amd64"
+        ],
+        "glibc": "2.28"
+      },
+      "resources": {
+        "structure.lock": "sha256:b2447fff9059d0819049b9d4761e740d6a69a5f3686bf40cc7122edc3307d39b"
       }
     }
   }

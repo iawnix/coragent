@@ -4,7 +4,7 @@
 
 根据方法 Skill 选择预设入口、原生命令或任务脚本，以及 `job.toml` 中的命名环境。
 所选绑定提供目标 Python 或原生程序；预设入口还声明自己的依赖。
-结构准备与化学验证器可共用 `structure.lock` 环境；Gaussian/xTB
+结构准备与化学验证器可共用 `structure.lock` 环境；Gaussian/xTB/CREST
 的 Python 包装脚本使用 `wrapper.lock`；CF22D 使用 `cf22d.lock`；分子图像使用
 `render.lock`。这些锁文件位于化学扩展的 `environments` 目录，供安装使用，不决定
 研究应选择哪种科学方法。

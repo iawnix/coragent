@@ -1,11 +1,16 @@
 # Thermochemistry, elementary kinetics and networks
 
-This reference defines scientific checks, not a catalog of callable analysis
-capabilities. The package has no bundled thermochemistry, barrier, TST, branching
-or reaction-network executor. Run a concrete analysis script through Job Runtime
-and register its inputs and outputs. `artifact_derive` only records a descriptor.
+The [independent analysis executors](energy_execution.md) combine thermal sources,
+convert standard states, calculate finite conformer free energies and balanced
+profiles, and export successful scan slices. CF22D supplies the underlying RRHO
+calculator. [Kinetic executors](kinetics_execution.md) provide bounded classical
+TST, common-precursor branching and explicit closed mass-action integration. Run calculations through Job Runtime and register their
+inputs/outputs; `artifact_derive` only records a descriptor.
 The [Gaussian runner](../../gaussian/SKILL.md) parses electronic energy and available
 thermal corrections; inspect the actual output fields and missing values.
+Read its `energy_evidence` before using target energies or thermal totals; a
+`reference_scf_energy_hartree` or `reported_thermochemical_totals` value does not
+establish target-method/state energy. See [current capabilities](../../method-selection/references/capabilities.md).
 
 Keep species identity, quantity (`E`, `E+ZPE`, `H`, `G`), units, method/basis,
 electronic state, stationary-point assignment and conditions explicit. Separate

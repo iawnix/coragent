@@ -37,3 +37,7 @@ Monitor 唤醒后先核对最新用户要求、已有结论与剩余预算；已
 恢复时读取 `task_read` 与运行时快照中的新 `actual_user_submission_ids`。用户补充条件或明确要求可行替代路线后，调用 `task_update`，传 `action="refine"`、当前 `expected_revision` 与这些 `source_submission_ids`；范围没变就不传 objective/criteria。返回 active 后继续。`progress` 和 Node 状态修改不会解除任务阻塞。版本冲突先重读再重试。任务证据引用 `job_…` 或收集的 Artifact/Result，不传 `job_result_…` 回执。
 
 执行故障由 execution_recovery 单独记录，不等于研究 blocked。无新证据轮数提示重新评估方法，不是固定停止阈值。失败后先检查已有回执，不能盲目重复已完成或结果未知的外部操作。最终回复恢复沿用完成证据，仅补充说明，不启动新计算或重复发送。执行待处理时说明故障；新指令解决问题后可用 refine，用户也可在 Monitor 显式 resume。
+
+多步化学任务使用领域的[路径证据合同](../../domains/chemical/skills/mechanism-reasoning/references/pathway_execution.zh-CN.md)，
+将化学中间体/缺步骤与 Node 关系分开保存。扫描失败、NEB 候选和已验证基元步骤是不同
+结果。切换方法时保留先前回执及原始交付标准；动力学/交叉分析仍是普通独立 Job。

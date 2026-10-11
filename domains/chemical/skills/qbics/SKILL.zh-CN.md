@@ -19,3 +19,6 @@ description: 判断 QBICS 的适用性，核实已安装命令、输入与验证
 本 Skill 缺少脚本本身不是执行失败，也不是科学结果。
 
 临时包装脚本通过通用准备器的 `--script` 和明确的 `--backend` 提交，见[方法选择](../method-selection/SKILL.zh-CN.md)。此路径记录脚本、环境、输入和输出。本 Skill 提供科学方法指导，当前没有内置该方法的执行入口。
+
+另有独立内置投影梯度实现，见 [surface-crossing](../surface-crossing/SKILL.zh-CN.md)。
+它不是 QBICS 封装，不能据此声称 QBICS 已安装或已验证。

@@ -48,3 +48,23 @@ in their configured environments. Open the final document and images to check
 links, axes, captions, units, tables, and provenance. Register the report and its
 figures, data, and scripts as materials and cite them in the research conclusion.
 Use the email Skill for delivery only with sending authorization.
+
+## Energy-analysis datasets
+
+For collected `chemical-thermochemistry-result/1`,
+`chemical-free-energy-ensemble-result/1`, `chemical-energy-profile-result/1` and
+`chemical-scan-slice-result/1`, consume result JSON together with the accompanying
+CSV. See [energy contracts](../energetics/references/energy_execution.md).
+Show missing quantities as unavailable, preserve E/H/G labels, conditions and
+reference, and cite source digests/Artifacts. Plot successful scan rows only,
+retain gaps at excluded points, and label profiles as discrete states or sampled
+potential slices. Neither an activation comparison nor an ensemble population
+certifies TS connectivity, network selectivity or exhaustive sampling.
+
+For conditional kinetic outputs, label TST assumptions, common-precursor branch
+scope and the network's temperature, initial concentrations, conservation/error
+diagnostics and terminal status. Partial trajectories do not establish the
+requested endpoint yield. Distinguish kinetic predictions from product-G rankings.
+For electronic/crossing outputs, show target vs reference energy and separate
+state-character continuity, numerical stationarity and curvature. An unverified
+state or missing Hessian must remain visible in the report.

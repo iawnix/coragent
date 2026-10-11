@@ -9,6 +9,8 @@ description: Prepare a scientific method and named compute environment for execu
 
 Use this Skill when selecting a method or preparing execution for an already specified method. Read the relevant method Skill using its listed path. Installation configuration and method checks are Agent work; unavailable evidence is not automatically a request for user input.
 
+Read the [implemented capabilities and boundaries](references/capabilities.md) when determining what is bundled, what requires a native command/script, and which checks are specialized. A Skill description or installed executable alone does not establish complete support.
+
 Start from the requested observable or the scientific question to resolve. Consider
 system size, charge, spin, electronic state, metals or multireference risk,
 solvent, constraints, target observable, expected uncertainty, candidate

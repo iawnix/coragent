@@ -37,3 +37,10 @@ Treat missing calculations, missing validation and an unfinished reply as remain
 For recovery, read `task_read` and the new `actual_user_submission_ids` from the runtime snapshot. If the user supplies the missing input or explicitly requests a viable alternative, call `task_update` with `action="refine"`, the current `expected_revision` and those `source_submission_ids`; omit objective/criteria when scope is unchanged. Continue after the returned state is active. `progress` and Node status edits do not reactivate blocked tasks. On revision conflict, reread before retrying. Cite `job_…` or collected Artifacts/Results in task evidence, not `job_result_…` receipts.
 
 Execution failures use execution_recovery, independently of research blocked. Runs without new evidence are a replanning signal, not a fixed stopping threshold. Inspect prior receipts after a failed run; never blindly repeat completed or uncertain side effects. During final-response recovery, use the saved completion evidence and deliver the explanation without new calculations or external sends. If execution needs attention, explain the failure; a new instruction resolving it can use refine, or the user can explicitly resume in Monitor.
+
+For multistep chemical tasks, use the domain
+[pathway evidence contract](../../domains/chemical/skills/mechanism-reasoning/references/pathway_execution.md)
+to retain chemical intermediates and missing steps independently of Node relations.
+A failed scan, a NEB candidate and a validated elementary step are different
+results. Method changes keep prior receipts and the original delivery criterion;
+kinetic/crossing analyses remain ordinary independent Jobs.

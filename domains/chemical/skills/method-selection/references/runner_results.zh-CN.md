@@ -11,6 +11,10 @@ runner 完成了请求的数值和输出检查，不代表极小值、鞍点、�
 电子数奇偶关系，再转换为 PySCF spin 或 xTB 未配对电子数。破缺对称态等不能
 仅由此约定确定的电子态，需要明确支持的方法或输入，不能只凭多重度推断。
 
+Gaussian 记录能量类型依据 `energy_evidence`，并单独保存 `reference_scf_energy_hartree`。
+只有受支持的目标能量才写入成功步骤；不支持或缺失时保留原始输出并令 runner 检查失败，
+`--validation none` 也不例外，详见[能量解释与能力范围](capabilities.zh-CN.md)。
+
 `opt-sp` 的单点使用优化后的结构。核对 SP 输入摘要与优化结构摘要一致，且两个
 步骤均完成。独立提交的优化与单点通过明确的 Artifact 依赖关联。
 

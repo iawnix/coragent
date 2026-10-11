@@ -33,3 +33,11 @@ the framing, revise the current proposal or create a related Node for an indepen
   hypotheses and falsifiers.
 - [strategy_reflection.md](references/strategy_reflection.md): reframing after
   repeated or unexpected results.
+
+For conditional exploration decisions and explicit multistep materials, read
+[pathway audit contracts](references/pathway_execution.md). `chemical.pathway-check@1`
+uses the structure binding and input role input to retain hypotheses, guesses,
+observations, atom/stoichiometric continuity and missing steps. Optional bound
+classical mode/IRC checks are recomputed; missing evidence never becomes a pass.
+For competing products, use the energetics Skill to separate thermodynamic
+ordering, conditional TST branching and explicit reversible network predictions.

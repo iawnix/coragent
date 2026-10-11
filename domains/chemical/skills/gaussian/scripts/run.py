@@ -6,8 +6,8 @@ import shutil
 import subprocess
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / '_shared'))
-from science import prepare, read_xyz, digest, finite_energy, finish, write_json
-from gaussian_io import write_gjf, parse_log, write_xyz
+from science import prepare, read_xyz, digest, finish, write_json
+from gaussian_io import write_gjf, parse_log, write_xyz, require_supported_energy
 from cli import parse_arguments
 
 
@@ -19,7 +19,7 @@ def validate(summary, task, method, basis):
         raise ValueError('Gaussian did not terminate normally')
     if task == 'opt' and not (summary['stationary_point_found'] and summary['final_convergence_satisfied']):
         raise ValueError('Gaussian optimization lacks converged stationary point evidence')
-    return finite_energy(summary['electronic_energy_hartree'])
+    return require_supported_energy(summary)
 
 
 def main():

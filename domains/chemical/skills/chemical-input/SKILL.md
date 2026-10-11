@@ -10,6 +10,13 @@ description: Turn chemical names, descriptions or supplied structures into molec
 Use this Skill to prepare structures for the user's research. Keep the original
 input, chosen structure, source, charge and multiplicity with the resulting files.
 
+Use `chemical.material@1` when handing off a name, SMILES or supplied XYZ with its
+original text, graph/coordinates, fragments, unknown settings, state declaration
+and reversible atom order. Preserve XYZ coordinates and complex orientations;
+do not regenerate them through SMILES embedding. No product is required for
+independent import/calculation. See [material input](references/material_input.md).
+This entry does not resolve names online, optimize, or infer XYZ bonds.
+
 ## From input to calculation
 
 1. Use an explicitly supplied structure, such as SMILES, directly. For a name,
@@ -26,7 +33,8 @@ input, chosen structure, source, charge and multiplicity with the resulting file
    study separate branches within the task's scope. Enumerate unspecified stereo
    when appropriate. Ask only when missing information prevents choosing a useful
    research approach; a lookup failure alone should lead to inference.
-4. Generate initial geometries with `chemical.seed@1`, then continue the requested
+4. Generate missing geometries with `chemical.seed@1`; preserve and inspect supplied
+   coordinates instead. Then continue the requested
    optimization, single-point or reaction work. Candidate source is provenance;
    it does not impose a confirmation step before subsequent calculations.
 
@@ -48,6 +56,13 @@ geometry is the starting point for the requested calculations; report computed
 results after inspecting their outputs.
 
 ## Reactions and comparison
+
+For bounded automatic correspondence candidates, use `chemical.map-candidates@1`.
+Use `chemical.conformer-compare@1` for symmetry-aware comparison of supplied
+geometries and `chemical.reorder-tensors@1` for consistent coordinate, gradient,
+Hessian and mode permutations. Read [structure_analysis.md](references/structure_analysis.md)
+for contracts, independent calls, search coverage and state boundaries. Geometry
+agreement is not electronic-state identity, and mapping candidates are not mechanisms.
 
 Use `chemical.reaction@1` when the task needs reactant/product atom mapping. Check
 composition, charge and explicit mappings, and supply the intended bond changes

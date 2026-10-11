@@ -7,7 +7,7 @@ Use the method Skill to choose a recipe, native command or task script and a
 named environment from `job.toml`. The selected binding supplies the target
 Python or native program; a recipe also declares its own dependencies.
 Structure preparation and chemical validators can
-share the `structure.lock` environment. Gaussian/xTB Python wrappers use
+share the `structure.lock` environment. Gaussian/xTB/CREST Python wrappers use
 `wrapper.lock`; CF22D uses `cf22d.lock`; molecular rendering uses `render.lock`.
 These locks are installation resources under the chemical extension's
 `environments` directory. They do not prescribe which scientific method to use.

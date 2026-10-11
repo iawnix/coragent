@@ -1,6 +1,8 @@
-# ASE NEB 可用性
+# NEB 可用性
 
-当前包不提供已注册的 ASE NEB workflow 或内置 NEB runner，旧 `ase.neb@1` 接口不是可调用能力。
+当前提供 `chemical.neb-xtb@1`：有界 NumPy NEB 引擎及 xTB 6.7.1 能量/梯度适配器。
+设置、可选 path 环境、收敛与部分结果见[路径合同](path_search.zh-CN.md)。
+这不是 ASE 实现；旧 `ase.neb@1` 接口仍不可调用。
 安装了 ASE 或找到 xTB/Gaussian，本身不代表已有可执行的 NEB 路径。
 
 若所选环境提供有文档的 NEB 脚本，先核实其真实输入输出合同、calculator 绑定和依赖，

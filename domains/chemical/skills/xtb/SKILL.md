@@ -33,3 +33,8 @@ inspect vibrational modes, scan constraints and point convergence, or integratio
 stability and trajectories as appropriate. Compare energies with consistent methods,
 electronic states, and energy definitions; absolute xTB–DFT energy differences do
 not measure accuracy.
+
+For material-based 1D/2D scans and bound Cartesian gradients, use
+`chemical.scan-xtb@1` and `chemical.gradient-xtb@1` with the optional path_xtb
+scientific environment; [path operations](../candidate-generation/references/path_search.md)
+explain native restraint potentials, separate physical energies, and the xTB NEB adapter.

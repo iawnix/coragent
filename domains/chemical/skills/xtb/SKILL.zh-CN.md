@@ -26,3 +26,7 @@ description: 使用 xTB 进行低成本结构筛选、单点、优化、频率�
 检查 SCC（适用时）、优化收敛和结构身份；频率检查振动模式，扫描检查约束与每点收敛，
 动力学检查积分稳定性与轨迹。能量比较需要一致的方法、电子态和能量定义；
 不能用 xTB 与 DFT 的绝对能量差判断准确度。
+
+基于材料的一维/二维扫描与绑定结构的 Cartesian 梯度使用 `chemical.scan-xtb@1`、
+`chemical.gradient-xtb@1`，需可选 path_xtb 科学环境。原生约束势、独立物理能量和
+xTB NEB 适配说明见[路径操作](../candidate-generation/references/path_search.zh-CN.md)。

@@ -11,9 +11,9 @@ approach sampling, or another justified method. Select their order from the
 current hypothesis and evidence.
 
 Before QST2/QST3, verify atom count/order or an explicit map, charge/spin,
-endpoint preparation/optimization status, conformational compatibility, and that both
-structures describe one elementary step. Record why this interpolation tests
-the proposed step.
+endpoint preparation/optimization status and conformational compatibility. Assess
+whether the pair is a plausible elementary-step hypothesis; supplied R/P may span
+several steps. Record why this interpolation tests the proposed step.
 
 ## Execution without a reaction-specific recipe
 
@@ -55,3 +55,7 @@ characterization. For a classical TS this normally separates:
 - additional state, robustness, stereochemical, or thermochemical checks.
 
 Record the observations, scientific criteria, unresolved questions and next steps with research_update using the existing node_id and a note. Publish a reusable conclusion with research_result, citing collected materials and stating limitations. A completed computation does not establish a scientific conclusion.
+
+Supplied material endpoints can use `chemical.qst-prepare@1`; bounded scan and
+xTB NEB recipes are documented in [path operations](path_search.md). These
+interfaces do not certify that an endpoint pair describes one elementary step.

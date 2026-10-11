@@ -159,3 +159,107 @@ def test_specific_failure_precedes_secondary_termination_signals(tmp_path, messa
     summary = result['summary']
     assert summary['primary_failure']['kind'] == kind
     assert {event['kind'] for event in summary['diagnostics']} >= {kind, 'signal', 'execution_error'}
+
+
+@pytest.mark.parametrize('method,label', [
+    ('HF', 'RHF'), ('HF', 'UHF'), ('ROHF', 'ROHF'), ('B3LYP', 'RB3LYP'),
+    ('M062X', 'RM062X'), ('wB97X-D', 'RwB97XD'),
+])
+def test_matching_scf_energy_preserves_method_and_fortran_exponent(tmp_path, method, label):
+    summary = parse(tmp_path, f' #p {method}/6-31G* SP\n ----\n'
+                    f' SCF Done: E({label}) = -7.5123D+01 A.U.\n')['summary']
+    assert summary['electronic_energy_hartree'] == pytest.approx(-75.123)
+    assert summary['reference_scf_energy_hartree'] == summary['electronic_energy_hartree']
+    assert summary['energy_evidence']['status'] == 'supported'
+    assert summary['energy_evidence']['scf_method'] == label
+
+
+@pytest.mark.parametrize('route,label,extra', [
+    ('B3LYP/6-31G* TD=(Root=2,NStates=4)', 'RB3LYP', ' Excited State 2: Singlet-A 4.1 eV\n'),
+    ('B3LYP/6-31G* TDA', 'RB3LYP', ''),
+    ('CIS/6-31G*', 'RHF', ''),
+    ('MP2/6-31G*', 'RHF', ' EUMP2 = -7.60D+01\n'),
+    ('CCSD(T)/6-31G*', 'RHF', ' CCSD(T)= -7.61D+01\n'),
+    ('B2PLYP/6-31G*', 'RB2PLYP', ''),
+    ('B3LYP/6-31G* Counterpoise=2', 'RB3LYP', ''),
+    ('B3LYP/6-31G* IOp(3/76=1000005000)', 'RB3LYP', ''),
+    ('B3LYP/6-31G*', 'RB3LYP', ' Total Energy, E(TD-HF/TD-KS) = -75.0\n'),
+    ('B3LYP/6-31G*', 'RHF', ''),
+])
+def test_reference_scf_is_not_promoted_to_unsupported_target_energy(tmp_path, route, label, extra):
+    summary = parse(tmp_path, f' #p {route}\n ----\n SCF Done: E({label}) = -75.1 A.U.\n'
+                    + extra + ' Zero-point correction= 0.01\n'
+                    ' Sum of electronic and zero-point Energies= -75.09\n'
+                    ' Sum of electronic and thermal Free Energies= -75.12\n'
+                    ' Normal termination of Gaussian\n')['summary']
+    assert summary['normal_termination']
+    assert summary['reference_scf_energy_hartree'] == -75.1
+    assert summary['electronic_energy_hartree'] is None
+    assert summary['energy_evidence']['status'] == 'unsupported'
+    assert summary['electronic_plus_zpe_hartree'] is None
+    assert summary['electronic_plus_thermal_free_energy_hartree'] is None
+    assert summary['reported_thermochemical_totals']['electronic_plus_zpe_hartree'] == -75.09
+    assert summary['zero_point_correction_hartree'] == .01
+
+
+def test_missing_route_or_invalid_final_energy_never_reuses_an_earlier_value(tmp_path):
+    missing = parse(tmp_path, ' SCF Done: E(RHF) = -75.1 A.U.\n')['summary']
+    assert missing['electronic_energy_hartree'] is None
+    assert missing['reference_scf_energy_hartree'] == -75.1
+    for value in ['********', 'NaN', '-Infinity']:
+        summary = parse(tmp_path, ' #p HF/STO-3G SP\n ----\n SCF Done: E(RHF) = -75.1 A.U.\n'
+                        f' SCF Done: E(RHF) = {value} A.U.\n')['summary']
+        assert summary['reference_scf_energy_hartree'] is None
+        assert summary['electronic_energy_hartree'] is None
+        assert summary['energy_evidence']['reason'] == 'invalid_final_scf_energy'
+
+
+@pytest.mark.parametrize('mode', ['xyz', 'explicit'])
+def test_runners_retain_output_but_reject_mp2_reference_energy(tmp_path, mode):
+    from tests.unit.test_gaussian_explicit_input import gjf
+    log = tmp_path / 'synthetic.out'
+    log.write_text(' #p MP2/6-31G** SP SCF=Tight Int=UltraFine\n ----\n'
+                   ' SCF Done: E(RHF) = -76.0 A.U.\n EUMP2 = -7.62D+01\n'
+                   ' Normal termination of Gaussian\n')
+    program = tmp_path / 'fixture-gaussian'
+    program.write_text('#!/bin/sh\ncat >/dev/null\ncat ' + shlex.quote(str(log)) + '\n')
+    program.chmod(0o755)
+    if mode == 'explicit':
+        source = gjf(tmp_path / 'input.gjf', 'SP SCF=Tight Int=UltraFine')
+        source.write_text(source.read_text().replace('M062X/', 'MP2/'))
+        inputs = ['--input-gjf', str(source), '--validation', 'none']
+    else:
+        source = tmp_path / 'input.xyz'
+        source.write_text('3\nsynthetic\nO 0 0 0\nH 0 0 1\nH 0 1 0\n')
+        inputs = ['--xyz', str(source), '--task', 'sp']
+    out = tmp_path / 'out'
+    run = subprocess.run([sys.executable, str(SKILLS / 'gaussian/scripts/run.py'), *inputs,
+        '--method', 'MP2', '--executable', str(program), '--output-dir', str(out),
+        '--threads', '12', '--memory-mb', '4000'], capture_output=True, text=True, timeout=30)
+    assert run.returncode == 1
+    result = json.loads((out / 'result.json').read_text())
+    assert result['checks_passed'] is False
+    assert result['steps'] == []
+    assert 'target energy not assessed' in result['error']['message']
+    folder = out if mode == 'explicit' else out / 'sp'
+    assert (folder / 'gaussian.out').read_text() == log.read_text()
+    parsed = json.loads((folder / 'parsed.json').read_text())
+    assert parsed['summary']['reference_scf_energy_hartree'] == -76.0
+    assert parsed['summary']['electronic_energy_hartree'] is None
+    if mode == 'explicit':
+        assert result['execution_status'] == 'succeeded'
+        assert result['parsing']['status'] == 'completed'
+        assert result['check_status'] == 'not_satisfied'
+
+
+def test_unsupported_scan_keeps_reference_points_without_target_energies(tmp_path):
+    from gaussian_io import parse_scan_log
+    path = tmp_path / 'scan.out'
+    path.write_text(' #p MP2/6-31G* Opt=Scan\n ----\n'
+                    ' SCF Done: E(RHF) = -75.0 A.U.\n SCF Done: E(RHF) = -75.1 A.U.\n'
+                    ' Normal termination of Gaussian\n')
+    parsed = parse_scan_log(path)
+    assert not parsed['summary']['scan_energies_complete']
+    assert parsed['summary']['electronic_energy_hartree'] is None
+    assert [p['reference_scf_energy_hartree'] for p in parsed['profile']['points']] == [-75., -75.1]
+    assert all(p['energy_hartree'] is None for p in parsed['profile']['points'])
