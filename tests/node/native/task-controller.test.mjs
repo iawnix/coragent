@@ -728,6 +728,75 @@ test("recovery budget survives restart, ignores new evidence, and rejects Monito
   assert.equal((await env.controller.current(context)).continuation.sequence, 4);
 });
 
+for (const scenario of ["tool", "progress", "wait", "disabled", "failed", "duplicate", "query", "pause", "cancel", "superseded"])
+test(`user recovery ${scenario} follows current input evidence and Pi outcome`, async t => {
+  const clock = { value: 1000 }, options = recoveryOptions(clock), env = await fixture(t, new MemoryStorage(), options);
+  await env.begin();
+  await env.controller.observeToolResults(observed("research_result", { result: { id: "result_old" } }), context);
+  env.faux.setResponses([transientFailure()]);
+  await env.controller.reconcile(); await env.conversation.waitForIdle(context); await env.controller.reconcile();
+  const failed = await env.admission.status("task:task_1:continue:1", context);
+  const entered = Promise.withResolvers(), finish = Promise.withResolvers();
+  env.faux.setResponses([async () => {
+    entered.resolve(); await finish.promise;
+    return scenario === "failed" ? transientFailure() : fauxAssistantMessage("User response finished");
+  }]);
+  const input = await env.admission.submitUser({ requestId: "user-recovery", content: "Continue the research" }, context);
+  await entered.promise;
+  try {
+    let task = await env.controller.current(context);
+    assert.equal(task.execution_recovery.state, "attention_required", "admission alone cannot resume automatic work");
+    if (scenario === "progress") {
+      await env.controller.update({ action: "progress", expected_revision: task.revision,
+        evidence_refs: ["result_new"] }, "user-evidence", context);
+    } else if (scenario === "wait") {
+      env.jobStates.set("job_new", "running");
+      await env.controller.observeToolResults(observed("job_start", { job_id: "job_new", submitted_at: "now" }), context);
+      task = await env.controller.current(context);
+      await env.controller.update({ action: "wait", expected_revision: task.revision,
+        wait: { job_ids: ["job_new"], mode: "all" } }, "user-wait", context);
+    } else if (scenario !== "query") {
+      await env.controller.observeToolResults(observed("research_result", { result: { id: scenario === "duplicate" ? "result_old" : "result_new" } }), context);
+    }
+    if (["pause", "cancel"].includes(scenario)) {
+      task = await env.controller.current(context);
+      await env.controller.control({ user_task_id: task.user_task_id, expected_revision: task.revision,
+        action: scenario, request_id: `user-${scenario}`, ...(scenario === "cancel" ? { jobs: "keep" } : {}) }, context);
+    } else if (scenario === "superseded") {
+      env.faux.setResponses([fauxAssistantMessage("Answer the later question only")]);
+      await env.admission.submitUser({ requestId: "later-query", content: "What just happened?", whenBusy: "followUp" }, context);
+    }
+  } finally { finish.resolve(); }
+  await env.conversation.waitForIdle(context);
+  if (scenario === "disabled") options.enabled = false;
+  await env.reopen();
+  env.faux.setResponses([fauxAssistantMessage("Continue from saved evidence")]);
+  await env.controller.reconcile(); await env.conversation.waitForIdle(context);
+  let task = await env.controller.current(context);
+  assert.equal((await env.admission.status(failed.requestId, context)).status, "unanswered", "failure history is retained");
+  if (["tool", "progress", "wait", "disabled"].includes(scenario)) {
+    assert.equal(task.execution_recovery, null);
+    assert.equal(task.continuation.sequence, ["wait", "disabled"].includes(scenario) ? 1 : 2);
+    assert.ok(task.audit.some(item => item.action === "user_execution_recovered"));
+    if (scenario === "wait") {
+      assert.equal(task.state, "waiting");
+      env.jobStates.set("job_new", "succeeded");
+      await env.controller.reconcile(); await env.conversation.waitForIdle(context);
+      task = await env.controller.current(context);
+      assert.equal(task.continuation.sequence, 2, "completed Job wait resumes automatically");
+    }
+  } else {
+    assert.equal(task.continuation.sequence, 1);
+    if (["pause", "cancel"].includes(scenario)) assert.equal(task.state, scenario === "pause" ? "paused" : "cancelled");
+    else {
+      assert.equal(task.execution_recovery.state, "attention_required");
+      assert.equal(task.execution_recovery.submission_id, scenario === "failed" ? input.id : failed.id);
+      await env.controller.reconcile();
+      assert.equal((await env.controller.current(context)).continuation.sequence, 1);
+    }
+  }
+});
+
 for (const control of ["pause", "cancel", "user"]) test(`${control} supersedes pending execution recovery`, async t => {
   const clock = { value: 1000 }, env = await fixture(t, new MemoryStorage(), recoveryOptions(clock));
   await env.begin(); env.faux.setResponses([transientFailure()]);

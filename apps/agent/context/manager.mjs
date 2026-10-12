@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import { projectDecisionTask } from "../tasks/projection.mjs";
 
 const KEY = "coragent.research-context/1";
-const SAFETY_TOKENS = 4096;
 const PROJECTION_MAX_BYTES = 16000;
 const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const envelope = (tag, value) => ({ role: "user", timestamp: 0,
@@ -22,19 +21,26 @@ export function contextAnchor(entries) {
 }
 
 export function contextPolicy(settings, value = process.env.CORAGENT_CONTEXT_INPUT_TOKENS) {
-  const inputTokens = value === undefined ? 131072 : Number(value);
-  if (!Number.isSafeInteger(inputTokens) || inputTokens < 8192) {
+  const inputTokens = value === undefined ? undefined : Number(value);
+  if (inputTokens !== undefined && (!Number.isSafeInteger(inputTokens) || inputTokens < 8192)) {
     throw new Error("CORAGENT_CONTEXT_INPUT_TOKENS must be an integer of at least 8192");
   }
+  if (inputTokens === undefined) return settings;
   return { ...settings, compaction: { ...settings.compaction, maxInputTokens: inputTokens,
     keepRecentTokens: Math.min(settings.compaction?.keepRecentTokens ?? 20000, Math.floor(inputTokens / 3)),
     backgroundTokens: Math.min(8192, Math.floor(inputTokens / 8)),
   } };
 }
 
+/** Pi durable's threshold, shared by final admission and terminal telemetry. */
+export function contextInputBudget(contextWindow, { reserveTokens = 16384, maxInputTokens } = {}) {
+  return Math.min(contextWindow - reserveTokens, maxInputTokens ?? Infinity);
+}
+
 /** One policy over native history, research orientation, compaction and final
  * admission. Scientific facts remain in the research store; Pi owns persistence. */
-export function createContextManager({ bridge, coordinator, sessionId, estimateContextTokens, inputTokens = 131072 }) {
+export function createContextManager({ bridge, coordinator, sessionId, estimateContextTokens,
+  inputTokens, reserveTokens = 16384, getCompactionPolicy = () => ({ reserveTokens, maxInputTokens: inputTokens }) }) {
   async function projection(task, scope) {
     const control = { task: projectDecisionTask(task) };
     const taskTokens = estimateContextTokens([envelope("research_context", control)]).tokens;
@@ -104,13 +110,15 @@ export function createContextManager({ bridge, coordinator, sessionId, estimateC
       } : null, actual_user_submission_ids, automatic_continuation_enabled });
       const messages = [...request.messages, control];
       const estimate = estimateContextTokens(messages);
-      const hardLimit = request.model.contextWindow - request.maxTokens - SAFETY_TOKENS;
-      const limit = Math.min(inputTokens, hardLimit);
+      // Match Pi durable's native threshold: contextWindow - reserveTokens.
+      const policy = getCompactionPolicy();
+      const reserve = policy.reserveTokens ?? 16384;
+      const limit = contextInputBudget(request.model.contextWindow, policy);
       const blocked = estimate.tokens > limit;
       const telemetry = { schema_version: "research-request-context/4", session_id: sessionId, request_id: requestId,
-        input_tokens: estimate.tokens, usage_tokens: estimate.usageTokens, input_budget_tokens: inputTokens,
+        input_tokens: estimate.tokens, usage_tokens: estimate.usageTokens, input_budget_tokens: limit,
         control_tokens: estimateContextTokens([control]).tokens, output_reserve_tokens: request.maxTokens,
-        safety_tokens: SAFETY_TOKENS, model_context_window: request.model.contextWindow, blocked,
+        reserve_tokens: reserve, safety_tokens: 0, model_context_window: request.model.contextWindow, blocked,
         estimated: true, history_digest: hash(request.messages), control_digest: hash(control) };
       // Telemetry contains sizes and identities, never another full snapshot.
       try {
@@ -118,7 +126,7 @@ export function createContextManager({ bridge, coordinator, sessionId, estimateC
         await coordinator.commit_files({ request_id: `request-context:${identity}`, operation: "research.request_context",
           payload: telemetry, writes: { [`operations/contexts/${identity}.json`]: telemetry }, result: { digest: identity } });
       } catch { /* Observability failure does not change the model's factual context. */ }
-      if (blocked) return { block: `context_budget_exceeded: input estimate ${estimate.tokens}, operating budget ${inputTokens}, output reserve ${request.maxTokens}, safety ${SAFETY_TOKENS}, window ${request.model.contextWindow}`, compact: true };
+      if (blocked) return { block: `context_budget_exceeded: input estimate ${estimate.tokens}, budget ${limit}, reserve ${reserve}, window ${request.model.contextWindow}`, compact: true };
       return { messages };
     },
   };

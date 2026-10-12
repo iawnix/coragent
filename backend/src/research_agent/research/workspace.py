@@ -10,7 +10,7 @@ from research_agent.foundation.transactions import TransactionCoordinator, read_
 MANIFEST_SCHEMA = "research_workspace/3"
 WORKSPACE_MODE = "research"
 WORKSPACE_STATES = frozenset({"ready", "admission_pending"})
-DIRECTORIES = ("inputs", "artifacts", "runs", "logs", "research", "operations", "environments", "reports")
+DIRECTORIES = ("inputs", "artifacts", "runs", "research", "operations", "reports")
 
 class WorkspaceModeError(RuntimeError):
     pass

@@ -1,5 +1,5 @@
 import { loadPi } from "./source.mjs";
-import { createContextManager, contextPolicy } from "../context/manager.mjs";
+import { createContextManager, contextPolicy, contextInputBudget } from "../context/manager.mjs";
 import { recordUserSources } from "../tools/user-sources.mjs";
 import { createInputAdmission, createInputService, bindUserInputConversation, INPUT_ADMISSION_SERVICE_ID } from "../host/admission/input.mjs";
 import { createMonitorAdmission, MONITOR_ADMISSION_SERVICE_ID } from "../host/admission/monitor.mjs";
@@ -71,7 +71,7 @@ export async function createCoRAgentHarness(databasePath, options) {
     });
     const harnessSettings = contextPolicy(createHarnessSettings(settingsManager));
     const contextManager = createContextManager({ bridge: commandBridge, coordinator: transactionCoordinator,
-      sessionId, estimateContextTokens, inputTokens: harnessSettings.compaction.maxInputTokens,
+      sessionId, estimateContextTokens, getCompactionPolicy: () => harnessSettings.compaction,
     });
     const packageReadGuard = createPackageSourceReadGuard({ packageRoot: loadedSkills.packageRoot, cwd,
       publicKnowledgeRoots: loadedSkills.skills.map(skill => dirname(skill.filePath)),
@@ -183,9 +183,11 @@ export async function createCoRAgentHarness(databasePath, options) {
             const [view, agent, research] = await Promise.all([conversation.context(context), conversation.agent(context), commandBridge.execute_command("research.read", {})]);
             const model = agent.model && modelRuntime.getModel(agent.model.provider, agent.model.modelId);
             // Reuse Pi's compaction-aware request estimate. It is not an exact tokenizer count.
-            return { model: agent.model || null, contextWindow: model?.contextWindow || null,
-              contextTokens: estimateContext(view, []),
-              inputBudgetTokens: harnessSettings.compaction.maxInputTokens || null,
+            const contextWindow = model?.contextWindow || null;
+            const inputBudgetTokens = contextWindow === null ? null : contextInputBudget(contextWindow, harnessSettings.compaction);
+            return { model: agent.model || null, contextWindow,
+              contextTokens: estimateContext(view, []), inputBudgetTokens,
+              reserveTokens: harnessSettings.compaction.reserveTokens ?? null,
               estimated: true,
               entryId: view.entries.at(-1)?.id ?? null, firstEntryId: view.entries[0]?.id ?? null, headId: view.head?.id ?? null, research };
           },

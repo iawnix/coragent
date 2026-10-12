@@ -361,6 +361,11 @@ session 格式。
 以及 `research_workspace/3` 的 `workspace_manifest.json` 与 Research Memory 存储。Node 按需在 `research/nodes/` 创建，不生成全局 progress 或 lifecycle 文档。Host 的 WorkspaceDirectory 也提供同一操作给 CoRHub。Host 不会创建无名项目；
 初始化会验证规范协议，遇到旧格式或不完整状态时拒绝而不是重写。
 
+工作区顶层目录为 `inputs/`、`artifacts/`、`runs/`、`research/`、`operations/` 和 `reports/`。
+`inputs/` 按需存放输入资料；计算输入及日志保存在 `runs/jobs/<job_id>/` 下，日志位于其中的
+`logs/`，环境绑定与验证记录随 Job 元数据保存。新版不再创建顶层 `logs/` 和 `environments/`。
+不兼容或迁移使用旧目录清单的工作区；请使用此版本新建工作区。
+
 ## 运行 CoRAgent Web Research Explorer
 
 安装时选择 CoRAgent Web 后，可使用只读浏览器：

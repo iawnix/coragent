@@ -61,3 +61,22 @@ def test_python_created_workspace_is_accepted_by_js_transport(tmp_path: Path) ->
     assert attached["schema_version"] == manifest["schema_version"]
     assert attached["workspace_id"] == "workspace_python_contract"
     assert attached["research_memory"] == manifest["research_memory"]
+
+
+def test_js_validates_new_layout_and_rejects_old_directory_contract(tmp_path):
+    root = tmp_path / "layout"
+    manifest = initialize_workspace(root, "layout", "research")
+    path = root / "workspace_manifest.json"
+    script = (
+        "const {readFile}=await import('node:fs/promises');"
+        "const {default:assert}=await import('node:assert/strict');"
+        "const {validate_workspace_files}=await import(process.argv[1]);"
+        "const manifest=JSON.parse(await readFile(process.argv[2]+'/workspace_manifest.json','utf8'));"
+        "await validate_workspace_files(manifest,process.argv[2]);"
+        "assert.deepEqual(manifest.directories,['inputs','artifacts','runs','research','operations','reports']);"
+        "const old={...manifest,directories:['inputs','artifacts','runs','logs','research','operations','environments','reports']};"
+        "await assert.rejects(validate_workspace_files(old,process.argv[2]),/workspace_directories_mismatch/);"
+    )
+    subprocess.run(["node", "--input-type=module", "-e", script, WORKSPACE_MODULE.as_uri(), str(root)],
+                   cwd=ROOT, check=True, capture_output=True, text=True)
+    assert json.loads(path.read_text()) == manifest

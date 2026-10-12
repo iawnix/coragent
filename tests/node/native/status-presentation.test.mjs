@@ -290,3 +290,19 @@ test('execution recovery is visible without claiming research is blocked', () =>
    assert.equal(status.reason, label); assert.doesNotMatch(status.text, /Task blocked/);
  }
 });
+
+test('a running user response takes display priority over pending recovery without hiding its details', () => {
+ const recovery = { state: 'attention_required', phase: 'research', reason: 'request_blocked', detail: 'Previous request exceeded context' };
+ const taskWithRecovery = { ...task, execution_recovery: recovery };
+ const status = createStatusPresentation({session:{workspaceId:'w',sessionId:'s'},theme,...tui});
+ const running = snapshot({task:taskWithRecovery});
+ status.update({monitor:running});
+ assert.equal(activityStatus({monitor:running,sessionId:'s'}).symbol,'…');
+ assert.match(status.activity.render(120).join(''),/Responding · Recovery pending/);
+ assert.match(status.monitorDetails(),/Previous request exceeded context/);
+ status.update({monitor:snapshot({task:taskWithRecovery,execution:{state:'idle'}})});
+ assert.match(status.activity.render(120).join(''),/Monitor ! · Execution needs attention/);
+ status.update({monitor:snapshot({task})});
+ assert.match(status.activity.render(120).join(''),/Researching/);
+ assert.doesNotMatch(status.monitorDetails(),/Previous request exceeded context/);
+});

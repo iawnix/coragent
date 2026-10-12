@@ -9,8 +9,8 @@ import { require_workspace_id } from "../contracts/workspace-id.mjs";
 
 export const WORKSPACE_MANIFEST_SCHEMA = "research_workspace/3";
 export const WORKSPACE_STATES = Object.freeze(["ready", "admission_pending"]);
-const COMMON_DIRECTORIES = Object.freeze(["inputs", "artifacts", "runs", "logs"]);
-const RESEARCH_DIRECTORIES = Object.freeze(["research", "operations", "environments", "reports"]);
+const COMMON_DIRECTORIES = Object.freeze(["inputs", "artifacts", "runs"]);
+const RESEARCH_DIRECTORIES = Object.freeze(["research", "operations", "reports"]);
 
 /**
  * Validate the immutable workspace identity contract shared by Host, App

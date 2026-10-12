@@ -7,12 +7,12 @@ import {Harness, MemoryStorage, createRegistry, defineExtension, hook, Generatio
 import {createModels, fauxProvider, fauxAssistantMessage} from '@earendil-works/pi-ai';
 import {TODO_CONTEXT as context} from '@earendil-works/chord/context';
 import {openNodeSqliteStorage} from '@earendil-works/pi-durable/storage/sqlite/node';
-import {createContextManager, contextAnchor, contextPolicy} from '../../../apps/agent/context/manager.mjs';
+import {createContextManager, contextAnchor, contextPolicy, contextInputBudget} from '../../../apps/agent/context/manager.mjs';
 import {pinnedPiSource, TEST_ROOT} from './test-environment.mjs';
 const {estimateContextTokens} = await import(pathToFileURL(join(pinnedPiSource(),'packages/ai/src/utils/estimate.ts')));
 const snapshot = () => ({schema_version:'research-decision/1',snapshot_id:'ctx_fixture',sequence:1,nodes:[],jobs:[]});
 function fixtureManager(overrides = {}) {
-  return createContextManager({sessionId:'fixture',estimateContextTokens,inputTokens:65536,
+  return createContextManager({sessionId:'fixture',estimateContextTokens,inputTokens:65536,reserveTokens:5120,
     bridge:{async execute_command(){return snapshot();}},coordinator:{async commit_files(){}},...overrides});
 }
 const fixtureInjector = overrides => fixtureManager(overrides).admit;
@@ -100,18 +100,43 @@ test('an uncompactable first request stops before contacting the provider', {tim
 
 
 
-test('history, tools, control and provider output share one operating and hard budget', async () => {
+test('explicit cap and Pi reserve share one admission budget', async () => {
   const telemetry = [];
   const manager = fixtureManager({inputTokens:8192,coordinator:{async commit_files(r){telemetry.push(r.payload);}}});
   const request = {messages:[{role:'system',content:'rules',toolsAdded:[{name:'read',description:'inspect',parameters:{type:'object'}}],timestamp:1}],model:{contextWindow:1000000},maxTokens:128000};
   assert.ok((await manager.admit(request,'small')).messages);
   assert.ok((await manager.admit({...request,messages:[{role:'user',content:'x'.repeat(40000)}]},'large')).compact);
   assert.equal(telemetry.at(-1).input_budget_tokens,8192);
-  assert.ok((await manager.admit({...request,maxTokens:999999},'output')).block);
+  const native = fixtureManager({inputTokens:undefined, reserveTokens:16384,
+    coordinator:{async commit_files(r){telemetry.push(r.payload);}}});
+  const nativeRequest = {...request, model:{contextWindow:20000}};
+  assert.ok((await native.admit({...nativeRequest,messages:[{role:'user',content:'x'.repeat(20000)}]},'native')).block);
+  assert.equal(telemetry.at(-1).input_budget_tokens,3616);
   assert.equal(telemetry[0].snapshot,undefined);
   assert.equal(telemetry[0].schema_version,'research-request-context/4');
   assert.throws(()=>contextPolicy({},'bad'),/integer/);
-  assert.equal(contextPolicy({}).compaction.maxInputTokens,131072);
+  assert.equal(contextPolicy({}).compaction?.maxInputTokens,undefined);
+  assert.equal(contextPolicy({},'131072').compaction.maxInputTokens,131072);
+});
+
+test('default admission follows model window and Pi reserve without the old fixed cap', async () => {
+  const telemetry = [];
+  const manager = fixtureManager({inputTokens:undefined,reserveTokens:16384,
+    coordinator:{async commit_files(r){telemetry.push(r.payload);}}});
+  const request = {messages:[{role:'user',content:'x'.repeat(800000),timestamp:0}],
+    model:{contextWindow:1000000},maxTokens:128000};
+  assert.ok((await manager.admit(request,'large-window')).messages);
+  assert.ok(telemetry.at(-1).input_tokens > 131072);
+  assert.equal(telemetry.at(-1).input_budget_tokens,983616);
+  assert.ok((await manager.admit({...request,model:{contextWindow:200000}},'smaller-window')).block);
+  assert.equal(telemetry.at(-1).input_budget_tokens,183616);
+  assert.equal(contextInputBudget(200000,{reserveTokens:0}),200000);
+  assert.equal(contextInputBudget(200000,{reserveTokens:16384,maxInputTokens:999999}),183616);
+  let reserveTokens=16384;
+  const settings={get compaction(){return {reserveTokens};}};
+  const native=contextPolicy(settings);
+  reserveTokens=32768;
+  assert.equal(contextInputBudget(200000,native.compaction),167232,'native settings remain live');
 });
 
 test('tool turns, progress revisions and external events do not rehydrate; scope changes and reset do', async () => {

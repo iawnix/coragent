@@ -18,6 +18,10 @@ const BlockFinalization = defineDocFamily({ kind: "coragent.task-block-finalizat
 // may still verify cancellations and acknowledge the user's instruction.
 const UserControlFinalization = defineDocFamily({ kind: "coragent.task-user-control-finalization", version: 1, family: true,
   scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
+// Link user-driven recovery to Pi's submission outcome. Merely asking a question
+// must not restart automatic work; new task evidence and a successful run must agree.
+const UserRecoveryAttempt = defineDocFamily({ kind: "coragent.task-user-recovery", version: 1, family: true,
+  scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
 const terminal = new Set(["completed", "cancelled"]);
 const jobFinished = new Set(["succeeded", "failed", "timed_out", "cancelled", "collected", "unknown"]);
 const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -260,8 +264,13 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     },
     async afterAdmission(tx, { id, requestId, producer, identity, control }) {
       if (producer === "user") {
-        const index = await tx.doc(UserTasks, conversation.id);
+        const { index, task } = await currentTx(tx);
         index.latest_user_submission_id = String(id);
+        if (["active", "waiting"].includes(task?.state) && task.execution_recovery?.phase === "research") {
+          const attempt = await tx.doc(UserRecoveryAttempt, conversation.id, task.user_task_id, null);
+          Object.assign(attempt, { submission_id: id, request_id: requestId, control_epoch: task.control_epoch,
+            recovery_submission_id: task.execution_recovery.submission_id, progressed: false });
+        }
         return;
       }
       if (!control) return;
@@ -281,6 +290,35 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     },
   };
   admission.setPolicy(policy);
+
+  async function recordUserRecoveryProgress(tx, task) {
+    if (task.execution_recovery?.phase !== "research" || !["active", "waiting"].includes(task.state)) return;
+    const attempt = await tx.doc(UserRecoveryAttempt, conversation.id, task.user_task_id, null);
+    const live = await tx.doc(LiveDoc, conversation.id);
+    if (attempt.control_epoch === task.control_epoch && live.run?.inputs.includes(attempt.submission_id)
+      && attempt.recovery_submission_id === task.execution_recovery.submission_id) attempt.progressed = true;
+  }
+
+  async function settleUserRecovery(ctx) {
+    await conversation.commit(async tx => {
+      const { task } = await currentTx(tx);
+      if (!task?.execution_recovery || !["active", "waiting"].includes(task.state)) return;
+      const attempt = await tx.doc(UserRecoveryAttempt, conversation.id, task.user_task_id, null);
+      if (!attempt.submission_id || attempt.control_epoch !== task.control_epoch
+        || attempt.recovery_submission_id !== task.execution_recovery.submission_id) return;
+      const live = await tx.doc(LiveDoc, conversation.id), inbox = await tx.doc(InboxDoc, conversation.id);
+      if (live.run || hasPendingInput(inbox.items)) return;
+      const record = await tx.submissionByRequest(conversation.id, attempt.request_id);
+      if (!["done", "unanswered"].includes(record?.status)) return;
+      delete attempt.submission_id;
+      if (record.status === "unanswered") {
+        recordExecutionFailure(task, record, "research", true);
+      } else if (attempt.progressed) {
+        task.execution_recovery = null;
+        changed(task, "user_execution_recovered", "runtime", "User execution completed with new task evidence");
+      }
+    }, ctx);
+  }
 
   async function settleWait(ctx) {
     const basis = await getCurrent(ctx);
@@ -479,7 +517,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           if (task.state === "completing") task.state = "active";
           task.sources.push(...sources); task.control_epoch += 1;
         } else if (params.action === "progress") {
-          recordProgress(task, identities);
+          if (recordProgress(task, identities)) await recordUserRecoveryProgress(tx, task);
           task.progress = { summary: params.reason ?? null, evidence_refs: params.evidence_refs, at: stamp() };
         } else if (params.action === "set_research") {
           task.research = copy(params.research);
@@ -532,6 +570,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         const { task } = await currentTx(tx);
         if (task?.user_task_id !== basis.user_task_id || task.control_epoch !== basis.control_epoch || !["active", "waiting"].includes(task.state)) return;
         if (!recordProgress(task, [...new Set(identities)])) return;
+        await recordUserRecoveryProgress(tx, task);
         task.progress = { summary: "Recorded new research evidence or execution milestone",
           evidence_refs: [...new Set(refs)], at: stamp() };
         changed(task, "tool_progress", "runtime", task.progress.summary);
@@ -627,11 +666,14 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       }
       for (const id of index?.cancellation_tasks || []) await settleCancellations(await controller.read({ user_task_id: id }, ctx), ctx);
       let task = await settleWait(ctx);
-      if (!enabled || !task || !["active", "waiting", "completing"].includes(task.state)) return;
+      if (!task || !["active", "waiting", "completing"].includes(task.state)) return;
       const [live, inbox] = await Promise.all([harness.snapshot(LiveDoc, conversation.id, ctx), harness.snapshot(InboxDoc, conversation.id, ctx)]);
       // A queued compaction write is safe to flush at the next boundary. Only
       // queued user/steering inputs should hold back internal task recovery.
       if (live?.run || hasPendingInput(inbox?.items)) return;
+      await settleUserRecovery(ctx);
+      task = await getCurrent(ctx);
+      if (!enabled) return;
       if (task.state === "completing") {
         const delivery = await (await harness.submission(task.completion_submission_id, ctx)).status(ctx);
         if (!["done", "unanswered"].includes(delivery.status)) return;

@@ -417,6 +417,14 @@ operation to CoRHub. The Host itself does not create unnamed projects, and
 bootstrap validates the canonical protocol and refuses legacy or partial state
 rather than rewriting it.
 
+Workspace root directories are `inputs/`, `artifacts/`, `runs/`, `research/`,
+`operations/` and `reports/`. `inputs/` holds input material as needed. Calculation
+inputs live under `runs/jobs/<job_id>/`, with logs in its `logs/` subdirectory;
+environment bindings and verification evidence are stored in Job metadata.
+New workspaces no longer create root-level `logs/` or `environments/` directories.
+Workspaces with the old directory list are unsupported and are not migrated;
+create a new workspace with this version.
+
 ## Run The Research Explorer
 
 If CoRAgent Web was selected, start it with:
