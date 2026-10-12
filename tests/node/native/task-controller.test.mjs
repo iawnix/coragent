@@ -16,7 +16,7 @@ import { createToolExecutionContext } from "../../../apps/agent/tools/context.mj
 import { projectUserTask } from "../../../apps/agent/tasks/projection.mjs";
 
 const { admitSubmission } = await import(pathToFileURL(join(pinnedPiSource(), "packages/durable/src/harness/submissions.ts")).href);
-async function fixture(t, storage = new MemoryStorage(), controllerOptions = {}) {
+async function fixture(t, storage = new MemoryStorage(), controllerOptions = {}, beforeRequest) {
   const faux = fauxProvider(), models = createModels(); models.setProvider(faux.provider);
   let harness, admission, controller;
   const registry = createRegistry();
@@ -32,6 +32,7 @@ async function fixture(t, storage = new MemoryStorage(), controllerOptions = {})
         const origin = await admission.origin(record, ctx);
         if (origin.producer !== "user") await controller.validateConsumption(record, origin, ctx);
       }
+      return beforeRequest?.(_request, api, ctx);
     },
   })] }));
   harness = await Harness.open(storage, { models, registry, settings: { retry: { enabled: false } } }, context);
@@ -626,6 +627,44 @@ test("transient wait status failure preserves user access and can recover", asyn
 
 const transientFailure = () => ({ ...fauxAssistantMessage(""), stopReason: "error", errorMessage: "503 Service Unavailable" });
 const recoveryOptions = clock => ({ recoveryPolicy: { maxRetries: 2, baseDelayMs: 100, maxDelayMs: 200 }, now: () => clock.value });
+
+test("budget failure with a queued compaction settles after Job wait and resumes once", async t => {
+  let block = false, queued;
+  const env = await fixture(t, new MemoryStorage(), {}, async () => {
+    if (!block) return;
+    block = false;
+    let task = await env.controller.current(context);
+    await env.controller.update({ action: "wait", expected_revision: task.revision,
+      wait: { job_ids: ["job_1"], mode: "all" } }, "wait-before-budget-failure", context);
+    const first = (await env.conversation.context(context)).entries[0].id;
+    queued = await env.conversation.submit({ type: "write", requestId: "pending-summary",
+      entry: { kind: "pi.compaction", head: first,
+        model: [{ role: "user", content: "Retained research constraints", timestamp: 0 }] } }, context);
+    return { block: "context_budget_exceeded: fixture input exceeds operating budget" };
+  });
+  await env.begin(); env.jobStates.set("job_1", "running"); block = true;
+  env.faux.setResponses([() => { assert.fail("blocked input must not reach provider"); }]);
+  await env.controller.reconcile(); await env.conversation.waitForIdle(context);
+  assert.equal((await queued.status(context)).status, "queued");
+  env.jobStates.set("job_1", "succeeded");
+  await env.reopen(); await env.controller.reconcile();
+  const task = await env.controller.current(context);
+  assert.equal(task.state, "active");
+  assert.equal(task.continuation.reservation, null);
+  assert.equal(task.execution_recovery.state, "attention_required");
+  assert.equal(task.execution_recovery.reason, "request_blocked");
+  await env.controller.reconcile();
+  assert.equal((await env.controller.current(context)).continuation.sequence, 1);
+  env.faux.setResponses([fauxAssistantMessage("Resume from retained evidence")]);
+  await env.controller.control({ user_task_id: task.user_task_id, action: "resume", request_id: "resume-after-budget-fix",
+    expected_revision: task.revision }, context);
+  await env.controller.reconcile(); await env.conversation.waitForIdle(context);
+  assert.equal((await queued.status(context)).status, "done");
+  assert.equal((await env.harness.snapshot(InboxDoc, env.conversation.id, context)).items.length, 0);
+  assert.equal((await env.controller.current(context)).continuation.sequence, 2);
+  assert.equal((await env.admission.status("task:task_1:continue:1", context)).status, "unanswered");
+  assert.equal((await env.admission.status("task:task_1:continue:2", context)).status, "done");
+});
 
 test("transient execution recovers once after its durable delay without blocking research", async t => {
   const clock = { value: 1000 }, env = await fixture(t, new MemoryStorage(), recoveryOptions(clock));

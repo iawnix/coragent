@@ -15,6 +15,9 @@ export const InputHead = defineDoc({ kind: "coragent.input-head", version: 1,
 
 const queueModes = { steeringMode: "one-at-a-time", followUpMode: "one-at-a-time" };
 const keyFor = requestId => createHash("sha256").update(requestId).digest("hex");
+/** Compaction writes can be flushed at the next idle boundary; only queued
+ * user inputs make an internal wake unsafe to admit. */
+export const hasPendingInput = items => Array.isArray(items) && items.some(item => item?.mode !== "write");
 function fail(code, message) { return Object.assign(new Error(message), { code }); }
 function requireRequestId(value) {
   if (typeof value !== "string" || !value || value.length > 512) {
@@ -61,7 +64,7 @@ export function createInputAdmission({ harness, conversation, LiveDoc, InboxDoc,
       }
       if (idleOnly) {
         const [live, inbox] = await Promise.all([tx.doc(LiveDoc, conversation.id), tx.doc(InboxDoc, conversation.id)]);
-        if (live.run || inbox.items.length) throw fail("busy", "Internal events wait for an idle session");
+        if (live.run || hasPendingInput(inbox.items)) throw fail("busy", "Internal events wait for an idle session");
       }
       const head = await tx.doc(InputHead, conversation.id);
       const control = await policy?.beforeAdmission(tx, { producer, identity, basis });

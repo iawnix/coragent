@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { defineDoc, defineDocFamily } from "@earendil-works/pi-durable";
 import { taskRecoveryPolicy, retryableSubmission, recoveryReady } from "./recovery.mjs";
+import { hasPendingInput } from "../host/admission/input.mjs";
 import shared from "../../../contracts/commands/shared.json" with { type: "json" };
 
 export const UserTasks = defineDoc({ kind: "coragent.user-tasks", version: 1,
@@ -628,7 +629,9 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       let task = await settleWait(ctx);
       if (!enabled || !task || !["active", "waiting", "completing"].includes(task.state)) return;
       const [live, inbox] = await Promise.all([harness.snapshot(LiveDoc, conversation.id, ctx), harness.snapshot(InboxDoc, conversation.id, ctx)]);
-      if (live?.run || inbox?.items.length) return;
+      // A queued compaction write is safe to flush at the next boundary. Only
+      // queued user/steering inputs should hold back internal task recovery.
+      if (live?.run || hasPendingInput(inbox?.items)) return;
       if (task.state === "completing") {
         const delivery = await (await harness.submission(task.completion_submission_id, ctx)).status(ctx);
         if (!["done", "unanswered"].includes(delivery.status)) return;

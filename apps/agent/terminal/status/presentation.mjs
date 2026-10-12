@@ -93,10 +93,15 @@ export function createStatusPresentation({ session, theme, truncateToWidth, visi
       const percent = Number.isFinite(tokens) && capacity > 0 ? tokens / capacity * 100 : null;
       const icon = ring && percent !== null ? `${['○','◔','◑','◕','●'][Math.min(4, Math.round(percent / 25))]} ` : '';
       const context = `${icon}Context: ${tokens === null ? 'Unknown' : `${formatTokens(tokens)}`}/${formatTokens(capacity)}${percent === null ? '' : ` (${percent.toFixed(0)}%)`}`;
+      const budget = current && Number.isFinite(telemetry?.inputBudgetTokens)
+        ? ` · Budget: ${formatTokens(telemetry.inputBudgetTokens)}` : '';
       const total = formatTokens(usageTotals(view?.docs?.['pi.usage'])?.totalTokens);
-      const second = `${context} · Total tokens: ${total}`;
-      const short = `${icon}Ctx: ${percent === null ? '?' : `${percent.toFixed(0)}%`} · Tokens: ${total}`;
-      const color = percent >= 90 ? 'error' : percent >= 70 ? 'warning' : 'muted';
+      const second = `${context}${budget} · Total tokens: ${total}`;
+      const short = `${icon}Ctx: ${percent === null ? '?' : `${percent.toFixed(0)}%`}${budget} · Tokens: ${total}`;
+      const budgetPercent = Number.isFinite(tokens) && telemetry?.inputBudgetTokens > 0
+        ? tokens / telemetry.inputBudgetTokens * 100 : null;
+      const pressure = Math.max(percent ?? 0, budgetPercent ?? 0);
+      const color = pressure >= 90 ? 'error' : pressure >= 70 ? 'warning' : 'muted';
       const lines = [fit(first,w), fit(visibleWidth(second) <= w ? second : short,w)];
       return lines.map((line, index) => ` ${monochrome ? stripVTControlCharacters(line) : theme.fg(index ? color : 'muted', line)}`);
     },
@@ -127,6 +132,7 @@ export function createStatusPresentation({ session, theme, truncateToWidth, visi
         `Cache read: ${count(totals?.cacheRead)} · Cache write: ${count(totals?.cacheWrite)}`,
         `Reasoning: ${count(totals?.reasoning)}`,
         `Context: ${count(current ? telemetry.contextTokens : null)} / ${count(current ? telemetry.contextWindow : null)}`,
+        `Input budget: ${count(current ? telemetry.inputBudgetTokens : null)}`,
         ...(rows.length ? ['', 'By model', ...rows] : [])].join('\n');
     },
     monitorDetails() {

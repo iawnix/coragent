@@ -12,7 +12,7 @@ import {pinnedPiSource, TEST_ROOT} from './test-environment.mjs';
 const {estimateContextTokens} = await import(pathToFileURL(join(pinnedPiSource(),'packages/ai/src/utils/estimate.ts')));
 const snapshot = () => ({schema_version:'research-decision/1',snapshot_id:'ctx_fixture',sequence:1,nodes:[],jobs:[]});
 function fixtureManager(overrides = {}) {
-  return createContextManager({sessionId:'fixture',estimateContextTokens,
+  return createContextManager({sessionId:'fixture',estimateContextTokens,inputTokens:65536,
     bridge:{async execute_command(){return snapshot();}},coordinator:{async commit_files(){}},...overrides});
 }
 const fixtureInjector = overrides => fixtureManager(overrides).admit;
@@ -111,7 +111,7 @@ test('history, tools, control and provider output share one operating and hard b
   assert.equal(telemetry[0].snapshot,undefined);
   assert.equal(telemetry[0].schema_version,'research-request-context/4');
   assert.throws(()=>contextPolicy({},'bad'),/integer/);
-  assert.equal(contextPolicy({}).compaction.maxInputTokens,65536);
+  assert.equal(contextPolicy({}).compaction.maxInputTokens,131072);
 });
 
 test('tool turns, progress revisions and external events do not rehydrate; scope changes and reset do', async () => {

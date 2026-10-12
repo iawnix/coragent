@@ -184,7 +184,9 @@ export async function createCoRAgentHarness(databasePath, options) {
             const model = agent.model && modelRuntime.getModel(agent.model.provider, agent.model.modelId);
             // Reuse Pi's compaction-aware request estimate. It is not an exact tokenizer count.
             return { model: agent.model || null, contextWindow: model?.contextWindow || null,
-              contextTokens: estimateContext(view, []), estimated: true,
+              contextTokens: estimateContext(view, []),
+              inputBudgetTokens: harnessSettings.compaction.maxInputTokens || null,
+              estimated: true,
               entryId: view.entries.at(-1)?.id ?? null, firstEntryId: view.entries[0]?.id ?? null, headId: view.head?.id ?? null, research };
           },
         }));

@@ -22,7 +22,7 @@ export function contextAnchor(entries) {
 }
 
 export function contextPolicy(settings, value = process.env.CORAGENT_CONTEXT_INPUT_TOKENS) {
-  const inputTokens = value === undefined ? 65536 : Number(value);
+  const inputTokens = value === undefined ? 131072 : Number(value);
   if (!Number.isSafeInteger(inputTokens) || inputTokens < 8192) {
     throw new Error("CORAGENT_CONTEXT_INPUT_TOKENS must be an integer of at least 8192");
   }
@@ -34,7 +34,7 @@ export function contextPolicy(settings, value = process.env.CORAGENT_CONTEXT_INP
 
 /** One policy over native history, research orientation, compaction and final
  * admission. Scientific facts remain in the research store; Pi owns persistence. */
-export function createContextManager({ bridge, coordinator, sessionId, estimateContextTokens, inputTokens = 65536 }) {
+export function createContextManager({ bridge, coordinator, sessionId, estimateContextTokens, inputTokens = 131072 }) {
   async function projection(task, scope) {
     const control = { task: projectDecisionTask(task) };
     const taskTokens = estimateContextTokens([envelope("research_context", control)]).tokens;

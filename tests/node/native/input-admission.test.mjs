@@ -6,7 +6,7 @@ import { Harness, MemoryStorage, createRegistry, LiveDoc, InboxDoc } from "@eare
 import { createModels, fauxProvider, fauxAssistantMessage } from "@earendil-works/pi-ai";
 import { TODO_CONTEXT as context } from "@earendil-works/chord/context";
 import { pinnedPiSource } from "./test-environment.mjs";
-import { createInputAdmission, bindUserInputConversation } from "../../../apps/agent/host/admission/input.mjs";
+import { createInputAdmission, bindUserInputConversation, hasPendingInput } from "../../../apps/agent/host/admission/input.mjs";
 
 const { admitSubmission } = await import(pathToFileURL(join(pinnedPiSource(), "packages/durable/src/harness/submissions.ts")).href);
 const { createAgentController } = await import(pathToFileURL(join(pinnedPiSource(), "packages/coding-agent/src/experimental/services/agent-controller-provider.ts")).href);
@@ -20,6 +20,31 @@ async function fixture(t) {
   const admission = createInputAdmission({ harness, conversation, LiveDoc, InboxDoc, admitSubmission });
   return { harness, conversation, admission, native: bindUserInputConversation(conversation, admission, harness), faux };
 }
+
+test("queued compaction writes do not block an idle internal wake", async t => {
+  const { harness, conversation, admission, faux } = await fixture(t);
+  let started;
+  const running = new Promise(resolve => { started = resolve; });
+  faux.setResponses([(_ctx, options) => new Promise(resolve => {
+    started();
+    options.signal.addEventListener("abort", () => resolve(fauxAssistantMessage("aborted")), { once: true });
+  })]);
+  await admission.submitUser({ requestId: "running-write-boundary", content: "Hold the session" }, context);
+  await started;
+  const queued = await conversation.submit({ type: "write", requestId: "queued-compaction",
+    entry: { kind: "pi.compaction", head: "self", model: [{ role: "user", content: "summary", timestamp: Date.now() }] } }, context);
+  assert.equal((await admission.status("queued-compaction", context)).status, "queued");
+  await conversation.abort(context);
+  assert.equal(hasPendingInput((await harness.snapshot(InboxDoc, conversation.id, context)).items), false);
+  faux.setResponses([fauxAssistantMessage("internal wake")]);
+  await admission.submitInternal({ requestId: "internal-wake-after-compaction", producer: "task_controller",
+    identity: { user_task_id: "task_fixture", request_id: "internal-wake-after-compaction" },
+    basis: { control_epoch: 1 }, content: "Continue", whenBusy: "reject" }, context);
+  await conversation.waitForIdle(context);
+  assert.equal((await admission.status("queued-compaction", context)).status, "done");
+  assert.equal((await admission.status("internal-wake-after-compaction", context)).status, "done");
+  assert.equal(queued.id < (await admission.status("internal-wake-after-compaction", context)).id, true);
+});
 
 test("native and Host retry share one Pi submission, with a content conflict rejected", async t => {
   const { conversation, admission, native } = await fixture(t);

@@ -14,12 +14,12 @@ const nativeTheme = await import(pathToFileURL(join(pinnedPiSource(),'packages/c
 const theme = {fg:(_,text)=>text,bold:text=>text};
 const agent={model:{provider:'fixture',modelId:'a'},thinkingLevel:'medium'};
 const view={entries:[{id:1}],docs:{'pi.agent':agent,'pi.usage':{models:{'fixture/a':{input:10,output:20,cacheRead:30,totalTokens:60}}}}};
-const telemetry={entryId:1,firstEntryId:1,model:agent.model,contextTokens:48000,contextWindow:200000};
+const telemetry={entryId:1,firstEntryId:1,model:agent.model,contextTokens:48000,contextWindow:200000,inputBudgetTokens:131072};
 
 test('usage ledger survives compacted entries and model switch invalidates context',()=>{
  const status=createStatusPresentation({session:{workspaceId:'工作区',sessionId:'bb7a1aa2-d9c2-454e-9907-bbf519a28faf'},theme,...tui});
  status.update({view,telemetry});
- assert.match(status.footer.render(150).join('\n'),/Context: 48.0k\/200.0k \(24%\).*Total tokens: 60/);
+ assert.match(status.footer.render(150).join('\n'),/Context: 48.0k\/200.0k \(24%\).*Budget: 131.1k.*Total tokens: 60/);
  for(const width of [12,30,60,100,180]) for(const line of status.footer.render(width)) assert.ok(tui.visibleWidth(line)<=width,line);
  assert.equal(usageTotals(view.docs['pi.usage']).reasoning,null);
  assert.equal(usageTotals({models:{a:{input:10},b:{}}}).input,null);
