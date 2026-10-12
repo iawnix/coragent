@@ -6,6 +6,10 @@
 再选择 QST2/3。分离片段需构象/复合物准备，已给复合物保留相对取向；按需要优化并
 表征候选势阱。扫描或 IRC 发现中间体/意外出口时扩展路径；自旋变化使用专用交叉证据。
 
+上一轮计算虽未得到鞍点但提供了振动、梯度、路径或电子结构线索时，可将这些线索整理为
+编辑假设，交给 [reactive-geometry](../../reactive-geometry/SKILL.zh-CN.md) 生成新的反应中心取向和局部位移候选；候选仍需独立
+预优化、TS 优化、频率和 IRC 验证。
+
 chemical.pathway-check@1 使用 structure 环境、input 角色、chemical-pathway-input/1，
 检查明确材料、假设和证据关系，不修改 Node，也不自动宣告用户任务完成。
 

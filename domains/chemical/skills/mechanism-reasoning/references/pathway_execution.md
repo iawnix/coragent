@@ -11,6 +11,8 @@ retains its relative placement. Optimize/characterize candidate basins when need
 and expand the path when scans or IRC reveal intermediates/unexpected exits.
 Spin changes route to specialized crossing evidence, not ordinary TS certification.
 
+When a failed or partial calculation provides usable mode, gradient, path or electronic evidence, turn it into an explicit edit hypothesis for [reactive-geometry](../../reactive-geometry/SKILL.md). Generated candidates still need appropriate refinement, TS optimization, frequencies and IRC.
+
 `chemical.pathway-check@1` uses the structure binding, input role input and
 chemical-pathway-input/1. It audits explicit material, hypothesis and evidence
 relations without mutating Nodes or declaring the user task complete.

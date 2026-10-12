@@ -67,6 +67,7 @@ lists independent executors, their backends and scientific limits. Bundled modul
 
 - Name/SMILES/XYZ materials, mapping candidates, tensor reordering and conformer comparison.
 - CF22D, xTB and Gaussian calculations; bounded CREST ensembles and rigid-fragment complex sampling.
+- [Reactive geometry editing](../domains/chemical/skills/reactive-geometry/SKILL.md): directed fragment placement, local edits and evidence-bound mode displacements; geometry screening only, followed by separate solver refinement.
 - xTB/Gaussian relaxed scans, QST2/QST3 preparation, gradients and ASE NEB v2 candidate searches.
 - General stationary-point, mode and IRC checks; thermochemistry, conformer free energies and energy profiles.
 - Multistep pathway checks, conditional TST, common-precursor branching and mass-action networks.

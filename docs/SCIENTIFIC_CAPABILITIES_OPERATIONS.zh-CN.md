@@ -58,6 +58,7 @@ Job 文件位于 `runs/jobs/<job_id>`。收集把声明文件登记为生产 Job
 
 - 名称/SMILES/XYZ 材料、映射候选、张量重排与构象比较。
 - CF22D、xTB、Gaussian 计算，以及有界 CREST 构象集合和刚性片段复合物采样。
+- [反应构象编辑](../domains/chemical/skills/reactive-geometry/SKILL.zh-CN.md)：定向片段摆放、局部编辑和绑定证据的模式位移；先做几何筛选，再由独立求解器精修。
 - xTB/Gaussian 弛豫扫描、QST2/QST3 准备、梯度与 ASE NEB v2 候选搜索。
 - 通用驻点、模式与 IRC 检查，以及热化学、构象自由能与能量剖面。
 - 多步路径检查、条件 TST、共同前体竞争分支与质量作用动力学网络。

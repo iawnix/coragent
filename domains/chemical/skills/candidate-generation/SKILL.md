@@ -19,6 +19,10 @@ sampling according to the proposed bond changes and available evidence. Bind
 all seeds and generated structures as Artifacts with recorded production provenance and preserve the
 method, constraints, frame selection, and provenance.
 
+When an existing candidate needs a new approach orientation, reaction-center distance, or
+evidence-supported local distortion, use the [reactive-geometry](../reactive-geometry/SKILL.md) Skill first and pass its
+provenance-preserving candidates to QST, scans, or NEB.
+
 Do not promote a scan maximum, NEB image, interpolation, or constrained
 structure as a verified saddle point. Record useful candidates as facts about
 the generated structure and failed or distorted searches as issues only when
