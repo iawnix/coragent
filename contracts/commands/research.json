@@ -60,9 +60,20 @@
             },
             "description": "Internal task navigation roots. Does not authorize or schedule research work."
           },
+          "source_submission_ids": {
+            "$ref": "shared.json#/tools/create/properties/source_submission_ids",
+            "description": "Current task submission IDs used only to expose their exact Research Memory user_* bindings in the review context."
+          },
           "view": {
-            "const": "decision",
-            "description": "Internal request-only orientation. Omit for full snapshots and explicit reads; not a model parameter."
+            "anyOf": [
+              {
+                "const": "decision"
+              },
+              {
+                "const": "review"
+              }
+            ],
+            "description": "Internal bounded orientation. review is a deterministic research-state brief; neither view authorizes writes or schedules work."
           },
           "waited_job_ids": {
             "type": "array",
@@ -70,6 +81,16 @@
               "type": "string"
             },
             "description": "Internal task waits to retain even outside research focus."
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "context_refresh",
+              "new_evidence",
+              "goal_changed",
+              "explicit"
+            ],
+            "description": "Internal Review refresh reason. It never authorizes writes or schedules work."
           }
         },
         "required": [],
@@ -183,6 +204,9 @@
           },
           "source_refs": {
             "$ref": "shared.json#/tools/create/properties/source_refs"
+          },
+          "source_submission_ids": {
+            "$ref": "shared.json#/tools/create/properties/source_submission_ids"
           },
           "input_refs": {
             "$ref": "shared.json#/tools/create/properties/input_refs"

@@ -24,10 +24,55 @@ def cell(value):
     return value.replace('\n','<br>')
 
 
+def research_review(value):
+    """Validate a generic Research Review without turning it into a verdict.
+
+    The review is a bounded index over the canonical research records.  Reports
+    retain it for traceability, while the original Result/Artifact evidence
+    remains the source for any chemical claim.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError('research_review must be an object')
+    required = ('schema_version', 'review_id', 'state_digest', 'review_digest',
+                'status', 'review_status', 'source_refs', 'findings',
+                'contradictions', 'uncertainties', 'limitations', 'follow_up')
+    object_fields(value, required + ('scope', 'coverage', 'read_more', 'guidance',
+                                     'trigger', 'availability', 'error'), 'research review')
+    if value.get('schema_version') != 'research-review/1':
+        raise ValueError('research_review schema required')
+    for key in ('review_id', 'state_digest', 'review_digest'):
+        item = value.get(key)
+        if item is not None and (not isinstance(item, str) or len(item) > 256 or not item):
+            raise ValueError(f'research_review {key} must be bounded text or null')
+    if value.get('review_id') is None or value.get('state_digest') is None:
+        # Failed hydration is a valid lifecycle observation, but a report with
+        # a usable Review must identify the state it indexed.
+        if value.get('review_status') != 'failed':
+            raise ValueError('research_review identifiers required')
+    if value.get('review_digest') is not None:
+        expected = canonical({key: item for key, item in value.items() if key != 'review_digest'})
+        if value['review_digest'] != expected:
+            raise ValueError('research_review digest mismatch')
+    if not isinstance(value.get('status'), str) or not value['status']:
+        raise ValueError('research_review status required')
+    if value.get('review_status') not in {'current', 'pending', 'stale', 'running', 'failed'}:
+        raise ValueError('research_review review_status invalid')
+    for key in ('source_refs', 'findings', 'contradictions', 'uncertainties', 'limitations', 'follow_up'):
+        rows = value.get(key)
+        if not isinstance(rows, list) or len(rows) > 512:
+            raise ValueError(f'research_review {key} must be a bounded list')
+    if any(not isinstance(ref, str) or not ref.strip() or len(ref) > 512 for ref in value['source_refs']):
+        raise ValueError('research_review source_refs must contain bounded references')
+    return value
+
+
 def build_report(spec,output):
-    object_fields(spec,('schema_version','title','question','assessment','limitations','structures','evidence','energy_profile','trajectory'),'research report')
+    object_fields(spec,('schema_version','title','question','assessment','limitations','structures','evidence','energy_profile','trajectory','research_review'),'research report')
     if spec.get('schema_version')!='chemical-research-report-input/1':raise ValueError('research report schema required')
     for k in ('title','question','assessment'):text(spec.get(k),k)
+    review = research_review(spec.get('research_review'))
     limitations=spec.get('limitations')
     if not isinstance(limitations,list) or len(limitations)>128:raise ValueError('explicit limitations list required')
     for item in limitations:text(item,'limitation')
@@ -94,6 +139,7 @@ def build_report(spec,output):
         'structures':[{'label':row['label'],'material_sha256':m['sha256']} for row,m in zip(structures,materials)],
         'energy':energy,'trajectory':trajectory,'limitations':limitations,
         'scientific_validation':'not_assessed','files':files,
+        'research_review':review,
         'scope':'Evidence assembly with supplied author interpretation; canonical digests bind included data, not independent scientific certification'}
     write_json(out/'result.json',report)
     lines=['# '+cell(spec['title']),'','## Research question','',cell(spec['question']),
@@ -103,6 +149,16 @@ def build_report(spec,output):
            '| --- | --- | --- | --- |']
     for row in records:lines.append('| '+' | '.join(cell(v) for v in (row['label'],row['result']['schema_version'],row['reported_status'],row['source_sha256']))+' |')
     lines.extend(['','Full checks, partial failures and source references are retained in result.json.'])
+    if review:
+        lines.extend(['','## Research Review','',
+                      f"Review: `{cell(review.get('review_id'))}`; state: `{cell(review.get('state_digest'))}`; status: `{cell(review.get('review_status'))}` ({cell(review.get('status'))})."])
+        if review.get('source_refs'):
+            lines.extend(['','Indexed sources: '+', '.join(f'`{cell(ref)}`' for ref in review['source_refs'][:64])+'.'])
+        for label, key in (('Contradictions', 'contradictions'), ('Uncertainties', 'uncertainties')):
+            rows = review.get(key, [])
+            lines.extend(['', f'### {label}'])
+            lines.extend(['- '+cell(row.get('summary') if isinstance(row, dict) else row) for row in rows[:32]] or ['- None recorded in this bounded review.'])
+        lines.extend(['','The Research Review is a derived index of recorded research state. It does not certify transition-state validity, mechanism, or completion; inspect the cited Result and Artifact records before making those claims.'])
     if materials:lines.extend(['','## Supplied structures','','![Supplied structures](structures.png)','','Fixed camera and scale; lines, if present, are explicitly supplied display bonds.'])
     if energy:lines.extend(['','## Energy comparison','','![Discrete energy levels](energy.png)','',f"Quantity: {cell(energy['quantity'])}; unit: {cell(energy['unit'])}; reference: {cell(energy['reference'])}.",'','Conditions and source models are preserved in energy.json; these levels are not a continuous potential surface.'])
     else:lines.extend(['','## Energy comparison','','Comparable energy data were not supplied.'])

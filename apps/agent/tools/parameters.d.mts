@@ -24,6 +24,7 @@ export interface ToolParameters {
     "proposal"?: string;
     "plan"?: string;
     "source_refs"?: Array<string>;
+    "source_submission_ids"?: Array<string>;
     "input_refs"?: Array<string>;
     "relations"?: Array<{
       "kind": "part_of" | "requires" | "alternative_to";

@@ -4,6 +4,7 @@ import pytest
 from jsonschema import Draft202012Validator
 from research_agent.application.api import execute as execute_api, COMMAND_DEFINITIONS
 from research_agent.research import results, nodes, relations, views
+from research_agent.research.review import build as build_review
 from tests.unit.test_job_recovery import workspace
 
 
@@ -73,3 +74,40 @@ def test_report_citing_corrected_result_requests_review_without_rewriting(tmp_pa
     read = execute('research.read', tmp_path, {'ref': report['id']})
     assert {'code': 'cited_result_superseded', 'used': one['id'], 'superseded_by': two['id']} in read['review_notices']
     assert results.get_result(tmp_path, report['id']) == report
+
+
+def test_research_review_is_bounded_derived_state_and_preserves_source_refs(tmp_path):
+    workspace(tmp_path)
+    node = execute('research.create', tmp_path, {'goal': 'Compare two recorded alternatives'})['node']['id']
+    result = execute('research.result', tmp_path, {'node_id': node,
+        'conclusion': 'Preliminary comparison', 'limitations': 'Needs an independent check'})['result']['id']
+    review = execute('research.read', tmp_path, {'view': 'review', 'focus_node_ids': [node], 'limit': 8000})
+    assert review['schema_version'] == 'research-review/1'
+    assert review['state_digest'].startswith('sha256:')
+    assert review['review_id'].startswith('review_')
+    assert result in review['source_refs']
+    assert review['review_status'] == 'current'
+    assert review['guidance'].startswith('This is a derived review')
+    Draft202012Validator(COMMAND_DEFINITIONS['research.read']['result']).validate(json.loads(json.dumps(review)))
+
+
+def test_research_review_reports_failed_or_incomplete_jobs_as_follow_up(tmp_path):
+    workspace(tmp_path)
+    node = execute('research.create', tmp_path, {'goal': 'Inspect execution evidence'})['node']['id']
+    review = build_review(tmp_path, focus_node_ids=[node], jobs=[{
+        'job_id': 'job_1', 'node_id': node, 'state': 'failed', 'collection_state': 'not_collected',
+        'error': 'solver stopped', 'execution_conflict': False,
+    }])
+    assert review['status'] == 'attention'
+    assert any(item['ref'] == 'job_1' for item in review['contradictions'])
+    assert any(item['action'] == 'inspect_job' for item in review['follow_up'])
+
+
+def test_research_review_trigger_marks_new_evidence_pending(tmp_path):
+    workspace(tmp_path)
+    node = execute('research.create', tmp_path, {'goal': 'Review new evidence'})['node']['id']
+    review = execute('research.read', tmp_path, {
+        'view': 'review', 'focus_node_ids': [node], 'trigger': 'new_evidence', 'limit': 8000,
+    })
+    assert review['trigger'] == 'new_evidence'
+    assert review['review_status'] == 'pending'

@@ -54,6 +54,12 @@ For Geom=AllCheck, verify the checkpoint's electronic state. Stage dependencies
 with `--dependency /absolute/source.chk=previous.chk`; input references must
 be relative staged paths. Collect checkpoints needed by subsequent calculations.
 
+Gaussian reads each input section until a blank line terminator. Every explicit
+`.gjf` must therefore end with a blank line (two newline characters after the
+final coordinate or extra section), and Link1 boundaries must remain blank. A file
+ending at the last coordinate can fail before calculation; check this and use the
+executor instead of a direct Gaussian shell call for a research Job.
+
 ```bash
 "$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.gaussian-input --version 1 --input input=ts.gjf --collect results/ts.chk --output prepared/ts.json -- --method M062X --basis '6-31G**' --charge 0 --multiplicity 1 --threads 12 --memory-mb 4000 --validation saddle
 ```

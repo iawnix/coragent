@@ -15,6 +15,8 @@ export function formatTask(task) {
     `Task: ${task.title} · ${taskStateLabel(task.state)}`,
     `Goal: ${task.objective}`,
     `Progress: ${text(task.progress?.summary)}`,
+    ...(task.research_review ? [`Research Review: ${text(task.research_review.review_status)} · ${text(task.research_review.current_review_ref)}`,
+      `Reviewed state: ${text(task.research_review.last_reviewed_state_digest)}`] : []),
     ...(task.execution_recovery ? [
       `Execution recovery: ${task.execution_recovery.state} · ${task.execution_recovery.phase}`,
       `Failure: ${task.execution_recovery.reason} · ${text(task.execution_recovery.detail)}`,

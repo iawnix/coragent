@@ -5,7 +5,7 @@ description: Resume research through persistent problem Nodes, explicit relation
 
 # Research Memory
 
-Start from the injected workspace context or `research_read {}`. It preserves original user requirements and selects relevant Nodes, Results and execution facts within a budget. Omitted content is not absent or completed; use the returned references to inspect it. Scientific interpretation belongs to you and the domain Skill, not the execution receipt.
+Start from the injected `research-review/1` context or `research_read {}`. The Review is a disposable projection of Research State: it preserves references to original requirements, relevant Nodes, Results and execution facts, and calls out contradictions, uncertainties, limitations and follow-up reads within a budget. Omitted content is not absent or completed; use the returned references to inspect it. Scientific interpretation belongs to you and the domain Skill, not the execution receipt.
 
 User task control belongs to `task_read` and `task_update`: objective, delivery criteria, waiting, blockers and completion. A Node's open/paused/closed status does not pause or complete that task. Apply actual user stop/resume instructions through `task_update action=apply_user_control`; cancelling Jobs alone also leaves the task active. See the [research workflow](../research-workflow/SKILL.md) for source authorization and Job policy. Keep scientific interpretation and evidence here, and reference those records from task progress or completion.
 
@@ -13,11 +13,15 @@ User task control belongs to `task_read` and `task_update`: objective, delivery 
 
 - `research_read {}` restores the workspace overview; `{ref}` reads a returned Node, Result or record reference. Follow pagination to inspect a long object.
 - `research_search {query}` finds research. Use the tool's declared filters and paging fields; copy exact returned references.
-- `research_create {goal}` creates a persistent local problem. Optionally supply title, proposal, plan and initial explicit relations. A goal alone is enough.
+- `research_create {goal}` creates a persistent local problem. Optionally supply title, proposal, plan, initial explicit relations and source bindings. For current Task Controller inputs use `source_submission_ids` exactly as supplied by runtime context (for example `['11']`); the adapter resolves them to Research Memory refs. Use `source_refs` only with an exact returned `user_*` reference (for example `['user_1']`). These are different namespaces: never construct `user_11` from submission `11`.
 - `research_update {node_id, note}` records a new observation or explanation. Optionally replace proposal, plan or progress, choose status (`open`, `paused`, `closed`), change explicit relations or set assessment_ref.
 - `research_result {node_id, conclusion}` publishes an immutable, independently useful result. Optional observation, limitations, inputs, evidence_refs and files distinguish observations from interpretation. Set as_assessment only when this result should become the Node's current synthesis.
 
 Framework identity, request deduplication, read basis and Node revisions are supplied by the adapter. Do not invent transaction fields. On a stale-read conflict, inspect the returned current Node, merge the scientific change, and retry through a new tool call. A Job update does not change the Node's authored revision. No global progress object or end-of-turn checkpoint exists.
+
+## Use the Research Review
+
+`research-review/1` is the default context projection, not a second memory state. Its `state_digest` and `review_digest` identify the Research State seen when it was produced; a new Monitor batch, terminal or collected Job, Result/Artifact evidence, or changed user requirement creates a new review boundary. Ordinary progress logs, intermediate Job states and tool turns reuse the existing anchor. When the Review is `pending`, the runtime may add one bounded model synthesis; the same `state_digest` is synthesized at most once. It remains temporary context and cannot replace source evidence or write to Memory. `contradictions` and `uncertainties` are prompts for verification, not scientific conclusions. `follow_up` suggests reads or checks and never grants write permission, closes a Node or starts a Job. Use the original tools for full history, Node fields, Result bodies, Job receipts and Artifact contents. The domain delivery Skill still produces the final user report; Review does not replace `chemical.research-report`.
 
 For a large Node, inspect the specific field you intend to change:
 

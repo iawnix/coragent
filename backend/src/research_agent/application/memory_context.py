@@ -22,14 +22,71 @@ def jobs(root):
     return output
 
 
+def _source_bindings(root, submission_ids, session_id=None, *, require=False):
+    """Resolve Pi submission IDs to exact immutable Research Memory refs.
+
+    Pi's submission sequence and Research Memory's operational record IDs are
+    deliberately different namespaces.  Resolve by the recorded provenance
+    instead of allowing callers to guess a ``user_<submission_id>`` ref.
+    """
+    if submission_ids is None:
+        return []
+    if (not isinstance(submission_ids, list) or len(submission_ids) > 64
+            or any(not isinstance(value, str) or not value.strip() for value in submission_ids)
+            or len(set(submission_ids)) != len(submission_ids)):
+        raise ValueError('source_submission_ids_invalid: use unique submission ID strings')
+    from research_agent.research.records import record, journal
+    output = []
+    for submission_id in submission_ids:
+        matches = []
+        for item in journal(root).get('records', []):
+            if item.get('origin') != 'user':
+                continue
+            ref = item.get('ref')
+            try:
+                value = record(root, ref)
+            except (FileNotFoundError, ValueError):
+                continue
+            data = value.get('data') or {}
+            if str(data.get('message_id')) != submission_id:
+                continue
+            if session_id is not None and str(data.get('session_id')) != str(session_id):
+                continue
+            matches.append(value)
+        if len(matches) > 1:
+            raise ValueError('source_submission_ambiguous: ' + submission_id)
+        if not matches:
+            if require:
+                raise ValueError('source_submission_not_found: ' + submission_id)
+            continue
+        value = matches[0]
+        output.append({'submission_id': submission_id, 'research_ref': value['ref']})
+    return output
+
+
+def resolve_source_submission_ids(root, submission_ids, session_id=None):
+    if submission_ids and not session_id:
+        raise ValueError('source_submission_session_required: runtime session_id is required to resolve task inputs')
+    return [item['research_ref'] for item in _source_bindings(root, submission_ids, session_id, require=True)]
+
+
 def read(root, *, ref=None, offset=0, limit=16000, session_id=None, event_ids=(), entry_node_ids=(), focus_node_ids=(), field=None,
-         view=None, waited_job_ids=()):
+         view=None, waited_job_ids=(), trigger='context_refresh', source_submission_ids=None):
     from .job_state import project_events
     from .job_monitor import assess
     with TransactionCoordinator(root).locked():
         workspace(root)
         errors = project_events(root)
         current = jobs(root)
+        if view == 'review':
+            if ref or field or offset:
+                raise ValueError('review_view_requires_snapshot')
+            from research_agent.research.review import build
+            events = [assess(root, event_id, session_id)['event'] for event_id in event_ids]
+            return build(root, max_bytes=max(2048, limit), session_id=session_id, entry_node_ids=entry_node_ids,
+                         focus_node_ids=focus_node_ids, events=events, jobs=current, waited_job_ids=waited_job_ids,
+                         projection={'pending': len(errors)}, trigger=trigger,
+                         source_bindings=_source_bindings(root, source_submission_ids, session_id))
         if view == 'decision':
             if ref or field or offset:
                 raise ValueError('decision_view_requires_snapshot')

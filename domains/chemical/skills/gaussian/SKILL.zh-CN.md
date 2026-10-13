@@ -52,6 +52,12 @@ bash 命令只准备并校验 Job 请求；`prepared/gaussian.json` 是请求文
 用 `--dependency /absolute/source.chk=previous.chk` 暂存依赖，输入文件中
 只引用相对暂存路径，并收集后续计算需要的 checkpoint。
 
+Gaussian 按空行结束输入 section。因此每个显式 `.gjf` 的文件末尾都必须有一个
+空行（最后一个坐标或附加 section 后必须有两个换行符），每个 Link1 段之间的
+空行边界也必须保留。如果文件只停在最后一个坐标行，Gaussian 可能在计算开始
+前就因输入解析失败而退出。提交前先检查这一点；研究 Job 不要绕过 executor，
+直接用 shell 调用 Gaussian。
+
 ```bash
 "$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.gaussian-input --version 1 --input input=ts.gjf --collect results/ts.chk --output prepared/ts.json -- --method M062X --basis '6-31G**' --charge 0 --multiplicity 1 --threads 12 --memory-mb 4000 --validation saddle
 ```

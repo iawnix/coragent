@@ -9,6 +9,8 @@ const task = {
   objective: 'Explain the comparison and its limits', state: 'active', criteria: [],
   research: { entry_node_ids: ['node_1', 'node_2'], focus_node_ids: ['node_3'] },
   updated_at: '2026-10-10T00:00:00Z', revision: 7,
+  research_review: { current_review_ref: 'review_state', last_reviewed_state_digest: 'sha256:state',
+    review_digest: 'sha256:review', review_status: 'current', trigger: 'context_refresh', updated_at: '2026-10-10T00:00:01Z' },
 };
 const snapshot = {
   schema_version: 'research-snapshot/3', sequence: 42,
@@ -107,6 +109,16 @@ test('research snapshot errors surface through the existing Monitor error envelo
   const response = await service.handle({ method: 'monitor/task/read', params: { user_task_id: 'task_1' } });
   assert.deepEqual(response, { result: null, error: { code: 'research_read_failed', message: 'Research unavailable' } });
   assert.equal(calls, 1);
+});
+
+test('Monitor overview exposes the Review lifecycle pointer', async () => {
+  const service = createMonitorService({ workspaceId: 'w', sessionId: 's',
+    controller: { async current() { return task; }, health() { return { automatic_continuation_enabled: false }; } },
+    kernel: { async execute_command(command) { return command === 'job.list' ? { jobs: [], next_cursor: null } : {}; } },
+    harness: { async snapshot() { return null; } }, conversation: { id: 'c' }, LiveDoc: {} });
+  const response = await service.handle({ method: 'monitor/overview', params: {} });
+  assert.equal(response.error, null);
+  assert.deepEqual(response.result.research_review, task.research_review);
 });
 
 test('task controls read revision through task pages even when research is unavailable', async () => {
