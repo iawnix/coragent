@@ -48,6 +48,11 @@ evidence 为 1–128 条，每条含唯一 id、label、带 schema_version 的 r
 规范化内容匹配的 source_sha256，以及可选 artifact_id。artifact_id 是来源标注，
 不自动查询 Artifact 存储。result.json 完整保留原结果、报告状态及限制，不提升为新认证。
 
+可选的 `research_review` 字段接受完整的 `research-review/1` 投影。脚本会在排除
+`review_digest` 字段后重新计算摘要，并把 Review 的 ID、状态摘要、来源引用、矛盾和
+不确定性保存在 `result.json` 与 `report.md` 中。Review 不能替代必需的原始
+Result/Artifact 证据，也不能认证过渡态。
+
 可选 structures 最多12条 {label, material, display_bonds}，每条 1–128 个有坐标
 原子。可选 trajectory 是上述完整输入。可选 energy_profile 必须是
 chemical-energy-profile-input/1，由[能量模块](../../energetics/references/energy_execution.zh-CN.md)

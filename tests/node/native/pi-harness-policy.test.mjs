@@ -13,6 +13,7 @@ test("Harness package-source guard blocks private package reads but allows publi
   await mkdir(join(packageRoot, "src"), { recursive: true });
   await mkdir(workspace, { recursive: true });
   await writeFile(join(skillRoot, "SKILL.md"), "public\n");
+  await writeFile(join(skillRoot, "run.py"), "print('ok')\n");
   await writeFile(join(packageRoot, "src", "private.mjs"), "private\n");
   const guard = createPackageSourceReadGuard({ packageRoot, cwd: workspace, publicKnowledgeRoots: [skillRoot] });
   try {
@@ -22,6 +23,11 @@ test("Harness package-source guard blocks private package reads but allows publi
     const recovery = JSON.parse(missing.block.reason);
     assert.equal(recovery.code, "skill_resource_not_found");
     assert.deepEqual(recovery.skill_locations, [join(skillRoot, "SKILL.md")]);
+    const alias = guard({ toolName: "read", args: { path: join(packageRoot, "skills/demo/SKILL.md") } });
+    assert.equal(alias.block, undefined);
+    assert.deepEqual(alias.arguments, { path: join(skillRoot, "SKILL.md") });
+    const aliasJob = guard({ toolName: "job_start", args: { command: ["python", join(packageRoot, "skills/demo/run.py")] } });
+    assert.deepEqual(aliasJob.arguments, { command: ["python", join(skillRoot, "run.py")] });
     const rejectedJob = guard({ toolName: "job_start", args: { command: ["python", join(packageRoot, "domains/other/skills/demo/run.py")] } });
     assert.equal(JSON.parse(rejectedJob.block.reason).code, "skill_resource_not_found");
     assert.equal(guard({ toolName: "job_start", args: { command: ["python", "skills/demo/run.py"] } }), undefined);

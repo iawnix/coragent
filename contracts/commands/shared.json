@@ -189,7 +189,18 @@
           },
           "maxItems": 64,
           "uniqueItems": true,
-          "description": "Original user requirements: exact user_* references returned in the research context. Only user messages are accepted; use input_refs for background materials."
+          "description": "Original user requirements: exact Research Memory user_* references returned by research_read/search. Never derive a user_* reference from a Task Controller submission ID; use source_submission_ids for current task inputs. Only user messages are accepted; use input_refs for background materials."
+        },
+        "source_submission_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 64,
+          "uniqueItems": true,
+          "description": "Current Pi/Task Controller user submission IDs, as strings. The runtime resolves these to exact Research Memory user_* references; never prefix these values with user_."
         },
         "input_refs": {
           "type": "array",

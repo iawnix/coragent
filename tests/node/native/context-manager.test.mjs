@@ -170,6 +170,55 @@ test('hydration recovery reuses immutable memo, escapes data and grants no read 
   assert.ok(await manager.prepare({entries:[{kind:'pi.user',model:first.messages}]},memoApi(),context,{task}));
 });
 
+test('pending research review receives one bounded synthesis tied to its digest', async () => {
+  let calls = 0;
+  const manager = fixtureManager({
+    bridge: { async execute_command() { return {
+      schema_version: 'research-review/1', review_id: 'review_state', state_digest: 'sha256:state',
+      review_digest: 'sha256:review', status: 'attention', review_status: 'pending', trigger: 'new_evidence',
+      scope: {}, coverage: {}, findings: [], contradictions: [{ref: 'job_1', summary: 'failed'}],
+      uncertainties: [], limitations: [], follow_up: [], source_refs: ['job_1'], read_more: {}, guidance: 'review',
+    }; } },
+    synthesizeReview: async review => {
+      calls++;
+      assert.equal(review.state_digest, 'sha256:state');
+      return { schema_version: 'research-review-synthesis/1', source_state_digest: review.state_digest,
+        source_review_digest: review.review_digest, status: 'attention', summary: 'Inspect job_1',
+        key_findings: [], contradictions: [], uncertainties: [], next_actions: [{action: 'inspect', ref: 'job_1'}], source_refs: ['job_1'] };
+    },
+  });
+  const prepared = await manager.prepare({entries: []}, memoApi(), context, {task: fullTask(), refresh_research: true});
+  const body = decode(prepared.messages[0]);
+  assert.equal(body.research_review.synthesis.source_state_digest, 'sha256:state');
+  assert.equal(calls, 1);
+});
+
+test('internal evidence refresh coalesces event ids and skips the same review digest', async () => {
+  const requests = [];
+  let calls = 0;
+  const manager = fixtureManager({
+    bridge: { async execute_command(command, params) {
+      assert.equal(command, 'research.read'); requests.push(params);
+      return { schema_version: 'research-review/1', review_id: 'review_state', state_digest: 'sha256:state',
+        review_digest: 'sha256:review', status: 'attention', review_status: 'pending', trigger: 'new_evidence',
+        scope: {}, coverage: {}, findings: [], contradictions: [], uncertainties: [], limitations: [], follow_up: [],
+        source_refs: [], read_more: {}, guidance: 'review' };
+    } },
+    synthesizeReview: async () => { calls++; return { schema_version: 'research-review-synthesis/1', source_state_digest: 'sha256:state',
+      source_review_digest: 'sha256:review', status: 'attention', summary: 'Inspect evidence', key_findings: [],
+      contradictions: [], uncertainties: [], next_actions: [], source_refs: [] }; },
+  });
+  const task = { ...fullTask(), event_inputs: [{ event_ids: ['event_2', 'event_1'] }] };
+  const first = await manager.prepare({entries: []}, memoApi(), context, { task, input_ids: [7], refresh_research: true,
+    review_trigger: 'new_evidence' });
+  const view = { entries: [committed(first)] };
+  await manager.prepare(view, memoApi(), context, { task, input_ids: [7], refresh_research: true,
+    review_trigger: 'new_evidence' });
+  assert.deepEqual(requests[0].event_ids, ['event_1', 'event_2']);
+  assert.equal(requests[0].trigger, 'new_evidence');
+  assert.equal(calls, 1);
+});
+
 test('failed hydration is explicit and retried only at a new input boundary', async () => {
   let reads = 0;
   const manager = fixtureManager({bridge:{async execute_command(){reads++;throw Error('State unavailable');}}});

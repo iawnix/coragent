@@ -70,3 +70,9 @@ state-character continuity, numerical stationarity and curvature. An unverified
 state or missing Hessian must remain visible in the report.
 
 Use independent `chemical.trajectory@1` and `chemical.research-report@1` Jobs for fixed-camera GIF/XYZ/CSV profiles and illustrated Markdown packages. They retain incomplete paths, supplied author assessment and source evidence; energy comparisons are recomputed through the existing energetics contract. See [trajectory and report contracts](references/research_tools.md).
+
+When available, include the generic `research-review/1` projection as the
+`research_review` field in the report input. The report validates its digest and
+retains the Review as a bounded index of source references, contradictions and
+uncertainties. It is an orientation aid; read the cited Result and Artifact
+records before making chemical or completion claims.

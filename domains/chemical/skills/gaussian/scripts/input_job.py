@@ -7,6 +7,7 @@ from pathlib import Path, PurePosixPath
 
 from gaussian_io import parse_log, parse_irc_log, write_irc_parse_artifacts, write_xyz, require_supported_energy
 from science import digest, write_json, new_result, finish
+from geometry_safety import assess_gaussian_input, require_safe
 
 
 def local_reference(value):
@@ -18,6 +19,8 @@ def local_reference(value):
 
 def inspect_input(path, method, basis, charge, multiplicity, threads, memory_mb):
     text = Path(path).read_text()
+    if not text.endswith('\n\n'):
+        raise ValueError('Gaussian input must end with a blank line (two trailing newline characters)')
     sections = re.split(r'(?im)^\s*--Link1--\s*$', text)
     references, checkpoints, routes = set(), set(), []
     for section in sections:
@@ -56,7 +59,12 @@ def inspect_input(path, method, basis, charge, multiplicity, threads, memory_mb)
         for ref in re.findall(r'(?m)^\s*@([^\s]+)\s*$', section): references.add(local_reference(ref))
         if re.search(r'\b(external|include)\s*=', route, re.I):
             raise ValueError('external executable and route include directives are unsupported')
-    return {'routes': routes, 'references': sorted(references), 'checkpoints': sorted(checkpoints)}
+    geometry_reports = assess_gaussian_input(text, profile='ts_candidate')
+    for report in geometry_reports:
+        require_safe(report)
+    return {'routes': routes, 'references': sorted(references), 'checkpoints': sorted(checkpoints),
+            'geometry_safety': {'status': 'passed' if geometry_reports else 'not_assessed',
+                                'blocks': geometry_reports}}
 
 
 def run_input(args):

@@ -30,6 +30,19 @@ export const taskError = (code, message) => Object.assign(new Error(message), { 
 const requireValue = (ok, code, message) => { if (!ok) throw taskError(code, message); };
 const stamp = () => new Date().toISOString();
 const researchSchema = shared.tools.taskUpdate.properties.research;
+const reviewStatuses = new Set(["current", "pending", "stale", "running", "failed"]);
+const reviewProjection = data => {
+  requireValue(data && data.schema_version === "research-review/1", "research_review_invalid", "Research Review projection schema is unsupported");
+  requireValue(reviewStatuses.has(data.review_status), "research_review_invalid", "Research Review lifecycle status is invalid");
+  for (const key of ["review_id", "state_digest", "review_digest"])
+    requireValue(data[key] === null || typeof data[key] === "string", "research_review_invalid", `Research Review ${key} must be text or null`);
+  requireValue(data.review_status === "failed" || (data.review_id && data.state_digest),
+    "research_review_invalid", "A usable Research Review requires review and state digests");
+  requireValue(typeof data.status === "string" && data.status.length > 0, "research_review_invalid", "Research Review status is required");
+  return { current_review_ref: data.review_id ?? null, last_reviewed_state_digest: data.state_digest ?? null,
+    review_digest: data.review_digest ?? null, review_status: data.review_status,
+    trigger: typeof data.trigger === "string" ? data.trigger : null, updated_at: stamp() };
+};
 const taskRecord = task => {
   if (task) requireValue(task.schema_version === "coragent-user-task/2", "task_schema_unsupported", "User tasks require coragent-user-task/2");
   return task;
@@ -435,6 +448,20 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       requireValue(task?.user_task_id, "task_not_found", "User task does not exist in this conversation");
       return taskRecord(task);
     },
+    /** Persist only the derived Review pointer used by Monitor. Review facts
+     * remain in the research store and do not advance the user-task revision. */
+    async recordResearchReview(data, ctx, expectedTaskId = null) {
+      const pointer = reviewProjection(data);
+      return conversation.commit(async tx => {
+        const { task } = await currentTx(tx);
+        if (!task || terminal.has(task.state) || expectedTaskId && task.user_task_id !== expectedTaskId) return null;
+        const previous = task.research_review;
+        const same = previous && ["current_review_ref", "last_reviewed_state_digest", "review_digest", "review_status", "trigger"]
+          .every(key => previous[key] === pointer[key]);
+        if (!same) task.research_review = pointer;
+        return copy(task);
+      }, ctx);
+    },
     async list(ctx, { limit = 25, cursor } = {}) {
       const index = await harness.snapshot(UserTasks, conversation.id, ctx);
       const offset = cursor === undefined ? 0 : Number(cursor);
@@ -458,7 +485,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           title: params.title, objective: params.objective, sources, criteria: params.criteria,
           state: "active", reason: null, revision: 1, control_epoch: 1, wait: null,
           progress: null, progress_version: 0, completion: null, execution_recovery: null,
-          research: { entry_node_ids: [], focus_node_ids: [] }, progress_identities: [],
+          research: { entry_node_ids: [], focus_node_ids: [] }, research_review: null, progress_identities: [],
           event_inputs: [],
           continuation: { sequence: 0, reservation: null, no_progress: 0 }, audit: [],
           created_at: stamp(), updated_at: stamp() });
@@ -551,12 +578,15 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       if (!basis || !["active", "waiting"].includes(basis.state)) return;
       const substantive = new Set(["research_result", "artifact_create", "artifact_register", "job_start", "job_status", "job_collect", "job_reconcile", "job_cancel"]);
       const observations = [], refs = [], identities = [];
+      let reviewPending = false;
       for (const entry of entries) for (const message of entry.model || []) {
         if (message.role !== "toolResult" || message.isError || !substantive.has(message.toolName)) continue;
         const result = message.details.result;
-        if (message.toolName === "research_result") { refs.push(result.result.id); identities.push(resultIdentity(result.result.id)); }
-        else if (message.toolName.startsWith("artifact_")) { refs.push(result.artifact_id); identities.push(artifactIdentity(result)); }
+        if (message.toolName === "research_result") { refs.push(result.result.id); identities.push(resultIdentity(result.result.id)); reviewPending = true; }
+        else if (message.toolName.startsWith("artifact_")) { refs.push(result.artifact_id); identities.push(artifactIdentity(result)); reviewPending = true; }
         else if (result.accepted !== false) observations.push(result);
+        if (message.toolName === "job_collect" || message.toolName === "job_reconcile"
+          || message.toolName === "job_status" && jobFinished.has(result.state)) reviewPending = true;
       }
       // Successful tool receipts already attest immutable products. Only Job
       // ownership needs a read; queries of historical Jobs remain valid tools.
@@ -572,7 +602,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         if (!recordProgress(task, [...new Set(identities)])) return;
         await recordUserRecoveryProgress(tx, task);
         task.progress = { summary: "Recorded new research evidence or execution milestone",
-          evidence_refs: [...new Set(refs)], at: stamp() };
+          evidence_refs: [...new Set(refs)], at: stamp(), review_pending: reviewPending };
         changed(task, "tool_progress", "runtime", task.progress.summary);
       }, ctx);
     },

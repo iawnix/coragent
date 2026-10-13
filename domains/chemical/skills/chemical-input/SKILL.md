@@ -42,6 +42,16 @@ Prepare each entry with the generic executor CLI and submit its returned file an
 digest through `job_start`. The selected target's `structure` Python binding
 provides RDKit. Collect the Job's JSON and geometries as research materials.
 
+Do not run `scripts/prepare.py`, `scripts/material.py` or the other chemical
+scripts directly with native `bash` or the control-plane `$CORAGENT_PYTHON`.
+Those scripts import scientific packages such as RDKit and are valid only as
+executor entries after Job Runtime has selected and probed the `structure`
+binding. Native `bash` may create the input JSON and inspect returned files;
+the executor CLI must perform the chemical operation. A direct
+`ModuleNotFoundError` is an environment-routing failure: do not install a
+package into the control-plane Python or retry the same command; prepare the
+executor request and submit it through `job_start` instead.
+
 Before generating files, explicitly cd in the command to the work_dir returned by research_create/research_read, or use absolute output paths beneath it; before Node association, use workspace research/work/. work_dir is returned guidance, not a bash parameter. The relative paths below assume that directory was selected in the same command; use absolute paths for inputs stored elsewhere. Put reports in reports/; avoid loose files in the workspace root and leave historical requests in place.
 
 ```text

@@ -1,0 +1,60 @@
+diff --git a/packages/coding-agent/src/modes/interactive/components/skill-invocation-message.ts b/packages/coding-agent/src/modes/interactive/components/skill-invocation-message.ts
+index 55acf6928..f808f7a42 100644
+--- a/packages/coding-agent/src/modes/interactive/components/skill-invocation-message.ts
++++ b/packages/coding-agent/src/modes/interactive/components/skill-invocation-message.ts
+@@ -39,20 +39,30 @@ export class SkillInvocationMessageComponent extends Box {
+ 		const content = new Container();
+ 
+ 		if (this.expanded) {
+-			// Expanded: label + skill name header + full content
++			// Expanded: label + skill name header + full content and any attached
++			// user/tool detail. Keeping the detail in this component means a
++			// blocked read cannot escape the collapsed Skill card as a second
++			// full-height user message.
+ 			const label = theme.fg("customMessageLabel", `\x1b[1m[skill]\x1b[22m`);
+ 			content.addChild(new Text(label, 0, 0));
+-			const header = `**${this.skillBlock.name}**\n\n`;
++			const header = `**${this.skillBlock.name}**  ${theme.fg("accent", "▴")}\n\n`;
+ 			content.addChild(
+ 				new Markdown(header + this.skillBlock.content, 0, 0, this.markdownTheme, {
+ 					color: (text: string) => theme.fg("customMessageText", text),
+ 				}),
+ 			);
++			if (this.skillBlock.userMessage) {
++				content.addChild(new Text("", 0, 1));
++				content.addChild(new Markdown(this.skillBlock.userMessage, 0, 0, this.markdownTheme, {
++					color: (text: string) => theme.fg("customMessageText", text),
++				}));
++			}
+ 		} else {
+-			// Collapsed: single line - [skill] name (hint to expand)
++			// Collapsed: one line with the same arrow affordance as tool cards.
+ 			const line =
+ 				theme.fg("customMessageLabel", `\x1b[1m[skill]\x1b[22m `) +
+ 				theme.fg("customMessageText", this.skillBlock.name) +
++				theme.fg("accent", "  ▾") +
+ 				theme.fg("dim", ` (${keyText("app.tools.expand")} to expand)`);
+ 			content.addChild(new Text(line, 0, 0));
+ 		}
+diff --git a/packages/coding-agent/src/modes/interactive/interactive-mode.ts b/packages/coding-agent/src/modes/interactive/interactive-mode.ts
+index 55ea40409..d275b0d0a 100644
+--- a/packages/coding-agent/src/modes/interactive/interactive-mode.ts
++++ b/packages/coding-agent/src/modes/interactive/interactive-mode.ts
+@@ -3940,17 +3940,6 @@ export class InteractiveMode {
+ 						);
+ 						component.setExpanded(this.toolOutputExpanded);
+ 						this.chatContainer.addChild(component);
+-						// Render user message separately if present
+-						if (skillBlock.userMessage) {
+-							this.chatContainer.addChild(new Spacer(1));
+-							const userComponent = new UserMessageComponent(
+-								skillBlock.userMessage,
+-								this.getMarkdownThemeWithSettings(),
+-								this.outputPad,
+-								this.getMarkdownTransformers(),
+-							);
+-							this.chatContainer.addChild(userComponent);
+-						}
+ 					} else {
+ 						const userComponent = new UserMessageComponent(
+ 							textContent,

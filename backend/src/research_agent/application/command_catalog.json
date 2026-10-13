@@ -14,8 +14,10 @@
         "focus_node_ids",
         "field",
         "entry_node_ids",
+        "source_submission_ids",
         "view",
-        "waited_job_ids"
+        "waited_job_ids",
+        "trigger"
       ],
       "required": [],
       "schema": {
@@ -119,9 +121,27 @@
             },
             "description": "Internal task navigation roots. Does not authorize or schedule research work."
           },
+          "source_submission_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "maxItems": 64,
+            "uniqueItems": true,
+            "description": "Current task submission IDs used only to expose their exact Research Memory user_* bindings in the review context."
+          },
           "view": {
-            "const": "decision",
-            "description": "Internal request-only orientation. Omit for full snapshots and explicit reads; not a model parameter."
+            "anyOf": [
+              {
+                "const": "decision"
+              },
+              {
+                "const": "review"
+              }
+            ],
+            "description": "Internal bounded orientation. review is a deterministic research-state brief; neither view authorizes writes or schedules work."
           },
           "waited_job_ids": {
             "type": "array",
@@ -129,6 +149,16 @@
               "type": "string"
             },
             "description": "Internal task waits to retain even outside research focus."
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "context_refresh",
+              "new_evidence",
+              "goal_changed",
+              "explicit"
+            ],
+            "description": "Internal Review refresh reason. It never authorizes writes or schedules work."
           }
         },
         "required": [],
@@ -1204,6 +1234,142 @@
               "read_more"
             ],
             "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "const": "research-review/1"
+              },
+              "review_id": {
+                "type": "string"
+              },
+              "state_digest": {
+                "type": "string"
+              },
+              "review_digest": {
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "attention",
+                  "uncertain",
+                  "oriented"
+                ]
+              },
+              "review_status": {
+                "enum": [
+                  "current",
+                  "pending",
+                  "stale",
+                  "running",
+                  "failed"
+                ]
+              },
+              "trigger": {
+                "enum": [
+                  "new_evidence",
+                  "context_refresh"
+                ]
+              },
+              "scope": {
+                "type": "object",
+                "additionalProperties": {
+                  "x-typescript-type": "JsonValue"
+                }
+              },
+              "user_sources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "submission_id": {
+                      "type": "string"
+                    },
+                    "research_ref": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "submission_id",
+                    "research_ref"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "coverage": {
+                "type": "object",
+                "additionalProperties": {
+                  "x-typescript-type": "JsonValue"
+                }
+              },
+              "findings": {
+                "type": "array",
+                "items": {
+                  "x-typescript-type": "JsonValue"
+                }
+              },
+              "contradictions": {
+                "type": "array",
+                "items": {
+                  "x-typescript-type": "JsonValue"
+                }
+              },
+              "uncertainties": {
+                "type": "array",
+                "items": {
+                  "x-typescript-type": "JsonValue"
+                }
+              },
+              "limitations": {
+                "type": "array",
+                "items": {
+                  "x-typescript-type": "JsonValue"
+                }
+              },
+              "follow_up": {
+                "type": "array",
+                "items": {
+                  "x-typescript-type": "JsonValue"
+                }
+              },
+              "source_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "read_more": {
+                "type": "object",
+                "additionalProperties": {
+                  "x-typescript-type": "JsonValue"
+                }
+              },
+              "guidance": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schema_version",
+              "review_id",
+              "state_digest",
+              "review_digest",
+              "status",
+              "review_status",
+              "trigger",
+              "scope",
+              "user_sources",
+              "coverage",
+              "findings",
+              "contradictions",
+              "uncertainties",
+              "limitations",
+              "follow_up",
+              "source_refs",
+              "read_more",
+              "guidance"
+            ],
+            "additionalProperties": false
           }
         ]
       }
@@ -1411,6 +1577,7 @@
         "proposal",
         "plan",
         "source_refs",
+        "source_submission_ids",
         "input_refs",
         "relations",
         "session_id",
@@ -1479,7 +1646,18 @@
             },
             "maxItems": 64,
             "uniqueItems": true,
-            "description": "Original user requirements: exact user_* references returned in the research context. Only user messages are accepted; use input_refs for background materials."
+            "description": "Original user requirements: exact Research Memory user_* references returned by research_read/search. Never derive a user_* reference from a Task Controller submission ID; use source_submission_ids for current task inputs. Only user messages are accepted; use input_refs for background materials."
+          },
+          "source_submission_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "maxItems": 64,
+            "uniqueItems": true,
+            "description": "Current Pi/Task Controller user submission IDs, as strings. The runtime resolves these to exact Research Memory user_* references; never prefix these values with user_."
           },
           "input_refs": {
             "type": "array",

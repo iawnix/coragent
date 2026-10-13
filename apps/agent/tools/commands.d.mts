@@ -11,8 +11,10 @@ export interface CommandParameters {
     "focus_node_ids"?: Array<string>;
     "field"?: "goal" | "title" | "proposal" | "plan" | "progress" | "status" | "assessment_ref" | "relations" | "subjects" | null;
     "entry_node_ids"?: Array<string>;
-    "view"?: "decision";
+    "source_submission_ids"?: Array<string>;
+    "view"?: "decision" | "review";
     "waited_job_ids"?: Array<string>;
+    "trigger"?: "context_refresh" | "new_evidence" | "goal_changed" | "explicit";
   };
   "research.search": {
     "query"?: string;
@@ -30,6 +32,7 @@ export interface CommandParameters {
     "proposal"?: string | null;
     "plan"?: string | null;
     "source_refs"?: Array<string>;
+    "source_submission_ids"?: Array<string>;
     "input_refs"?: Array<string>;
     "relations"?: Array<{
       "kind": "part_of" | "requires" | "alternative_to";
@@ -398,6 +401,28 @@ export interface CommandResults {
     "bounds": Record<string, JsonValue>;
     "read_more": Record<string, JsonValue>;
     "projection"?: Record<string, JsonValue>;
+  } | {
+    "schema_version": "research-review/1";
+    "review_id": string;
+    "state_digest": string;
+    "review_digest": string;
+    "status": "attention" | "uncertain" | "oriented";
+    "review_status": "current" | "pending" | "stale" | "running" | "failed";
+    "trigger": "new_evidence" | "context_refresh";
+    "scope": Record<string, JsonValue>;
+    "user_sources": Array<{
+      "submission_id": string;
+      "research_ref": string;
+    }>;
+    "coverage": Record<string, JsonValue>;
+    "findings": Array<JsonValue>;
+    "contradictions": Array<JsonValue>;
+    "uncertainties": Array<JsonValue>;
+    "limitations": Array<JsonValue>;
+    "follow_up": Array<JsonValue>;
+    "source_refs": Array<string>;
+    "read_more": Record<string, JsonValue>;
+    "guidance": string;
   };
   "research.search": {
     "schema_version": "research-search/2";

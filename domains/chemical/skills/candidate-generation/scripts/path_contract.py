@@ -9,6 +9,7 @@ from conformers import state_comparison
 from ensemble_material import canonical, checked, derive_material, xyz_text
 from material import object_fields
 from xyz import validate_electronic_state
+from geometry_safety import assess, require_safe
 
 BOHR_ANGSTROM = .529177210903
 
@@ -30,15 +31,22 @@ def material(value):
     if value.get('electronic_state', {}).get('kind') != 'ground': raise ValueError('this profile requires explicit ground state')
     if any(a.get('isotope') is not None for a in m['atoms']): raise ValueError('explicit isotope masses need a separate solver input')
     validate_electronic_state([[a['element']] for a in m['atoms']], value.get('charge'), value.get('multiplicity'))
-    geometry(m['coordinates'])
+    bonded = [(b.GetBeginAtomIdx(), b.GetEndAtomIdx()) for b in m['mol'].GetBonds()] if m['mol'] is not None else ()
+    geometry(m['coordinates'], elements=[a['element'] for a in m['atoms']], bonded_pairs=bonded)
     return m
 
 
-def geometry(xyz):
+def geometry(xyz, *, elements=None, bonded_pairs=(), reaction_pairs=(), profile='general'):
     xyz = numeric_array(xyz, (len(xyz), 3), 'geometry')
-    if len(xyz) > 1:
-        distances = np.linalg.norm(xyz[:, None] - xyz[None, :], axis=2)
-        if np.any(distances[np.triu_indices(len(xyz), 1)] < .1): raise ValueError('coincident or near-coincident atoms')
+    # When a low-level caller has no material metadata, retain the historical
+    # role of this helper (finite/non-coincident coordinates only).  All
+    # material-bound callers pass real elements and bonds below, enabling the
+    # stronger non-reaction contact check without rejecting synthetic/path
+    # fixtures that intentionally omit atom identity.
+    known_elements = elements if elements is not None else ['H'] * len(xyz)
+    require_safe(assess(known_elements, xyz, bonded_pairs=bonded_pairs,
+                        reaction_pairs=reaction_pairs, profile=profile,
+                        clash_scale=.75))
     return xyz
 
 

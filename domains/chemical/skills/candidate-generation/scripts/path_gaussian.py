@@ -18,7 +18,7 @@ class GaussianOptimizer:
         directory = Path(directory); directory.mkdir(parents=True, exist_ok=False)
         s = self.settings
         header = gaussian_header(s, f'Opt=(ModRedundant,CalcFC,MaxCycles={s.get("max_cycles", 200)})')
-        text = header + gaussian_geometry(self.material, geometry(xyz), 'Constrained scan point; candidate only')
+        text = header + gaussian_geometry(self.material, geometry(xyz, elements=[a['element'] for a in self.material['atoms']]), 'Constrained scan point; candidate only')
         for axis, target in zip(axes, targets):
             kind = {'distance': 'B', 'angle': 'A', 'dihedral': 'D'}[axis['kind']]
             text += kind + ' ' + ' '.join(str(i+1) for i in axis['indexes']) + f' {target:.12g} F\n'
@@ -41,4 +41,4 @@ class GaussianOptimizer:
         energy = require_supported_energy(summary)
         atoms = parsed['atoms']
         if [a[0] for a in atoms] != [a['element'] for a in self.material['atoms']]: raise ValueError('Gaussian output atom order differs')
-        return geometry([a[1:] for a in atoms]), energy, {'optimization': summary, 'constraint_model': 'Gaussian ModRedundant frozen internal coordinates'}
+        return geometry([a[1:] for a in atoms], elements=[a[0] for a in atoms]), energy, {'optimization': summary, 'constraint_model': 'Gaussian ModRedundant frozen internal coordinates'}

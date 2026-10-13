@@ -65,6 +65,13 @@ canonical content. artifact_id is optional attribution, not an Artifact-store lo
 Full results, reported status and limitations remain in result.json; the generator
 does not promote their reported status to a new scientific certification.
 
+The optional `research_review` field accepts a complete `research-review/1`
+projection. Its `review_digest` is recomputed over the projection excluding the
+digest field. The generated `result.json` and `report.md` preserve the Review's
+ID, state digest, source references, contradictions and uncertainties. A Review
+does not replace the required source Result/Artifact evidence or certify a
+transition state.
+
 Optional `structures` has at most12 `{label, material, display_bonds}` rows (1–128
 coordinate atoms each). Optional `trajectory` is a complete input as above.
 Optional `energy_profile` is a chemical-energy-profile-input/1 object, recomputed

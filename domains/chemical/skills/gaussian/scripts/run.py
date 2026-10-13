@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / '_shared'))
 from science import prepare, read_xyz, digest, finish, write_json
 from gaussian_io import write_gjf, parse_log, write_xyz, require_supported_energy
 from cli import parse_arguments
+from geometry_safety import assess, require_safe
 
 
 def validate(summary, task, method, basis):
@@ -38,6 +39,11 @@ def main():
         for task in (['opt','sp'] if a.task=='opt-sp' else [a.task]):
             step=out/task; step.mkdir()
             shutil.copyfile(geometry,step/'input.xyz')
+            current_atoms = read_xyz(geometry)
+            safety = assess([atom[0] for atom in current_atoms],
+                            [atom[1:] for atom in current_atoms], profile='general')
+            require_safe(safety)
+            result['geometry_safety'] = {'status': 'passed', 'input': safety}
             route=f'#p {a.method}/{a.basis} '+('Opt=Tight' if task=='opt' else 'SP')+' SCF=Tight Int=UltraFine'
             write_gjf(step/'input.gjf','Skill calculation',read_xyz(geometry),route,a.charge,a.multiplicity,a.threads,f'{a.memory_mb}MB','wavefunction.chk',[])
             with (step/'input.gjf').open('rb') as source, (step/'gaussian.out').open('wb') as log:
@@ -51,7 +57,8 @@ def main():
                     raise ValueError('optimized geometry missing or atom order changed')
                 geometry=step/'geometry.xyz'; write_xyz(geometry,parsed['atoms'],'Optimized geometry; angstrom')
             result['steps'].append({'task':task,'input_sha256':digest(step/'input.xyz'),
-                'energy_hartree':energy,'geometry_sha256':digest(geometry),'summary':parsed['summary']})
+                'energy_hartree':energy,'geometry_sha256':digest(geometry),
+                'geometry_safety': safety, 'summary':parsed['summary']})
         shutil.copyfile(geometry,out/'geometry.xyz'); finish(out,result,__file__)
         return 0
     except Exception as exc:

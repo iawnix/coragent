@@ -7,7 +7,9 @@ import { runTerminalSessions } from "../terminal/session.mjs";
 import { subscribeMonitor } from "../terminal/status/monitor.mjs";
 import { connectHost } from "../transport/host-client.mjs";
 import { createCoRAgentToolRenderers } from "../terminal/renderers/tools.mjs";
+import { enhanceMarkdown } from "../terminal/renderers/markdown-enhance.mjs";
 import { PUBLIC_TOOL_NAMES } from "../tools/contracts.mjs";
+import { PI_BUILTIN_TOOL_NAMES } from "./presentation.mjs";
 
 if (!process.env.CORAGENT_PI_RUNTIME_ROOT) throw new Error("remote Pi client requires CORAGENT_PI_RUNTIME_ROOT");
 const sourceRoot = resolve(process.env.CORAGENT_PI_RUNTIME_ROOT);
@@ -21,11 +23,18 @@ const [commandModule, clientModule, tuiModule] = await Promise.all([
 const { clientCommand } = commandModule;
 const { runClient } = clientModule;
 const { runClientTui } = tuiModule;
-const [{ configureToolRenderers }, tuiComponents] = await Promise.all([
+const [{ configureToolRenderers, configureMarkdownTransformers }, tuiComponents] = await Promise.all([
   loadPi("clientChat", sourceRoot),
   loadPi("tui", sourceRoot),
 ]);
-configureToolRenderers(createCoRAgentToolRenderers(tuiComponents, Object.values(PUBLIC_TOOL_NAMES)));
+// Pi's native coding tools are separate from the Harness command inventory,
+// but they still need the same compact Skinn presentation in the remote client.
+configureToolRenderers(createCoRAgentToolRenderers(tuiComponents, [
+  "monitor",
+  ...Object.values(PUBLIC_TOOL_NAMES),
+  ...PI_BUILTIN_TOOL_NAMES,
+]));
+configureMarkdownTransformers([enhanceMarkdown]);
 
 function createHostRequest() {
   const socketPath = process.env.CORAGENT_HOST_SOCKET?.trim();

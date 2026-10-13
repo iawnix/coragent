@@ -63,6 +63,7 @@ export function createMonitorService({ controller, harness, conversation, kernel
       jobs.counts = counts;
       return { schema_version: "coragent-monitor/1", workspace_id: workspaceId, session_id: sessionId,
         task, jobs, execution: { state: live?.run ? "running" : "idle", run_id: live?.run ? String(live.run.inputs[0]) : null },
+        research_review: task?.research_review ?? null,
         task_controller: controller.health(),
         automatic_continuation_enabled: controller.health().automatic_continuation_enabled, updated_at: new Date().toISOString() };
     },

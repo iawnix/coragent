@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PIN_PATH = ROOT / "config" / "pi-source.json"
 PATCH_ROOT = ROOT / "config" / "pi-patches"
-PATCH_NAMES = ("001-workspaces.patch", "002-worker-launch.patch", "003-client-connection.patch", "004-client-lifecycle.patch", "005-client-history.patch", "006-tool-presentation.patch", "007-client-status.patch", "008-request-admission.patch", "009-input-identity.patch", "010-context-lifecycle.patch")
+PATCH_NAMES = ("001-workspaces.patch", "002-worker-launch.patch", "003-client-connection.patch", "004-client-lifecycle.patch", "005-client-history.patch", "006-tool-presentation.patch", "007-client-status.patch", "008-request-admission.patch", "009-input-identity.patch", "010-context-lifecycle.patch", "011-markdown-presentation.patch", "012-skill-presentation.patch", "013-monitor-presentation.patch")
 class PiSourceError(RuntimeError): pass
 
 def pin():
@@ -55,16 +55,14 @@ def patch_check(source, patch, *, reverse=False):
 def apply_patch(source):
     if git(source, "rev-parse", "HEAD") != pin()["commit"]:
         raise PiSourceError("refusing to patch a different Pi source commit")
-    pending = []
-    # Preflight every independent patch before changing any source file. A
-    # complete old patch group is accepted; a partially applied group is not.
+    # Apply patches in order. Later presentation patches intentionally build
+    # on earlier managed patches, so checking every patch against the pristine
+    # checkout would reject a valid ordered patch group.
     for patch in patches():
         if patch_check(source, patch, reverse=True):
             continue
         if not patch_check(source, patch):
             raise PiSourceError(f"Pi patch is partially applied or incompatible: {patch.name}")
-        pending.append(patch)
-    for patch in pending:
         try:
             subprocess.run(["git", "-C", str(source), "apply", str(patch)], check=True, text=True)
         except subprocess.CalledProcessError as exc:

@@ -33,6 +33,13 @@ def test_explicit_gaussian_input_preserves_ts_and_irc_routes(tmp_path):
         helper.inspect_input(path, 'M062X', '6-31G**', 0, 1, 12, 4000)
 
 
+def test_explicit_gaussian_input_requires_terminal_blank_line(tmp_path):
+    path = gjf(tmp_path/'input.gjf')
+    path.write_text(path.read_text().rstrip('\n') + '\n')
+    with pytest.raises(ValueError, match='end with a blank line'):
+        helper.inspect_input(path, 'M062X', '6-31G**', 0, 1, 12, 4000)
+
+
 def test_normal_exit_without_frequency_does_not_validate_a_saddle(tmp_path):
     path = gjf(tmp_path/'input.gjf')
     program = tmp_path/'gaussian'
