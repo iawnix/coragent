@@ -13,6 +13,45 @@ coordinates only. Solver preoptimization and TS searches are separate Jobs.
 
 ## Input
 
+### Agent tool selection
+
+Use `chemical.reactive-sites@1` when explicit mapped bond changes need to be
+translated into fixed/mobile roles and local approach hypotheses. Use
+`chemical.reactive-pose@1` to sample those hypotheses. Use a one-point
+`chemical.scan-xtb@1` axis to perform restrained preoptimization before QST or
+NEB. The [capability map](capability_map.md), [call cards](call_cards.md) and
+[recovery playbook](recovery_playbook.md) describe how to interpret and combine
+these results; none of them turns a geometry into a TS verdict.
+
+### Automatic fragment poses
+
+`chemical.reactive-pose@1` accepts `chemical-reactive-pose/1`. The request
+embeds a `chemical-material/1` object:
+
+```json
+{
+  "schema_version": "chemical-reactive-pose/1",
+  "material": {"schema_version": "chemical-material/1"},
+  "bond_changes": [{"atoms": ["C", "F"], "before": 0, "after": 1}],
+  "sampling": {"count": 32, "direction_count": 7, "cone_degrees": 35}
+}
+```
+
+At least one declared forming bond must connect separate graph fragments. The
+executor chooses the larger fragment as the fixed reference, aligns the other
+fragment's local reaction atom toward the fixed atom, and samples distances and
+twists. For a multi-contact pose it fits the mobile fragment rigidly to all
+requested targets; poses whose fit residual exceeds `pair_tolerance` are
+rejected. Defaults are bounded and deterministic under `seed`; `distances` can
+override the generated covalent-radius-based distances per forming pair, and
+`twists` defaults to `[0, 120, -120]` degrees.
+
+Every result records local directions, rigid transforms, reaction-pair distances
+and the geometry-safety report. The executor never embeds SMILES, ranks
+electronic energies or claims that an accepted pose is a TS. Use `chemical.seed`
+or CREST first, inspect the pose ensemble, then run a separate constrained
+preoptimization, QST, scan or NEB.
+
 `chemical-reactive-geometry/1` contains an embedded `material` with 2–256 atoms in Å,
 `bond_changes`, `edit_hypotheses`, and optional `sampling`. Product input is not
 required. Import/assemble materials first using chemical-input/CREST; this executor

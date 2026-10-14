@@ -2,10 +2,47 @@
 
 [English](reactive_geometry.md)
 
+## 内容
+
+- [输入](#输入)
+- [编辑操作](#编辑操作)
+- [检查、输出与交接](#检查输出与交接)
+
 `chemical.reactive-geometry@1` 使用 `structure` 绑定（RDKit/NumPy），只编辑坐标。
 受限预优化和 TS 搜索使用独立求解器 Job。
 
 ## 输入
+
+### Agent 工具选择
+
+当需要把显式映射键变化转换成固定/移动角色和局部接近假设时，使用
+`chemical.reactive-sites@1`；使用 `chemical.reactive-pose@1` 采样这些假设；在 QST 或 NEB
+之前，用单点 `chemical.scan-xtb@1` 执行约束预优化。[能力地图](capability_map.zh-CN.md)、
+[调用卡片](call_cards.zh-CN.md)和[恢复手册](recovery_playbook.zh-CN.md)说明如何解释和组合
+这些结果；它们都不会把几何结构直接判定为 TS。
+
+### 自动生成片段取向
+
+`chemical.reactive-pose@1` 接受 `chemical-reactive-pose/1`。请求中的 `material`
+必须嵌入 `chemical-material/1` 对象：
+
+```json
+{
+  "schema_version": "chemical-reactive-pose/1",
+  "material": {"schema_version": "chemical-material/1"},
+  "bond_changes": [{"atoms": ["C", "F"], "before": 0, "after": 1}],
+  "sampling": {"count": 32, "direction_count": 7, "cone_degrees": 35}
+}
+```
+
+至少一个声明的成键必须连接图中的独立片段。执行器将较大片段作为固定参考，使另一片段的
+局部反应原子朝向固定原子，并采样距离和扭转角。多接触取向会对移动片段执行刚性拟合；
+拟合残差超过 `pair_tolerance` 的候选会被拒绝。`seed` 使有界采样可复现；`distances`
+可按成键对覆盖基于共价半径生成的默认距离，`twists` 默认是 `[0, 120, -120]` 度。
+
+结果会记录局部方向、刚性变换、反应对距离和几何安全报告。执行器不嵌入 SMILES、不排序
+电子能量，也不声称取向是 TS。先使用 `chemical.seed` 或 CREST，再审查取向集合，随后分别
+运行受限预优化、QST、扫描或 NEB。
 
 `chemical-reactive-geometry/1` 包含嵌入的 `material`（2–256 原子、Å 坐标）、
 `bond_changes`、`edit_hypotheses`，以及可选 `sampling`，不要求产物。

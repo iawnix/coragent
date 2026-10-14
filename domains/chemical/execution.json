@@ -578,6 +578,133 @@
       "version": "1",
       "backend": "structure",
       "runtime": "python",
+      "id": "chemical.reactive-sites",
+      "skill": "reactive-geometry",
+      "entry": "skills/reactive-geometry/scripts/reactive_sites.py",
+      "cli": "skills/reactive-geometry/scripts/reactive_sites_cli.py",
+      "argv": [
+        "{entry}",
+        "--input",
+        "{input:input}",
+        "--output-dir",
+        "results",
+        "{args}"
+      ],
+      "inputs": {
+        "input": "input.json"
+      },
+      "outputs": [
+        {
+          "path": "results/result.json",
+          "required": true,
+          "min_bytes": 2,
+          "media_type": "application/json"
+        },
+        {
+          "path": "results",
+          "recursive": true,
+          "required": true,
+          "min_bytes": 1
+        }
+      ],
+      "requirements": {
+        "python": ">=3.11",
+        "packages": {
+          "numpy": ">=2,<3",
+          "rdkit": ">=2025.9,<2027"
+        },
+        "imports": [
+          "numpy",
+          "rdkit.Chem"
+        ]
+      },
+      "resources": {
+        "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
+        "skills/_shared/geometry_safety.py": "sha256:155fe4aa535c4c5e0bb8366ca80099e9a66c5b744adde9d77611ee47d48e9f40",
+        "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
+        "skills/chemical-input/scripts/analysis_material.py": "sha256:7eec6a5ec7f370a98815ebbdf4e317e5e24911b38eee48e46cadaa5262366210",
+        "skills/chemical-input/scripts/correspondence.py": "sha256:9e93ed7035757865c49e15f50318a9a64e1c561d759fb44200ace3ac15a2a4c8",
+        "skills/chemical-input/scripts/material.py": "sha256:fa6123ec3441b82f4609d5caf11325ccbea1b0bfc94d526ed921f0dd85b495ff",
+        "skills/crest/scripts/ensemble_material.py": "sha256:2a52c033bb0ca2f6f531444808098206f2d2f48d74670f5fc8f1c2c93138302a",
+        "skills/reactive-geometry/scripts/reactive_sites.py": "sha256:2327b2b4e0df73811bfc70bbf7203b4adfe75395abcb0a6f98f93509e89d1924",
+        "skills/reactive-geometry/scripts/reactive_sites_cli.py": "sha256:a8ea97dd78c3ab2e648ba1f00ac7e18737e8ee7d533076fa68aae2ff440a96dc"
+      },
+      "module_paths": [
+        "skills/_shared",
+        "skills/chemical-input/scripts",
+        "skills/crest/scripts",
+        "skills/reactive-geometry/scripts"
+      ]
+    },
+    {
+      "version": "1",
+      "backend": "structure",
+      "runtime": "python",
+      "id": "chemical.reactive-pose",
+      "skill": "reactive-geometry",
+      "entry": "skills/reactive-geometry/scripts/reactive_pose.py",
+      "cli": "skills/reactive-geometry/scripts/pose_cli.py",
+      "argv": [
+        "{entry}",
+        "--input",
+        "{input:input}",
+        "--output-dir",
+        "results",
+        "{args}"
+      ],
+      "inputs": {
+        "input": "input.json"
+      },
+      "outputs": [
+        {
+          "path": "results/result.json",
+          "required": true,
+          "min_bytes": 2,
+          "media_type": "application/json"
+        },
+        {
+          "path": "results",
+          "recursive": true,
+          "required": true,
+          "min_bytes": 1
+        }
+      ],
+      "requirements": {
+        "python": ">=3.11",
+        "packages": {
+          "numpy": ">=2,<3",
+          "rdkit": ">=2025.9,<2027"
+        },
+        "imports": [
+          "numpy",
+          "rdkit.Chem"
+        ]
+      },
+      "resources": {
+        "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
+        "skills/_shared/geometry_safety.py": "sha256:155fe4aa535c4c5e0bb8366ca80099e9a66c5b744adde9d77611ee47d48e9f40",
+        "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
+        "skills/candidate-generation/scripts/path_contract.py": "sha256:03885183ed85b11a052e7c539f985c87a83a9fec0e4b2c54627338bc04b59a78",
+        "skills/chemical-input/scripts/analysis_material.py": "sha256:7eec6a5ec7f370a98815ebbdf4e317e5e24911b38eee48e46cadaa5262366210",
+        "skills/chemical-input/scripts/conformers.py": "sha256:b0150d7429219bf62f0da73ef40501459bdfbc27155c973de85724cdfccc75e6",
+        "skills/chemical-input/scripts/correspondence.py": "sha256:9e93ed7035757865c49e15f50318a9a64e1c561d759fb44200ace3ac15a2a4c8",
+        "skills/chemical-input/scripts/material.py": "sha256:fa6123ec3441b82f4609d5caf11325ccbea1b0bfc94d526ed921f0dd85b495ff",
+        "skills/crest/scripts/ensemble_material.py": "sha256:2a52c033bb0ca2f6f531444808098206f2d2f48d74670f5fc8f1c2c93138302a",
+        "skills/reactive-geometry/scripts/pose_cli.py": "sha256:8c95da6067fa9111b6fbbd42ee5c153bf86eba73e82c20314c67f745b9263d5b",
+        "skills/reactive-geometry/scripts/reactive_pose.py": "sha256:043a2b5232c2a3ab284c375c5e267d3a37e3756729f75fa50ffc8329184589d1"
+      },
+      "module_paths": [
+        "skills/_shared",
+        "skills/chemical-input/scripts",
+        "skills/crest/scripts",
+        "skills/candidate-generation/scripts",
+        "skills/reactive-geometry/scripts"
+      ]
+    },
+    {
+      "version": "1",
+      "backend": "structure",
+      "runtime": "python",
       "id": "chemical.path-candidates",
       "skill": "candidate-generation",
       "entry": "skills/candidate-generation/scripts/prepare_path.py",
