@@ -52,6 +52,9 @@ bash 命令只准备并校验 Job 请求；`prepared/gaussian.json` 是请求文
 用 `--dependency /absolute/source.chk=previous.chk` 暂存依赖，输入文件中
 只引用相对暂存路径，并收集后续计算需要的 checkpoint。
 
+L101（Link 101）附近的错误通常来自输入 section 边界、标题、电荷/多重度、几何、Z-matrix
+或 route 触发的附加数据。创建和排查 `.gjf` 时参阅 [L101 输入文件说明](references/l101_input_guide.zh-CN.md)。
+
 Gaussian 按空行结束输入 section。因此每个显式 `.gjf` 的文件末尾都必须有一个
 空行（最后一个坐标或附加 section 后必须有两个换行符），每个 Link1 段之间的
 空行边界也必须保留。如果文件只停在最后一个坐标行，Gaussian 可能在计算开始
