@@ -111,7 +111,13 @@
         }
       ],
       "requirements": {
-        "python": ">=3.11"
+        "python": ">=3.11",
+        "packages": {
+          "numpy": ">=2,<3"
+        },
+        "imports": [
+          "numpy"
+        ]
       },
       "resources": {
         "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
@@ -168,7 +174,13 @@
         }
       ],
       "requirements": {
-        "python": ">=3.11"
+        "python": ">=3.11",
+        "packages": {
+          "numpy": ">=2,<3"
+        },
+        "imports": [
+          "numpy"
+        ]
       },
       "resources": {
         "skills/_shared/geometry_safety.py": "sha256:155fe4aa535c4c5e0bb8366ca80099e9a66c5b744adde9d77611ee47d48e9f40",
@@ -239,7 +251,13 @@
         }
       ],
       "requirements": {
-        "python": ">=3.11"
+        "python": ">=3.11",
+        "packages": {
+          "numpy": ">=2,<3"
+        },
+        "imports": [
+          "numpy"
+        ]
       },
       "resources": {
         "skills/_shared/geometry_safety.py": "sha256:155fe4aa535c4c5e0bb8366ca80099e9a66c5b744adde9d77611ee47d48e9f40",
