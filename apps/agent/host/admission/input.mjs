@@ -15,6 +15,17 @@ export const InputHead = defineDoc({ kind: "coragent.input-head", version: 1,
 
 const queueModes = { steeringMode: "one-at-a-time", followUpMode: "one-at-a-time" };
 const keyFor = requestId => createHash("sha256").update(requestId).digest("hex");
+export const RUNTIME_TASK_CONTINUATION_START = '<runtime_task_continuation origin="runtime">';
+export const RUNTIME_TASK_CONTINUATION_END = "</runtime_task_continuation>";
+
+/** Keep internal task wakes distinguishable from user messages on the Pi wire.
+ * The model still receives a user-role message, but presentation clients can
+ * render it as runtime status instead of a user card. */
+export function markInternalInput(content, producer) {
+  if (producer !== "task_controller" || typeof content !== "string") return content;
+  if (content.startsWith(RUNTIME_TASK_CONTINUATION_START)) return content;
+  return `${RUNTIME_TASK_CONTINUATION_START}\n${content}\n${RUNTIME_TASK_CONTINUATION_END}`;
+}
 /** Compaction writes can be flushed at the next idle boundary; only queued
  * user inputs make an internal wake unsafe to admit. */
 export const hasPendingInput = items => Array.isArray(items) && items.some(item => item?.mode !== "write");
@@ -70,7 +81,9 @@ export function createInputAdmission({ harness, conversation, LiveDoc, InboxDoc,
       const control = await policy?.beforeAdmission(tx, { producer, identity, basis });
       // Only Pi reads/writes occur inside this commit. Domain assessment and
       // Python I/O happen before it and are revalidated before consumption.
-      const id = await admitSubmission(tx, conversation.id, { type: "input", requestId, content, whenBusy }, Date.now(), queueModes);
+      const id = await admitSubmission(tx, conversation.id, {
+        type: "input", requestId, content: markInternalInput(content, producer), whenBusy,
+      }, Date.now(), queueModes);
       Object.assign(provenance, { producer, fingerprint, identity: identity ?? null, admission_basis: basis });
       head.id = id;
       await policy?.afterAdmission(tx, { id, requestId, producer, identity, basis, control });

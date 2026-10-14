@@ -1,0 +1,92 @@
+diff --git a/packages/coding-agent/src/modes/interactive/components/runtime-task-message.ts b/packages/coding-agent/src/modes/interactive/components/runtime-task-message.ts
+new file mode 100644
+index 0000000..b08cedd
+--- /dev/null
++++ b/packages/coding-agent/src/modes/interactive/components/runtime-task-message.ts
+@@ -0,0 +1,27 @@
++import { Container, Text } from "@earendil-works/pi-tui";
++import { theme } from "../theme/theme.ts";
++
++const START = '<runtime_task_continuation origin="runtime">';
++const END = "</runtime_task_continuation>";
++const LEGACY_START = "Continue the existing authorized user task using the runtime task snapshot.";
++const LEGACY_COMPLETION = "Recover only the final response for the existing completion proposal.";
++
++/** Recognize current and pre-marker task-controller messages in durable sessions. */
++export function isRuntimeTaskContinuation(text: string): boolean {
++	const value = text.trim();
++	return (value.startsWith(START) && value.endsWith(END))
++		|| value.startsWith(LEGACY_START)
++		|| value.startsWith(LEGACY_COMPLETION);
++}
++
++/** Compact runtime status; the full control prompt remains model-visible only. */
++export class RuntimeTaskMessageComponent extends Container {
++	constructor() {
++		super();
++		this.addChild(new Text(
++			`${theme.fg("accent", "↻")} ${theme.fg("muted", "Continuing authorized task")} ${theme.fg("dim", "· internal runtime")}`,
++			1,
++			0,
++		));
++	}
++}
+diff --git a/packages/coding-agent/src/experimental/client-tui-chat.ts b/packages/coding-agent/src/experimental/client-tui-chat.ts
+index 90fdaea..f9f6ccb 100644
+--- a/packages/coding-agent/src/experimental/client-tui-chat.ts
++++ b/packages/coding-agent/src/experimental/client-tui-chat.ts
+@@ -7,6 +7,7 @@ import { AssistantMessageComponent } from "../modes/interactive/components/assis
+ import { type StatusIndicator, WorkingStatusIndicator } from "../modes/interactive/components/status-indicator.ts";
+ import { ToolExecutionComponent, type ToolRenderers } from "../modes/interactive/components/tool-execution.ts";
+ import { UserMessageComponent } from "../modes/interactive/components/user-message.ts";
++import { isRuntimeTaskContinuation, RuntimeTaskMessageComponent } from "../modes/interactive/components/runtime-task-message.ts";
+ import { theme } from "../modes/interactive/theme/theme.ts";
+ 
+ // Presentations may register renderers without importing execution tools.
+@@ -122,7 +123,10 @@ export class ExperimentalChatView {
+ 				item.mode === "write"
+ 					? `<${String(item.entry.kind)}>`
+ 					: userText(item.content as UserMessage["content"]).replace(/\s+/g, " ");
+-			this.pendingMessages.addChild(new TruncatedText(theme.fg("muted", `[${item.mode}] ${text}`), 1, 0));
++			const label = item.mode !== "write" && isRuntimeTaskContinuation(text)
++				? "↻ Continuing authorized task"
++				: text;
++			this.pendingMessages.addChild(new TruncatedText(theme.fg("muted", `[${item.mode}] ${label}`), 1, 0));
+ 		}
+ 	}
+ 
+@@ -193,8 +197,10 @@ export class ExperimentalChatView {
+ 	#addEntry(entry: EntryRecord): void {
+ 		const message = entry.model?.[0];
+ 		if (entry.kind === "pi.user" && message?.role === "user") {
++			const text = userText(message.content);
+ 			this.transcript.addChild(new Spacer(1));
+-			this.transcript.addChild(new UserMessageComponent(userText(message.content), undefined, 1, presentationMarkdownTransformers));
++			if (isRuntimeTaskContinuation(text)) this.transcript.addChild(new RuntimeTaskMessageComponent());
++			else this.transcript.addChild(new UserMessageComponent(text, undefined, 1, presentationMarkdownTransformers));
+ 		} else if (entry.kind === "pi.assistant" && message?.role === "assistant") {
+ 			const component = this.#streaming ?? new AssistantMessageComponent(undefined, false, undefined, "Thinking...", 1, presentationMarkdownTransformers);
+ 			if (this.#streaming === undefined) this.transcript.addChild(component);
+diff --git a/packages/coding-agent/src/modes/interactive/interactive-mode.ts b/packages/coding-agent/src/modes/interactive/interactive-mode.ts
+index 55ea404..c1fb17f 100644
+--- a/packages/coding-agent/src/modes/interactive/interactive-mode.ts
++++ b/packages/coding-agent/src/modes/interactive/interactive-mode.ts
+@@ -180,6 +180,7 @@ import { ToolExecutionComponent } from "./components/tool-execution.ts";
+ import { TreeSelectorComponent } from "./components/tree-selector.ts";
+ import { TrustSelectorComponent } from "./components/trust-selector.ts";
+ import { UserMessageComponent } from "./components/user-message.ts";
++import { isRuntimeTaskContinuation, RuntimeTaskMessageComponent } from "./components/runtime-task-message.ts";
+ import { UserMessageSelectorComponent } from "./components/user-message-selector.ts";
+ import { editInExternalEditor } from "./external-editor.ts";
+ import { refreshModelCatalogs } from "./model-catalog-refresh.ts";
+@@ -3930,6 +3931,10 @@ export class InteractiveMode {
+ 					if (this.chatContainer.children.length > 0) {
+ 						this.chatContainer.addChild(new Spacer(1));
+ 					}
++					if (isRuntimeTaskContinuation(textContent)) {
++						this.chatContainer.addChild(new RuntimeTaskMessageComponent());
++						break;
++					}
+ 					const skillBlock = parseSkillBlock(textContent);
+ 					if (skillBlock) {
+ 						// Render skill block (collapsible)

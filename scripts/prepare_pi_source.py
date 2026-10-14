@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PIN_PATH = ROOT / "config" / "pi-source.json"
 PATCH_ROOT = ROOT / "config" / "pi-patches"
-PATCH_NAMES = ("001-workspaces.patch", "002-worker-launch.patch", "003-client-connection.patch", "004-client-lifecycle.patch", "005-client-history.patch", "006-tool-presentation.patch", "007-client-status.patch", "008-request-admission.patch", "009-input-identity.patch", "010-context-lifecycle.patch", "011-markdown-presentation.patch", "012-skill-presentation.patch", "013-monitor-presentation.patch")
+PATCH_NAMES = ("001-workspaces.patch", "002-worker-launch.patch", "003-client-connection.patch", "004-client-lifecycle.patch", "005-client-history.patch", "006-tool-presentation.patch", "007-client-status.patch", "008-request-admission.patch", "009-input-identity.patch", "010-context-lifecycle.patch", "011-markdown-presentation.patch", "012-skill-presentation.patch", "013-monitor-presentation.patch", "014-runtime-presentation.patch")
 class PiSourceError(RuntimeError): pass
 
 def pin():
@@ -30,9 +30,8 @@ def verify(source):
       source/"packages/coding-agent/src/experimental/client-tui.ts",
     ]
     if any(not p.is_file() for p in required): raise PiSourceError("Pi source is missing the durable experimental runtime")
-    for patch in patches():
-        if not patch_check(source, patch, reverse=True):
-            raise PiSourceError(f"Pi patch is missing or incompatible: {patch.name}")
+    if not verify_patches(source):
+        raise PiSourceError("Pi patches are missing or incompatible")
     protocol = (source / "packages/protocol/src/protocol.ts").read_text()
     version = re.search(r"export const PROTOCOL_VERSION = (\d+) as const;", protocol)
     if version is None or int(version[1]) != pin()["protocolVersion"]:
@@ -44,6 +43,37 @@ def patches():
     if any(not path.is_file() for path in result):
         raise PiSourceError("missing managed Pi patch files")
     return result
+
+def verify_patches(source):
+    """Check the ordered patch stack without mutating the managed checkout.
+
+    Presentation patches intentionally touch the same files.  Each reverse
+    check therefore has to run after the later patch has been removed; doing
+    independent checks against the final tree rejects a valid stack.
+    """
+    touched = set()
+    for patch in patches():
+        for line in patch.read_text().splitlines():
+            if line.startswith(("--- a/", "+++ b/")):
+                path = line[6:]
+                if path != "/dev/null":
+                    touched.add(path)
+    with tempfile.TemporaryDirectory(prefix=".pi-verify-", dir=source.parent) as temporary:
+        checkout = Path(temporary)
+        # The repository root is nested in the product checkout, so create a
+        # private Git boundary before applying paths from Pi's patch root.
+        subprocess.run(["git", "-C", str(checkout), "init", "--quiet"], check=True)
+        for relative in touched:
+            origin = source / relative
+            if origin.is_file():
+                target = checkout / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(origin, target)
+        for patch in reversed(patches()):
+            if not patch_check(checkout, patch, reverse=True):
+                return False
+            subprocess.run(["git", "-C", str(checkout), "apply", "--reverse", str(patch)], check=True, text=True)
+    return True
 
 def patch_check(source, patch, *, reverse=False):
     result = subprocess.run(
