@@ -50,3 +50,8 @@ chemical-energy-profile-result/1、chemical-scan-slice-result/1，联合读取 J
 缺 Hessian 必须保留在结论中。
 
 独立 `chemical.trajectory@1` 和 `chemical.research-report@1` Job 可生成固定视角 GIF/XYZ/CSV 剖面及图文 Markdown 报告，保留未完整路径、作者解释和来源证据，能量比较由既有 energetics 合同重算。见[轨迹与报告合同](references/research_tools.zh-CN.md)。
+
+如果上下文提供通用的 `research-review/1` 投影，应在报告输入的
+`research_review` 字段中带入。报告会校验其摘要，并保留其中的来源引用、矛盾和
+不确定性。Research Review 只是有界的事实索引；提出化学结论或完成声明前，仍须读取
+它引用的 Result 和 Artifact 原始记录。

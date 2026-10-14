@@ -1,8 +1,9 @@
 # Explicit reaction mapping / 显式反应映射
 
-Use chemical-input scripts/prepare.py --output mapping.json reaction --smiles
-'<mapped-reactants>><mapped-products>'. Each explicit atom must have a unique
-positive map label on each side. The helper checks element/charge conservation,
+Prepare the mapping through the `chemical.reaction@1` executor and pass
+the returned request to `job_start`; do not invoke `scripts/prepare.py` directly
+from native `bash`. Each explicit atom must have a unique positive map label on
+each side. The helper checks element/charge conservation,
 map coverage and element correspondence, and reports formed/broken/order-changed bonds.
 For isotope or proton-transfer studies use explicit isotopes and H atoms, and
 inspect that correspondence rather than treating implicit H as mapped evidence.

@@ -1,0 +1,40 @@
+--- a/packages/coding-agent/src/experimental/client-tui-chat.ts
++++ b/packages/coding-agent/src/experimental/client-tui-chat.ts
+@@ -1,3 +1,4 @@
++import type { MarkdownTransformer } from "../core/extensions/types.ts";
+ import type { AssistantMessage, ToolResultMessage, UserMessage } from "@earendil-works/pi-ai";
+ import type { ConversationView, EntryRecord, InboxState, LiveState } from "@earendil-works/pi-durable";
+ import { Container, Spacer, Text, TruncatedText, type TUI } from "@earendil-works/pi-tui";
+@@ -25,6 +26,11 @@
+ 		.filter((block) => block.type === "text")
+ 		.map((block) => block.text)
+ 		.join("");
++}
++
++let presentationMarkdownTransformers: MarkdownTransformer[] = [];
++export function configureMarkdownTransformers(transformers: readonly MarkdownTransformer[]): void {
++	presentationMarkdownTransformers = [...transformers];
+ }
+ 
+ /** Renders the root conversation's durable view for the service-only experimental presentation. */
+@@ -169,9 +175,9 @@
+ 		const message = entry.model?.[0];
+ 		if (entry.kind === "pi.user" && message?.role === "user") {
+ 			this.transcript.addChild(new Spacer(1));
+-			this.transcript.addChild(new UserMessageComponent(userText(message.content)));
++			this.transcript.addChild(new UserMessageComponent(userText(message.content), undefined, 1, presentationMarkdownTransformers));
+ 		} else if (entry.kind === "pi.assistant" && message?.role === "assistant") {
+-			const component = this.#streaming ?? new AssistantMessageComponent();
++			const component = this.#streaming ?? new AssistantMessageComponent(undefined, false, undefined, "Thinking...", 1, presentationMarkdownTransformers);
+ 			if (this.#streaming === undefined) this.transcript.addChild(component);
+ 			this.#streaming = undefined;
+ 			component.updateContent(message, false);
+@@ -201,7 +207,7 @@
+ 
+ 	#syncStreaming(message: AssistantMessage): void {
+ 		if (this.#streaming === undefined) {
+-			this.#streaming = new AssistantMessageComponent();
++			this.#streaming = new AssistantMessageComponent(undefined, false, undefined, "Thinking...", 1, presentationMarkdownTransformers);
+ 			this.transcript.addChild(this.#streaming);
+ 		}
+ 		this.#streaming.updateContent(message, true);

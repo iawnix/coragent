@@ -33,7 +33,20 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
     server = createServer(async (req, res) => {
       try {
         let body = ""; for await (const part of req) body += part;
-        const request = JSON.parse(body); observedRequests.push(request);
+        const request = JSON.parse(body);
+        // Review synthesis is an internal tool-free request and must not
+        // consume one of the continuation fixture's scripted steps.
+        if (JSON.stringify(request).includes('deterministic review')) {
+          const response = { id: `review_${observedRequests.length}`, object: "chat.completion",
+            choices: [{ index: 0, message: { role: "assistant", content: JSON.stringify({
+              status: "uncertain", summary: "Inspect the recorded research evidence.",
+              key_findings: [], contradictions: [], uncertainties: [], next_actions: [], source_refs: [],
+            }) }, finish_reason: "stop" }] };
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify(response));
+          return;
+        }
+        observedRequests.push(request);
         if (scenario === "user-stop" && requests === 4) {
           await backend.sendInput({ ...scope, client_message_id: "stop-research", request_id: "stop-research",
             text: "Stop this research and cancel its running calculations.", mode: "steer" });
@@ -68,14 +81,15 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
         const rootNode = latestNodes.get("Compare derivations"), shared = latestNodes.get("Approximation bounds");
         const branchA = latestNodes.get("Derivation A"), branchB = latestNodes.get("Derivation B");
         const researchEnvelope = request.messages.findLast(message => typeof message.content === "string" && message.content.startsWith('<research_context origin="runtime">'));
-        const snapshot = JSON.parse(researchEnvelope.content.split("\n")[1]).research;
-        assert.equal(snapshot.schema_version, "research-decision/1");
-        if (snapshot.scope.focus_count) {
-          assert.ok(snapshot.nodes.some(node => node.selection === "explicit_focus"));
+        const researchPayload = JSON.parse(researchEnvelope.content.split("\n")[1]);
+        const snapshot = researchPayload.research_review || researchPayload.research;
+        assert.ok(snapshot && ["research-review/1", "research-decision/1"].includes(snapshot.schema_version));
+        if (snapshot.scope.focus_node_ids?.length) {
+          assert.ok(snapshot.findings.some(item => snapshot.scope.focus_node_ids.includes(item.ref)));
         }
-        if (scenario === "branches" && snapshot.scope.entry_count) {
-          assert.ok(snapshot.nodes.some(node => node.id === rootNode.id && node.plan));
-          assert.ok(snapshot.relations.some(edge => edge.source === branchA.id && edge.target === rootNode.id && edge.kind === "part_of"));
+        if (scenario === "branches" && snapshot.scope.entry_node_ids?.length) {
+          assert.ok(snapshot.source_refs.includes(rootNode.id));
+          assert.ok(snapshot.source_refs.includes(branchA.id));
         }
         const bind = (entry, focus) => ({ name: "task_update", arguments: { expected_revision: task?.revision,
           action: "set_research", research: { entry_node_ids: entry, focus_node_ids: focus } } });

@@ -31,6 +31,13 @@ description: 将化学名称、描述或给定结构转成分子图和初始几�
 通过通用 executor CLI 准备请求，将返回的文件及摘要交给 `job_start`。
 所选目标的 `structure` Python 绑定提供 RDKit。收集 Job 的 JSON 和几何文件作为研究材料。
 
+不要在原生 `bash` 中直接调用 `scripts/prepare.py`、`scripts/material.py` 或其他化学脚本，
+也不要用控制面 `$CORAGENT_PYTHON` 直接运行它们。这些脚本会导入 RDKit 等科学依赖，只有
+Job Runtime 选择并探测 `structure` 绑定后，作为 executor entry 执行才是有效路径。原生
+`bash` 只负责生成输入 JSON 和查看返回文件；化学操作必须通过 executor CLI 准备请求，再用
+`job_start` 提交。若直接调用出现 `ModuleNotFoundError`，这是执行环境路由错误，不要把依赖
+安装到控制面 Python，也不要重复同一命令；改为准备 executor request 并提交 Job。
+
 生成文件前，在命令中显式 cd 到 research_create/research_read 返回的 work_dir，或使用该目录下的绝对输出路径；未关联 Node 时使用工作区内的 research/work/。work_dir 是返回的位置建议，不是 bash 参数。以下相对路径示例假设已在同一命令中切换到工作目录；输入若在其他位置，请使用绝对路径。报告放在 reports/，不要在工作区根目录散落文件或移动历史请求。
 
 ```text

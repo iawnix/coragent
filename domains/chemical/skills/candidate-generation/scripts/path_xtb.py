@@ -80,7 +80,7 @@ class XtbCalculator:
 
     def evaluate(self, xyz, directory):
         directory = Path(directory); directory.mkdir(parents=True, exist_ok=False)
-        xyz = geometry(xyz); (directory / 'input.xyz').write_text(xyz_text(self.material['atoms'], xyz))
+        xyz = geometry(xyz, elements=[a['element'] for a in self.material['atoms']]); (directory / 'input.xyz').write_text(xyz_text(self.material['atoms'], xyz))
         invoke(self.command() + ['--grad'], directory, self.settings['timeout_seconds'], self.settings['threads'])
         summary = read_output(directory, self.settings['method'], 'sp', self.material['value'])
         gradient = directory / 'gradient'
@@ -93,7 +93,7 @@ class XtbCalculator:
 
     def optimize(self, xyz, axes, targets, directory):
         directory = Path(directory); directory.mkdir(parents=True, exist_ok=False)
-        (directory / 'input.xyz').write_text(xyz_text(self.material['atoms'], geometry(xyz)))
+        (directory / 'input.xyz').write_text(xyz_text(self.material['atoms'], geometry(xyz, elements=[a['element'] for a in self.material['atoms']])))
         force = self.settings.get('force_constant', 1.)
         text = '$constrain\n force constant=' + str(force) + '\n'
         for axis, target in zip(axes, targets):
@@ -103,7 +103,7 @@ class XtbCalculator:
         summary = read_output(directory, self.settings['method'], 'opt', self.material['value'])
         atoms = read_xyz(directory/'xtbopt.xyz')
         if [a[0] for a in atoms] != [a['element'] for a in self.material['atoms']]: raise ValueError('optimized atom order differs')
-        coords = geometry([a[1:] for a in atoms])
+        coords = geometry([a[1:] for a in atoms], elements=[a[0] for a in atoms])
         # xTB TOTAL ENERGY during restrained optimization may include the added
         # potential. A fresh unrestrained evaluation supplies physical energy.
         value = self.evaluate(coords, directory/'unrestrained')

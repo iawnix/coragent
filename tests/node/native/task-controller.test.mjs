@@ -136,6 +136,23 @@ test("idle active tasks continue beyond three evidence-free runs and explicit bl
 const nodeId = n => `node_${n + 1}`;
 const observed = (toolName, result) => [{ id: 200, model: [{ role: "toolResult", toolName, content: [], details: { result } }] }];
 
+test("Research Review lifecycle is an idempotent Task pointer and does not advance revision", async t => {
+  const { controller, begin } = await fixture(t);
+  let task = await begin();
+  const review = { schema_version: "research-review/1", review_id: "review_state",
+    state_digest: "sha256:state", review_digest: "sha256:review", status: "attention",
+    review_status: "current", trigger: "context_refresh" };
+  const revision = task.revision;
+  task = await controller.recordResearchReview(review, context, task.user_task_id);
+  assert.equal(task.revision, revision);
+  assert.deepEqual(task.research_review, { current_review_ref: "review_state",
+    last_reviewed_state_digest: "sha256:state", review_digest: "sha256:review",
+    review_status: "current", trigger: "context_refresh", updated_at: task.research_review.updated_at });
+  const again = await controller.recordResearchReview(review, context, task.user_task_id);
+  assert.equal(again.revision, revision);
+  assert.deepEqual(projectUserTask(again).research_review, task.research_review);
+});
+
 test("research binding has one bounded write path, preserves task control and allows shared Nodes", async t => {
   const { controller, begin, kernel, calls } = await fixture(t);
   let task = await begin();

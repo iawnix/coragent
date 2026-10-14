@@ -49,7 +49,15 @@ def validate_refs(root, refs, external=None):
         elif ref.startswith('result_'):
             get_result(root, ref)
         elif ref.startswith(('user_', 'record_', 'note_')):
-            record(root, ref)
+            try:
+                record(root, ref)
+            except FileNotFoundError as exc:
+                if re.fullmatch(r'user_[1-9][0-9]*', ref):
+                    raise ValueError(
+                        f'source_ref_invalid: {ref} looks like a Task Controller submission ID; '
+                        'use source_submission_ids or the exact Research Memory user_* reference returned by research_read'
+                    ) from exc
+                raise
         elif ref not in (external or {}):
             raise ValueError('reference_not_verified: ' + ref)
     return refs

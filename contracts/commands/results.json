@@ -2295,6 +2295,135 @@
         "read_more"
       ],
       "additionalProperties": false
+    },
+    "ResearchReview": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "research-review/1"
+        },
+        "review_id": {
+          "type": "string"
+        },
+        "state_digest": {
+          "type": "string"
+        },
+        "review_digest": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "attention",
+            "uncertain",
+            "oriented"
+          ]
+        },
+        "review_status": {
+          "enum": [
+            "current",
+            "pending",
+            "stale",
+            "running",
+            "failed"
+          ]
+        },
+        "trigger": {
+          "enum": [
+            "new_evidence",
+            "context_refresh"
+          ]
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": {
+            "x-typescript-type": "JsonValue"
+          }
+        },
+        "user_sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "submission_id": {"type": "string"},
+              "research_ref": {"type": "string"}
+            },
+            "required": ["submission_id", "research_ref"],
+            "additionalProperties": false
+          }
+        },
+        "coverage": {
+          "type": "object",
+          "additionalProperties": {
+            "x-typescript-type": "JsonValue"
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "x-typescript-type": "JsonValue"
+          }
+        },
+        "contradictions": {
+          "type": "array",
+          "items": {
+            "x-typescript-type": "JsonValue"
+          }
+        },
+        "uncertainties": {
+          "type": "array",
+          "items": {
+            "x-typescript-type": "JsonValue"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "x-typescript-type": "JsonValue"
+          }
+        },
+        "follow_up": {
+          "type": "array",
+          "items": {
+            "x-typescript-type": "JsonValue"
+          }
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "read_more": {
+          "type": "object",
+          "additionalProperties": {
+            "x-typescript-type": "JsonValue"
+          }
+        },
+        "guidance": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "review_id",
+        "state_digest",
+        "review_digest",
+        "status",
+        "review_status",
+        "trigger",
+        "scope",
+        "user_sources",
+        "coverage",
+        "findings",
+        "contradictions",
+        "uncertainties",
+        "limitations",
+        "follow_up",
+        "source_refs",
+        "read_more",
+        "guidance"
+      ],
+      "additionalProperties": false
     }
   },
   "commands": {
@@ -2308,6 +2437,9 @@
         },
         {
           "$ref": "results.json#/definitions/ResearchDecision"
+        },
+        {
+          "$ref": "results.json#/definitions/ResearchReview"
         }
       ]
     },

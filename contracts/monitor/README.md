@@ -67,6 +67,14 @@ type UserTask = {
   sources: { submission_id: string; entry_id: unknown; text: string }[];
   criteria: Criterion[];
   research: { entry_node_ids: string[]; focus_node_ids: string[] };
+  research_review: {
+    current_review_ref: string | null;
+    last_reviewed_state_digest: string | null;
+    review_digest: string | null;
+    review_status: "current" | "pending" | "stale" | "running" | "failed";
+    trigger: string | null;
+    updated_at: string | null;
+  } | null;
   state: TaskState;
   reason: string | null;
   revision: number;
@@ -119,6 +127,14 @@ type Overview = {
   workspace_id: string;
   session_id: string;
   task: UserTask | null;
+  research_review: {
+    current_review_ref: string | null;
+    last_reviewed_state_digest: string | null;
+    review_digest: string | null;
+    review_status: "current" | "pending" | "stale" | "running" | "failed";
+    trigger: string | null;
+    updated_at: string | null;
+  } | null;
   jobs: Page<Job> & { counts: { running: number; queued: number; total: number } };
   execution: { state: "running" | "idle"; run_id: string | null };
   task_controller: ControllerHealth;

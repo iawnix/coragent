@@ -35,7 +35,8 @@ class EvidenceCalculator(Calculator):
 
     def calculate(self, atoms=None, properties=('energy', 'forces'), system_changes=all_changes):
         super().calculate(atoms, properties, system_changes)
-        xyz = geometry(self.atoms.get_positions())
+        xyz = geometry(self.atoms.get_positions(),
+                       elements=[a['element'] for a in self.material['atoms']])
         if self.ledger['attempted'] >= self.ledger['limit']:
             raise RuntimeError('calculator evaluation budget exhausted')
         attempt = self.ledger['attempted']
@@ -88,7 +89,8 @@ def neb(spec, output, calculator_factory):
             raise ValueError('path endpoints differ from mapped materials')
     else:
         xyzs = np.array([(1-t)*m['coordinates']+t*pxyz for t in np.linspace(0, 1, count)])
-    for xyz in xyzs: geometry(xyz)
+    elements = [a['element'] for a in m['atoms']]
+    for xyz in xyzs: geometry(xyz, elements=elements)
     if any(np.linalg.norm(a-b) < 1e-10 for a, b in zip(xyzs, xyzs[1:])):
         raise ValueError('duplicate adjacent NEB images')
     if not isinstance(spec.get('settings'), dict): raise ValueError('calculator settings required')
@@ -116,14 +118,14 @@ def neb(spec, output, calculator_factory):
         if not supplied and interpolation == 'idpp':
             idpp_interpolate(band, traj=None, log=None, steps=idpp_steps)
         for i, atoms in enumerate(images):
-            geometry(atoms.positions)
+            geometry(atoms.positions, elements=elements)
             atoms.calc = EvidenceCalculator(backend, m, out, ledger, i)
         for step in range(steps+1):
             proposed = np.array([a.positions for a in images])
             result['pending_images'] = proposed.tolist()
             result['current_iteration'] = step
             write_json(out/'result.json', result)
-            for atoms in images: geometry(atoms.positions)
+            for atoms in images: geometry(atoms.positions, elements=elements)
             if any(np.linalg.norm(a-b) < 1e-10 for a,b in zip(proposed,proposed[1:])):
                 raise ValueError('duplicate adjacent NEB images during optimization')
             energies = np.array([a.get_potential_energy() / Hartree for a in images])

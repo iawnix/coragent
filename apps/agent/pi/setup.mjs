@@ -1,5 +1,6 @@
 import { loadPi } from "./source.mjs";
 import { createContextManager, contextPolicy, contextInputBudget } from "../context/manager.mjs";
+import { createResearchReviewer } from "../context/reviewer.mjs";
 import { recordUserSources } from "../tools/user-sources.mjs";
 import { createInputAdmission, createInputService, bindUserInputConversation, INPUT_ADMISSION_SERVICE_ID } from "../host/admission/input.mjs";
 import { createMonitorAdmission, MONITOR_ADMISSION_SERVICE_ID } from "../host/admission/monitor.mjs";
@@ -70,7 +71,10 @@ export async function createCoRAgentHarness(databasePath, options) {
 
     });
     const harnessSettings = contextPolicy(createHarnessSettings(settingsManager));
+    const reviewerModel = resolved.model ? modelRuntime.getModel(resolved.model.provider, resolved.model.modelId) : null;
+    const synthesizeReview = createResearchReviewer({ modelRuntime, model: reviewerModel });
     const contextManager = createContextManager({ bridge: commandBridge, coordinator: transactionCoordinator,
+      synthesizeReview,
       sessionId, estimateContextTokens, getCompactionPolicy: () => harnessSettings.compaction,
     });
     const packageReadGuard = createPackageSourceReadGuard({ packageRoot: loadedSkills.packageRoot, cwd,
@@ -105,9 +109,31 @@ export async function createCoRAgentHarness(databasePath, options) {
         hook(GenerationTask, {
           prepareContext: async (view, api, context) => {
             const live = await api.snapshot(LiveDoc, api.conversationId, context);
+            const task = await taskController.current(context);
             await recordUserSources({ harness, admission: inputAdmission, monitorAdmission, taskController, api, context,
               inputIds: live?.run?.inputs, bridge: commandBridge, sessionId, recordedIds: recordedUserSources });
-            return contextManager.prepare(view, api, context, { task: await taskController.current(context), input_ids: live?.run?.inputs || [] });
+            const inputIds = live?.run?.inputs || [];
+            const origins = await Promise.all(inputIds.map(async id => {
+              const record = await (await harness.submission(id, context)).status(context);
+              return inputAdmission.origin(record, context);
+            }));
+            const monitorEvidence = origins.some(origin => origin?.producer === "monitor");
+            const taskEvidence = origins.some(origin => origin?.producer === "task_controller")
+              && task?.progress?.review_pending === true;
+            // Internal monitor/task continuations are the coalescing boundary for
+            // a new Review. Ordinary tool turns reuse the durable context anchor.
+            const refresh = (monitorEvidence || taskEvidence) && (!task || task.state === "active");
+            const prepared = await contextManager.prepare(view, api, context, { task,
+              input_ids: inputIds, refresh_research: refresh,
+              review_trigger: refresh ? "new_evidence" : "context_refresh" });
+            // Review persistence is a Monitor pointer. A durable pointer write
+            // must never turn an otherwise usable model context into a failed
+            // generation; the canonical Review remains readable from research.
+            if (prepared?.data) {
+              try { await taskController.recordResearchReview(prepared.data, context, task?.user_task_id ?? null); }
+              catch { /* Monitor can report the last durable pointer; context stays usable. */ }
+            }
+            return prepared;
           },
           afterTools: async (_assistant, results, api, context) => {
             await taskController.observeToolResults(await Promise.all(results.map(id => api.entry(id, context))), context);
@@ -145,6 +171,7 @@ export async function createCoRAgentHarness(databasePath, options) {
             const tool = durableTools.find(tool => tool.name === call.name);
             if (restriction && !["read", "grep", "find", "ls"].includes(call.name) && tool?.metadata?.effect !== "read") return { block: restriction };
             const packagePolicy = packageReadGuard({ toolName: call.name, args: call.arguments });
+            if (packagePolicy?.arguments) return { arguments: packagePolicy.arguments };
             if (packagePolicy?.block) return { block: packagePolicy.block.reason || String(packagePolicy.block) };
             return undefined;
           },

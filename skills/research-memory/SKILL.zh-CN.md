@@ -5,7 +5,7 @@ description: 用持久问题 Node、显式关系、执行观察与不可变 Resu
 
 # Research Memory
 
-先读注入的工作区上下文或 `research_read {}`。上下文在预算内保留原始用户要求、关键 Node、Result 与执行事实；省略不表示不存在或已经完成。按返回引用继续读取。执行回执记录事实，领域 Skill 和 Agent 负责科学解释。
+先读注入的工作区上下文中的 `research-review/1`，或调用 `research_read {}` 获取当前 Review。Review 是从 Research State 计算出的短期审查：保留原始用户要求、关键 Node、Result 与执行事实的引用，并列出矛盾、未知项、限制和后续读取建议；省略不表示不存在或已经完成。按返回引用继续读取。执行回执记录事实，领域 Skill 和 Agent 负责科学解释。
 
 用户任务的目标、交付条件、等待、阻塞和完成由 `task_read`、`task_update` 管理。Node 的 open/paused/closed 不会暂停或完成用户任务。真实用户的停止或恢复指令通过 `task_update action=apply_user_control` 写入；仅取消 Job 也不会停止任务。授权来源与 Job 策略见[研究工作流](../research-workflow/SKILL.zh-CN.md)。科学解释与证据仍保存在 Memory，任务进展和完成依据引用这些记录。
 
@@ -13,11 +13,17 @@ description: 用持久问题 Node、显式关系、执行观察与不可变 Resu
 
 - `research_read {}` 恢复概览；`{ref}` 读取返回的 Node、Result 或记录，长内容按返回分页继续读取。
 - `research_search {query}` 检索研究内容；只用工具 schema 声明的过滤和分页字段，复制精确引用。
-- `research_create {goal}` 创建局部研究问题；title、proposal、plan 和初始关系可选。
+- `research_create {goal}` 创建局部研究问题；title、proposal、plan、初始关系和来源绑定可选。当前任务的用户输入使用运行时提供的 `source_submission_ids`（例如 `['11']`），适配层会把它解析成 Research Memory 引用。`source_refs` 只能填写工具实际返回的精确 `user_*` 引用（例如 `['user_1']`）。这两个命名空间不同，禁止把提交 ID `11` 拼成 `user_11`。
 - `research_update {node_id, note}` 追加观察或解释；按需修改 proposal、plan、progress、status（open / paused / closed）、显式关系或 assessment_ref。
 - `research_result {node_id, conclusion}` 发布不可变产出；可附 observation、limitations、inputs、evidence_refs 和 files。只有明确要替换综合判断时才设置 as_assessment。
 
 身份、请求去重、读取依据和版本由适配层提供，模型不用填写事务字段。遇到读取版本冲突，读当前 Node，合并研究内容后用新调用提交。Job 新事件不会改变 Node 的内容修订号。没有全局 progress 对象，也不需要回合结束 checkpoint。
+
+## 使用 Research Review
+
+`research-review/1` 是默认上下文投影，不是新的记忆状态。它带有 `state_digest` 和 `review_digest`，只对生成时看到的 Research State 有效；新的 Monitor 事件批次、Job 终态或收集、Result/Artifact 写入、用户约束变化后会重新建立 Review，普通中间状态和工具回合会复用已有 Review。Review 为 `pending` 时，运行时可能附带一次限长的模型综合；相同 `state_digest` 不重复综合。这份综合仍是临时上下文，不能代替原始证据，也不能自动写入 Memory。Review 的 `contradictions` 和 `uncertainties` 是需要核实的线索，不是科学结论；`follow_up` 只提供读取或核对建议，不自动授予写权限、关闭 Node 或启动 Job。
+
+需要完整历史、Node 字段、Result 正文、Job 回执或 Artifact 内容时，按 Review 的 `source_refs` 和 `read_more` 使用原有工具。最终用户报告继续使用领域交付 Skill；Review 不替代 `chemical.research-report`。
 
 Node 很大时，单独读取准备修改的字段：
 

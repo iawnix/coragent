@@ -22,9 +22,12 @@ export async function checkCommandResultTypes(bridge: RuntimeBridge) {
   } else if (read.schema_version === "research-decision/1") {
     const snapshot: string = read.snapshot_id;
     void snapshot;
-  } else {
+  } else if (read.schema_version === "research-read/2") {
     const offset: number = read.offset;
     void offset;
+  } else {
+    const review: string = read.review_id;
+    void review;
   }
   const start = await bridge.execute_command("job.start", { command: ["/bin/true"] });
   if ("submitted_at" in start) {

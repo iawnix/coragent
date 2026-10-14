@@ -267,12 +267,21 @@ def test_trajectory_invalid_sources_are_rejected(fault):
 
 def report_spec():
     result=local_diagnostics(local_spec())
+    review={'schema_version':'research-review/1','review_id':'review_'+'a'*64,
+        'state_digest':'sha256:'+'b'*64,'review_digest':None,'status':'attention',
+        'review_status':'current','source_refs':['node_1','result_1'],
+        'findings':[{'ref':'node_1','kind':'node','summary':'Geometry remains preliminary'}],
+        'contradictions':[{'ref':'job_1','kind':'job_failure','summary':'Execution failed'}],
+        'uncertainties':[{'ref':'node_1','kind':'node','summary':'No validated assessment'}],
+        'limitations':[],'follow_up':[{'action':'inspect_job','ref':'job_1'}],
+        'trigger':'context_refresh'}
+    review['review_digest']=canonical({key:value for key,value in review.items() if key!='review_digest'})
     return {'schema_version':'chemical-research-report-input/1','title':'Synthetic path report',
         'question':'Does the candidate have evidence of a TS?',
         'assessment':'Insufficient evidence; geometry alone is not validation.',
         'limitations':['Synthetic data; no native chemistry benchmark.'],
         'evidence':[{'id':'geometry','label':'Local geometry','result':result,'source_sha256':canonical(result)}],
-        'structures':[{'label':'Supplied geometry','material':molecule()}]}
+        'structures':[{'label':'Supplied geometry','material':molecule()}], 'research_review':review}
 
 
 def test_report_recomputes_energy_and_preserves_evidence_and_links(tmp_path):
@@ -287,12 +296,15 @@ def test_report_recomputes_energy_and_preserves_evidence_and_links(tmp_path):
     assert '![Discrete energy levels](energy.png)' in text
     assert '![Trajectory illustration](trajectory/trajectory.gif)' in text
     assert s['limitations'][0] in text
+    assert r['research_review']==s['research_review']
+    assert '## Research Review' in text and 'Execution failed' in text
 
 
-@pytest.mark.parametrize('fault',['digest','incompatible_energy'])
+@pytest.mark.parametrize('fault',['digest','review_digest','incompatible_energy'])
 def test_report_rejects_unbound_evidence_or_incomparable_energy(tmp_path,fault):
     s=report_spec()
     if fault=='digest':s['evidence'][0]['result']['scientific_verdict']='invented'
+    elif fault=='review_digest':s['research_review']['review_digest']='sha256:'+'c'*64
     else:
         s['energy_profile']=profile_input();s['energy_profile']['species']['complex']['electronic']['model']['basis']='other'
     with pytest.raises(ValueError):build_report(s,tmp_path/'report')

@@ -96,7 +96,12 @@ def execute(command: str, root: str | Path, params: dict[str, Any] | None = None
         if command in mutations:
             from research_agent.foundation.transactions import TransactionCoordinator
             with TransactionCoordinator(root).locked():
-                reply = mutations[command](root, {**value, "_reference_details": memory_context.reference_details(root, value)})
+                request = dict(value)
+                if command == "research.create" and request.get("source_submission_ids"):
+                    resolved = memory_context.resolve_source_submission_ids(
+                        root, request["source_submission_ids"], request.get("session_id"))
+                    request["source_refs"] = list(dict.fromkeys([*(request.get("source_refs") or []), *resolved]))
+                reply = mutations[command](root, {**request, "_reference_details": memory_context.reference_details(root, request)})
                 try:
                     views.render(root)
                 except (OSError, ValueError) as exc:
