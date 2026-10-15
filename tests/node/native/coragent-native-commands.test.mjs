@@ -195,7 +195,7 @@ test('Monitor grammar separates user tasks, compute jobs and execution records',
   ]) assert.deepEqual(parseSlashCommand('monitor', input), {command:'client.monitor',params:{method,...fields}});
   for (const input of ['status', 'enable', 'disable', 'task', 'task cancel t1', 'task cancel t1 --keep-jobs --cancel-jobs',
     'task pause', 'job cancel', 'health extra', 'jobs --task', 'jobs --limit 0', 'jobs --limit 101',
-    'jobs --task t1 --task t2', 'jobs --root /tmp', 'tasks --task t1']) assert.throws(() => parseSlashCommand('monitor', input), /Usage/);
+    'jobs --task t1 --task t2', 'jobs --root /tmp', 'jobs --cursor 50', 'tasks --task t1']) assert.throws(() => parseSlashCommand('monitor', input), /Usage/);
 });
 
 test('Monitor task controls use current revision and direct Host requests without model input', async () => {
@@ -249,12 +249,29 @@ test('Monitor views keep tool payloads out of user task and Job details', async 
     command:['SECRET_COMMAND'],metadata:{key:'SECRET_METADATA'}}});
   assert.match(detail,/Execution: succeeded/);
   assert.match(detail,/Collection: not_collected/);
-  assert.match(detail,/Analysis: Not recorded/);
+  assert.doesNotMatch(detail,/Analysis: Not recorded/);
   assert.doesNotMatch(detail,/SECRET_/);
   assert.match(formatMonitor('monitor/runs',{items:[],next_cursor:'c2'},{user_task_id:'t1',limit:5}),
     /Next page: \/monitor runs --task t1 --limit 5 --cursor c2/);
   assert.match(formatMonitor('monitor/run/read',{run:{run_id:'r1'},items:[],next_cursor:'c3'},{run_id:'r1'}),
     /Next page: \/monitor run r1 --cursor c3/);
+});
+
+test('Monitor overview stays compact and links to detailed views', async () => {
+  const {formatMonitor} = await import('../../../apps/agent/terminal/commands/monitor.mjs');
+  const overview = formatMonitor('monitor/overview', {
+    task: {user_task_id: 't1', title: 'Research', objective: 'Compare paths', state: 'waiting',
+      wait: {job_ids: ['job_1'], mode: 'all'}, reason: null, progress: null,
+      research_review: {review_status: 'pending'}},
+    jobs: {items: [{job_id: 'job_1', state: 'running', collection_state: 'not_collected'}],
+      counts: {running: 1, queued: 0, total: 1}},
+    automatic_continuation_enabled: true,
+  });
+  assert.match(overview, /Task: Research · Waiting for compute/);
+  assert.match(overview, /Jobs: 1 running · 0 queued · 1 total/);
+  assert.match(overview, /Research review: pending/);
+  assert.match(overview, /\/monitor task t1 · \/monitor jobs --task t1/);
+  assert.doesNotMatch(overview, /Delivery criteria|Compute jobs|Analysis: Not recorded/);
 });
 
 test('execution records label model and tool operations and expose safe failure facts', async () => {

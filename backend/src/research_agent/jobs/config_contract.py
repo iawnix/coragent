@@ -64,7 +64,78 @@ def validate_python(binding, label="python"):
     return binding
 
 
+def _validate_execution_config(value):
+    """Validate the target-oriented schema and expose its binding view."""
+    if set(value) != {"execution"}:
+        raise ValueError("job config must contain only the execution table")
+    execution = value.get("execution")
+    if not isinstance(execution, dict) or set(execution) - {"default_target", "targets"}:
+        raise ValueError("execution contains unsupported fields")
+    default = execution.get("default_target")
+    targets = execution.get("targets")
+    if not isinstance(default, str) or not re.fullmatch(NAME_PATTERN, default):
+        raise ValueError("execution.default_target is invalid")
+    if not isinstance(targets, dict) or not targets or default not in targets:
+        raise ValueError("execution.targets must define the default target")
+    local_count = 0
+    environments = {}
+    for name, raw in targets.items():
+        if not isinstance(name, str) or not re.fullmatch(NAME_PATTERN, name):
+            raise ValueError(f"invalid execution target name: {name!r}")
+        if not isinstance(raw, dict):
+            raise ValueError(f"execution.targets.{name} must be a table")
+        target = dict(raw)
+        scope = target.get("type")
+        driver = target.get("driver")
+        if scope not in {"local", "remote"}:
+            raise ValueError(f"execution target {name!r} must declare type=local or type=remote")
+        if not isinstance(driver, str) or not driver:
+            raise ValueError(f"execution target {name!r} must declare driver")
+        if scope == "local":
+            local_count += 1
+            if driver not in {"local", "process", "systemd"}:
+                raise ValueError(f"unsupported local execution driver: {driver}")
+            if "cluster_name" in target:
+                raise ValueError(f"local execution target {name!r} cannot declare cluster_name")
+        else:
+            if not isinstance(target.get("cluster_name"), str) or not target["cluster_name"].strip():
+                raise ValueError(f"remote execution target {name!r} requires cluster_name")
+            if not isinstance(target.get("ssh_host"), str) or not target["ssh_host"].strip():
+                raise ValueError(f"remote execution target {name!r} requires ssh_host")
+            if not isinstance(target.get("remote_root"), str):
+                raise ValueError(f"remote execution target {name!r} requires remote_root")
+            _absolute(target["remote_root"], f"execution.targets.{name}.remote_root")
+        options = target.get("options", {})
+        if not isinstance(options, dict):
+            raise ValueError(f"execution.targets.{name}.options must be a table")
+        bindings = target.get("bindings", {})
+        if not isinstance(bindings, dict):
+            raise ValueError(f"execution.targets.{name}.bindings must be a table")
+        normalized = dict(target)
+        normalized.update({"kind": scope, "backends": bindings, "driver": driver})
+        for common in (
+            "ssh_config", "allowed_queues", "commands", "connect_timeout_seconds",
+            "command_timeout_seconds", "transfer_timeout_seconds", "submission",
+        ):
+            if common not in normalized and common in options:
+                normalized[common] = options[common]
+        if scope == "local":
+            normalized.setdefault("supervisor", "process" if driver == "process" else "systemd")
+        elif driver in {"pbs", "torque"}:
+            normalized.setdefault("scheduler", driver)
+        environments[name] = normalized
+    if local_count > 1:
+        raise ValueError("execution configuration may define at most one local target")
+    return {
+        "default_environment": default,
+        "environments": environments,
+        "execution": value["execution"],
+    }
+
+
 def validate_job_config(value):
+    if isinstance(value, dict) and "execution" in value:
+        return _validate_execution_config(value)
     _keys(value, {"default_environment", "environments"}, "job config")
     environments = value.get("environments")
     if not isinstance(environments, dict) or not environments or value.get("default_environment") not in environments:

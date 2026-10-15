@@ -212,7 +212,13 @@ class TorqueSSHPlatform(RemoteExecutionPlatform):
             raise FileNotFoundError(f"job cwd does not exist: {spec.cwd}")
         if not probe['inputs_present']:
             raise FileNotFoundError(f"job inputs missing: {probe['missing_inputs']}")
-        metadata = {**spec.metadata, 'remote_dir': remote_dir, 'scratch_path': scratch, 'execution_timeout_seconds': timeout}
+        metadata = {**spec.metadata, 'remote_dir': remote_dir, 'scratch_path': scratch,
+                    'execution_timeout_seconds': timeout,
+                    'target_name': self.name,
+                    'scope': getattr(self, 'scope', 'remote'),
+                    'driver': getattr(self, 'driver', self.scheduler),
+                    'cluster_name': getattr(self, 'cluster_name', None),
+                    'target_config_digest': getattr(self, 'target_config_digest', None)}
         self._write(spec.cwd / 'spec.json', {
             'command': list(spec.command), 'cwd': str(spec.cwd), 'remote_dir': remote_dir,
             'outputs': [output.__dict__ for output in spec.outputs],

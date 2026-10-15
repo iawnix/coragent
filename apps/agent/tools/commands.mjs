@@ -135,7 +135,12 @@ function parseMonitorSlash(tokens, usage) {
       if (flag === "--limit") {
         if (!/^[1-9]\d*$/.test(value) || Number(value) > 100) throw usageError(usage, '--limit must be an integer from 1 to 100');
         params.limit = Number(value);
-      } else params[flag === "--task" ? "user_task_id" : "cursor"] = value;
+      } else {
+        if (flag === "--cursor" && action === "jobs" && !/^job_[1-9]\d*$/.test(value)) {
+          throw usageError(usage, '--cursor for jobs must be copied from a previous /monitor jobs response');
+        }
+        params[flag === "--task" ? "user_task_id" : "cursor"] = value;
+      }
     }
   } else if (["task", "job", "run"].includes(action)) {
     const operation = parts.shift();

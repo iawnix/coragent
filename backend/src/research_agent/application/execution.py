@@ -187,10 +187,15 @@ def _intent_path(root: Path, job_id: str) -> str:
 
 
 def _platform_name(params: dict[str, Any]) -> str | None:
-    value = params.get("platform") or (params.get("environment") if isinstance(params.get("environment"), str) else None)
     target = params.get("execution_target")
-    if value is None and isinstance(target, dict):
-        value = target.get("environment")
+    if isinstance(target, str):
+        value = target
+    elif isinstance(target, dict):
+        value = target.get("target") or target.get("environment")
+    else:
+        value = params.get("platform") or (
+            params.get("environment") if isinstance(params.get("environment"), str) else None
+        )
     return str(value) if value is not None else None
 
 
@@ -424,10 +429,20 @@ def _stage_start(root, runtime, params, job_id, preparation=None, prepared_param
         raise
     request_id = params.get("request_id") or f"job.start:{spec.job_id}"
     input_manifest = json.loads((spec.cwd / "input_manifest.json").read_text())
+    target_name = _platform_name(prepared_params) or runtime.default
+    target = runtime.platforms[target_name]
+    target_digest = getattr(target, "target_config_digest", None)
+    target_driver = getattr(target, "driver", None)
+    target_scope = getattr(target, "scope", None)
+    target_cluster = getattr(target, "cluster_name", None)
     execution_content = {"command": list(spec.command), "inputs": input_manifest,
         "environment_digest": hashlib.sha256(json.dumps(dict(spec.env), sort_keys=True).encode()).hexdigest(),
         "outputs": [output.__dict__ for output in spec.outputs], "timeout_seconds": spec.timeout_seconds,
-        "platform": _platform_name(prepared_params) or runtime.default,
+        "platform": target_name,
+        "target_driver": target_driver,
+        "target_scope": target_scope,
+        "cluster_name": target_cluster,
+        "target_config_digest": target_digest,
         "configuration": spec.metadata.get("configuration_sha256"), "resources": spec.metadata.get("resources_sha256"),
         "submission": {key: spec.metadata[key] for key in ('queue', 'queue_wait_seconds', 'resources') if key in spec.metadata},
         "execution_environment": spec.metadata.get("execution_environment", {}).get("sha256")}
@@ -455,7 +470,12 @@ def _stage_start(root, runtime, params, job_id, preparation=None, prepared_param
         **spec.metadata.get("research_binding", {"node_id": None, "node_revision": None}),
         "request_digest": _request_digest(params),
         "command": list(spec.command), "cwd": str(spec.cwd), "workspace_id": spec.workspace_id,
-        "platform": _platform_name(prepared_params) or runtime.default,
+        "platform": target_name,
+        "target_name": target_name,
+        "target_driver": target_driver,
+        "target_scope": target_scope,
+        "cluster_name": target_cluster,
+        "target_config_digest": target_digest,
     }
     # A durable dispatching intent is committed before spawning. If the
     # Agent Server dies after this point, reconcile reports unknown rather
