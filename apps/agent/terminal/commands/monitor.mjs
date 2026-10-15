@@ -36,7 +36,30 @@ export function formatTask(task) {
 }
 
 function jobRow(job) {
-  return `${job.job_id} · ${text(job.state)} · Collection: ${text(job.collection_state)} · Analysis: Not recorded`;
+  return `${job.job_id} · ${text(job.state)} · Collection: ${text(job.collection_state)}`;
+}
+
+function formatOverview(task, jobs, automaticContinuation) {
+  const counts = jobs?.counts || {};
+  const jobSummary = `${counts.running ?? 0} running · ${counts.queued ?? 0} queued · ${counts.total ?? jobs?.items?.length ?? 0} total`;
+  if (!task) return [
+    'No current task',
+    `Jobs: ${jobSummary}`,
+    `Automatic continuation: ${automaticContinuation ? 'On' : 'Off'}`,
+    '', '/monitor tasks · /monitor jobs · /monitor health',
+  ].join('\n');
+  return [
+    `Task: ${task.title} · ${taskStateLabel(task.state)}`,
+    `Goal: ${task.objective}`,
+    ...(task.progress?.summary ? [`Progress: ${task.progress.summary}`] : []),
+    ...(task.wait ? [`Waiting for: ${task.wait.job_ids.join(', ')} (${task.wait.mode})`] : []),
+    ...(task.execution_recovery ? [`Recovery: ${task.execution_recovery.phase} · ${task.execution_recovery.reason} · ${text(task.execution_recovery.detail)}`] : []),
+    ...(task.reason ? [`Reason: ${task.reason}`] : []),
+    ...(task.research_review ? [`Research review: ${text(task.research_review.review_status)}`] : []),
+    `Jobs: ${jobSummary}`,
+    `Automatic continuation: ${automaticContinuation ? 'On' : 'Off'}`,
+    '', `/monitor task ${task.user_task_id} · /monitor jobs --task ${task.user_task_id}`,
+  ].join('\n');
 }
 
 function nextPage(response, command, params) {
@@ -82,11 +105,7 @@ function formatResearch(snapshot, sessionJobIds) {
 export function formatMonitor(method, response, params = {}) {
   switch (method) {
     case 'monitor/overview':
-      return [formatTask(response.task), '',
-        `Automatic continuation: ${response.automatic_continuation_enabled ? 'On' : 'Off'}`,
-        '', 'Compute jobs', lines(response.jobs.items.map(jobRow)),
-        ...(response.jobs.next_cursor ? ['More jobs: /monitor jobs'] : []),
-        '', '/monitor tasks · /monitor jobs · /monitor runs · /monitor health'].join('\n');
+      return formatOverview(response.task, response.jobs, response.automatic_continuation_enabled);
     case 'monitor/tasks':
       return lines(response.items.map(task => `${task.user_task_id} · ${task.title} · ${taskStateLabel(task.state)}`))
         + '\n\nDetails: /monitor task <task-id>' + nextPage(response, 'tasks', params);
@@ -103,7 +122,7 @@ export function formatMonitor(method, response, params = {}) {
     case 'monitor/job/read':
     case 'monitor/job/cancel':
       return [`Job: ${response.job.job_id}`, `Execution: ${text(response.job.state)}`,
-        `Collection: ${text(response.job.collection_state)}`, 'Analysis: Not recorded',
+        `Collection: ${text(response.job.collection_state)}`,
         `User task: ${text(response.job.user_task_id)}`, `Platform: ${text(response.job.platform)}`,
         ...(response.job.error ? [`Error: ${text(response.job.error)}`] : []),
         ...(response.job.result_receipt ? ['Receipt:\n' + formatFields(response.job.result_receipt)] : []),

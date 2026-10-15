@@ -144,10 +144,10 @@ Monitor 的基础任务状态如下。`jobs running` 只统计运行中的计算
 `✓` 是普通状态标记，任务是否完成以旁边的文字为准；`Ⅱ` 表示暂停，`…` 表示检查或准备，
 `!` 表示需要注意，`×` 表示连接或控制错误。
 
-`/monitor` 概览实时展示原始目标、交付条件、最近登记的进展、具体 Job 等待条件、控制原因和
-自动推进设置。作业执行与输出收集分别显示；当前科学分析字段标明“Not recorded”，
-等待后续有证据的研究投影，不根据 Job 成功推断分析已完成。
-Pi generation/tool Task 仅出现在执行详情中，不混入用户任务列表。
+`/monitor` 概览提供紧凑的实时摘要，展示任务状态、目标、最近进展、具体 Job 等待条件、恢复原因、
+Job 数量、自动推进设置和 Research Review 状态。用 `/monitor task <id>` 查看交付条件与研究详情，
+用 `/monitor jobs` 查看执行和收集状态，用 `/monitor run <id>` 查看 Pi generation/tool Task。
+Job 成功不直接等于科学分析完成；该区别以任务的 Research Review 和 Result 为准。
 
 启动时，`-c` 选择当前 workspace 最近的可写 SQLite durable session，`--session-id <id>` 选择
 指定 session。顶层 `-r`/`--resume` 会被明确拒绝，因为 Host-mediated client 必须先取得

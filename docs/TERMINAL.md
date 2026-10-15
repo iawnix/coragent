@@ -182,13 +182,13 @@ of a blocked task. `✓` is the normal status symbol; the adjacent text determin
 whether the task is complete. `Ⅱ` means paused, `…` checking or preparing, `!` attention,
 and `×` a connection or controller error.
 
-`/monitor` is a live current-session overview. It displays the original objective,
-delivery criteria, latest recorded progress, concrete Job waits, control reason,
-and automatic-continuation setting. Compute execution and output collection have
-separate fields. Scientific analysis shows “Not recorded” until a dedicated
-research projection provides evidence; a successful Job is not treated as completed
-analysis. Open execution details to inspect Pi generation/tool tasks; they are not
-mixed into the user-task list.
+`/monitor` is a compact live current-session overview. It displays the task state,
+objective, latest progress, concrete Job waits, recovery reason, Job counts,
+automatic-continuation setting and research-review state. Use `/monitor task <id>`
+for delivery criteria and research details, `/monitor jobs` for execution and
+collection, and `/monitor run <id>` for Pi generation/tool tasks. A successful Job
+is not treated as completed scientific analysis; the task's research review and
+Results are the source for that distinction.
 
 At launch, `-c` selects the latest writable SQLite durable session and
 `--session-id <id>` selects an exact session. Startup `-r`/`--resume` is
