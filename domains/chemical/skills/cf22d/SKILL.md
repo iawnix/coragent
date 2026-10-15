@@ -1,29 +1,28 @@
 ---
 name: cf22d
-description: Run and interpret PySCF CF22D single-point, geometry optimization, transition-state, frequency, and RRHO thermochemistry calculations.
+description: Adapt declared CF22D/PySCF inputs and parser evidence to the registered pyscf binding without selecting or validating a scientific task.
 ---
 
-# CF22D calculations
+# CF22D backend
 
-Use `chemical.cf22d@1` with the target's `pyscf` binding. The executor supports
-`sp`, `opt`, `opt-sp`, `ts`, `freq`, `thermo`, `opt_freq`, and `ts_freq`.
-CF22D and its dispersion implementation must be available in that environment.
+This Skill owns the CF22D/PySCF binding, task argument translation, staged
+inputs, units and parser evidence. It does not choose a basis or scientific
+operation for a research question and does not certify stationary points,
+transition states or thermochemistry. Use `method-selection`, `candidate-generation`,
+`energetics` and `validation` for those decisions.
 
-Before generating files, explicitly cd in the command to the work_dir returned by research_create/research_read, or use absolute output paths beneath it; before Node association, use workspace research/work/. work_dir is returned guidance, not a bash parameter. The relative paths below assume that directory was selected in the same command; use absolute paths for inputs stored elsewhere. Put reports in reports/; avoid loose files in the workspace root and leave historical requests in place.
+`chemical.cf22d@1` accepts the registered task vocabulary `sp`, `opt`, `opt-sp`,
+`ts`, `freq`, `thermo`, `opt_freq` and `ts_freq`. The target `pyscf` environment
+must provide CF22D and its declared dispersion implementation. The adapter
+records basis, charge, multiplicity, task, convergence fields, units and raw
+provenance according to the shared [runner contract](../method-selection/references/runner_results.md).
+
+Prepare a request through the executor interface:
 
 ```bash
 "$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.cf22d --version 1 --input geometry=input.xyz --output prepared/cf22d.json -- --task opt-sp --basis def2-tzvp --charge 0 --multiplicity 1
 ```
 
-Submit the returned request file/digest with `job_start` and the intended node_id.
-Preparation stages the declared scripts and outputs. Read the shared
-[runner contract](../method-selection/references/runner_results.md) for result,
-unit, electronic-state and optimization-to-SP semantics.
-
-Choose the basis and resources for the user's question; the default basis is
-`def2-tzvp`. Inspect SCF and optimization convergence, frequency modes and the
-limitations of RRHO corrections before interpreting a stationary point or free
-energy. A TS optimization alone does not establish the target reaction.
-
-- [Scientific checks and method limits](references/cf22d_workflow.md)
-- [Target environment diagnosis](references/environment_doctor.md)
+The request file is not a result. Start a Job with `job_start`, then submit and
+collect it through the normal Job lifecycle. Environment prerequisites and parser-specific fields are documented
+in [CF22D workflow](references/cf22d_workflow.md) and [environment diagnosis](references/environment_doctor.md).

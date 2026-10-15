@@ -1,21 +1,41 @@
 ---
 name: email
-description: 通过配置的 SMTP 或 ClawEmail 发送用户要求的研究邮件，保存可恢复、可去重的发送回执。
+description: 通过安装配置的 SMTP 运输层发送已明确授权的邮件，并保存持久、幂等的发送回执。
 ---
 
-# 邮件交付
+# 邮件运输层
 
-例如“完成后给我发邮件”在收件人与内容明确时授权该次交付，不授权无关共享。通过原生 bash 使用 CORAGENT_PYTHON 运行本 Skill 的 CLI；邮件交付不创建科学计算 Job。
+这个 Skill 只提供运输接口。它不决定何时发送、邮件代表什么、对应哪个领域事件，
+也不决定哪些文件应作为附件。调用方先准备通用邮件消息，并在用户明确授权后调用本 Skill。
 
-1. 先用本 Skill 的 scripts/email_cli.py check 通过 CORAGENT_NOTIFICATION_CONFIG 检查安装配置，再判断是否缺少设置。收件人来自配置；只说明解决问题所需的诊断，不暴露秘密值。
-2. 生成并检查报告，在 reports/ 或 artifacts/ 下保存附件。草稿包含稳定 notification_id、event、subject、summary、report_refs。event 可选 progress、report_ready、calculation_failed、calculation_ambiguous、study_completed，描述内容必须符合实际结果与用户授权。
-3. 执行 prepare 固定收件人、附件摘要和大小，此步骤不发送。核对 prepared.json 后，按用户授权执行 send。工具不校验科学完成条件；Agent 应诚实说明未完成工作。
-4. 保存返回的 receipt_ref。sent 表示运输层接受，already_sent 返回原回执；unknown/sending 需核查，不能自动换 ID 重发。记录失败仅恢复记录，不再次发送。
+收件人来自安装配置。通过 `CORAGENT_NOTIFICATION_CONFIG` 检查 SMTP 配置；凭据不能复制到
+邮件请求或发送回执中。
 
-研究笔记不参与发送准入。进度变化不会使已准备的附件失效；附件或收件人改变需要重新准备。相同 notification_id 的内容不能改变。详见 [交付协议](references/email_delivery.zh-CN.md)。
+通用消息合同为 `ts-email-message/1`：
+
+```json
+{
+  "schema_version": "ts-email-message/1",
+  "message_id": "stable-authorized-delivery-id",
+  "subject": "邮件主题",
+  "body": "邮件正文",
+  "attachments": [
+    {"ref": "artifacts/example.txt", "sha256": "sha256:...", "size_bytes": 123}
+  ],
+  "metadata": {"optional": "由调用方定义的上下文"}
+}
+```
+
+`prepare` 固定配置收件人与附件摘要，但不发送；`send` 接收已准备好的消息，重新核对 SMTP
+配置和附件并返回回执。`sent` 表示 SMTP 服务器已接受消息；同一消息再次发送返回
+`already_sent`。结果为 `unknown` 时必须先核查，不能直接重试。
 
 ```text
-"$CORAGENT_PYTHON" <此 Skill 目录>/scripts/email_cli.py check --root <workspace> --output reports/email/config-check.json
-"$CORAGENT_PYTHON" <此 Skill 目录>/scripts/email_cli.py prepare --root <workspace> --request-file reports/email/draft.json --output reports/email/prepared.json
-"$CORAGENT_PYTHON" <此 Skill 目录>/scripts/email_cli.py send --root <workspace> --request-file reports/email/prepared.json --output reports/email/result.json
+"$CORAGENT_PYTHON" <此 Skill 目录>/scripts/email_cli.py check --root <工作区> --output <工作区>/email-check.json
+"$CORAGENT_PYTHON" <此 Skill 目录>/scripts/email_cli.py prepare --root <工作区> --request-file <工作区>/email-message.json --output <工作区>/email-prepared.json
+"$CORAGENT_PYTHON" <此 Skill 目录>/scripts/email_cli.py send --root <工作区> --request-file <工作区>/email-prepared.json --output <工作区>/email-result.json
 ```
+
+领域 Skill 负责组织邮件内容和领域授权，然后调用这个运输接口。
+
+通用消息、回执和重试合同见[交付协议](references/email_delivery.zh-CN.md)。

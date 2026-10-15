@@ -42,10 +42,17 @@ function jobRow(job) {
 function formatOverview(task, jobs, automaticContinuation) {
   const counts = jobs?.counts || {};
   const jobSummary = `${counts.running ?? 0} running · ${counts.queued ?? 0} queued · ${counts.total ?? jobs?.items?.length ?? 0} total`;
+  // Keep the common one-job overview compact. When several jobs are active,
+  // include their identities so the status view remains actionable without
+  // requiring an immediate second command.
+  const activeJobs = jobs?.items?.length > 1
+    ? ['', 'Active jobs', ...jobs.items.map(jobRow)]
+    : [];
   if (!task) return [
     'No current task',
     `Jobs: ${jobSummary}`,
     `Automatic continuation: ${automaticContinuation ? 'On' : 'Off'}`,
+    ...activeJobs,
     '', '/monitor tasks · /monitor jobs · /monitor health',
   ].join('\n');
   return [
@@ -58,6 +65,7 @@ function formatOverview(task, jobs, automaticContinuation) {
     ...(task.research_review ? [`Research review: ${text(task.research_review.review_status)}`] : []),
     `Jobs: ${jobSummary}`,
     `Automatic continuation: ${automaticContinuation ? 'On' : 'Off'}`,
+    ...activeJobs,
     '', `/monitor task ${task.user_task_id} · /monitor jobs --task ${task.user_task_id}`,
   ].join('\n');
 }

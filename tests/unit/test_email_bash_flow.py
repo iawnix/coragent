@@ -73,7 +73,7 @@ password_env = "CORAGENT_FIXTURE_PASSWORD"
         monkeypatch.setenv("CORAGENT_NOTIFICATION_CONFIG", str(config))
         monkeypatch.setenv("SSL_CERT_FILE", str(cert))
         monkeypatch.setenv("CORAGENT_FIXTURE_PASSWORD", "fixture-only")
-        script = Path(__file__).resolve().parents[2] / "skills/email/scripts/email_cli.py"
+        script = Path(__file__).resolve().parents[2] / "domains/chemical/skills/report/scripts/email_delivery.py"
         calculation = dispatch("start", {"root": str(tmp_path), "request_id": "calculation",
             "command": [sys.executable, "-c", "import json;from pathlib import Path;Path('result.json').write_text(json.dumps({'method':'fixture','validated':True,'steps':[{'task':'sp','energy_hartree':-1}]}))"],
             "outputs": [{"path": "result.json", "required": True}]})

@@ -82,7 +82,13 @@
     "!scripts/build_web.py",
     "!scripts/check_package.py",
     "!scripts/update_*.py",
-    "!scripts/update_*.mjs"
+    "!scripts/update_*.mjs",
+    "!**/__pycache__/**",
+    "!**/*.pyc",
+    "!**/*.pyo",
+    "!**/*.egg-info/**",
+    "!**/.pytest_cache/**",
+    "!**/node_modules/**"
   ],
   "engines": {
     "node": ">=22.19.0"

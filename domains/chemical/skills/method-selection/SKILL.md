@@ -1,6 +1,6 @@
 ---
 name: method-selection
-description: Prepare a scientific method and named compute environment for execution, including when the user has already fixed the method.
+description: Coordinate scientific method and backend selection with a named compute environment, including execution preparation when the method is already fixed.
 ---
 
 # CoRAgent Method Selection
@@ -8,8 +8,14 @@ description: Prepare a scientific method and named compute environment for execu
 [Chinese version](SKILL.zh-CN.md)
 
 Use this Skill when selecting a method or preparing execution for an already specified method. Read the relevant method Skill using its listed path. Installation configuration and method checks are Agent work; unavailable evidence is not automatically a request for user input.
+This is a cross-task coordination layer. It does not implement a solver and does
+not replace the scientific operation, backend adapter, or evidence validator.
 
 Read the [implemented capabilities and boundaries](references/capabilities.md) when determining what is bundled, what requires a native command/script, and which checks are specialized. A Skill description or installed executable alone does not establish complete support.
+Use the [scientific operation and backend map](references/operation_backend_map.md) to keep
+operation ownership, backend ownership and evidence ownership separate.
+Use the [complete operation/backend registry](references/operation_backend_registry.md)
+when checking the registered executor and validator owner for an operation.
 
 Start from the requested observable or the scientific question to resolve. Consider
 system size, charge, spin, electronic state, metals or multireference risk,
@@ -53,5 +59,7 @@ retrying or declaring the method unavailable.
 
 - [Request preparation](references/request_preparation.md): installed executors, explicit inputs and recovery.
 - [Runner results, units and electronic state](references/runner_results.md)
+- [xTB operation recipes](references/xtb_operation_recipes.md): native task examples and operation-level evidence boundaries.
+- [Operation/backend registry](references/operation_backend_registry.md): exhaustive registered runtime ownership.
 
 When a search fails or repeats the same outcome, use [search diagnosis and recovery](references/search_recovery.md) to separate execution, numerical and hypothesis problems before changing settings or seeds.

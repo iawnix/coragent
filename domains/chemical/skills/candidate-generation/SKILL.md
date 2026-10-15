@@ -1,6 +1,6 @@
 ---
 name: candidate-generation
-description: Generate transition-state candidate geometries with chemically informed construction, scans, QST, NEB, or conformer and orientation sampling.
+description: Generate candidate geometries for transition-state and reaction-path searches from mapped endpoints, bond changes, constraints and available structural evidence.
 ---
 
 # CoRAgent TS Candidate Generation
@@ -11,6 +11,9 @@ Use this Skill to produce candidate geometries for a proposed elementary step.
 Candidate generation does not establish a transition state; validation belongs
 to `validation`, and method or Backend choice belongs to
 `method-selection`.
+This is the scientific search-operation layer. Gaussian, xTB and other software
+recipes remain backend concerns; their presence here only describes how a search
+can be executed through the existing Job interface.
 
 Start from explicit reactant/product identities, atom mapping, charge,
 multiplicity, and relevant conformers. Choose chemically informed construction,
@@ -33,22 +36,29 @@ coordinates or constraints. Choose a candidate-generation method from those inpu
 reaction names do not select a mandatory script or validator. New reaction classes
 do not require new tools or Skill sections. Use explicit solver inputs or a bounded
 task script through the existing Job interface, preserving atom correspondence and
-checking each method's prerequisites. For Gaussian QST/TS and IRC inputs, use the
+checking each method's prerequisites. For Gaussian QST/TS inputs, use the
 [Gaussian Skill](../gaussian/SKILL.md).
 
 The [mapped path preparer](references/path_preparation.md) accepts explicit bond
 changes and either automatically embedded single-fragment endpoints or supplied
-mapped geometries. It writes QST2 and bidirectional IRC inputs through the existing
-Job recipes. Its optional geometry strategies do not define the scientific verdict.
+mapped geometries. It writes QST2 inputs through the existing Job recipes. Its
+optional geometry strategies do not define the scientific verdict.
 Check the input and validation scope before reuse; an unsupported preparation case
 does not make the research method unavailable. Other methods can use shared runners,
 explicit solver inputs or task scripts.
+
+See [script layout](references/script_layout.md) for the implementation boundaries and compatibility entrypoints.
+
 Read [candidate_generation.md](references/candidate_generation.md) for method
 criteria and [ase_neb_executor.md](references/ase_neb_executor.md) for NEB availability and prerequisites.
+Use the shared [reaction-search task interface](references/reaction_task_interface.md)
+when handing a candidate to IRC or validation.
 
-Read [Gaussian path preparation](references/gaussian_path.md) for checkpoint, atom mapping and IRC input conventions.
-
-The bundled DA path supports six neutral, non-aromatic carbon reaction centers. Aromatic, charged or heteroatom centers outside that scope are unassessed, not evidence against the proposed chemistry. RDKit perceives aromaticity again when parsing Kekule SMILES; rewriting the same graph cannot extend this helper. Use explicit bond-change checks and independently prepared candidates or another justified method. Generated IRC inputs use CalcFC to recompute the Hessian at the checkpoint geometry; include that cost in the budget.
+Read [specialized path preparation](references/gaussian_path.md) only when using
+that optional compatibility recipe; its local contract does not define the scope
+of candidate generation as a whole. Pass a selected candidate to `validation` for
+saddle evidence and bidirectional IRC connectivity; preserve endpoint and solver
+metadata when that validation prepares IRC inputs.
 
 For supplied material endpoints, use `chemical.qst-prepare@1` for QST2/QST3.
 For bounded 1D/2D grids use `chemical.scan-xtb@1` or `chemical.scan-gaussian@1`;

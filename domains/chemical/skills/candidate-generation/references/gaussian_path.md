@@ -7,9 +7,9 @@ reaction recipe. DA construction is isolated in `../scripts/da_geometry.py`;
 `prepare_path.py` selects it for legacy diels_alder specs. Its scientific acceptance
 profile remains DA-specific and does not validate unrelated generic preparations.
 
-This strategy implements one bounded path: explicit neutral-carbon
-Diels–Alder topology, mapped reactant/product seeds, Gaussian QST2+Freq, and
-forward/reverse IRC from the collected TS checkpoint. It supports closed-shell
+This strategy implements bounded candidate preparation for explicit neutral-carbon
+Diels–Alder topology, mapped reactant/product seeds and Gaussian QST2+Freq. IRC input
+preparation and evidence are handled separately by `validation`. It supports closed-shell
 singlets without isotope-specific masses. Specify reactant stereochemistry;
 unspecified product stereochemistry can be enumerated, at most 16 variants.
 This path does not implement NEB, exhaustive conformer search or complete mechanism discovery.
@@ -48,7 +48,7 @@ Register each selected branch's spec and geometries. The branch spec is the subj
 of the `chemical.diels_alder_path@1` acceptance profile; evidence for different
 spec artifacts cannot be mixed to satisfy one path.
 The generated `CoRAgentSpec` title binds the solver output to the branch spec digest.
-Keep that title in the TS input and checkpoint; raw TS and IRC logs must echo it.
+Keep that title in the TS input and checkpoint; validation binds later evidence to the same branch artifact.
 
 Prepare a TS request with the existing method-selection helper:
 
@@ -59,40 +59,6 @@ Prepare a TS request with the existing method-selection helper:
 Submit the returned `request_file` and `request_sha256` through `job_start`.
 Collect the terminal Job. A successful runner is not a scientific verdict:
 validate the raw collected `gaussian.out` with the registered saddle validator.
-Inspect the checks and their scope before choosing the next experiment. A parser failure is not a scientific rejection and does not prohibit further exploration. Record missing evidence and your rationale; do not describe unresolved checks as passed. When IRC is the chosen next step, prepare inputs from that Job's collected `ts.chk`:
+Inspect the checks and their scope before choosing the next experiment.
 
-```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.path-irc --version 1 --input spec=<branch>/spec.json --input checkpoint=<collected-ts.chk> --input-artifact <spec-ref> --input-artifact <checkpoint-ref> --output <work_dir>/irc-request.json
-```
-
-Submit and collect the IRC-input Job before using its generated inputs and checkpoint.
-
-For each direction, use `-m research_agent.application.executors --executor chemical.gaussian-input --version 1 --input input=<workspace>/irc/forward.gjf`
-(or `reverse.gjf`), `--dependency <workspace>/irc/ts.chk=ts.chk`, and
-`--collect results/irc_path_summary.json --collect results/irc_path_points.json --collect results/gaussian_endpoint.xyz`.
-Keep the same method/resources and use `--validation irc` after `--`.
-Submit each returned reference, collect both results, then validate connectivity.
-
-Registered validators use `job_start(validator_id=..., input_artifact_ids=[...])`:
-
-| Validator, version 1 | Ordered input Artifact IDs |
-| --- | --- |
-| `chemical.reaction_mapping` | registered branch spec |
-| `chemical.gaussian_saddle` | branch spec, collected saddle Gaussian log |
-| `chemical.gaussian_irc_connectivity` | branch spec, saddle log, forward IRC log, reverse IRC log |
-
-Input schemas, hashes and producer receipt versions are checked before execution.
-The mapping validator checks the entire bond-change pattern and per-atom hydrogen
-counts. The saddle validator checks route, charge/spin, processor/memory readback,
-convergence, a complete frequency table and same-sign forming-bond displacement.
-The IRC validator rechecks that saddle, completed directional paths, starting
-geometry RMSD ≤ 0.05 Å, and distinct mapped reactant/product endpoint connectivity.
-Ambiguous covalent distances or missing fields do not pass. Endpoint checks cover
-explicit tetrahedral and E/Z stereochemistry, not a general stereochemical mechanism proof or bond-order recovery.
-
-Gaussian parsing currently requires ordinary Cartesian orientation tables,
-`Atom AN X Y Z` harmonic modes and coordinate-bearing IRC `CURRENT STRUCTURE`
-blocks. Unsupported output formats, incomplete paths or missing resource readback
-need review; do not replace them with a passing Agent assessment. Tests execute
-these real helpers, parsers and Jobs with synthetic solver output. They do not
-establish that an actual Gaussian search converges for every candidate.
+IRC preparation and bidirectional path validation are owned by `validation`; see [IRC input preparation](../../validation/references/irc_preparation.md) and [IRC validation](../../validation/references/irc_validation.md).

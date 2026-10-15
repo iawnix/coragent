@@ -71,7 +71,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_REPO = "git@github.com:iawnix/coragent.git"
 PROGRESS_PREFIX = "@@coragent-progress@@"
 MINIMUM_NODE_VERSION = (22, 19, 0)
-EMAIL_PROVIDERS = {"clawemail", "smtp"}
+EMAIL_PROVIDERS = {"smtp"}
 SMTP_PRESETS = {
     "163": "smtp.163.com",
     "qq": "smtp.qq.com",
@@ -294,7 +294,6 @@ def parse_args(argv: list[str] | None = None, *, use_environment: bool = True) -
     )
     email.add_argument("--email-port", type=int)
     email.add_argument("--email-security", choices=("ssl", "starttls"))
-    email.add_argument("--clawemail-root")
     password = email.add_mutually_exclusive_group()
     password.add_argument("--email-password-env")
     password.add_argument("--email-password-file")
@@ -456,11 +455,8 @@ def _load_existing_email_defaults(args: argparse.Namespace, root: Path) -> None:
     if not isinstance(email, dict) or not email.get("enabled"):
         return
     provider = email.get("provider", "smtp")
-    if provider == "clawemail":
-        args.email_binding = "clawemail"
-        args.email_recipient = email.get("recipient")
-        args.clawemail_root = email.get("clawemail_root")
-        return
+    if provider != "smtp":
+        raise ValueError("invalid email configuration")
     args.email_binding = "smtp"
     args.email_recipient = email.get("recipient")
     args.email_preset = email.get("preset", "qq")
@@ -653,13 +649,8 @@ def configure_email_interactively(args: argparse.Namespace, *, force: bool = Fal
             _clear_email_options(args)
             args._clear_email = True
         return
-    args.email_binding = ask("Email binding (smtp or clawemail)", getattr(args, "email_binding", None) or "smtp").lower()
+    args.email_binding = "smtp"
     args.email_recipient = _ask_email_address("Notification recipient", getattr(args, "email_recipient", None) or "")
-    if args.email_binding == "clawemail":
-        _clear_smtp_options(args)
-        args.clawemail_root = ask("ClawEmail installation root", getattr(args, "clawemail_root", None) or "")
-        return
-    args.clawemail_root = None
     args.email_preset = ask("SMTP mailbox preset (163, qq, or custom)", getattr(args, "email_preset", None) or "qq").lower()
     if args.email_preset == "custom":
         args.email_host = ask("SMTP hostname", getattr(args, "email_host", None) or "")
@@ -695,7 +686,6 @@ def _clear_smtp_options(args: argparse.Namespace) -> None:
 
 def _clear_email_options(args: argparse.Namespace) -> None:
     args.email_recipient = None
-    args.clawemail_root = None
     _clear_smtp_options(args)
 
 
@@ -767,10 +757,6 @@ def show_install_plan(args: argparse.Namespace, installation: dict[str, str | No
                 else "not configured"
             )
         field("Configuration", configuration, tone="muted")
-    elif args.email_binding == "clawemail":
-        field("Provider", "ClawEmail", tone="success")
-        field("Recipient", args.email_recipient)
-        field("ClawEmail root", args.clawemail_root)
     else:
         field("Provider", f"SMTP ({args.email_preset})", tone="success")
         field("Recipient", args.email_recipient)
@@ -1125,7 +1111,6 @@ def validate_email_options(args: argparse.Namespace) -> None:
         args.email_username,
         args.email_port,
         args.email_security,
-        args.clawemail_root,
         args.email_password_env,
         args.email_password_file,
     )
@@ -1134,25 +1119,8 @@ def validate_email_options(args: argparse.Namespace) -> None:
             raise ValueError("email options require --email-binding")
         return
     if args.email_binding not in EMAIL_PROVIDERS:
-        raise ValueError("--email-binding must be smtp or clawemail")
+        raise ValueError("invalid email configuration")
     _validate_email_address(args.email_recipient, "--email-recipient")
-    if args.email_binding == "clawemail":
-        clawemail_path = Path(args.clawemail_root).expanduser() if isinstance(args.clawemail_root, str) else None
-        if (
-            clawemail_path is None
-            or not clawemail_path.is_absolute()
-            or clawemail_path.is_symlink()
-            or not clawemail_path.is_dir()
-        ):
-            raise ValueError("--clawemail-root must be an existing absolute non-symbolic-link directory")
-        _validate_clawemail_install(clawemail_path)
-        if any(
-            value is not None
-            for value in (args.email_preset, args.email_host, args.email_username, args.email_port, args.email_security, args.email_password_env, args.email_password_file)
-        ):
-            raise ValueError("SMTP-only email options cannot be used with ClawEmail")
-        return
-
     if args.email_preset not in SMTP_PRESETS:
         raise ValueError("--email-preset must be 163, qq, or custom for SMTP")
     if args.email_preset == "custom":
@@ -1208,27 +1176,6 @@ def _validate_smtp_host(value: object, label: str) -> None:
         raise ValueError(f"{label} must be a hostname")
 
 
-def _validate_clawemail_install(root: Path) -> None:
-    skill_file = root / "SKILL.md"
-    manager = root / "bin/clawemail-manager"
-    state = root / ".clawemail"
-    if (
-        not skill_file.is_file()
-        or skill_file.is_symlink()
-        or "name: clawemail" not in skill_file.read_text(encoding="utf-8")[:2048]
-    ):
-        raise ValueError("--clawemail-root does not contain a ClawEmail skill")
-    if not manager.is_file() or manager.is_symlink() or not os.access(manager, os.X_OK):
-        raise ValueError("--clawemail-root does not contain an executable clawemail-manager")
-    if state.is_symlink() or not state.is_dir():
-        raise ValueError("--clawemail-root does not contain a physical .clawemail state directory")
-    for path, label in ((state / "skill.json", "settings"), (state / "mail-cli.json", "authentication")):
-        if path.is_symlink() or not path.is_file():
-            raise ValueError(f"ClawEmail {label} file is missing or unsafe: {path}")
-        if stat.S_IMODE(path.stat().st_mode) != 0o600:
-            raise ValueError(f"ClawEmail {label} file must have mode 0600: {path}")
-
-
 def configure_notification_config(args: argparse.Namespace) -> dict[str, str]:
     """Write installation-owned notification configuration without exposing secrets."""
 
@@ -1250,19 +1197,6 @@ def configure_notification_config(args: argparse.Namespace) -> dict[str, str]:
     except ImportError:
         from _install_inputs import provision_config_credentials
     provision_config_credentials(args)
-
-    if args.email_binding == "clawemail":
-        content = "\n".join(
-            [
-                "[notifications.email]",
-                "enabled = true",
-                f"recipient = {_toml_string(args.email_recipient)}",
-                f"clawemail_root = {_toml_string(str(Path(args.clawemail_root).expanduser()))}",
-                "",
-            ]
-        )
-        _write_private_text(config_path, content)
-        return {"status": "configured", "binding": "clawemail", "path": str(config_path)}
 
     password_file: Path | None = None
     if args.email_password_file is not None:

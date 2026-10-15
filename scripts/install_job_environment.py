@@ -14,6 +14,7 @@ from pathlib import Path
 import subprocess
 import sys
 import shutil
+from urllib.parse import urlsplit
 
 contract_path = Path(__file__).resolve().parents[1] / "backend/src/research_agent/jobs/config_contract.py"
 spec = importlib.util.spec_from_file_location("job_config_contract", contract_path)
@@ -60,8 +61,13 @@ def _install_locked(binding, *, adopt=False, package_cache=None, offline=False):
                           or previous.get("binding_sha256") != binding_digest(binding) or not previous.get("inventory_sha256")):
             raise ValueError("existing prefix has no matching environment receipt; choose a new versioned prefix")
     else:
-        subprocess.run([binding["conda_executable"], "create", "--yes", "--prefix", str(prefix), "--file", str(lock),
-                        *(['--offline'] if offline else [])], check=True)
+        conda_lock = _offline_conda_lock(lock) if offline else None
+        try:
+            subprocess.run([binding["conda_executable"], "create", "--yes", "--prefix", str(prefix), "--file",
+                            str(conda_lock or lock), *(['--offline'] if offline else [])], check=True)
+        finally:
+            if conda_lock is not None:
+                conda_lock.unlink(missing_ok=True)
         if pip_lock:
             cache = Path(package_cache) if package_cache else prefix.parent / '.pip-packages' / digest.removeprefix('sha256:')
             cache.mkdir(parents=True, exist_ok=True)
@@ -92,6 +98,44 @@ def _install_locked(binding, *, adopt=False, package_cache=None, offline=False):
             "executable": observed["files"]["python"]["path"], "prefix": observed["prefix"], "version": observed["python_version"]}}, indent=2) + "\n")
     pending.replace(receipt)
     return json.loads(receipt.read_text())
+
+
+def _offline_conda_lock(lock):
+    """Materialize explicit lock URLs as local package-cache URLs when possible.
+
+    Conda's offline explicit-file path does not consistently discover archives
+    copied into a fresh package cache.  Rewriting only the installer input keeps
+    the published lock and its digest immutable while making offline installs
+    deterministic.  Missing archives remain remote URLs so Conda reports the
+    normal offline cache error.
+    """
+    cache_values = os.environ.get('CONDA_PKGS_DIRS', '')
+    caches = [Path(value) for value in cache_values.split(os.pathsep) if value]
+    if not caches:
+        return None
+    lines = lock.read_text().splitlines()
+    changed = False
+    rewritten = []
+    for line in lines:
+        if not line.startswith(('http://', 'https://')):
+            rewritten.append(line)
+            continue
+        parsed = urlsplit(line)
+        archive = parsed.path.rsplit('/', 1)[-1]
+        local = next((cache / archive for cache in caches if (cache / archive).is_file()), None)
+        if local is None:
+            rewritten.append(line)
+            continue
+        value = local.resolve().as_uri()
+        if parsed.fragment:
+            value += '#' + parsed.fragment
+        rewritten.append(value)
+        changed = True
+    if not changed:
+        return None
+    path = lock.with_name('.' + lock.name + '.offline')
+    path.write_text('\n'.join(rewritten) + '\n')
+    return path
 
 
 def main():

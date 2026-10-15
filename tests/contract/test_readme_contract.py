@@ -22,7 +22,7 @@ ORCHESTRATION_ROOT = ROOT / "skills" / "research-workflow"
 FOCUSED_SKILLS = {
     "research-workflow": ORCHESTRATION_ROOT,
     **{name: ROOT / "domains" / "chemical" / "skills" / name for name in (
-        "candidate-generation", "validation", "irc", "energetics", "method-selection",
+        "candidate-generation", "validation", "energetics", "method-selection",
         "cf22d", "xtb", "crest", "qbics", "gaussian", "mechanism-reasoning", "chemical-input",
     )},
     "email": ROOT / "skills" / "email",

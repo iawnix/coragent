@@ -20,7 +20,7 @@
 | Gaussian SP/optimization | `chemical.gaussian` | XYZ sp/opt/opt-sp; target energy interpretation has the HF/DFT SCF boundary below |
 | Gaussian TS/frequency/QST/IRC/scan | `chemical.gaussian-input` | Explicit GJF execution and limited checks; termination/frequency count does not prove the target path; no complete scan validator |
 | CF22D | `chemical.cf22d`, `chemical.cf22d-doctor` | PySCF sp/opt/opt-sp/ts/freq/thermo/opt_freq/ts_freq and diagnostics; includes RRHO, not IRC/NEB/crossings |
-| Mapped endpoints and IRC inputs | `chemical.path-candidates`, `chemical.path-irc` | Explicit transformations, compatible single-fragment embedding or provided mapped geometries; optional DA geometry; preparation does not run Gaussian |
+| Mapped endpoints and TS-validation IRC inputs | `chemical.path-candidates`, `chemical.path-irc` | Candidate endpoint preparation and post-saddle IRC input preparation; explicit transformations, compatible single-fragment embedding or provided mapped geometries; optional DA geometry; preparation does not run Gaussian |
 | CREST ensembles | `chemical.crest`, `chemical.crest-ensemble`, `chemical.ensemble-select` | Bounded 3.0.2 GFN1/GFN2 ground-state search, primary consistency, inferred identity and geometric/electronic-energy screening; partial results retained; no exhaustive coverage or free energies |
 | Complex placements | `chemical.complex-sample` | Seeded rigid-fragment assembly/perturbation, collision/distance checks and lineage; supplied coordinates required, unknown total spin preserved; no optimization |
 | Material QST2/QST3 | `chemical.qst-prepare` | Supplied mapped endpoint/guess geometries, explicit compatible states, permutation and GJF export; no minimum or elementary-step certification |

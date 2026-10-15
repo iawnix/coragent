@@ -1,6 +1,6 @@
 """Resolve, patch, and verify the Pi v1 durable runtime used by CoRAgent."""
 from __future__ import annotations
-import argparse, json, os, re, shutil, subprocess, sys, tempfile
+import argparse, fcntl, json, os, re, shutil, subprocess, sys, tempfile
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PIN_PATH = ROOT / "config" / "pi-source.json"
@@ -111,12 +111,29 @@ def install(root):
     except ImportError:
         from app_layout import paths
     destination=paths(Path(root).resolve()).pi_runtime/commit
+    destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with (destination.parent / (commit + ".install.lock")).open("a") as guard:
+        fcntl.flock(guard, fcntl.LOCK_EX)
+        return _install_locked(destination, commit)
+
+
+def _install_locked(destination, commit):
     if destination.exists():
         if not (destination/"packages/coding-agent/src/experimental/process.ts").is_file(): raise PiSourceError(f"invalid managed Pi source: {destination}")
-        apply_patch(destination)
+        try:
+            apply_patch(destination)
+        except PiSourceError:
+            # A prior interrupted or older managed installation may contain a
+            # patch stack from a different patch revision. The checkout is
+            # installer-owned, so restore the pinned commit before retrying the
+            # complete ordered stack.
+            subprocess.run(["git", "-C", str(destination), "reset", "--hard", commit], check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(["git", "-C", str(destination), "clean", "-fd"], check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            apply_patch(destination)
         verify(destination)
     else:
-        destination.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
         with tempfile.TemporaryDirectory(prefix=".pi-source-",dir=destination.parent) as temp:
             staged=Path(temp)/commit; clone(staged); install_deps(staged); hydrate_model_data(staged); prepare_build(staged); os.replace(staged,destination)
     if not (destination/"node_modules").is_dir(): install_deps(destination)

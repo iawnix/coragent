@@ -1,32 +1,25 @@
 ---
 name: xtb
-description: 使用 xTB 进行低成本结构筛选、单点、优化、频率、约束扫描和分子动力学，并分析原始输出。
+description: 将已声明的 xTB 输入、原生命令和解析证据适配到注册的 xTB 绑定，不选择科学操作。
 ---
 
-# xTB 计算
+# xTB 后端
 
-根据任务选择单点、结构优化、频率、约束扫描或分子动力学，明确方法、电荷、电子态和溶剂设置。
+本 Skill 负责 xTB 命令绑定、输入暂存、电子态/溶剂字段转换和受支持的输出解析。它不在筛选、
+优化、扫描、动力学或路径操作之间做科学选择，也不认证过渡态或解释研究结果；这些决策属于
+操作 Skill 和 `method-selection`。
 
-单点与优化可以使用 `chemical.xtb@1`，它固定使用 GFN2-xTB，接受 `sp`、`opt`、`opt-sp`：
-
-生成文件前，在命令中显式 cd 到 research_create/research_read 返回的 work_dir，或使用该目录下的绝对输出路径；未关联 Node 时使用工作区内的 research/work/。work_dir 是返回的位置建议，不是 bash 参数。以下相对路径示例假设已在同一命令中切换到工作目录；输入若在其他位置，请使用绝对路径。报告放在 reports/，不要在工作区根目录散落文件或移动历史请求。
+`chemical.xtb@1` 是 GFN2-xTB 的注册封装，支持 `sp`、`opt`、`opt-sp`。它把电荷和多重度
+转换为原生命令，记录请求的溶剂/态字段，并返回原始输出来源：
 
 ```bash
 "$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.xtb --version 1 --input geometry=input.xyz --output prepared/xtb.json -- --task opt-sp --charge 0 --multiplicity 1
 ```
 
-将返回的请求文件和摘要交给 `job_start`，需要关联研究问题时提供 node_id。
-输出和电子态语义见[共享 runner 契约](../method-selection/references/runner_results.zh-CN.md)。
-该封装把多重度转换为 xTB 的未配对电子参数。
+其它原生 xTB 命令通过通用 Job、显式控制文件和收集输出执行；使用 `job_start` 启动作业，
+原生命令选项不是封装器的 `--task` 值。解析字段和回执见 [xTB 后端合同](references/xtb_backend_contract.zh-CN.md) 及[共享 runner 合同](../method-selection/references/runner_results.zh-CN.md)。
 
-频率、扫描和动力学通过通用 Job 运行原生 xTB 命令，准备控制文件并声明要收集的输出。
-不需要先把任务注册为 executor，也不要把原生命令选项传给上述封装的 `--task`。
-具体命令、输入和解析范围见 [xTB 执行与解释](references/xtb_executor.zh-CN.md)。
-
-检查 SCC（适用时）、优化收敛和结构身份；频率检查振动模式，扫描检查约束与每点收敛，
-动力学检查积分稳定性与轨迹。能量比较需要一致的方法、电子态和能量定义；
-不能用 xTB 与 DFT 的绝对能量差判断准确度。
-
-基于材料的一维/二维扫描与绑定结构的 Cartesian 梯度使用 `chemical.scan-xtb@1`、
-`chemical.gradient-xtb@1`，需可选 path_xtb 科学环境。原生约束势、独立物理能量和
-xTB NEB 适配说明见[路径操作](../candidate-generation/references/path_search.zh-CN.md)。
+基于材料的有界扫描和 Cartesian 梯度在 `candidate-generation` 注册为
+`chemical.scan-xtb@1`、`chemical.gradient-xtb@1`；可选的 `path_xtb` 绑定也服务于
+`chemical.neb-xtb@2`。这些入口负责操作层的约束、梯度和 NEB 证据；本 Skill 只提供 xTB
+适配器和解析边界。旧的[xTB 执行指针](references/xtb_executor.zh-CN.md)为现有链接保留。

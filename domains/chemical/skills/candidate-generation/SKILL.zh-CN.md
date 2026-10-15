@@ -1,6 +1,6 @@
 ---
 name: candidate-generation
-description: 通过化学构造、扫描、QST、NEB 或构象与取向采样生成过渡态候选几何。
+description: 根据映射端点、键变化、约束和已有结构证据，为过渡态与反应路径搜索生成候选几何。
 ---
 
 # CoRAgent 过渡态候选生成
@@ -9,6 +9,8 @@ description: 通过化学构造、扫描、QST、NEB 或构象与取向采样生
 
 使用本 Skill 为所提出的基元步骤生成候选几何。候选生成不能证明其为过渡态；验证由
 `validation` 负责，方法与 Backend 选择由 `method-selection` 负责。
+本 Skill 属于科学搜索操作层。Gaussian、xTB 等软件配方仍属于后端适配；此处提到它们
+只是为了说明如何通过既有 Job 接口执行搜索。
 
 从明确的反应物/产物身份、原子映射、电荷、多重度与相关构象出发。根据成键变化和
 已有证据选择化学构造、松弛扫描、QST2/QST3、直接 TS 优化、NEB 或片段取向采样。
@@ -23,18 +25,22 @@ description: 通过化学构造、扫描、QST、NEB 或构象与取向采样生
 用映射端点、键变化及相关坐标或约束表达所提出的步骤，再据此选择候选生成方法。
 反应名称不决定必须调用哪个脚本或验证器；新增反应类型不要求新增工具或 Skill 分支。
 通过现有 Job 接口运行显式求解器输入或有界任务脚本，保留原子对应关系，并核验所选
-方法的前提。Gaussian QST/TS 和 IRC 输入见 [Gaussian Skill](../gaussian/SKILL.zh-CN.md)。
+方法的前提。Gaussian QST/TS 输入见 [Gaussian Skill](../gaussian/SKILL.zh-CN.md)。
 
 [映射路径准备器](references/path_preparation.zh-CN.md) 接收显式键变化，支持单片段端点
-自动构象生成或用户提供的映射几何，通过已有 Job 配方生成 QST2 与双向 IRC 输入。
+自动构象生成或用户提供的映射几何，通过已有 Job 配方生成 QST2 输入。
 可选几何策略不决定科学验收结论，使用前核对输入与验证范围。准备器不支持某种输入
 不等于研究方法不可用；其他方法仍可使用共享 runner、显式求解器输入或任务脚本。
 方法判据见 [candidate_generation.zh-CN.md](references/candidate_generation.zh-CN.md)，
 NEB 可用性与前提见 [ase_neb_executor.zh-CN.md](references/ase_neb_executor.zh-CN.md)。
+把候选交给 IRC 或 validation 时，使用统一的[反应搜索任务接口](references/reaction_task_interface.zh-CN.md)。
 
-checkpoint、原子映射与 IRC 输入约定见 [Gaussian 路径准备](references/gaussian_path.zh-CN.md)。
+脚本职责和兼容入口见 [脚本布局](references/script_layout.zh-CN.md)。只有使用可选的兼容性
+路径准备器时，才需要阅读其专用说明。
 
-内置 DA 路线只支持六个中性、非芳香碳反应中心。芳香、带电或杂原子中心超出适用范围时属于未评估，不是对反应的反证。RDKit 读取 Kekule SMILES 会重新识别芳香性，重写同一分子不能扩展封装能力。改用显式键变化检查和独立准备的候选，或其它有依据的方法。生成的 IRC 输入用 CalcFC 在 checkpoint 几何上重算 Hessian，预算应包含这项成本。
+阅读[专用路径准备](references/gaussian_path.zh-CN.md)；
+其中的局部契约不定义候选生成整体的适用范围。候选应交给 `validation` 获取鞍点证据和双向
+IRC 连通性验证；验证准备 IRC 输入时仍须保留端点和求解器元数据。
 
 已有材料端点的 QST2/QST3 使用 `chemical.qst-prepare@1`；有界一维/二维扫描使用
 `chemical.scan-xtb@1` 或 `chemical.scan-gaussian@1`；xTB 梯度与 NEB 使用

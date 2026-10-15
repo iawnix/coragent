@@ -1,6 +1,7 @@
 """Generic input preparation with deterministic geometry; no real Gaussian calculation."""
 import copy
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -12,6 +13,13 @@ from reaction_checks import molecules, ordered_molecule, path_spec
 from path_specification import preparation_spec
 from input_job import inspect_input
 from gaussian_io import read_xyz
+
+irc_spec = importlib.util.spec_from_file_location(
+    'chemical_irc_preparation',
+    Path(__file__).resolve().parents[2] / 'domains/chemical/skills/validation/scripts/irc_preparation.py',
+)
+irc_helper = importlib.util.module_from_spec(irc_spec)
+irc_spec.loader.exec_module(irc_helper)
 
 
 RING_OPENING = {
@@ -70,6 +78,8 @@ def test_unimolecular_ring_opening_generates_reproducible_generic_qst2(tmp_path)
 
 
 def test_supplied_multifragment_coordinates_preserve_mapping_and_produce_irc(tmp_path):
+    assert not hasattr(helper, 'prepare_irc')
+    assert hasattr(irc_helper, 'prepare_irc')
     spec = supplied_substitution()
     result = prepare(tmp_path, spec)
     assert result['strategy'] == 'provided_endpoints'
@@ -81,7 +91,7 @@ def test_supplied_multifragment_coordinates_preserve_mapping_and_produce_irc(tmp
     branch = Path(row['files']['spec.json']['path'])
     inspect_input(Path(row['files']['ts.gjf']['path']), 'M062X', '6-31G**', -1, 1, 2, 1000)
     checkpoint = tmp_path / 'fixture.chk'; checkpoint.write_bytes(b'synthetic checkpoint')
-    irc = helper.prepare_irc(branch, checkpoint, tmp_path / 'irc', max_points=12)
+    irc = irc_helper.prepare_irc(branch, checkpoint, tmp_path / 'irc', max_points=12)
     assert Path(irc['checkpoint']['path']).read_bytes() == checkpoint.read_bytes()
     assert irc['spec_sha256'] == row['files']['spec.json']['sha256']
     for item in irc['inputs']:

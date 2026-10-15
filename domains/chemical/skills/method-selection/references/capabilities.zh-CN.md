@@ -20,7 +20,7 @@
 | Gaussian 单点与优化 | `chemical.gaussian` | XYZ 的 sp/opt/opt-sp；能量解释受下述 HF/DFT SCF 解析边界限制 |
 | Gaussian TS、频率、QST、IRC、扫描 | `chemical.gaussian-input` | 显式 GJF 执行及有限检查；不能从正常终止或虚频数直接认定目标路径；无完整扫描验收器 |
 | CF22D | `chemical.cf22d`、`chemical.cf22d-doctor` | PySCF 的 sp/opt/opt-sp/ts/freq/thermo/opt_freq/ts_freq 及环境诊断；已有 RRHO，不包含 IRC、NEB、交叉点 |
-| 映射端点与 IRC 输入 | `chemical.path-candidates`、`chemical.path-irc` | 通用显式变换、相容单片段自动嵌入或给定映射端点；可选 DA 几何策略；准备输入不执行 Gaussian |
+| 映射端点与 TS 验证 IRC 输入 | `chemical.path-candidates`、`chemical.path-irc` | 候选端点准备和鞍点验证后的 IRC 输入准备；通用显式变换、相容单片段自动嵌入或给定映射端点；可选 DA 几何策略；准备输入不执行 Gaussian |
 | CREST 构象集合 | `chemical.crest`、`chemical.crest-ensemble`、`chemical.ensemble-select` | 有界 3.0.2 GFN1/GFN2 基态搜索、主要证据核验、身份推断与几何/电子能筛选；保留部分结果，不认证穷尽或自由能 |
 | 复合物排布 | `chemical.complex-sample` | 有种子的刚性片段组装/扰动、碰撞与距离检查、原子来源；需要已有坐标，总自旋可保持未知，不进行优化 |
 | 材料 QST2/QST3 | `chemical.qst-prepare` | 已有映射端点/猜测、相容态声明、置换与 GJF 导出；不认证极小点或基元步骤 |

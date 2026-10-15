@@ -1,10 +1,6 @@
-"""Pure argument contract for local reaction-center diagnostics."""
-import argparse
+"""Compatibility entrypoint; implementation moved to ``diagnostics/diagnostics_cli.py``."""
 from pathlib import Path
 
-
-def parse_arguments(argv=None):
-    p=argparse.ArgumentParser(description=__doc__,allow_abbrev=False)
-    p.add_argument('--input',type=Path,required=True)
-    p.add_argument('--output',type=Path,required=True)
-    return p.parse_args(argv)
+_TARGET = Path(__file__).resolve().parent / 'diagnostics/diagnostics_cli.py'
+globals()['__file__'] = str(_TARGET)
+exec(compile(_TARGET.read_text(), str(_TARGET), 'exec'), globals())

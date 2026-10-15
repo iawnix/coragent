@@ -158,7 +158,7 @@ def test_remote_queue_selection_is_explicit_and_allowlisted():
 @pytest.mark.parametrize('mutate', [
     lambda target: target.update(ssh_host='-oProxyCommand=bad'),
     lambda target: target.update(remote_root='/scratch/../other'),
-    lambda target: target.update(scheduler='slurm'),
+    lambda target: target.update(scheduler='unsupported'),
     lambda target: target.update(command_timeout_seconds=0),
     lambda target: target.update(max_nodes=2),
     lambda target: target.update(commands={'pbsnodes': 'pbsnodes'}),

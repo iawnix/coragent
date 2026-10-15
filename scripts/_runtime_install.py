@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Iterator
+from urllib.parse import urlsplit
 
 try:
     from ._bootstrap import load_runtime_environment
@@ -319,13 +320,18 @@ def _prepare_base(
     if effective_action != "reuse":
         if conda is None:
             raise RuntimeInstallError("Conda is required to create or update the control base")
-        completed = subprocess.run(
-            _conda_env_command(conda, effective_action, prefix, lock_path),
-            text=True,
-            stdout=sys.stderr,
-            stderr=sys.stderr,
-            check=False,
-        )
+        local_lock = _offline_conda_lock(lock_path)
+        try:
+            completed = subprocess.run(
+                _conda_env_command(conda, effective_action, prefix, local_lock or lock_path),
+                text=True,
+                stdout=sys.stderr,
+                stderr=sys.stderr,
+                check=False,
+            )
+        finally:
+            if local_lock is not None:
+                local_lock.unlink(missing_ok=True)
         if completed.returncode != 0:
             raise RuntimeInstallError(
                 f"Conda {effective_action} failed with exit code {completed.returncode}"
@@ -588,3 +594,33 @@ def _conda_env_command(conda: str, action: str, prefix: Path, lock_path: Path) -
     # An explicit lock installs exact builds without invoking a dependency solver.
     return [conda, "install" if action == "update" else "create", "--yes",
             "--prefix", str(prefix), "--file", str(lock_path)]
+
+
+def _offline_conda_lock(lock: Path) -> Path | None:
+    """Use package-cache archives for explicit locks when they are available."""
+    values = os.environ.get("CONDA_PKGS_DIRS", "")
+    caches = [Path(value) for value in values.split(os.pathsep) if value]
+    if not caches:
+        return None
+    changed = False
+    rewritten: list[str] = []
+    for line in lock.read_text().splitlines():
+        if not line.startswith(("http://", "https://")):
+            rewritten.append(line)
+            continue
+        parsed = urlsplit(line)
+        archive = parsed.path.rsplit("/", 1)[-1]
+        local = next((cache / archive for cache in caches if (cache / archive).is_file()), None)
+        if local is None:
+            rewritten.append(line)
+            continue
+        value = local.resolve().as_uri()
+        if parsed.fragment:
+            value += "#" + parsed.fragment
+        rewritten.append(value)
+        changed = True
+    if not changed:
+        return None
+    path = lock.with_name("." + lock.name + ".offline")
+    path.write_text("\n".join(rewritten) + "\n")
+    return path

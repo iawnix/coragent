@@ -1,7 +1,17 @@
-# Delivery protocol
+# Generic email delivery protocol
 
-notification_id identifies one authorized delivery, never a retry time or note version. report_refs contains up to eight files under reports/ or artifacts/. prepare pins ts-user-notification/2, configured recipient, attachment hashes and sizes.
+`message_id` identifies one authorized email message. It is stable across
+retries and must not be changed to bypass an uncertain result. The request
+uses `ts-email-message/1`; `attachments` contains at most eight regular files
+under the workspace's `reports/` or `artifacts/` trees, each pinned by its
+byte digest and size.
 
-The send library locks logical identity, persists sending before transport and then records sent/failed/unknown. A failure proven to precede transport can retry under the same identity; reconcile uncertainty first. Password rotation does not bypass deduplication.
+The transport locks the message identity, records a `sending` receipt before
+opening SMTP, and then records `sent`, `failed`, or `unknown`. A failure proven
+to precede SMTP transport can retry with the same identity. An uncertain result
+must be reconciled first. Password rotation does not create a new delivery.
 
-Receipts live under reports/email/deliveries. After sending, the CLI persists a runtime event using canonical receipt identity, then projects it into research records. Failed projections replay on the next research-context read without another email command. If event persistence itself fails, journal_error is visible and the send receipt remains authoritative; retry the same notification identity to recover registration without resending. Read a receipt through status --receipt-ref and record the outcome with research_update using the delivery Node and a note when such a Node exists.
+Receipts live under `artifacts/email/deliveries`. The transport does not write
+research records, classify scientific status, validate a report manifest, or
+choose a delivery event. A caller that needs those actions owns them and may
+store the transport receipt as one of its own evidence references.

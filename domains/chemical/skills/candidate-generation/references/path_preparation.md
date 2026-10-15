@@ -1,9 +1,9 @@
-# Mapped QST2 and IRC preparation
+# Mapped QST2 preparation
 
 `scripts/prepare_path.py` prepares Gaussian inputs from a declared elementary step.
 It does not infer a product, select a mechanism, execute Gaussian or certify a saddle.
-Use the same `chemical.path-candidates@1` and `chemical.path-irc@1` Job recipes for
-explicit transformations; a reaction name does not require a new tool.
+Use `chemical.path-candidates@1` for explicit transformations; a reaction name does
+not require a new tool. IRC input preparation is a separate validation implementation; candidate generation does not provide or import it.
 
 ## Contents
 
@@ -88,29 +88,6 @@ collect the terminal Job. Each successful branch contains spec.json, atom_order.
 reactants.xyz, product.xyz and ts.gjf, with digests. The branch spec binds the input
 title through CoRAgentSpec; retain its collected Artifact identity. The Job stages
 and pins all helper modules. Generated geometry is not a verified transition state.
-
-Run a selected ts.gjf with `chemical.gaussian-input@1`, collecting `results/ts.chk`;
-use the same method/basis/state/resources and `--validation saddle`. Inspect the raw
-output and mode evidence before preparing IRC from the collected checkpoint:
-
-```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.path-irc --version 1 --input spec=<branch-spec.json> --input checkpoint=<collected-ts.chk> --input-artifact <branch-spec-ref> --input-artifact <checkpoint-ref> --output <work_dir>/irc-request.json -- --max-points 80
-```
-
-IRC preparation supports the same explicit transformation contract regardless of
-endpoint geometry strategy. It retains checkpoint bytes and digest and writes
-forward.gjf/reverse.gjf with CalcFC and Geom=AllCheck, recalculating the Hessian at
-the checkpoint geometry. It does not parse the binary checkpoint: verify its atom
-order, method, charge/spin and producer evidence; it does not reuse a stored Hessian.
-Submit and collect the preparation Job, then run each generated input using the
-Gaussian Skill, staging ts.chk and selecting `--validation irc`.
-
-The existing chemical.reaction_mapping, chemical.gaussian_saddle and
-chemical.gaussian_irc_connectivity path validators and chemical.diels_alder_path
-acceptance profile still use the specialized DA contract. Generic preparation does
-not make those checks applicable. Use collected outputs with suitable analysis for
-the declared bond changes, mode and endpoints; record unassessed criteria explicitly.
-
 For independent fragment assembly or perturbation of a supplied complex, use
 `chemical.complex-sample@1`; for CREST and ensemble screening use the
 [ensemble contract](../../crest/references/crest_ensemble.md). Exported seeds

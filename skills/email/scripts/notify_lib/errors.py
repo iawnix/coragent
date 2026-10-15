@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 
-ERROR_SCHEMA = "ts-user-notification-error/1"
+ERROR_SCHEMA = "ts-email-error/1"
 
 
 class NotificationError(ValueError):

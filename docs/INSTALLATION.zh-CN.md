@@ -176,7 +176,7 @@ package 步骤还会在同一目录保留独立的 `install-failure-<timestamp>.
 `enabled = false` 时不传入邮件设置，新安装不启用邮件，更新保留已有设置。
 模型凭据示例及私有配置保护说明见 [config/README.md](../config/README.md)。
 
-已有 ClawEmail 安装仍受支持。直接 SMTP 投递时必须使用 163 或 QQ 邮箱的 SMTP 授权码，
+直接 SMTP 投递时必须使用 163 或 QQ 邮箱的 SMTP 授权码，
 不能使用网页登录密码；授权码应保存在配置文件之外。
 
 交互式 `install.sh` 会询问是否配置邮件；非交互安装可显式提供同一配置：

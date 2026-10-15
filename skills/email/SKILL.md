@@ -1,21 +1,48 @@
 ---
 name: email
-description: Prepare and send user-requested research email through configured SMTP or ClawEmail, with durable delivery receipts.
+description: Deliver an explicitly authorized email through the installation's SMTP transport, with durable idempotent receipts.
 ---
 
-# Email delivery
+# Email transport
 
-An explicit request such as “email me the report when finished” authorizes that delivery once its recipient and contents are clear; it does not authorize unrelated sharing. Run this Skill's CLI through native bash with CORAGENT_PYTHON; email delivery does not create a calculation Job.
+This Skill is a transport interface. It does not decide when a message should
+be sent, what a message means, which domain event it represents, or which files
+belong in an attachment. A caller prepares a generic email message and invokes
+this Skill only after the user has authorized the delivery.
 
-1. Use scripts/email_cli.py check from this Skill directory to inspect installation configuration via CORAGENT_NOTIFICATION_CONFIG before claiming settings are missing. The configured recipient owns addressing. Disclose only the diagnostic needed to resolve the issue, never secret values.
-2. Build and inspect reports under reports/ or artifacts/. A draft contains stable notification_id, event, subject, summary and report_refs. Events are progress, report_ready, calculation_failed, calculation_ambiguous and study_completed. Describe actual results within user authorization.
-3. prepare pins recipient, attachment digests and sizes without sending. Inspect the prepared request, then use send when authorized. The transport does not certify scientific completion; the Agent must state unfinished work honestly.
-4. Preserve receipt_ref. sent means transport acceptance; already_sent returns the original receipt. Reconcile unknown/sending; never rotate IDs to retry an uncertain send. A record-registration failure requires recording recovery, not another email.
+The configured recipient owns addressing. The SMTP configuration is inspected
+through `CORAGENT_NOTIFICATION_CONFIG`; credentials are never copied into a
+message request or a receipt.
 
-Research notes do not gate delivery. Progress updates do not invalidate prepared attachments; changed attachments or recipient require preparation again. Reusing notification_id with changed content is rejected. Read [delivery protocol](references/email_delivery.md).
+The generic message contract is `ts-email-message/1`:
+
+```json
+{
+  "schema_version": "ts-email-message/1",
+  "message_id": "stable-authorized-delivery-id",
+  "subject": "Message subject",
+  "body": "Message body",
+  "attachments": [
+    {"ref": "artifacts/example.txt", "sha256": "sha256:...", "size_bytes": 123}
+  ],
+  "metadata": {"optional": "caller-owned context"}
+}
+```
+
+`prepare` pins the configured recipient and attachment digests without sending.
+`send` accepts the prepared message, revalidates the SMTP configuration and
+attachments, and returns a receipt. `sent` means the SMTP server accepted the
+message; `already_sent` is the idempotent result for the same message. An
+`unknown` result must be reconciled before another attempt.
 
 ```text
-"$CORAGENT_PYTHON" <this Skill directory>/scripts/email_cli.py check --root <workspace> --output reports/email/config-check.json
-"$CORAGENT_PYTHON" <this Skill directory>/scripts/email_cli.py prepare --root <workspace> --request-file reports/email/draft.json --output reports/email/prepared.json
-"$CORAGENT_PYTHON" <this Skill directory>/scripts/email_cli.py send --root <workspace> --request-file reports/email/prepared.json --output reports/email/result.json
+"$CORAGENT_PYTHON" <this Skill directory>/scripts/email_cli.py check --root <workspace> --output <workspace>/email-check.json
+"$CORAGENT_PYTHON" <this Skill directory>/scripts/email_cli.py prepare --root <workspace> --request-file <workspace>/email-message.json --output <workspace>/email-prepared.json
+"$CORAGENT_PYTHON" <this Skill directory>/scripts/email_cli.py send --root <workspace> --request-file <workspace>/email-prepared.json --output <workspace>/email-result.json
 ```
+
+Domain Skills own message composition and domain-specific authorization before
+calling this transport.
+
+Read [delivery protocol](references/email_delivery.md) for the generic
+message, receipt, and retry contract.

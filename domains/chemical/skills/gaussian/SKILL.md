@@ -1,100 +1,58 @@
 ---
 name: gaussian
-description: Prepare, run, and inspect Gaussian calculations, including single-point, optimization, frequency, transition-state, IRC, QST, and explicit scan inputs.
+description: Adapt declared Gaussian inputs and executions to the registered Gaussian binding, preserving route, state, parser and provenance contracts.
 ---
 
-# Gaussian calculations
+# Gaussian backend
 
-Use `chemical.gaussian@1` for XYZ `sp`, `opt`, or `opt-sp` calculations. Its
-defaults are M062X/6-31G**, Opt=Tight or SP, SCF=Tight, and Int=UltraFine.
-Use `chemical.gaussian-input@1` for a complete explicit Gaussian input.
-Both use the target's `gaussian` binding.
+This Skill owns Gaussian route construction, staged input execution, raw-log
+parsing and supported energy/gradient evidence. It does not choose the
+scientific operation, select a method for a research question, assign an IRC
+basin, or certify a transition state. Use `candidate-generation`, `validation`
+or `method-selection` for those decisions.
 
-After collection, `chemical.gaussian-evidence@1` can normalize a raw log section
-for independent [stationary, mode and IRC checks](../validation/references/general_checks.md).
-These analysis Jobs use `structure` and do not rerun Gaussian or certify a TS from termination alone.
+Registered adapters:
 
-Choose the input mode before preparing arguments:
+- `chemical.gaussian@1` accepts XYZ material input for `sp`, `opt` and
+  `opt-sp` runner tasks.
+- `chemical.gaussian-input@1` accepts a complete `.gjf` and checks its declared
+  route with `--validation opt/sp/frequency/minimum/saddle/irc/none`.
+- `chemical.electronic-gaussian@1` and `chemical.state-tracking@1` expose the
+  bounded electronic-state contracts described in
+  [electronic states](references/electronic_states.md).
+- `chemical.gaussian-evidence@1` normalizes selected raw-log sections for the
+  independent validation and IRC checks.
 
-| Executor | Preparer input | Arguments after `--` |
-| --- | --- | --- |
-| `chemical.gaussian@1` | `--input geometry=input.xyz` | `--task opt/sp/opt-sp`; task selects calculation and checks. Omit `--validation`. |
-| `chemical.gaussian-input@1` | `--input input=input.gjf` | `--validation opt/sp/frequency/minimum/saddle/irc/none`; checks the supplied GJF route. Omit `--task`. |
+Both execution adapters use the target `gaussian` binding. The adapter stages
+inputs and dependencies, preserves charge/multiplicity and method metadata,
+records raw outputs and returns parser evidence. It does not add scientific
+claims to a successful Job.
 
-Neither mode accepts `--task-validation`. With XYZ, delete that option and its value; keep `--task opt` for an optimization. Do not replace it with `--validation opt`. Frequency/minimum/saddle/IRC checks require an explicit GJF with the appropriate route.
-
-Read help for the selected executor, using either `chemical.gaussian` or `chemical.gaussian-input`:
-`"$CORAGENT_PYTHON" -m research_agent.application.executors --executor chemical.gaussian --version 1 --help`.
-For software diagnosis, use the [targeted environment check](../method-selection/references/runtime_environment.md)
-with this recipe and the chosen environment.
-
-Before generating files, explicitly cd in the command to the work_dir returned by research_create/research_read, or use absolute output paths beneath it; before Node association, use workspace research/work/. work_dir is returned guidance, not a bash parameter. The relative paths below assume that directory was selected in the same command; use absolute paths for inputs stored elsewhere. Put reports in reports/; avoid loose files in the workspace root and leave historical requests in place.
+For an XYZ adapter request, prepare the Job through the executor interface:
 
 ```bash
 "$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.gaussian --version 1 --input geometry=input.xyz --output prepared/gaussian.json -- --task opt-sp --charge 0 --multiplicity 1
 ```
 
-The bash command prepares and validates a Job request; `prepared/gaussian.json` is not a calculation result and Gaussian has not been launched. On a parameter error, correct the arguments and prepare again. After success, inspect the request and submit its returned file/digest with `job_start` and the intended node_id, even for a brief calculation (replace placeholders with actual returned values):
-
-```json
-{"node_id":"<returned node_id>","request_file":"<returned request_file>","request_sha256":"<returned request_sha256>"}
-```
-
-Do not add command, inputs, outputs or platform overrides to this prepared submission. Use the returned job_id in `job_status`, then `job_collect` to preserve terminal outputs and their provenance. Cite the collected Artifacts in `research_result`; a collection receipt is evidence_refs/check_refs, not a file Artifact.
-Read the [runner contract](../method-selection/references/runner_results.md)
-for shared output and electronic-state semantics. Check the route readback,
-normal termination and convergence. An optimized structure without frequency
-evidence is not a verified minimum.
-
-## Explicit Gaussian inputs
-
-Prepare a complete .gjf for TS/Freq/IRC/QST/scan. Each Link1 section must match
-`--method`, `--basis`, `--threads`, `--memory-mb`, `--charge`, and `--multiplicity`.
-For Geom=AllCheck, verify the checkpoint's electronic state. Stage dependencies
-with `--dependency /absolute/source.chk=previous.chk`; input references must
-be relative staged paths. Collect checkpoints needed by subsequent calculations.
-
-Gaussian reads each input section until a blank line terminator. Every explicit
-`.gjf` must therefore end with a blank line (two newline characters after the
-final coordinate or extra section), and Link1 boundaries must remain blank. A file
-ending at the last coordinate can fail before calculation; check this and use the
-executor instead of a direct Gaussian shell call for a research Job.
+For an explicit input, stage checkpoint dependencies with relative names inside
+the Job and preserve blank section terminators:
 
 ```bash
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.gaussian-input --version 1 --input input=ts.gjf --collect results/ts.chk --output prepared/ts.json -- --method M062X --basis '6-31G**' --charge 0 --multiplicity 1 --threads 12 --memory-mb 4000 --validation saddle
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.gaussian-input --version 1 --input input=ts.gjf --collect results/ts.chk --output prepared/ts.json -- --method M062X --basis '6-31G**' --charge 0 --multiplicity 1 --threads 12 --memory-mb 4000 --validation none
 ```
 
-`--validation opt/sp/frequency/minimum/saddle/irc/none` selects runner checks only for this explicit GJF mode; it does not add calculation keywords to the GJF route.
-`saddle` requires stationary-point convergence and one imaginary frequency;
-inspect mode direction against the actual reaction coordinates. IRC produces path
-and endpoint artifacts; establish endpoint identities with suitable analysis.
-The registered `chemical.gaussian_saddle` and `chemical.gaussian_irc_connectivity`
-validators are DA-specific despite their names, not default checks for other reactions.
-A scan input can execute, but scan-specific completeness has no bundled validator.
+These commands prepare requests; start the Job with `job_start`, then submission and collection follow the shared
+[runner contract](../method-selection/references/runner_results.md). Do not
+invoke Gaussian directly for a research Job. The explicit-input parser requires
+complete Link1 metadata, relative staged dependencies and a final blank input
+section. L101-specific parsing failures are documented in the [L101 input
+guide](references/l101_input_guide.md).
 
-The bundled parser distinguishes reference SCF from supported target energy. It does
-not certify excited-state or arbitrary correlated-method energies; `--validation none`
-does not bypass this boundary. Preserve raw output and use appropriate analysis for
-unsupported quantities. See [capabilities and energy fields](../method-selection/references/capabilities.md).
-
-See [Gaussian scientific validation](references/gaussian_validation.md).
-
-- [Two-dimensional relaxed torsion scans](references/relaxed_scans.md)
-
-For QST2/QST3 from embedded material endpoints or a bounded ModRedundant
-scan grid, see [material-based path operations](../candidate-generation/references/path_search.md).
-The Gaussian scan adapter retains the HF/DFT SCF energy boundary; it is not a
-Gaussian gradient/NEB calculator; those use the separate state-aware entrypoints below.
-
-## Bound electronic-state calculations
-
-`chemical.electronic-gaussian@1` provides a separate typed adapter for bounded
-ground-spin HF/DFT and closed-shell singlet TDDFT/TDHF/TDA SP/optimization.
-`chemical.state-tracking@1` compares supplied AO transition-density characters
-with explicit cross-geometry overlap metrics; it detects root changes/ambiguity.
-Read [electronic state contracts](references/electronic_states.md). Native fixed-root
-optimization retains unverified state continuity until independent character
-information is available. Existing generic Gaussian energy guards remain in force.
-For different-spin crossings, use [surface-crossing](../surface-crossing/SKILL.md).
-
-For SCF/TS/IRC failures, checkpoint reuse and route mismatch, read [search diagnosis and recovery](../method-selection/references/search_recovery.md). New gradient-driven NEB searches use [ASE NEB v2](../candidate-generation/references/ase_neb_executor.md) with the separate path_gaussian binding.
+The parser distinguishes supported reference SCF energies and records unsupported
+or incomplete evidence as such. `--validation none` only disables the runner
+check; it does not broaden parser support. Use the operation Skill's evidence
+checks for any scientific conclusion. Gaussian path gradients and NEB use the
+separate `path_gaussian` adapter under `candidate-generation`. Legacy links to the old
+Gaussian validation and scan references are retained as compatibility pointers: see
+[validation-owned Gaussian checks](references/gaussian_validation.md) and
+[Gaussian scan recipes](references/relaxed_scans.md).

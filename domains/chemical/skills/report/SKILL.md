@@ -47,7 +47,16 @@ calculations use `job_*`. Plot with an available library, and run rendering Jobs
 in their configured environments. Open the final document and images to check
 links, axes, captions, units, tables, and provenance. Register the report and its
 figures, data, and scripts as materials and cite them in the research conclusion.
-Use the email Skill for delivery only with sending authorization.
+The report Skill owns delivery decisions: whether a message is progress, report-ready,
+failed, ambiguous, or complete; which report package members may be attached; how
+scientific status and limitations are worded; and how the delivery is registered in
+research records. Read [report email delivery](references/report_email_delivery.md)
+for that contract. After preparing that domain request and receiving explicit
+sending authorization, call the generic [email transport Skill](../../../../skills/email/SKILL.md).
+
+The report-specific adapter is `scripts/email_delivery.py`; it converts a
+report request into the generic email message and owns report-journal
+registration after the transport returns.
 
 ## Energy-analysis datasets
 

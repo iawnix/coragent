@@ -98,19 +98,17 @@ def test_smtp_connection_does_not_reset_timeout_for_each_ipv4_candidate(
 
 
 def test_interrupted_sending_receipt_is_reconciled_to_unknown(tmp_path) -> None:
-    receipt_ref = "reports/email/deliveries/" + "a" * 64 + ".json"
+    receipt_ref = "artifacts/email/deliveries/" + "a" * 64 + ".json"
     receipt_path = tmp_path / "receipt.json"
     receipt_path.write_text(json.dumps({
         "schema_version": delivery.RECEIPT_SCHEMA,
         "state": "sending",
         "created_at": "2026-09-23T00:00:00+00:00",
-        "notification_digest": "sha256:" + "b" * 64,
-        "event": "progress",
+        "message_digest": "sha256:" + "b" * 64,
+        "message_id": "message-v1",
         "subject": "Progress",
         "provider": "smtp",
-        "workspace_id": "ws_" + "c" * 24,
-        "workspace_revision": "rev_1",
-        "report_artifacts": [],
+        "attachments": [],
     }) + "\n", encoding="utf-8")
 
     with pytest.raises(NotificationError) as captured:

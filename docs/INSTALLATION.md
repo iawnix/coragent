@@ -201,8 +201,7 @@ referenced through `password_file` (relative to the config directory) or
 `password_env`. An absent file or `enabled = false` supplies no email settings:
 fresh installs leave email disabled, while updates preserve existing settings.
 
-Existing ClawEmail installations remain supported. For direct SMTP delivery,
-use an SMTP authorization code from a 163 or QQ mailbox (not the normal
+SMTP delivery requires an authorization code from a 163 or QQ mailbox (not the normal
 web-login password), and keep it outside the configuration file:
 
 The interactive `install.sh` flow now asks whether to configure email. For a

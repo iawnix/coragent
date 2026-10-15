@@ -54,7 +54,10 @@ def spec_sha256(package_root: Path) -> str:
 
 
 def default_prefix(package_root: Path, env_root: Path) -> Path:
-    return env_root / 'deps/python' / key(package_root, ['tools/test/environment.lock.txt','tools/test/environment.py'])
+    return env_root / 'deps/python' / key(package_root, [
+        'tools/test/environment.lock.txt', 'tools/test/environment.py',
+        'plugins/*/pyproject.toml', 'plugins/*/src/**/*',
+    ])
 
 
 def probe(python: Path, imports: str = TEST_IMPORTS) -> bool:
@@ -119,6 +122,17 @@ def prepare(package_root: Path, root: Path, components: list[str] | None = None)
                     # Only the atomic receipt publishes the completed environment.
                     run([conda,'create','--yes','--prefix',str(target),'--file',str(lock_path(package_root) if component=='python' else package_root/'environment.lock.txt')])
                     if not probe(target / 'bin/python',TEST_IMPORTS if component=='python' else 'import jsonschema,packaging'): raise RuntimeError('Locked Python probe failed')
+                    if component == 'python':
+                        # Scheduler adapters are first-party distributions with
+                        # entry points. Install them into the deterministic test
+                        # environment so source and unit lanes exercise the same
+                        # plugin boundary as the installed wheel lane.
+                        for plugin in sorted((package_root / 'plugins').iterdir()):
+                            if not plugin.is_dir() or not (plugin / 'pyproject.toml').is_file():
+                                continue
+                            run([str(target / 'bin/python'), '-m', 'pip', 'install',
+                                 '--no-index', '--no-deps', '--no-build-isolation',
+                                 '--disable-pip-version-check', str(plugin)], package_root)
                 elif component == 'node':
                     target.mkdir()
                     for name in ('package.json','package-lock.json'): shutil.copy2(package_root / name, target / name)

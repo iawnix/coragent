@@ -1,8 +1,8 @@
-# 映射 QST2 与 IRC 输入准备
+# 映射 QST2 输入准备
 
 `scripts/prepare_path.py` 根据声明的基元步骤准备 Gaussian 输入，不推断产物、不选择机理、
-不执行 Gaussian，也不认证鞍点。显式变换复用 `chemical.path-candidates@1` 与
-`chemical.path-irc@1` Job 配方，不需要按反应名称新增工具。
+不执行 Gaussian，也不认证鞍点。显式变换使用 `chemical.path-candidates@1`，不需要按反应名称
+新增工具。IRC 输入准备由 `validation` 独立实现；候选生成不提供也不导入 IRC 实现。
 
 ## 内容
 
@@ -78,26 +78,6 @@
 成功分支包含带摘要的 spec.json、atom_order.json、reactants.xyz、product.xyz 和 ts.gjf。
 分支 spec 通过 CoRAgentSpec 绑定输入标题，保留其收集后的 Artifact 身份。Job 会暂存并
 固定所有 helper 模块的摘要。生成几何不等于验证过渡态。
-
-所选 ts.gjf 通过 `chemical.gaussian-input@1` 执行，收集 `results/ts.chk`，保持相同的
-方法、基组、电荷/自旋和资源，并使用 `--validation saddle`。检查原始输出和振动模式
-证据后，使用收集的检查点准备 IRC：
-
-```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.path-irc --version 1 --input spec=<branch-spec.json> --input checkpoint=<collected-ts.chk> --input-artifact <branch-spec-ref> --input-artifact <checkpoint-ref> --output <work_dir>/irc-request.json -- --max-points 80
-```
-
-IRC 准备接收相同的显式变换契约，不依赖端点几何策略。它保留检查点原始字节及摘要，
-用 CalcFC 和 Geom=AllCheck 写 forward.gjf/reverse.gjf，在检查点几何上重新计算 Hessian，
-不解析二进制检查点，也不复用存储的 Hessian。必须核对检查点的原子顺序、方法、电荷/自旋
-和生产证据。先提交并收集输入准备 Job，
-再按 Gaussian Skill 分别运行两方向输入，暂存 ts.chk，使用 `--validation irc`。
-
-已有 chemical.reaction_mapping、chemical.gaussian_saddle、chemical.gaussian_irc_connectivity
-路径验证器和 chemical.diels_alder_path 验收 profile 仍使用 DA 专用契约。通用准备成功
-不会扩展这些检查的适用范围。应针对声明键变化、模式和端点，用适当分析检查收集的输出，
-明确记录尚未评估的条件。
-
 独立片段组装或已有复合物扰动使用 `chemical.complex-sample@1`；CREST 和集合筛选
 见[集合合同](../../crest/references/crest_ensemble.zh-CN.md)。导出种子需显式对应到本文
 端点原子键，并另行精修；复合物采样本身不确定基元步骤或过渡态。

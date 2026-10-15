@@ -375,7 +375,7 @@ def test_interactive_smtp_uses_sender_as_from_without_a_redundant_prompt(
     ])
     prompts: list[str] = []
     values = {
-        "Email binding (smtp or clawemail)": "smtp",
+        "Email binding": "smtp",
         "Notification recipient": "receiver@example.org",
         "SMTP mailbox preset (163, qq, or custom)": "qq",
         "SMTP port": "465",
@@ -645,38 +645,6 @@ def test_interactive_smtp_password_is_written_to_the_default_private_file(tmp_pa
     assert password_file.read_text(encoding="utf-8") == "163-authorization-code\n"
     assert stat.S_IMODE(password_file.stat().st_mode) == 0o600
     assert "163-authorization-code" not in (root / "etc/email.toml").read_text(encoding="utf-8")
-
-
-def test_clawemail_options_write_compatible_configuration(tmp_path: Path) -> None:
-    root = tmp_path / "install"
-    clawemail = tmp_path / "clawemail"
-    (clawemail / "bin").mkdir(parents=True)
-    (clawemail / ".clawemail").mkdir()
-    (clawemail / "SKILL.md").write_text("---\nname: clawemail\n---\n", encoding="utf-8")
-    manager = clawemail / "bin/clawemail-manager"
-    manager.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-    manager.chmod(0o755)
-    for name in ("skill.json", "mail-cli.json"):
-        path = clawemail / ".clawemail" / name
-        path.write_text("{}\n", encoding="utf-8")
-        path.chmod(0o600)
-    args = wizard.parse_args([
-        "--install-root", str(root),
-        "--without-web",
-        "--service-scope", "none",
-        "--non-interactive",
-        "--email-binding", "clawemail",
-        "--email-recipient", "receiver@example.org",
-        "--clawemail-root", str(clawemail),
-    ])
-    wizard.validate_options(args)
-
-    wizard.configure_notification_config(args)
-
-    content = (root / "etc/email.toml").read_text(encoding="utf-8")
-    assert 'recipient = "receiver@example.org"' in content
-    assert f'clawemail_root = "{clawemail}"' in content
-    assert "provider =" not in content
 
 
 def test_app_server_service_is_one_installation_host(tmp_path: Path) -> None:

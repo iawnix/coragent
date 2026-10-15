@@ -20,6 +20,8 @@ from path_validation import validate, topology
 from gaussian_io import read_xyz, parse_log
 spec=importlib.util.spec_from_file_location('chemical_candidate_path',SKILLS/'candidate-generation/scripts/prepare_path.py')
 helper=importlib.util.module_from_spec(spec);spec.loader.exec_module(helper)
+irc_spec=importlib.util.spec_from_file_location('chemical_irc_preparation',SKILLS/'validation/scripts/irc_preparation.py')
+irc_helper=importlib.util.module_from_spec(irc_spec);irc_spec.loader.exec_module(irc_helper)
 
 REACTANTS='[CH2:1]=[CH:2][CH:3]=[CH2:4].[CH2:5]=[CH:6][CH3:7]'
 PRODUCT='[CH2:1]1[CH:2]=[CH:3][CH2:4][CH2:5][CH:6]1[CH3:7]'
@@ -277,7 +279,7 @@ def test_generic_jobs_execute_candidate_gaussian_and_registered_validators(tmp_p
     assert proof['provenance']['status'] == 'verified'
     assert proof['provenance']['input_versions'][raw].startswith('sha256:')
     checkpoint=selected(ts,'ts.chk')
-    irc=helper.prepare_irc(Path(row['files']['spec.json']['path']),Path(checkpoint['location']),tmp_path/'irc')
+    irc=irc_helper.prepare_irc(Path(row['files']['spec.json']['path']),Path(checkpoint['location']),tmp_path/'irc')
     forwards=gaussian(irc['inputs'][0]['path'],'job_forward','irc',irc['checkpoint']['path'])
     reverse=gaussian(irc['inputs'][1]['path'],'job_reverse','irc',irc['checkpoint']['path'])
     joined=run_job(tmp_path,{'request_id':'job_connectivity','validator_id':'chemical.gaussian_irc_connectivity', "validator_version": "1",

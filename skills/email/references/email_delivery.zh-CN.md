@@ -1,7 +1,12 @@
-# 交付协议
+# 通用邮件交付协议
 
-notification_id 表示一次已授权的交付，不包含重试时间或笔记版本。report_refs 最多八个，指向 reports/ 或 artifacts/ 内文件。prepare 写入 ts-user-notification/2、配置收件人及附件摘要和大小。
+`message_id` 表示一次已授权的邮件消息，在重试时保持不变，不能通过更换它来绕过不确定结果。
+请求使用 `ts-email-message/1`；`attachments` 最多包含八个工作区 `reports/` 或 `artifacts/`
+目录下的普通文件，并为每个文件固定字节摘要和大小。
 
-发送库按逻辑身份加锁，先持久化 sending，再调用运输层，最后保存 sent/failed/unknown。发送尚未开始的失败可复用身份重试；结果不确定时先核查。密码轮换不会绕过去重。
+运输层按消息身份加锁，在打开 SMTP 前先写入 `sending` 回执，之后写入 `sent`、`failed` 或
+`unknown`。已确认发生在 SMTP 运输之前的失败可以用同一身份重试；结果不确定时必须先核查。
+密码轮换不会创建新的交付。
 
-回执保存在 reports/email/deliveries，发送完成后以规范回执身份保存运行事件，再投影到研究记录。投影失败的事件在下一次读取研究上下文时重放，不需要重新执行发送。事件持久化本身失败时显示 journal_error，发送回执仍是权威；用同一通知身份重试只恢复登记，不重发。可通过 status --receipt-ref 读取回执，如果已有交付 Node，可用 research_update 的 node_id 与 note 记录结果。
+回执保存在 `artifacts/email/deliveries`。运输层不写研究记录、不判断科学状态、不校验报告清单，
+也不选择领域事件。需要这些行为的调用方应自行负责，并可将运输回执作为自己的证据引用。

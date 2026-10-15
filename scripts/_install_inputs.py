@@ -57,7 +57,6 @@ def email_options(config: Path) -> list[str]:
         "username": ("email_username", "--email-address"),
         "password_file": ("email_password_file", "--email-password-file"),
         "password_env": ("email_password_env", "--email-password-env"),
-        "clawemail_root": ("clawemail_root", "--clawemail-root"),
     }
     if not isinstance(email, dict) or set(email) - {*fields, "enabled"}:
         raise ValueError("email.toml requires [notifications.email] with supported fields; store passwords separately")
@@ -144,7 +143,7 @@ def apply_config_directory(args: argparse.Namespace) -> None:
     configured = parse_args(["--non-interactive", *values], use_environment=False)
     explicit_password = args.email_password_file is not None or args.email_password_env is not None
     for attribute in ("email_binding", "email_preset", "email_host", "email_port", "email_security",
-                      "email_recipient", "email_username", "clawemail_root", "email_password_file", "email_password_env"):
+                      "email_recipient", "email_username", "email_password_file", "email_password_env"):
         if attribute in {"email_password_file", "email_password_env"} and explicit_password:
             continue
         if getattr(args, attribute) is None:

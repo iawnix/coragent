@@ -1,6 +1,6 @@
 ---
 name: geometry-safety
-description: Screen molecular and reaction-candidate coordinates for catastrophic input failures while allowing non-equilibrium reaction-center geometry.
+description: Apply a cross-task coordinate safety screen before electronic-structure jobs while allowing declared non-equilibrium reaction-center geometry.
 ---
 
 # Geometry safety

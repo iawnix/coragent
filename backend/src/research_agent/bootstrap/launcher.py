@@ -47,7 +47,6 @@ SESSION_ID = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,158}[A-Za-z0-9])?$")
 APP_SERVER_ID = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
 )
-NOTIFICATION_CLAWEMAIL_FIELDS = {"enabled", "recipient", "clawemail_root"}
 NOTIFICATION_SMTP_FIELDS = {
     "enabled",
     "provider",
@@ -802,78 +801,65 @@ def configure_notifications(installation: Installation) -> None:
             raise ValueError("notifications.email.enabled must be true or false")
         if not isinstance(recipient, str) or len(recipient) > 320 or not EMAIL_ADDRESS.fullmatch(recipient):
             raise ValueError("notifications.email.recipient must be one email address")
-        provider = email.get("provider", "clawemail")
-        if provider == "clawemail":
-            expected = set(NOTIFICATION_CLAWEMAIL_FIELDS)
-            if "provider" in email:
-                expected.add("provider")
-            if set(email) != expected:
-                raise ValueError(
-                    "notifications.email fields must be enabled, recipient, and clawemail_root"
-                )
-            clawemail_root = email["clawemail_root"]
-            if not isinstance(clawemail_root, str) or not clawemail_root.startswith("/"):
-                raise ValueError("notifications.email.clawemail_root must be an absolute path")
-        elif provider == "smtp":
-            if set(email) - NOTIFICATION_SMTP_FIELDS:
-                unknown = ", ".join(sorted(set(email) - NOTIFICATION_SMTP_FIELDS))
-                raise ValueError(f"unknown notifications.email fields: {unknown}")
-            required = {"enabled", "provider", "preset", "recipient", "username"}
-            missing = required - set(email)
-            if missing:
-                raise ValueError(
-                    "notifications.email is missing fields: " + ", ".join(sorted(missing))
-                )
-            preset = email["preset"]
-            if not isinstance(preset, str) or preset.lower() not in SMTP_PRESETS:
-                raise ValueError("notifications.email.preset must be 163, qq, or custom")
-            username = email["username"]
-            if not isinstance(username, str) or not EMAIL_ADDRESS.fullmatch(username):
-                raise ValueError("notifications.email.username must be one email address")
-            from_address = email.get("from_address", username)
-            if not isinstance(from_address, str) or not EMAIL_ADDRESS.fullmatch(from_address):
-                raise ValueError("notifications.email.from_address must be one email address")
-            password_env = email.get("password_env")
-            password_file = email.get("password_file")
-            if (password_env is None) == (password_file is None):
-                raise ValueError(
-                    "notifications.email must set exactly one of password_env or password_file"
-                )
-            if password_env is not None and (
-                not isinstance(password_env, str) or not ENV_NAME.fullmatch(password_env)
-            ):
-                raise ValueError("notifications.email.password_env must be an environment variable name")
-            if password_file is not None:
-                if not isinstance(password_file, str) or not password_file.startswith("/"):
-                    raise ValueError("notifications.email.password_file must be an absolute path")
-                secret_path = Path(password_file).expanduser()
-                if secret_path.is_symlink() or not secret_path.is_file():
-                    raise ValueError("notifications.email.password_file must be a regular file")
-                if stat.S_IMODE(secret_path.stat().st_mode) & 0o077:
-                    raise ValueError("notifications.email.password_file must have mode 0600")
-            defaults = SMTP_PRESETS[preset.lower()]
-            host = email.get("host", defaults["host"])
-            if (
-                not isinstance(host, str)
-                or not host
-                or len(host) > 255
-                or any(character.isspace() for character in host)
-                or "/" in host
-                or "@" in host
-            ):
-                raise ValueError("notifications.email.host must be a hostname")
-            if preset.lower() != "custom" and host != defaults["host"]:
-                raise ValueError(
-                    f"notifications.email.host must be {defaults['host']} for preset {preset.lower()}"
-                )
-            port = email.get("port", defaults["port"])
-            if not isinstance(port, int) or isinstance(port, bool) or not 1 <= port <= 65535:
-                raise ValueError("notifications.email.port must be an integer from 1 to 65535")
-            security = email.get("security", defaults["security"])
-            if not isinstance(security, str) or security.lower() not in SMTP_SECURITY:
-                raise ValueError("notifications.email.security must be ssl or starttls")
-        else:
-            raise ValueError("notifications.email.provider must be clawemail or smtp")
+        if set(email) - NOTIFICATION_SMTP_FIELDS:
+            unknown = ", ".join(sorted(set(email) - NOTIFICATION_SMTP_FIELDS))
+            raise ValueError(f"unknown notifications.email fields: {unknown}")
+        required = {"enabled", "provider", "preset", "recipient", "username"}
+        missing = required - set(email)
+        if missing:
+            raise ValueError(
+                "notifications.email is missing fields: " + ", ".join(sorted(missing))
+            )
+        if email.get("provider") != "smtp":
+            raise ValueError("invalid notifications.email configuration")
+        preset = email["preset"]
+        if not isinstance(preset, str) or preset.lower() not in SMTP_PRESETS:
+            raise ValueError("notifications.email.preset must be 163, qq, or custom")
+        username = email["username"]
+        if not isinstance(username, str) or not EMAIL_ADDRESS.fullmatch(username):
+            raise ValueError("notifications.email.username must be one email address")
+        from_address = email.get("from_address", username)
+        if not isinstance(from_address, str) or not EMAIL_ADDRESS.fullmatch(from_address):
+            raise ValueError("notifications.email.from_address must be one email address")
+        password_env = email.get("password_env")
+        password_file = email.get("password_file")
+        if (password_env is None) == (password_file is None):
+            raise ValueError(
+                "notifications.email must set exactly one of password_env or password_file"
+            )
+        if password_env is not None and (
+            not isinstance(password_env, str) or not ENV_NAME.fullmatch(password_env)
+        ):
+            raise ValueError("notifications.email.password_env must be an environment variable name")
+        if password_file is not None:
+            if not isinstance(password_file, str) or not password_file.startswith("/"):
+                raise ValueError("notifications.email.password_file must be an absolute path")
+            secret_path = Path(password_file).expanduser()
+            if secret_path.is_symlink() or not secret_path.is_file():
+                raise ValueError("notifications.email.password_file must be a regular file")
+            if stat.S_IMODE(secret_path.stat().st_mode) & 0o077:
+                raise ValueError("notifications.email.password_file must have mode 0600")
+        defaults = SMTP_PRESETS[preset.lower()]
+        host = email.get("host", defaults["host"])
+        if (
+            not isinstance(host, str)
+            or not host
+            or len(host) > 255
+            or any(character.isspace() for character in host)
+            or "/" in host
+            or "@" in host
+        ):
+            raise ValueError("notifications.email.host must be a hostname")
+        if preset.lower() != "custom" and host != defaults["host"]:
+            raise ValueError(
+                f"notifications.email.host must be {defaults['host']} for preset {preset.lower()}"
+            )
+        port = email.get("port", defaults["port"])
+        if not isinstance(port, int) or isinstance(port, bool) or not 1 <= port <= 65535:
+            raise ValueError("notifications.email.port must be an integer from 1 to 65535")
+        security = email.get("security", defaults["security"])
+        if not isinstance(security, str) or security.lower() not in SMTP_SECURITY:
+            raise ValueError("notifications.email.security must be ssl or starttls")
     except (KeyError, OSError, TypeError, ValueError, tomllib.TOMLDecodeError) as exc:
         raise CoRAgentHostError(f"invalid notification configuration: {path}: {exc}") from exc
     os.environ["CORAGENT_NOTIFICATION_CONFIG"] = str(path)

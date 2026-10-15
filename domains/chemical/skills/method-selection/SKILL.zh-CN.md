@@ -1,6 +1,6 @@
 ---
 name: method-selection
-description: 选择科学方法并准备命名计算环境；用户已经指定方法时同样用于执行准备。
+description: 协调科学方法、后端与命名计算环境；用户已经指定方法时同样负责执行准备。
 ---
 
 # CoRAgent 方法选择
@@ -8,8 +8,11 @@ description: 选择科学方法并准备命名计算环境；用户已经指定�
 [English version](SKILL.md)
 
 选择方法或准备已指定方法的执行时使用本 Skill。辅助脚本生成通用 Job 请求，由 Agent 提交执行。
+本 Skill 属于跨任务协调层，不实现求解器，也不替代科学操作、后端适配或证据验证。
 
 判断内置能力、原生命令/脚本途径与专用检查范围时，先读[当前能力与边界](references/capabilities.zh-CN.md)。Skill 描述或安装了可执行文件本身，不代表完整支持。
+使用[科学操作与后端映射](references/operation_backend_map.zh-CN.md)区分操作归属、后端归属和证据归属。
+核对注册执行器和验证器的操作归属时，使用[完整操作/后端注册表](references/operation_backend_registry.zh-CN.md)。
 
 从用户要求的可观测量或待解决的科学问题出发，考虑体系大小、电荷、自旋、电子态、金属或多参考
 风险、溶剂、约束、目标可观测量、预期误差、候选质量与成本。先根据方法 Skill 选择输入、
@@ -42,5 +45,7 @@ description: 选择科学方法并准备命名计算环境；用户已经指定�
 
 - [请求准备](references/request_preparation.zh-CN.md)：声明入口、显式输入与恢复。
 - [Runner 结果、单位与电子态](references/runner_results.zh-CN.md)
+- [xTB 操作配方](references/xtb_operation_recipes.zh-CN.md)：原生命令示例和操作层证据边界。
+- [操作/后端注册表](references/operation_backend_registry.zh-CN.md)：完整的运行时归属清单。
 
 搜索失败或反复得到相同结果时，按[搜索诊断与恢复](references/search_recovery.zh-CN.md)先区分执行、数值和假设问题，再修改设置或种子。

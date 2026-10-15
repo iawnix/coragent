@@ -1,23 +1,6 @@
-"""ASE NEB entries for the version 2 input and calculator contracts."""
+"""Compatibility entrypoint; implementation moved to ``neb/ase_search.py``."""
 from pathlib import Path
-import sys
 
-SKILLS = Path(__file__).resolve().parents[2]
-for part in ('_shared', 'chemical-input/scripts', 'crest/scripts', 'gaussian/scripts', 'energetics/scripts'):
-    sys.path.insert(0, str(SKILLS/part))
-from analysis_material import read_json
-from ase_neb import neb
-from gaussian_path import GaussianPathCalculator
-from path_xtb import XtbCalculator
-from ase_cli import parse_arguments
-
-
-def run(args):
-    spec, _ = read_json(args.input)
-    cls = XtbCalculator if args.operation == 'neb-xtb' else GaussianPathCalculator
-    return neb(spec, args.output_dir, lambda m,s: cls(m,s,args.executable))
-
-
-if __name__ == '__main__':
-    result = run(parse_arguments())
-    raise SystemExit(0 if result['status'] == 'converged' else 1)
+_TARGET = Path(__file__).resolve().parent / 'neb/ase_search.py'
+globals()['__file__'] = str(_TARGET)
+exec(compile(_TARGET.read_text(), str(_TARGET), 'exec'), globals())

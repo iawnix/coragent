@@ -6,6 +6,6 @@ Supported tasks: sp, opt, opt-sp, ts, freq, thermo, opt_freq, ts_freq. opt-sp ha
 
 Every run uses a new empty output directory. result.json and geometry.xyz are aggregate outputs; each step retains pyscf.out, pyscf_result.json and requested geometry/frequency/Hessian/thermochemistry artifacts. Scratch is retained in the attempt directory for diagnosis and may be cleaned after the process exits; never delete an installation scratch root. Script and input hashes bind the result. No script writes Research Memory.
 
-Verify execution_completed, SCF convergence, structured optimization convergence and the requested task artifacts. Preserve energy units and actual versions. Reject non-finite energies and mismatched method/basis/input. The Agent separately registers research notes and evidence.
+The adapter records execution_completed, SCF/structured-optimization status, units, versions and method/basis/input consistency fields. The Agent separately registers research notes and evidence; operation and validation/energetics Skills own scientific criteria.
 
-A stationary-point frequency count is not mode assignment, endpoint identity or IRC. A significant imaginary-frequency threshold defaults to -20 cm^-1. No frequency calculation means no verified minimum claim. This runner does not implement IRC, NEB, reaction scans, crossing points or multi-structure comparisons. Report missing support without substituting RHF or another functional.
+This runner does not implement IRC, NEB, reaction scans, crossing points or multi-structure comparisons. Keep unsupported capabilities explicit; validation and energetics Skills own stationary-point, frequency and thermochemistry criteria.

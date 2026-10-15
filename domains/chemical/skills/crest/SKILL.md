@@ -1,37 +1,29 @@
 ---
 name: crest
-description: Run bounded CREST conformer searches, import and screen ensembles, sample rigid-fragment complexes, and export members for independent refinement.
+description: Adapt declared CREST conformer and rigid-fragment ensemble jobs, preserving member identity, records and provenance.
 ---
 
-# CoRAgent CREST and ensembles
+# CREST backend
 
-[Chinese version](SKILL.zh-CN.md)
+This Skill owns the CREST executable binding, versioned input staging, ensemble
+receipt parsing and member-level provenance. It does not choose a reaction
+mechanism, rank a research hypothesis, certify a minimum or transition state, or
+interpret ensemble energies as free energies. Use `chemical-input`,
+`candidate-generation`, `energetics` or `method-selection` for those decisions.
 
-Use this Skill for independent conformer or complex preparation; R/P and a
-reaction name are not required. Read [the ensemble contract](references/crest_ensemble.md)
-for input schemas, Job examples, limits and interpretation.
+Registered adapters:
 
-Choose the operation that matches the available evidence:
+- `chemical.crest@1` stages an explicit ground-state material for the configured
+  CREST 3.0.2 GFN1/GFN2 binding.
+- `chemical.crest-ensemble@1` imports a receipt and exact source material.
+- `chemical.ensemble-select@1` and `chemical.complex-sample@1` use the
+  structure binding for deterministic record operations around the CREST data.
 
-- `chemical.crest@1`: bounded CREST 3.0.2 GFN1/GFN2 search of an explicit
-  ground-state material with known charge, multiplicity and coordinates.
-- `chemical.crest-ensemble@1`: import the run receipt and exact source material;
-  retain member identity inference, energy consistency and partial-result status.
-- `chemical.ensemble-select@1`: bounded symmetry-aware geometric clustering and
-  comparable electronic-energy screening, recording every member's decision.
-- `chemical.complex-sample@1`: sample rigid orientations/placements from separate
-  materials or perturb a supplied complex; preserve original coordinates and lineage.
+The adapter preserves source material, member IDs, coordinates, method/solvent
+metadata, energy fields, selection decisions and partial-result status. Unknown
+identity or state remains an explicit record field. Other CREST versions and
+native options require a generic Job with declared inputs and outputs; this
+registered adapter does not claim compatibility for them.
 
-Prepare and submit each operation through the existing Job lifecycle. CREST uses
-the `crest` backend with a configured native executable and Python wrapper
-binding. Import, selection and complex sampling use `structure` (RDKit/NumPy).
-Other verified CREST versions/features remain available through generic Jobs;
-this versioned wrapper does not establish their compatibility.
-
-Inspect primary files and per-member evidence before reuse. A complete search
-receipt is not an exhaustive search, minimum certification or verified identity.
-Unknown identity/state stays unresolved; mixed methods/solvents are not ranked.
-Retain the source ensemble, decisions, exported XYZ/materials and refinement
-manifest. Submit selected members to explicit compatible SP/optimization Jobs;
-do not silently change solvent, state or method. Sampling constraints do not
-carry into subsequent optimization. CREST energies are not free energies.
+Prepare and submit through the normal Job lifecycle. The detailed schemas and
+staging boundaries are in the [backend contract](references/crest_backend_contract.md); ensemble operations are documented in [the ensemble contract](references/crest_ensemble.md).

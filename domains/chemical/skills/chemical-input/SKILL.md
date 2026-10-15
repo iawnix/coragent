@@ -1,6 +1,6 @@
 ---
 name: chemical-input
-description: Turn chemical names, descriptions or supplied structures into molecular graphs and initial geometries using PubChem/OPSIN lookup, Agent inference and structure checks; prepare explicit reaction mappings when needed.
+description: Prepare molecular materials and explicit reaction definitions from names, SMILES or supplied coordinates, preserving identity, state and provenance for later scientific operations.
 ---
 
 # Chemical input
@@ -9,6 +9,8 @@ description: Turn chemical names, descriptions or supplied structures into molec
 
 Use this Skill to prepare structures for the user's research. Keep the original
 input, chosen structure, source, charge and multiplicity with the resulting files.
+This is the structure and reaction-definition layer; it does not choose a quantum
+method, run a solver, or certify a transition state.
 
 Use `chemical.material@1` when handing off a name, SMILES or supplied XYZ with its
 original text, graph/coordinates, fragments, unknown settings, state declaration
@@ -82,6 +84,9 @@ optimization or single-point calculation needs no reaction mapping.
 Retain the chosen target structure as an Artifact and use `chemical.compare@1` to
 compare a calculated structure with it when the study calls for that check. Cite
 checks and source structures in the research record and explain relevant differences.
+
+
+See [script layout](references/script_layout.md) for the implementation boundaries and compatibility entrypoints.
 
 ## References
 

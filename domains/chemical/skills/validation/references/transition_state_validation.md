@@ -45,4 +45,4 @@ Record each verified property as a research note with the primary output and
 analysis Artifact references. Record missing, conflicting, or ambiguous
 evidence as a research note. These records inform later status decisions but do
 not change a research Node or hypothesis automatically. IRC connectivity is a separate
-validation dimension handled by `irc`.
+validation dimension handled by this Skill's IRC checks.

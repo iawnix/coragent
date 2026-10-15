@@ -45,9 +45,13 @@ def package_lines(text):
         url, _, checksum = line.partition('#')
         if checksum and not re.fullmatch(r'[0-9a-f]{64}', checksum):
             raise EnvironmentMismatch('environment_lock_invalid')
-        if url in packages and packages[url] != checksum:
+        # Conda reports file URLs when an offline explicit lock is materialized
+        # from a local package cache. Compare the immutable archive identity so
+        # those URLs remain equivalent to the published channel URLs.
+        key = url.rsplit('/', 1)[-1]
+        if key in packages and packages[key] != checksum:
             raise EnvironmentMismatch('environment_lock_invalid')
-        packages[url] = checksum
+        packages[key] = checksum
     return packages
 
 

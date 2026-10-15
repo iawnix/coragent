@@ -1,4 +1,4 @@
-"""Bounded content, digest, and workspace-report path helpers."""
+"""Bounded message content, digests, and safe workspace attachment paths."""
 
 from __future__ import annotations
 
@@ -25,19 +25,19 @@ def workspace_path(
     ref = bounded_text(value, "workspace ref", 4096).replace("\\", "/")
     parts = ref.split("/")
     if not ref.startswith(("reports/", "artifacts/")) or any(part in {"", ".", ".."} for part in parts):
-        raise ValueError("notification artifacts must use a safe reports/ workspace-relative path")
+        raise ValueError("email attachments must use a safe workspace-relative path under reports/ or artifacts/")
     path = workspace.joinpath(*parts)
     current = workspace
     for part in parts:
         current = current / part
         if current.is_symlink():
-            raise ValueError(f"notification artifact path contains a symbolic link: {ref}")
+            raise ValueError(f"email attachment path contains a symbolic link: {ref}")
         if not current.exists():
             break
     if must_exist and not path.is_file():
-        raise ValueError(f"notification artifact does not exist: {ref}")
+        raise ValueError(f"email attachment does not exist: {ref}")
     if not must_exist and path.exists() and not allow_existing:
-        raise ValueError(f"notification artifact already exists: {ref}")
+        raise ValueError(f"email attachment already exists: {ref}")
     return ref, path
 
 

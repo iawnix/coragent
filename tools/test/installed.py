@@ -22,6 +22,18 @@ def install_wheel(wheel: Path, overlay: Path):
     subprocess.run([sys.executable,'-m','venv','--copies','--system-site-packages',str(overlay)],env=env,check=True)
     python=overlay/'bin/python'
     subprocess.run([str(python),'-m','pip','install','--no-index','--no-deps','--disable-pip-version-check',str(wheel)],env=env,check=True)
+    # Remote scheduler adapters are deliberately maintained as separate
+    # distributions.  The source lane must install the first-party plugin
+    # packages into the same isolated overlay so entry-point discovery tests
+    # exercise the shipped plugin boundary instead of the controller's source
+    # checkout or the host user's environment.
+    for plugin in sorted((ROOT / 'plugins').iterdir()):
+        if not plugin.is_dir() or not (plugin / 'pyproject.toml').is_file():
+            continue
+        subprocess.run([
+            str(python), '-m', 'pip', 'install', '--no-index', '--no-deps',
+            '--no-build-isolation', '--disable-pip-version-check', str(plugin),
+        ], env=env, check=True)
     program=('import importlib,pathlib,sys,json;'
              'names=["research_agent","research_agent.research","research_agent.jobs","research_agent.artifacts","research_agent.application","research_agent.foundation"];'
              'origins={name:importlib.import_module(name).__file__ for name in names};'
@@ -38,7 +50,7 @@ def install_wheel(wheel: Path, overlay: Path):
 def wheel_validation(files, extra, workers):
     test_root=Path(os.environ['CORAGENT_TEST_ENV_ROOT'])
     run_root=Path(os.environ['CORAGENT_TEST_RUN_ROOT'])
-    identity=key(ROOT,['backend/pyproject.toml','backend/src/**/*','package.json','scripts/_wheel.py','tools/test/installed.py'],sys.version+sys.prefix)
+    identity=key(ROOT,['backend/pyproject.toml','backend/src/**/*','package.json','scripts/_wheel.py','tools/test/installed.py','plugins/*/pyproject.toml','plugins/*/src/**/*'],sys.version+sys.prefix)
     cache=test_root/'builds'/identity
     with locked(test_root,'wheel-'+identity):
         receipt=cache/'wheel.json'

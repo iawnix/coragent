@@ -1,6 +1,6 @@
 ---
 name: chemical-input
-description: 将化学名称、描述或给定结构转成分子图和初始几何，优先使用 PubChem/OPSIN，查询无结果时由 Agent 推断并检查结构；按研究需要准备反应映射。
+description: 从名称、SMILES 或给定坐标准备分子材料和显式反应定义，为后续科学操作保留身份、电子态与来源。
 ---
 
 # 化学输入
@@ -8,6 +8,7 @@ description: 将化学名称、描述或给定结构转成分子图和初始几�
 [English version](SKILL.md)
 
 为用户的研究准备可用结构。随结果保存原始输入、选用结构、来源、电荷和多重度。
+本 Skill 负责结构与反应定义层，不选择量子化学方法、不运行求解器，也不认证过渡态。
 
 需要统一交接名称、SMILES 或用户已有 XYZ 时，使用 `chemical.material@1` 保存原文、
 图/坐标、片段、未知设置、电子态声明和可逆原子顺序。已有 XYZ 尤其是复合物应保留坐标与
@@ -62,6 +63,9 @@ Job Runtime 选择并探测 `structure` 绑定后，作为 executor entry 执行
 
 把选用的目标结构登记为 Artifact，研究需要时用 `chemical.compare@1` 对照计算后结构。
 在研究记录中引用检查结果及来源结构，解释影响研究的差异。
+
+
+脚本职责和兼容入口见 [脚本布局](references/script_layout.zh-CN.md)。
 
 ## 参考
 
