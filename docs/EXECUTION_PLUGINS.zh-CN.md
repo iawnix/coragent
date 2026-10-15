@@ -22,8 +22,10 @@ factory 接收一个 target 配置并返回 `RemoteSSHPlatform` 或实现了
 `ExecutionPlatform` 的自定义平台。调度器实现只需要实现 `RemoteScheduler`，不应复制
 输入 staging、receipt 写入或输出回收逻辑。
 
-PBS、Slurm 和 tri 可以分别由不同发行包维护；同一个 driver 名称的外部 entry point
-会覆盖 Core 提供的默认适配器。配置仍然只引用 target 名称：
+PBS、Slurm 和 tri 由独立发行包维护，Core 不再内置这些调度器实现。安装包分别为
+`tspi-execution-pbs`（提供 `pbs` 和 `torque`）、`tspi-execution-slurm` 和
+`tspi-execution-tri`。运行时只会发现已经安装的 entry point；配置选择了未安装的
+driver 时会明确报告插件未安装。配置仍然只引用 target 名称：
 
 ```toml
 [execution.targets.cluster_1w]

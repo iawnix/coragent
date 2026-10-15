@@ -11,7 +11,6 @@ from .local import LocalProcessPlatform
 from .remote import RemoteSSHPlatform
 from .platform import ExecutionPlatform
 from .registry import ExecutionPluginRegistry, PluginDescriptor
-from research_agent.execution_plugins.descriptors import register_builtin_scheduler_plugins
 
 
 from .config_contract import load_job_config
@@ -41,7 +40,6 @@ def _builtin_registry() -> ExecutionPluginRegistry:
             supervisor="systemd", platform_name=str(target["target_name"]),
         ),
     ))
-    register_builtin_scheduler_plugins(registry)
     registry.register(PluginDescriptor(
         driver="process", scope="remote",
         factory=lambda target: RemoteSSHPlatform(
