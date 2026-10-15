@@ -34,8 +34,8 @@ def _queues(value, label):
 
 
 def validate_remote(target, label):
-    if target.get('scheduler', 'torque') not in {'torque', 'pbs'}:
-        raise ValueError(f"{label}.scheduler must be torque or pbs")
+    if target.get('scheduler', 'torque') not in {'torque', 'pbs', 'slurm', 'tri', 'process'}:
+        raise ValueError(f"{label}.scheduler is unsupported")
     host = target.get('ssh_host')
     if not isinstance(host, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.@:-]*', host):
         raise ValueError(f"{label}.ssh_host is invalid")
@@ -46,7 +46,7 @@ def validate_remote(target, label):
         if key in target and (type(target[key]) is not int or not 1 <= target[key] <= maximum):
             raise ValueError(f"{label}.{key} must be between 1 and {maximum}")
     commands = target.get('commands', {})
-    _keys(commands, {'qsub', 'qstat', 'qdel', 'checkjob'}, label + '.commands')
+    _keys(commands, {'qsub', 'qstat', 'qdel', 'submit', 'status', 'cancel', 'checkjob', 'sacct'}, label + '.commands')
     for name, command in commands.items():
         if not isinstance(command, str) or not command or any(c.isspace() or c == '\0' for c in command):
             raise ValueError(f"{label}.commands.{name} must name one executable")
@@ -98,6 +98,8 @@ def _validate_execution_config(value):
             if "cluster_name" in target:
                 raise ValueError(f"local execution target {name!r} cannot declare cluster_name")
         else:
+            if driver not in {"pbs", "torque", "slurm", "tri", "process"}:
+                raise ValueError(f"unsupported remote execution driver: {driver}")
             if not isinstance(target.get("cluster_name"), str) or not target["cluster_name"].strip():
                 raise ValueError(f"remote execution target {name!r} requires cluster_name")
             if not isinstance(target.get("ssh_host"), str) or not target["ssh_host"].strip():
@@ -121,7 +123,7 @@ def _validate_execution_config(value):
                 normalized[common] = options[common]
         if scope == "local":
             normalized.setdefault("supervisor", "process" if driver == "process" else "systemd")
-        elif driver in {"pbs", "torque"}:
+        elif driver in {"pbs", "torque", "slurm", "tri", "process"}:
             normalized.setdefault("scheduler", driver)
         environments[name] = normalized
     if local_count > 1:
@@ -284,7 +286,7 @@ def validate_submission(result, *, kind, scheduler='torque', require_queue=True,
     if "queue_wait_seconds" in result and (type(result["queue_wait_seconds"]) is not int or result["queue_wait_seconds"] < 1):
         raise ValueError("queue_wait_seconds must be positive")
     queue = result.get("queue")
-    if require_queue and kind == "remote" and not queue:
+    if require_queue and kind == "remote" and scheduler != "process" and not queue:
         raise ValueError("queue_binding_missing: configure submission.queue; allowed_queues does not select a queue")
     if "queue" in result and (not isinstance(queue, str) or not re.fullmatch(QUEUE_PATTERN, queue)):
         raise ValueError("submission.queue is invalid")
@@ -356,9 +358,9 @@ def job_config_schema():
     target = record({'kind': {'enum': ['local', 'remote']}, 'supervisor': {'enum': ['process', 'systemd']}, 'python': python, 'submission': submission,
                      'backends': {'type': 'object', 'propertyNames': text('^' + NAME_PATTERN + '$'), 'additionalProperties': backend},
                      'ssh_host': text(r'^[A-Za-z0-9][A-Za-z0-9_.@:-]*$'), 'ssh_config': absolute,
-                     'scheduler': {'enum': ['torque', 'pbs']}, 'remote_root': absolute, 'allowed_queues': queues,
+                     'scheduler': {'enum': ['torque', 'pbs', 'slurm', 'tri', 'process']}, 'remote_root': absolute, 'allowed_queues': queues,
                      **{name: integer(limit) for name, limit in TIMEOUT_LIMITS.items()},
-                     'commands': record({key: text(r'^\S+$') for key in ('qsub', 'qstat', 'qdel', 'checkjob')})}, ('kind',))
+                     'commands': record({key: text(r'^\S+$') for key in ('qsub', 'qstat', 'qdel', 'submit', 'status', 'cancel', 'checkjob', 'sacct')})}, ('kind',))
     assert set(target['properties']) == TARGET_FIELDS and set(backend['properties']) == BACKEND_FIELDS
     target['allOf'] = [
         {'if': {'properties': {'kind': {'const': 'remote'}}}, 'then': {'required': ['ssh_host', 'remote_root'], 'not': {'required': ['supervisor']}},
@@ -375,8 +377,34 @@ def job_config_schema():
         {'if': {'properties': {'kind': {'const': 'remote'}, 'scheduler': {'const': 'pbs'}}, 'required': ['scheduler']},
          'else': submission_restriction({'properties': {'resources': {'not': {'required': ['select']}}}})},
     ])
+    legacy = record({'default_environment': text('^' + NAME_PATTERN + '$'),
+                     'environments': {'type': 'object', 'minProperties': 1,
+                                      'propertyNames': text('^' + NAME_PATTERN + '$'), 'additionalProperties': target}},
+                    ('default_environment', 'environments'))
+    execution_target = record({
+        'type': {'enum': ['local', 'remote']},
+        'driver': {'enum': ['local', 'process', 'systemd', 'pbs', 'torque', 'slurm', 'tri']},
+        'cluster_name': text('^' + NAME_PATTERN + '$'),
+        'ssh_host': text(r'^[A-Za-z0-9][A-Za-z0-9_.@:-]*$'),
+        'ssh_config': absolute, 'remote_root': absolute,
+        'options': {'type': 'object'},
+        'submission': submission,
+        'bindings': {'type': 'object', 'propertyNames': text('^' + NAME_PATTERN + '$'),
+                     'additionalProperties': backend},
+        **{name: integer(limit) for name, limit in TIMEOUT_LIMITS.items()},
+        'allowed_queues': queues,
+        'commands': {'type': 'object', 'propertyNames': text(r'^[A-Za-z][A-Za-z0-9_-]*$'),
+                     'additionalProperties': text(r'^\S+$')},
+    }, ('type', 'driver'))
+    execution_target['allOf'] = [
+        {'if': {'properties': {'type': {'const': 'remote'}}},
+         'then': {'required': ['cluster_name', 'ssh_host', 'remote_root']},
+         'else': {'not': {'anyOf': [{'required': [key]} for key in ('cluster_name', 'ssh_host', 'ssh_config', 'remote_root')]}}},
+    ]
+    execution = record({'default_target': text('^' + NAME_PATTERN + '$'),
+                        'targets': {'type': 'object', 'minProperties': 1,
+                                    'propertyNames': text('^' + NAME_PATTERN + '$'),
+                                    'additionalProperties': execution_target}},
+                       ('default_target', 'targets'))
     return {'$schema': 'https://json-schema.org/draft/2020-12/schema', 'title': 'Job installation configuration',
-            **record({'default_environment': text('^' + NAME_PATTERN + '$'),
-                      'environments': {'type': 'object', 'minProperties': 1,
-                                       'propertyNames': text('^' + NAME_PATTERN + '$'), 'additionalProperties': target}},
-                     ('default_environment', 'environments'))}
+            'oneOf': [legacy, record({'execution': execution}, ('execution',))]}

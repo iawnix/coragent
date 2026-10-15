@@ -12,7 +12,7 @@ from research_agent.foundation.transactions import TransactionCoordinator, _safe
 from research_agent.research.operational_ids import allocate_id
 
 _REFERENCE = re.compile(r"^prepared_[1-9][0-9]*$")
-_REQUEST_FIELDS = {"request_id", "work_id", "command", "platform", "environment", "inputs", "outputs", "metadata", "timeout_seconds", "input_artifact_ids"}
+_REQUEST_FIELDS = {"request_id", "work_id", "command", "platform", "execution_target", "environment", "inputs", "outputs", "metadata", "timeout_seconds", "input_artifact_ids"}
 
 
 class ReferenceError(ValueError):

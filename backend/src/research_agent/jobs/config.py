@@ -7,7 +7,7 @@ import tomllib
 from typing import Any
 
 from .local import LocalProcessPlatform
-from .remote import TorqueSSHPlatform
+from .remote import RemoteSSHPlatform
 from .platform import ExecutionPlatform
 from .registry import ExecutionPluginRegistry, PluginDescriptor
 
@@ -39,12 +39,14 @@ def _builtin_registry() -> ExecutionPluginRegistry:
             supervisor="systemd", platform_name=str(target["target_name"]),
         ),
     ))
-    for driver, scheduler in (("pbs", "pbs"), ("torque", "torque")):
+    for driver, scheduler in (("pbs", "pbs"), ("torque", "torque"),
+                              ("slurm", "slurm"), ("tri", "tri"),
+                              ("process", "process")):
         registry.register(PluginDescriptor(
             driver=driver,
             scope="remote",
-            factory=lambda target, scheduler=scheduler: TorqueSSHPlatform(
-                {**target, "scheduler": scheduler, **target.get("options", {})},
+            factory=lambda target, scheduler=scheduler: RemoteSSHPlatform(
+                {**target, **target.get("options", {}), "scheduler": scheduler, "driver": scheduler},
                 platform_name=str(target["target_name"]),
             ),
         ))
@@ -96,6 +98,8 @@ def _execution_targets(path: str | Path) -> tuple[dict[str, dict[str, Any]], str
                 raise ValueError(f"remote target {name!r} must declare ssh_host")
             if not isinstance(target.get("remote_root"), str) or not target["remote_root"].startswith("/"):
                 raise ValueError(f"remote target {name!r} must declare an absolute remote_root")
+            if driver not in {"pbs", "torque", "slurm", "tri", "process"}:
+                raise ValueError(f"remote target {name!r} has unsupported driver {driver!r}")
         options = target.get("options", {})
         if not isinstance(options, dict):
             raise ValueError(f"execution target {name!r}.options must be a table")
@@ -125,6 +129,6 @@ def platforms_from_config(path: str | Path | None = None) -> tuple[dict[str, Exe
         if kind == "local":
             platforms[name] = LocalProcessPlatform(supervisor=environment.get("supervisor", "systemd"), platform_name=name)
         else:
-            platforms[name] = TorqueSSHPlatform(environment, platform_name=name)
+            platforms[name] = RemoteSSHPlatform(environment, platform_name=name)
     default = str(value["default_environment"])
     return platforms, default

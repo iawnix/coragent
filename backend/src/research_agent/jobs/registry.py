@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+from importlib import metadata
 from typing import Any, Callable
 
 from .platform import ExecutionPlatform
@@ -31,6 +32,7 @@ class ExecutionPluginRegistry:
 
     def __init__(self) -> None:
         self._plugins: dict[tuple[str, str], PluginDescriptor] = {}
+        self._discovered = False
 
     def register(self, descriptor: PluginDescriptor) -> None:
         if descriptor.scope not in {"local", "remote"}:
@@ -41,6 +43,7 @@ class ExecutionPluginRegistry:
         self._plugins[key] = descriptor
 
     def descriptor(self, *, scope: str, driver: str) -> PluginDescriptor:
+        self.discover()
         try:
             return self._plugins[(scope, driver)]
         except KeyError as exc:
@@ -62,6 +65,35 @@ class ExecutionPluginRegistry:
             json.dumps(digest_input, sort_keys=True, separators=(",", ":"), default=str).encode()
         ).hexdigest())
         return platform
+
+    def discover(self) -> None:
+        """Load separately maintained execution plugins on first lookup.
+
+        Plugins are ordinary Python distributions exposing the
+        ``tspi.execution_plugins`` entry point. The entry point may return a
+        descriptor, an iterable of descriptors, or a registration callable;
+        importing is delayed until a target is actually constructed.
+        """
+        if self._discovered:
+            return
+        self._discovered = True
+        try:
+            entries = metadata.entry_points()
+            entries = entries.select(group="tspi.execution_plugins") if hasattr(entries, "select") else entries.get("tspi.execution_plugins", ())
+        except Exception:
+            entries = ()
+        for entry in entries:
+            loaded = entry.load()
+            values = loaded() if callable(loaded) and not isinstance(loaded, PluginDescriptor) else loaded
+            if isinstance(values, PluginDescriptor):
+                values = (values,)
+            for descriptor in values or ():
+                if not isinstance(descriptor, PluginDescriptor):
+                    raise TypeError(f"execution plugin {entry.name!r} did not return PluginDescriptor")
+                # Distribution plugins are the installation-level override
+                # point. This lets PBS/tri packages evolve independently of
+                # the fallback adapters shipped with the core runtime.
+                self._plugins[(descriptor.scope, descriptor.driver)] = descriptor
 
     def drivers(self, scope: str | None = None) -> tuple[str, ...]:
         values = [driver for (registered_scope, driver) in self._plugins

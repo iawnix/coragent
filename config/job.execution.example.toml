@@ -1,0 +1,39 @@
+# Named execution targets.  A local target is optional in deployments that
+# submit every job through SSH; at most one local target may be configured.
+
+[execution]
+default_target = "local"
+
+[execution.targets.local]
+type = "local"
+driver = "systemd" # use "process" where a user systemd manager is unavailable
+
+[execution.targets.cluster_1w]
+type = "remote"
+driver = "pbs" # "slurm", "tri", or "process" use the same SSH transport
+cluster_name = "1w"
+ssh_host = "login.1w.example"
+remote_root = "/scratch/coragent"
+
+[execution.targets.cluster_1w.options]
+connect_timeout_seconds = 15
+command_timeout_seconds = 60
+transfer_timeout_seconds = 3600
+
+[execution.targets.cluster_1w.options.commands]
+submit = "qsub"
+status = "qstat"
+cancel = "qdel"
+
+[execution.targets.cluster_1w.bindings.structure]
+# Bindings are target side software identities. Paths are interpreted on the
+# selected SSH target; they are not copied from the controller.
+command = "/opt/xtb/bin/xtb"
+
+[execution.targets.cluster_1w.options.submission]
+queue = "batch"
+
+[execution.targets.cluster_1w.options.submission.resources]
+cpus = 4
+memory_mb = 4096
+walltime = "01:00:00"

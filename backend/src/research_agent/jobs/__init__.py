@@ -14,13 +14,13 @@ from .models import (
 )
 from .platform import ExecutionPlatform
 from .local import LocalProcessPlatform
-from .remote import RemoteExecutionPlatform, TorqueSSHPlatform
+from .remote import RemoteExecutionPlatform, RemoteSSHPlatform, TorqueSSHPlatform
 from .config import load_job_config, platforms_from_config
 from .runtime import JobRuntime
 from .registry import ExecutionPluginRegistry, PluginDescriptor
 
 __all__ = [
     "ExecutionPlatform", "JobOutput", "JobReceipt", "JobRuntime", "JobSpec",
-    "JobState", "JobStatus", "LocalProcessPlatform", "RemoteExecutionPlatform", "TorqueSSHPlatform",
+    "JobState", "JobStatus", "LocalProcessPlatform", "RemoteExecutionPlatform", "RemoteSSHPlatform", "TorqueSSHPlatform",
     "load_job_config", "platforms_from_config", "ExecutionPluginRegistry", "PluginDescriptor",
 ]

@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | `models.example.json` | `models.json` | 模型服务地址与模型定义 |
 | `auth.example.json` | `auth.json` | 模型 API 凭据；provider 名称须与 models.json 一致 |
-| `job.example.toml` | `job.toml` | 本地和远程计算环境绑定 |
+| `job.execution.example.toml` | `job.toml` | 命名执行目标、本机与 SSH 集群绑定 |
 | `name-resolver.example.toml` | `name-resolver.toml` | PubChem、OPSIN 的启用、超时与缓存设置 |
 | `email.example.toml` | `email.toml` | 可选邮件通知设置 |
 
