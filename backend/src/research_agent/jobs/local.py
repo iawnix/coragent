@@ -92,7 +92,14 @@ class LocalProcessPlatform(ExecutionPlatform):
         (spec.cwd / "logs").mkdir(exist_ok=True)
         if (spec.cwd / "receipt.json").exists() or (spec.cwd / "spec.json").exists():
             raise ValueError("job directory already contains an execution; reconcile instead of resubmitting")
-        receipt = JobReceipt(job_id, self.name, _now(), spec.command, str(spec.cwd), None, {**spec.metadata, "supervisor": self.supervisor}, spec.workspace_id)
+        receipt = JobReceipt(job_id, self.name, _now(), spec.command, str(spec.cwd), None, {
+            **spec.metadata,
+            "supervisor": self.supervisor,
+            "target_name": self.name,
+            "scope": getattr(self, "scope", "local"),
+            "driver": getattr(self, "driver", "local"),
+            "target_config_digest": getattr(self, "target_config_digest", None),
+        }, spec.workspace_id)
         resources = spec.metadata.get("resources", {})
         self._write(spec.cwd / "spec.json", {
             "command": list(spec.command), "cwd": str(spec.cwd), "outputs": [o.__dict__ for o in spec.outputs],

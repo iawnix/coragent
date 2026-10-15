@@ -187,7 +187,9 @@ def _intent_path(root: Path, job_id: str) -> str:
 
 
 def _platform_name(params: dict[str, Any]) -> str | None:
-    value = params.get("platform") or (params.get("environment") if isinstance(params.get("environment"), str) else None)
+    value = params.get("execution_target") or params.get("platform") or (
+        params.get("environment") if isinstance(params.get("environment"), str) else None
+    )
     target = params.get("execution_target")
     if value is None and isinstance(target, dict):
         value = target.get("environment")

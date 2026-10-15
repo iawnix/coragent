@@ -17,9 +17,10 @@ from .local import LocalProcessPlatform
 from .remote import RemoteExecutionPlatform, TorqueSSHPlatform
 from .config import load_job_config, platforms_from_config
 from .runtime import JobRuntime
+from .registry import ExecutionPluginRegistry, PluginDescriptor
 
 __all__ = [
     "ExecutionPlatform", "JobOutput", "JobReceipt", "JobRuntime", "JobSpec",
     "JobState", "JobStatus", "LocalProcessPlatform", "RemoteExecutionPlatform", "TorqueSSHPlatform",
-    "load_job_config", "platforms_from_config",
+    "load_job_config", "platforms_from_config", "ExecutionPluginRegistry", "PluginDescriptor",
 ]
