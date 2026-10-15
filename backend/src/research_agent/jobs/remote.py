@@ -1,14 +1,13 @@
-"""SSH backed execution platforms.
+"""Generic SSH-backed execution platform.
 
-The remote adapter implements the same lifecycle as the local process adapter.
-It stages a job directory with rsync, submits one wrapper script to PBS/Torque,
-and brings declared outputs back during collect.
+Scheduler syntax is supplied by a :class:`RemoteScheduler` plugin. This
+module owns the transport, staging, receipts, status lifecycle and collection
+boundary shared by all remote targets.
 """
 from __future__ import annotations
 
 from abc import abstractmethod
 import hashlib
-import math
 import os
 from .outputs import collect_outputs
 import json
@@ -25,6 +24,7 @@ from .platform import ExecutionPlatform
 from .config_contract import SUBMISSION_FIELDS, execution_timeout, validate_submission
 from .process_environment import job_process_environment
 from .environment import _capture
+from .scheduler import RemoteScheduler
 
 
 class RemoteExecutionPlatform(ExecutionPlatform):
@@ -55,37 +55,24 @@ class RemoteSSHPlatform(RemoteExecutionPlatform):
 
     name = "remote"
 
-    def __init__(self, config: dict[str, Any], *, platform_name: str = "remote") -> None:
+    def __init__(self, config: dict[str, Any], *, platform_name: str = "remote",
+                 scheduler: RemoteScheduler | None = None) -> None:
         self.config = dict(config)
         self.name = platform_name
         self.host = self._required_string("ssh_host")
         self.remote_root = self._required_string("remote_root").rstrip("/")
-        self.scheduler = str(self.config.get("scheduler", self.config.get("driver", "torque"))).lower()
-        if self.scheduler == "process":
-            self.scheduler = "process"
-        if self.scheduler not in {"torque", "pbs", "slurm", "tri", "process"}:
-            raise ValueError(f"unsupported remote scheduler: {self.scheduler}")
+        if scheduler is None:
+            # Source-tree compatibility for direct construction. Production
+            # configuration passes a scheduler from the registry descriptor,
+            # so the core lifecycle has no scheduler implementation dependency.
+            from research_agent.execution_plugins.schedulers import adapter_for
+            scheduler = adapter_for(self.config)
+        self.scheduler_adapter = scheduler
+        self.scheduler = self.scheduler_adapter.name
         self.ssh_config = self.config.get("ssh_config")
         self.connect_timeout = int(self.config.get("connect_timeout_seconds", 15))
         self.command_timeout = int(self.config.get("command_timeout_seconds", 60))
         self.transfer_timeout = int(self.config.get("transfer_timeout_seconds", 3600))
-        commands = self.config.get("commands", {})
-        defaults = {
-            "pbs": {"submit": "qsub", "status": "qstat", "cancel": "qdel"},
-            "torque": {"submit": "qsub", "status": "qstat", "cancel": "qdel"},
-            "slurm": {"submit": "sbatch", "status": "squeue", "cancel": "scancel"},
-            "tri": {"submit": "tri-submit", "status": "tri-status", "cancel": "tri-cancel"},
-            "process": {},
-        }[self.scheduler]
-        # Accept scheduler-neutral names while retaining qsub/qstat/qdel in
-        # the normalized config used by older installation code.
-        self.commands = {
-            "submit": str(commands.get("submit", commands.get("qsub", defaults.get("submit", "")))),
-            "status": str(commands.get("status", commands.get("qstat", defaults.get("status", "")))),
-            "cancel": str(commands.get("cancel", commands.get("qdel", defaults.get("cancel", "")))),
-        }
-        self.commands.update({key: str(value) for key, value in commands.items() if key in {"checkjob", "sacct"}})
-        self.diagnostic_command = commands.get("checkjob")
         self.allowed_queues = tuple(str(item) for item in self.config.get("allowed_queues", ()))
 
     def _required_string(self, key: str) -> str:
@@ -145,7 +132,7 @@ class RemoteSSHPlatform(RemoteExecutionPlatform):
 
     def probe(self, spec: JobSpec) -> dict[str, Any]:
         missing = [str(path) for path in spec.inputs if not path.exists()]
-        commands = [value for value in self.commands.values() if value] + ["rsync"]
+        commands = [*self.scheduler_adapter.probe_commands(), "rsync"]
         if execution_timeout(spec.timeout_seconds, spec.metadata.get("resources", {})) is not None:
             commands.append("timeout")
         checks = " && ".join(f"command -v {shlex.quote(value)} >/dev/null" for value in commands)
@@ -209,42 +196,7 @@ class RemoteSSHPlatform(RemoteExecutionPlatform):
         return wrapper, scratch, timeout
 
     def _submit_arguments(self, spec):
-        # Notifications and intentional repeats belong to the managed workflow.
-        if self.scheduler == "process":
-            return []
-        if self.scheduler == "slurm":
-            args = [self.commands['submit'], '--parsable', '--job-name=' + spec.job_id,
-                    '--output=logs/scheduler.stdout', '--error=logs/scheduler.stderr']
-            if spec.metadata.get('queue'):
-                args += ['--partition=' + str(spec.metadata['queue'])]
-            resources = spec.metadata.get('resources', {})
-            if resources.get('cpus'): args += ['--cpus-per-task=' + str(resources['cpus'])]
-            if resources.get('memory_mb'): args += ['--mem=' + str(resources['memory_mb'])]
-            timeout = execution_timeout(spec.timeout_seconds, resources)
-            if timeout is not None: args += ['--time=' + str(math.ceil(timeout // 60 + (1 if timeout % 60 else 0)))]
-            return args
-        if self.scheduler == "tri":
-            args = [self.commands['submit']]
-            if spec.metadata.get('queue'): args += ['--queue', str(spec.metadata['queue'])]
-            return args
-        args = [self.commands['submit'], '-q', spec.metadata['queue'], '-m', 'n', '-r', 'n',
-                '-o', 'logs/scheduler.stdout', '-e', 'logs/scheduler.stderr']
-        resources = spec.metadata.get('resources', {})
-        if self.scheduler == 'pbs':
-            select = resources.get('select')
-            if not select and ('cpus' in resources or 'memory_mb' in resources):
-                select = '1'
-                if 'cpus' in resources: select += ':ncpus=' + str(resources['cpus'])
-                if 'memory_mb' in resources: select += ':mem=' + str(resources['memory_mb']) + 'mb'
-            if select: args += ['-l', 'select=' + select]
-        else:
-            if 'cpus' in resources: args += ['-l', 'nodes=1:ppn=' + str(resources['cpus'])]
-            if 'memory_mb' in resources: args += ['-l', 'mem=' + str(resources['memory_mb']) + 'mb']
-        timeout = execution_timeout(spec.timeout_seconds, resources)
-        if timeout is not None:
-            seconds = math.ceil(timeout)
-            args += ['-l', f'walltime={seconds//3600:02}:{seconds//60%60:02}:{seconds%60:02}']
-        return args
+        return self.scheduler_adapter.submit_arguments(spec)
 
     # Internal callers from older acceptance helpers can use the scheduler
     # neutral name while the public adapter remains driver based.
@@ -254,7 +206,7 @@ class RemoteSSHPlatform(RemoteExecutionPlatform):
     def start(self, spec: JobSpec) -> JobReceipt:
         validate_submission({key: value for key, value in spec.metadata.items() if key in SUBMISSION_FIELDS},
                             kind='remote', scheduler=self.scheduler,
-                            require_queue=self.scheduler != "process",
+                            require_queue=self.scheduler_adapter.requires_queue,
                             allowed_queues=(self.allowed_queues,))
         if (spec.cwd / 'receipt.json').exists() or (spec.cwd / 'spec.json').exists():
             raise ValueError('job directory already contains an execution; reconcile instead of resubmitting')
@@ -288,7 +240,7 @@ class RemoteSSHPlatform(RemoteExecutionPlatform):
             self._rsync(local_wrapper, remote_dir + '/.coragent/run.sh')
         finally:
             local_wrapper.unlink(missing_ok=True)
-        if self.scheduler == "process":
+        if not self.scheduler_adapter.requires_queue:
             result = self._run_ssh(
                 f"cd {shlex.quote(remote_dir)} && chmod 700 .coragent/run.sh && "
                 f"nohup .coragent/run.sh > .coragent/process.stdout 2> .coragent/process.stderr </dev/null & "
@@ -298,7 +250,7 @@ class RemoteSSHPlatform(RemoteExecutionPlatform):
             result = self._run_ssh(f"cd {shlex.quote(remote_dir)} && chmod 700 .coragent/run.sh && {submit} .coragent/run.sh > scheduler.id && cat scheduler.id")
         scheduler_id = result.stdout.strip().splitlines()[-1].strip() if result.stdout.strip() else ''
         if not re.fullmatch(r'[A-Za-z0-9_.\[\]-]+', scheduler_id):
-            raise RuntimeError('qsub returned no valid scheduler id; reconcile before retrying')
+            raise RuntimeError('scheduler returned no valid job id; reconcile before retrying')
         receipt = JobReceipt(spec.job_id, self.name, _now(), spec.command, str(spec.cwd), None,
                              {**metadata, 'scheduler_id': scheduler_id}, spec.workspace_id)
         self._write(spec.cwd / 'receipt.json', receipt.__dict__)
@@ -306,7 +258,7 @@ class RemoteSSHPlatform(RemoteExecutionPlatform):
         return receipt
 
     def recover_receipt(self, job_id: str, cwd: Path) -> JobReceipt | None:
-        """Recover a qsub response lost after remote acceptance, without resubmitting."""
+        """Recover a scheduler response lost after remote acceptance."""
         spec = json.loads((cwd / "spec.json").read_text())
         # Old submitted specs predate scoped directories; recover only their
         # original location, never resubmit or rewrite that historical identity.
@@ -324,62 +276,7 @@ class RemoteSSHPlatform(RemoteExecutionPlatform):
         return receipt
 
     def _scheduler_details(self, receipt):
-        scheduler_id = str(receipt.metadata["scheduler_id"])
-        if self.scheduler == "process":
-            result = self._run_ssh(f"test -f {shlex.quote(receipt.metadata.get('remote_dir','') + '/status.exit')}", check=False)
-            return ("C" if result.returncode == 0 else "R"), {"scheduler_id": scheduler_id, "observed_at": _now(), "source": "status.exit"}
-        if self.scheduler == "slurm":
-            command = f"{shlex.quote(self.commands['status'])} -j {shlex.quote(scheduler_id)} -h -o '%T|%R'"
-            result = self._run_ssh(command, check=False)
-            details = {"scheduler_id": scheduler_id, "observed_at": _now(), "source":"squeue"}
-            if result.returncode == 0 and result.stdout.strip():
-                state, reason = (result.stdout.strip().split('|', 1) + [None])[:2]
-                details.update(scheduler_state=state, scheduler_comment=reason)
-                return state, details
-            sacct = self.commands.get("sacct")
-            if sacct:
-                accounting = self._run_ssh(f"{shlex.quote(sacct)} -X -n -P -j {shlex.quote(scheduler_id)} -o State,ExitCode", check=False)
-                if accounting.returncode == 0 and accounting.stdout.strip():
-                    fields = accounting.stdout.strip().splitlines()[0].split('|')
-                    state = fields[0]
-                    exit_code = fields[1] if len(fields) > 1 else ''
-                    details["scheduler_state"] = state.split('+', 1)[0]
-                    if exit_code and exit_code.split(':', 1)[0].isdigit():
-                        details["exit_status"] = int(exit_code.split(':', 1)[0])
-                    return details["scheduler_state"], details
-            details["record_missing"] = True
-            return None, details
-        if self.scheduler == "tri":
-            result = self._run_ssh(f"{shlex.quote(self.commands['status'])} {shlex.quote(scheduler_id)}", check=False)
-            details = {"scheduler_id": scheduler_id, "observed_at": _now(), "source":"tri-status"}
-            state = result.stdout.strip().splitlines()[0] if result.returncode == 0 and result.stdout.strip() else None
-            details["scheduler_state"] = state
-            details["record_missing"] = state is None
-            return state, details
-        result = self._run_ssh(f"{shlex.quote(self.commands['status'])} -f {shlex.quote(scheduler_id)}", check=False)
-        details = {"scheduler_id":scheduler_id, "observed_at":_now(), "source":"qstat -f"}
-        if result.returncode:
-            details["query_error"] = result.stderr.strip()[:2000] or "scheduler record unavailable"
-            details["record_missing"] = (result.returncode != 255 and
-                                         bool(re.search(r'\bUnknown Job Id\b', result.stderr, re.IGNORECASE)))
-            return None, details
-        fields = dict(re.findall(r"(?m)^\s*([A-Za-z_.]+)\s*=\s*(.*?)\s*$", result.stdout))
-        state = fields.get("job_state")
-        details.update(scheduler_state=state, queue=fields.get("queue"), scheduler_comment=fields.get("comment"))
-        try:
-            details["wait_seconds"] = max(0, int((datetime.now(timezone.utc) - datetime.fromisoformat(receipt.submitted_at)).total_seconds())) if state in {"Q", "W", "H"} else None
-        except (ValueError, TypeError):
-            details["wait_seconds"] = None
-        if fields.get("exit_status") is not None: details["exit_status"] = int(fields["exit_status"])
-        if state in {"Q", "W", "H"} and self.diagnostic_command:
-            try:
-                diagnosis = self._run_ssh(f"{shlex.quote(self.diagnostic_command)} {shlex.quote(scheduler_id.split('.')[0])}", check=False)
-                details["queue_diagnosis"] = (diagnosis.stdout if diagnosis.returncode == 0 else diagnosis.stderr).strip()[:8000]
-                details["diagnosis_source"] = "checkjob"
-            except (OSError, subprocess.SubprocessError) as error:
-                # Optional diagnosis must not erase authoritative scheduler state.
-                details["diagnosis_error"] = str(error)[:2000]
-        return state, details
+        return self.scheduler_adapter.details(self, receipt)
 
     def status(self, receipt: JobReceipt) -> JobStatus:
         local_status = Path(receipt.cwd) / "status.json"
@@ -406,25 +303,20 @@ class RemoteSSHPlatform(RemoteExecutionPlatform):
                 scheduler_state, diagnostics = self._scheduler_details(receipt)
                 if self._cancellation_acknowledged(receipt):
                     diagnostics['cancellation_requested'] = True
-                    if scheduler_state in {'C', 'F'} or diagnostics.get('record_missing'):
+                    if self.scheduler_adapter.cancellation_terminal(scheduler_state, diagnostics) or diagnostics.get('record_missing'):
                         terminal = JobStatus(receipt.job_id, JobState.CANCELLED, self.name,
                                              exit_code=diagnostics.get('exit_status'), finished_at=_now(),
                                              diagnostics=diagnostics)
                         self._persist(receipt, terminal)
                         return terminal
-                if scheduler_state in {"C", "F"} and diagnostics.get("exit_status") is not None:
+                if self.scheduler_adapter.completed_with_exit(scheduler_state, diagnostics):
                     code = diagnostics["exit_status"]
                     terminal = JobStatus(receipt.job_id, JobState.SUCCEEDED if code == 0 else JobState.FAILED,
                         self.name, exit_code=code, finished_at=_now(), diagnostics=diagnostics,
                         error="Job exit receipt absent; exit status recovered from scheduler (check working directory and scheduler logs)")
                     self._persist(receipt, terminal)
                     return terminal
-                mapped = {"Q":JobState.QUEUED, "W":JobState.QUEUED, "H":JobState.HELD,
-                          "R":JobState.RUNNING, "E":JobState.RUNNING, "T":JobState.SUBMITTED,
-                          "PENDING":JobState.QUEUED, "CONFIGURING":JobState.SUBMITTED,
-                          "RUNNING":JobState.RUNNING, "COMPLETING":JobState.RUNNING,
-                          "QUEUED":JobState.QUEUED, "HELD":JobState.HELD,
-                          "SUBMITTED":JobState.SUBMITTED}.get(scheduler_state, JobState.UNKNOWN)
+                mapped = self.scheduler_adapter.map_state(scheduler_state)
                 return JobStatus(receipt.job_id, mapped, self.name, diagnostics=diagnostics,
                     error=(diagnostics.get("query_error") or "scheduler outcome unknown; exit receipt absent") if mapped == JobState.UNKNOWN else None)
             code = int(result.stdout.strip().splitlines()[-1])
@@ -473,10 +365,7 @@ class RemoteSSHPlatform(RemoteExecutionPlatform):
             return current
         scheduler_id = str(receipt.metadata.get("scheduler_id", ""))
         if scheduler_id:
-            if self.scheduler == "process":
-                result = self._run_ssh(f"kill {shlex.quote(scheduler_id)}", check=False)
-            else:
-                result = self._run_ssh(f"{shlex.quote(self.commands['cancel'])} {shlex.quote(scheduler_id)}", check=False)
+            result = self.scheduler_adapter.cancel(self, scheduler_id)
             if result.returncode: return JobStatus(receipt.job_id, JobState.UNKNOWN, self.name, error="scheduler did not confirm cancellation")
         else:
             return JobStatus(receipt.job_id, JobState.UNKNOWN, self.name, error="scheduler identity missing")

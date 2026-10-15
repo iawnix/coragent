@@ -91,15 +91,15 @@ def _validate_execution_config(value):
             raise ValueError(f"execution target {name!r} must declare type=local or type=remote")
         if not isinstance(driver, str) or not driver:
             raise ValueError(f"execution target {name!r} must declare driver")
+        if not re.fullmatch(NAME_PATTERN, driver):
+            raise ValueError(f"execution target {name!r} has an invalid driver")
         if scope == "local":
             local_count += 1
-            if driver not in {"local", "process", "systemd"}:
-                raise ValueError(f"unsupported local execution driver: {driver}")
             if "cluster_name" in target:
                 raise ValueError(f"local execution target {name!r} cannot declare cluster_name")
         else:
-            if driver not in {"pbs", "torque", "slurm", "tri", "process"}:
-                raise ValueError(f"unsupported remote execution driver: {driver}")
+            if not re.fullmatch(NAME_PATTERN, driver):
+                raise ValueError(f"invalid remote execution driver: {driver}")
             if not isinstance(target.get("cluster_name"), str) or not target["cluster_name"].strip():
                 raise ValueError(f"remote execution target {name!r} requires cluster_name")
             if not isinstance(target.get("ssh_host"), str) or not target["ssh_host"].strip():
@@ -122,7 +122,8 @@ def _validate_execution_config(value):
             if common not in normalized and common in options:
                 normalized[common] = options[common]
         if scope == "local":
-            normalized.setdefault("supervisor", "process" if driver == "process" else "systemd")
+            if driver in {"local", "process", "systemd"}:
+                normalized.setdefault("supervisor", "process" if driver == "process" else "systemd")
         elif driver in {"pbs", "torque", "slurm", "tri", "process"}:
             normalized.setdefault("scheduler", driver)
         environments[name] = normalized
@@ -383,7 +384,7 @@ def job_config_schema():
                     ('default_environment', 'environments'))
     execution_target = record({
         'type': {'enum': ['local', 'remote']},
-        'driver': {'enum': ['local', 'process', 'systemd', 'pbs', 'torque', 'slurm', 'tri']},
+        'driver': text('^' + NAME_PATTERN + '$'),
         'cluster_name': text('^' + NAME_PATTERN + '$'),
         'ssh_host': text(r'^[A-Za-z0-9][A-Za-z0-9_.@:-]*$'),
         'ssh_config': absolute, 'remote_root': absolute,

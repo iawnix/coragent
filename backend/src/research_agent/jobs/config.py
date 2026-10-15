@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import os
+import re
 import tomllib
 from typing import Any
 
@@ -10,6 +11,7 @@ from .local import LocalProcessPlatform
 from .remote import RemoteSSHPlatform
 from .platform import ExecutionPlatform
 from .registry import ExecutionPluginRegistry, PluginDescriptor
+from research_agent.execution_plugins.descriptors import register_builtin_scheduler_plugins
 
 
 from .config_contract import load_job_config
@@ -39,17 +41,14 @@ def _builtin_registry() -> ExecutionPluginRegistry:
             supervisor="systemd", platform_name=str(target["target_name"]),
         ),
     ))
-    for driver, scheduler in (("pbs", "pbs"), ("torque", "torque"),
-                              ("slurm", "slurm"), ("tri", "tri"),
-                              ("process", "process")):
-        registry.register(PluginDescriptor(
-            driver=driver,
-            scope="remote",
-            factory=lambda target, scheduler=scheduler: RemoteSSHPlatform(
-                {**target, **target.get("options", {}), "scheduler": scheduler, "driver": scheduler},
-                platform_name=str(target["target_name"]),
-            ),
-        ))
+    register_builtin_scheduler_plugins(registry)
+    registry.register(PluginDescriptor(
+        driver="process", scope="remote",
+        factory=lambda target: RemoteSSHPlatform(
+            {**target, **target.get("options", {}), "scheduler": "process", "driver": "process"},
+            platform_name=str(target["target_name"]),
+        ),
+    ))
     return registry
 
 
@@ -85,10 +84,10 @@ def _execution_targets(path: str | Path) -> tuple[dict[str, dict[str, Any]], str
             raise ValueError(f"execution target {name!r} must declare type=local or type=remote")
         if not isinstance(driver, str) or not driver:
             raise ValueError(f"execution target {name!r} must declare a driver")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", driver):
+            raise ValueError(f"execution target {name!r} has an invalid driver")
         if scope == "local":
             local += 1
-            if driver not in {"local", "process", "systemd"}:
-                raise ValueError(f"local target {name!r} has unsupported driver {driver!r}")
             if "cluster_name" in target:
                 raise ValueError(f"local target {name!r} cannot declare cluster_name")
         else:
@@ -98,8 +97,6 @@ def _execution_targets(path: str | Path) -> tuple[dict[str, dict[str, Any]], str
                 raise ValueError(f"remote target {name!r} must declare ssh_host")
             if not isinstance(target.get("remote_root"), str) or not target["remote_root"].startswith("/"):
                 raise ValueError(f"remote target {name!r} must declare an absolute remote_root")
-            if driver not in {"pbs", "torque", "slurm", "tri", "process"}:
-                raise ValueError(f"remote target {name!r} has unsupported driver {driver!r}")
         options = target.get("options", {})
         if not isinstance(options, dict):
             raise ValueError(f"execution target {name!r}.options must be a table")
