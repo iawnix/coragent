@@ -140,6 +140,34 @@ remote_root = "/scratch/coragent"
     assert platforms["cluster_2w"].host == "login.2w"
 
 
+def test_execution_target_identity_is_persisted_in_local_receipt(tmp_path: Path) -> None:
+    config = tmp_path / "job.toml"
+    config.write_text(
+        """[execution]
+default_target = "local"
+
+[execution.targets.local]
+type = "local"
+driver = "process"
+""",
+        encoding="utf-8",
+    )
+    platforms, default = platforms_from_config(config)
+    runtime = JobRuntime(platforms, default=default)
+    spec = JobSpec(
+        job_id="job_1",
+        command=(sys.executable, "-c", "print('target')"),
+        cwd=tmp_path / "job",
+    )
+    spec.cwd.mkdir()
+    receipt = runtime.job_start(spec)
+    assert receipt.metadata["target_name"] == "local"
+    assert receipt.metadata["scope"] == "local"
+    assert receipt.metadata["driver"] == "process"
+    assert receipt.metadata["target_config_digest"].startswith("sha256:")
+    assert _wait(runtime, receipt).state is JobState.SUCCEEDED
+
+
 def test_job_spec_separates_execution_target_from_process_environment(tmp_path: Path) -> None:
     spec = _spec(tmp_path, {
         'job_id': "job_1",

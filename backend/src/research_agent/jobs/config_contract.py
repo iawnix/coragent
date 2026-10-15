@@ -113,6 +113,12 @@ def _validate_execution_config(value):
             raise ValueError(f"execution.targets.{name}.bindings must be a table")
         normalized = dict(target)
         normalized.update({"kind": scope, "backends": bindings, "driver": driver})
+        for common in (
+            "ssh_config", "allowed_queues", "commands", "connect_timeout_seconds",
+            "command_timeout_seconds", "transfer_timeout_seconds", "submission",
+        ):
+            if common not in normalized and common in options:
+                normalized[common] = options[common]
         if scope == "local":
             normalized.setdefault("supervisor", "process" if driver == "process" else "systemd")
         elif driver in {"pbs", "torque"}:
