@@ -7,7 +7,7 @@ import shutil
 import subprocess
 
 from scripts._job_install import profiles, resource, digest
-from tools.test.environment import locked
+from tools.test.environment import locked, repair_conda_pycache_entries
 
 
 def prepare(package: Path, root: Path, names: list[str]):
@@ -30,6 +30,11 @@ def prepare(package: Path, root: Path, names: list[str]):
             with (root / 'registry' / ('prepare-scientific-' + name + '.log')).open('w') as log:
                 # Download only upstream artifacts named in the public lock.
                 # No private test file or environment is sent to a provider.
-                subprocess.run([conda, 'create', '--yes', '--prefix', str(prefix), '--file', str(lock)],
+                subprocess.run([conda, 'create', '--yes', '--download-only', '--prefix', str(prefix), '--file', str(lock)],
+                               stdout=log, stderr=subprocess.STDOUT, check=True)
+                if prefix.exists():
+                    shutil.rmtree(prefix)
+                repair_conda_pycache_entries(Path(os.environ['CONDA_PKGS_DIRS']))
+                subprocess.run([conda, 'create', '--yes', '--offline', '--prefix', str(prefix), '--file', str(lock)],
                                stdout=log, stderr=subprocess.STDOUT, check=True)
             receipt.write_text(json.dumps({'profile': name, 'lock_sha256': digest(lock.read_bytes())}) + '\n')

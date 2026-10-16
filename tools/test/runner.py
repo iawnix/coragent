@@ -454,8 +454,26 @@ def main(argv=None):
         if args.command=='replay' and not replay: raise ValueError('replay requires --run')
         return execute(args,root,replay)
     except (OSError,ValueError,RuntimeError,subprocess.CalledProcessError) as error:
-        # Logs and tool output remain private; surface only exception class.
-        print(json.dumps({'status':'infrastructure-error','category':type(error).__name__}))
+        # Keep private logs private, but expose enough safe context for CI
+        # failures to identify the failed preparation component immediately.
+        payload={'status':'infrastructure-error','category':type(error).__name__}
+        if isinstance(error, subprocess.CalledProcessError):
+            payload['returncode']=error.returncode
+            command=error.cmd if isinstance(error.cmd,list) else [str(error.cmd)]
+            payload['command']=Path(str(command[0])).name if command else None
+        candidates=sorted((root/'registry').glob('prepare-*.log'), key=lambda path: path.stat().st_mtime, reverse=True)
+        if candidates:
+            log_path=candidates[0]
+            try:
+                lines=[line.strip() for line in log_path.read_text(errors='replace').splitlines() if line.strip()]
+                detail='; '.join(lines[-3:])
+                detail=detail.replace(str(root), '<private-test-root>')
+                import re
+                detail=re.sub(r'https?://\S+', '<url>', detail)
+                payload.update({'component':log_path.name.split('-',2)[1], 'detail':detail[-600:]})
+            except OSError:
+                pass
+        print(json.dumps(payload))
         with (root/'registry/last-error.log').open('w') as log:
             import traceback
             traceback.print_exc(file=log)
