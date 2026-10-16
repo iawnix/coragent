@@ -159,6 +159,18 @@ def hydrate_model_data(source):
     if not npm: raise PiSourceError("npm is required")
     subprocess.run([npm,"run","hydrate:model-data"],cwd=source,check=True,stdout=sys.stderr)
 
+    # The model catalog is fetched from a moving upstream source.  New model
+    # metadata can add fields that are valid at runtime but narrower than the
+    # pinned provider type in this Pi release, making TypeScript reject the
+    # generated catalog.  The provider still validates its API map at runtime;
+    # keep the pinned source buildable until the next Pi release updates its
+    # generated type contract.
+    provider = source / "packages/ai/src/providers/opencode-go.ts"
+    text = provider.read_text()
+    needle = "models: Object.values(OPENCODE_GO_MODELS),"
+    if needle in text and "Object.values(OPENCODE_GO_MODELS) as any" not in text:
+        provider.write_text(text.replace(needle, "models: Object.values(OPENCODE_GO_MODELS) as any,"))
+
 def prepare_build(source):
     npm=shutil.which("npm")
     if not npm: raise PiSourceError("npm is required")
