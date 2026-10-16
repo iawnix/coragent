@@ -466,9 +466,10 @@ def main(argv=None):
             log_path=candidates[0]
             try:
                 lines=[line.strip() for line in log_path.read_text(errors='replace').splitlines() if line.strip()]
-                detail='; '.join(lines[-3:])
-                detail=detail.replace(str(root), '<private-test-root>')
                 import re
+                signals=[line for line in lines if re.search(r'(?:error TS\d+|npm ERR!|Error:|fatal:)', line, re.I)]
+                detail='; '.join((signals[-5:] or lines[-3:]))
+                detail=detail.replace(str(root), '<private-test-root>')
                 detail=re.sub(r'https?://\S+', '<url>', detail)
                 payload.update({'component':log_path.name.split('-',2)[1], 'detail':detail[-600:]})
             except OSError:
