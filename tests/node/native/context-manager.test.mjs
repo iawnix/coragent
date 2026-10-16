@@ -10,7 +10,7 @@ import {openNodeSqliteStorage} from '@earendil-works/pi-durable/storage/sqlite/n
 import {createContextManager, contextAnchor, contextPolicy, contextInputBudget} from '../../../apps/agent/context/manager.mjs';
 import {pinnedPiSource, TEST_ROOT} from './test-environment.mjs';
 const {estimateContextTokens} = await import(pathToFileURL(join(pinnedPiSource(),'packages/ai/src/utils/estimate.ts')));
-const snapshot = () => ({schema_version:'research-decision/1',snapshot_id:'ctx_fixture',sequence:1,nodes:[],jobs:[]});
+const snapshot = () => ({schema_version:'research-review/1',review_id:'review_fixture',state_digest:'sha256:state',review_digest:'sha256:review',status:'oriented',review_status:'current',trigger:'context_refresh',scope:{},coverage:{},findings:[],contradictions:[],uncertainties:[],limitations:[],follow_up:[],source_refs:[],read_more:{},guidance:'review'});
 function fixtureManager(overrides = {}) {
   return createContextManager({sessionId:'fixture',estimateContextTokens,inputTokens:65536,reserveTokens:5120,
     bridge:{async execute_command(){return snapshot();}},coordinator:{async commit_files(){}},...overrides});
@@ -35,7 +35,7 @@ for (const scenario of ['recovered','still-full','declined','compaction-failed',
     const inject = fixtureInjector({bridge:{async execute_command(){
       reads++;
       if (second && scenario === 'state-failed') throw Error('State offline');
-      return {schema_version:"research-decision/1",snapshot_id:`ctx_${revision}`,revision,nodes:[],jobs:[]};
+      return {schema_version:'research-review/1',review_id:`review_${revision}`,state_digest:'sha256:state',review_digest:'sha256:review',status:'oriented',review_status:'current',trigger:'context_refresh',scope:{},coverage:{},findings:[],contradictions:[],uncertainties:[],limitations:[],follow_up:[],source_refs:[],read_more:{},guidance:'review'};
     }}});
     registry.install(defineExtension({name:'bounded-admission',hooks:[
       hook(GenerationTask,{beforeRequest(request,api){

@@ -12,9 +12,9 @@ export interface CommandParameters {
     "field"?: "goal" | "title" | "proposal" | "plan" | "progress" | "status" | "assessment_ref" | "relations" | "subjects" | null;
     "entry_node_ids"?: Array<string>;
     "source_submission_ids"?: Array<string>;
-    "view"?: "decision" | "review";
+    "view"?: "review";
     "waited_job_ids"?: Array<string>;
-    "trigger"?: "context_refresh" | "new_evidence" | "goal_changed" | "explicit";
+    "trigger"?: "context_refresh" | "new_evidence";
   };
   "research.search": {
     "query"?: string;
@@ -388,19 +388,6 @@ export interface CommandResults {
     "review_notice_count"?: number;
     "work_dir"?: string;
     [key: string]: unknown;
-  } | {
-    "schema_version": "research-decision/1";
-    "snapshot_id": string;
-    "read_basis": string;
-    "scope": Record<string, JsonValue>;
-    "nodes": Array<JsonValue>;
-    "jobs": Array<JsonValue>;
-    "relations": Array<JsonValue>;
-    "diagnostics"?: Array<JsonValue>;
-    "wake_events": Record<string, JsonValue>;
-    "bounds": Record<string, JsonValue>;
-    "read_more": Record<string, JsonValue>;
-    "projection"?: Record<string, JsonValue>;
   } | {
     "schema_version": "research-review/1";
     "review_id": string;

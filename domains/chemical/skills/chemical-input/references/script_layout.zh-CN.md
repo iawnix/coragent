@@ -10,6 +10,5 @@
 - `scripts/diagnostics/` 负责局部几何观察及其 Job CLI。
 - `scripts/tensor/` 负责 Cartesian 张量重排。
 
-`scripts/` 根目录下的文件是现有 Job 和调用方使用的兼容入口，实际执行对应
-子目录中的实现，不是第二份实现。新的 executor 应引用分类后的文件，并声明
+脚本根目录不再提供转发入口。Job 和调用方应直接引用子目录中的实现，并声明
 对应的分类模块路径。

@@ -11,7 +11,5 @@ The implementation is split by the scientific operation it supports:
 - `scripts/diagnostics/` contains local geometry observations and their Job CLI.
 - `scripts/tensor/` contains Cartesian tensor reordering.
 
-The files directly under `scripts/` are compatibility entrypoints for existing
-Jobs and callers. They execute the implementation in the corresponding
-subdirectory; they are not a second implementation. New executor declarations
-should reference the categorized file and list its categorized module path.
+Root-level forwarding scripts are removed. Jobs and callers must use the implementation
+in the corresponding categorized subdirectory and include the corresponding module paths.

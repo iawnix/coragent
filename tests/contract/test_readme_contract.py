@@ -133,7 +133,7 @@ def test_normal_runtime_docs_expose_only_current_contracts() -> None:
     forbidden = [
         "ts-research-state/4",
         "ts-workspace/4",
-        "ts-research-decision/1",
+        "ts-research-review/1",
         "research_acts.json",
         "start_act",
         "complete_act",

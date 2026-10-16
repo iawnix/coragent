@@ -83,7 +83,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
         const researchEnvelope = request.messages.findLast(message => typeof message.content === "string" && message.content.startsWith('<research_context origin="runtime">'));
         const researchPayload = JSON.parse(researchEnvelope.content.split("\n")[1]);
         const snapshot = researchPayload.research_review || researchPayload.research;
-        assert.ok(snapshot && ["research-review/1", "research-decision/1"].includes(snapshot.schema_version));
+        assert.ok(snapshot && snapshot.schema_version === "research-review/1");
         if (snapshot.scope.focus_node_ids?.length) {
           assert.ok(snapshot.findings.some(item => snapshot.scope.focus_node_ids.includes(item.ref)));
         }

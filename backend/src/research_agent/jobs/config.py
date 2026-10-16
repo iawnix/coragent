@@ -11,6 +11,7 @@ from .local import LocalProcessPlatform
 from .remote import RemoteSSHPlatform
 from .platform import ExecutionPlatform
 from .registry import ExecutionPluginRegistry, PluginDescriptor
+from .process_scheduler import ProcessRemoteScheduler
 
 
 from .config_contract import load_job_config
@@ -45,6 +46,7 @@ def _builtin_registry() -> ExecutionPluginRegistry:
         factory=lambda target: RemoteSSHPlatform(
             {**target, **target.get("options", {}), "scheduler": "process", "driver": "process"},
             platform_name=str(target["target_name"]),
+            scheduler=ProcessRemoteScheduler({**target, **target.get("options", {})}),
         ),
     ))
     return registry
@@ -118,12 +120,16 @@ def platforms_from_config(path: str | Path | None = None) -> tuple[dict[str, Exe
         registry = _builtin_registry()
         return {name: registry.create(name, target) for name, target in targets.items()}, default
     value = load_job_config(configured)
+    registry = _builtin_registry()
     platforms: dict[str, ExecutionPlatform] = {}
     for name, environment in value["environments"].items():
         kind = environment["kind"]
         if kind == "local":
             platforms[name] = LocalProcessPlatform(supervisor=environment.get("supervisor", "systemd"), platform_name=name)
         else:
-            platforms[name] = RemoteSSHPlatform(environment, platform_name=name)
+            target = {**environment, "target_name": name, "type": "remote",
+                      "driver": environment.get("scheduler", "torque"),
+                      "cluster_name": environment.get("cluster_name", name)}
+            platforms[name] = registry.create(name, target)
     default = str(value["default_environment"])
     return platforms, default

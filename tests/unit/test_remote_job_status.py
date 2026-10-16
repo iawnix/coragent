@@ -1,10 +1,13 @@
 from pathlib import Path
 import subprocess
 import pytest
-from research_agent.jobs import TorqueSSHPlatform, JobReceipt, JobState
+from research_agent.jobs import RemoteSSHPlatform, JobReceipt, JobState
+from tests.unit.remote_scheduler_fixture import torque
 
 
-def platform():return TorqueSSHPlatform({'ssh_host':'fixture','remote_root':'/scratch'})
+def platform():
+    config = {'ssh_host':'fixture','remote_root':'/scratch'}
+    return RemoteSSHPlatform(config, scheduler=torque(config))
 def receipt(root):return JobReceipt('job_remote','remote','now',('true',),str(root),metadata={'scheduler_id':'123.cluster','remote_dir':'/scratch/job_remote'})
 
 
@@ -107,7 +110,8 @@ def test_scheduler_exit_recovers_job_that_could_not_write_receipt(tmp_path, monk
 
 
 def test_queue_diagnosis_preserves_normal_wait_and_explains_resources(tmp_path, monkeypatch):
-    remote = TorqueSSHPlatform({'ssh_host':'fixture','remote_root':'/scratch','commands':{'checkjob':'checkjob'}})
+    config = {'ssh_host':'fixture','remote_root':'/scratch','commands':{'checkjob':'checkjob'}}
+    remote = RemoteSSHPlatform(config, scheduler=torque(config))
     def run(command, **kwargs):
         if 'status.exit' in command: return subprocess.CompletedProcess([],1,'','')
         if command.startswith('checkjob'): return subprocess.CompletedProcess([],0,'idle procs: 224 feasible procs: 0\nRejection Reasons: Features','')
@@ -120,7 +124,8 @@ def test_queue_diagnosis_preserves_normal_wait_and_explains_resources(tmp_path, 
 
 
 def test_optional_diagnostic_timeout_does_not_erase_queue_state(tmp_path, monkeypatch):
-    remote = TorqueSSHPlatform({'ssh_host':'fixture','remote_root':'/scratch','commands':{'checkjob':'checkjob'}})
+    config = {'ssh_host':'fixture','remote_root':'/scratch','commands':{'checkjob':'checkjob'}}
+    remote = RemoteSSHPlatform(config, scheduler=torque(config))
     def run(command, **kwargs):
         if 'status.exit' in command:return subprocess.CompletedProcess([],1,'','')
         if command.startswith('checkjob'):raise subprocess.TimeoutExpired(command,1)

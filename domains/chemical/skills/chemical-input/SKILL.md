@@ -86,7 +86,7 @@ compare a calculated structure with it when the study calls for that check. Cite
 checks and source structures in the research record and explain relevant differences.
 
 
-See [script layout](references/script_layout.md) for the implementation boundaries and compatibility entrypoints.
+See [script layout](references/script_layout.md) for the implementation boundaries and canonical script paths.
 
 ## References
 

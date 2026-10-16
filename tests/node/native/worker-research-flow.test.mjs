@@ -209,8 +209,6 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
       assert.equal(snapshots[0].role, "user", "runtime data must remain after history on the provider wire");
       assert.equal(request.messages.at(-1), snapshots[0]);
       assert.match(snapshots[0].content, /origin="runtime"/);
-      assert.ok(request.messages.filter(m => ["system", "developer"].includes(m.role))
-        .every(m => !String(m.content).includes('"schema_version":"research-decision/1"')));
     }
     const truncated = toolResults.find(result => String(result.content).includes("Historical artifact metadata"));
     assert.ok(truncated, "actual Native read result must reach the provider");

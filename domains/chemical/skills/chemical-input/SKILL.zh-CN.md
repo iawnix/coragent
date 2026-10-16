@@ -65,7 +65,7 @@ Job Runtime 选择并探测 `structure` 绑定后，作为 executor entry 执行
 在研究记录中引用检查结果及来源结构，解释影响研究的差异。
 
 
-脚本职责和兼容入口见 [脚本布局](references/script_layout.zh-CN.md)。
+脚本职责和分类路径见 [脚本布局](references/script_layout.zh-CN.md)。
 
 ## 参考
 

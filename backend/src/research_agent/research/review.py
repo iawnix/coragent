@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 
 from . import relations
-from .decision_view import build as build_decision
+from .review_selection import build as build_selection
 from .records import digest, journal
 from .results import get_result, publication_order
 
@@ -69,19 +69,21 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
           trigger="context_refresh", source_bindings=()):
     if not 2048 <= max_bytes <= 32000:
         raise ValueError("review_budget_invalid: use 2048..32000 bytes")
+    if trigger not in {"context_refresh", "new_evidence"}:
+        raise ValueError("review_trigger_invalid: use context_refresh or new_evidence")
 
     graph, index = relations.graph(root), journal(root)
-    decision = build_decision(root, max_bytes=min(12000, max_bytes), session_id=session_id,
+    selection = build_selection(root, max_bytes=min(12000, max_bytes), session_id=session_id,
                               entry_node_ids=entry_node_ids, focus_node_ids=focus_node_ids,
                               events=events, jobs=jobs, waited_job_ids=waited_job_ids,
                               projection=projection)
     state_digest = _state_digest(graph, index, jobs, events)
-    selected = {node["id"] for node in decision.get("nodes", [])}
-    selected_jobs = {job["job_id"] for job in decision.get("jobs", [])}
+    selected = {node["id"] for node in selection.get("nodes", [])}
+    selected_jobs = {job["job_id"] for job in selection.get("jobs", [])}
     findings, contradictions, uncertainties, limitations, follow_up = [], [], [], [], []
     source_refs = []
 
-    for node in decision.get("nodes", []):
+    for node in selection.get("nodes", []):
         ref = node["id"]
         source_refs.append(ref)
         status = node.get("status")
@@ -121,7 +123,7 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
             limitations.append(_source(result["id"], "result_limitation", result["limitations"]))
 
     terminal = {"succeeded", "failed", "timed_out", "cancelled"}
-    for job in decision.get("jobs", []):
+    for job in selection.get("jobs", []):
         ref = job["job_id"]
         source_refs.append(ref)
         state = job.get("state")
@@ -137,15 +139,15 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
             follow_up.append({"action": "reconcile_job", "ref": ref, "reason": "Job evidence is not complete.",
                               "read": {"tool": "job_status", "job_id": ref}})
 
-    for diagnostic in decision.get("diagnostics", []):
+    for diagnostic in selection.get("diagnostics", []):
         code = diagnostic.get("code", "diagnostic")
         ids = diagnostic.get("node_ids", [])
         contradictions.append(_source(ids[0] if ids else code, "diagnostic", code,
                                       node_ids=ids, node_count=diagnostic.get("node_count", len(ids))))
 
-    omitted = decision.get("bounds", {}).get("omitted", {})
+    omitted = selection.get("bounds", {}).get("omitted", {})
     if any(value for key, value in omitted.items() if key in {"nodes", "jobs", "relations", "diagnostics"}):
-        limitations.append(_source("research-decision", "bounded_view", "Some scoped records were omitted; read current records before deciding."))
+        limitations.append(_source("research-review", "bounded_view", "Some scoped records were omitted; read current records before deciding."))
     if projection and projection.get("pending"):
         limitations.append(_source("runtime-projection", "pending_projection", "Runtime Job events still need reconciliation."))
 
@@ -155,7 +157,7 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         "review_id": "review_" + state_digest.removeprefix("sha256:"),
         "state_digest": state_digest,
         "status": status,
-        "scope": {"selection": decision.get("scope", {}).get("selection", "unbound"),
+        "scope": {"selection": selection.get("scope", {}).get("selection", "unbound"),
                   "entry_node_ids": list(entry_node_ids), "focus_node_ids": list(focus_node_ids)},
         "user_sources": list(source_bindings),
         "coverage": {"research_sequence": index["sequence"], "nodes": len(selected),
@@ -170,9 +172,8 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         "read_more": {"research": {"tool": "research_read"}, "jobs": {"tool": "job_status"}},
         "guidance": "This is a derived review of recorded evidence. It does not certify scientific validity, authorize writes, schedule a run, or declare completion.",
     }
-    pending_trigger = trigger in {"new_evidence", "goal_changed", "explicit"}
-    review["trigger"] = (trigger if pending_trigger else
-                          ("new_evidence" if projection and projection.get("pending") else "context_refresh"))
+    pending_trigger = trigger == "new_evidence"
+    review["trigger"] = trigger if pending_trigger else ("new_evidence" if projection and projection.get("pending") else "context_refresh")
     review["review_status"] = "pending" if pending_trigger or (projection and projection.get("pending")) else "current"
     review["review_digest"] = "sha256:" + digest({key: value for key, value in review.items() if key != "review_digest"})
     if _size(review) > max_bytes:

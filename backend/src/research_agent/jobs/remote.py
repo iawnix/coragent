@@ -62,11 +62,7 @@ class RemoteSSHPlatform(RemoteExecutionPlatform):
         self.host = self._required_string("ssh_host")
         self.remote_root = self._required_string("remote_root").rstrip("/")
         if scheduler is None:
-            # Source-tree compatibility for direct construction. Production
-            # configuration passes a scheduler from the registry descriptor,
-            # so the core lifecycle has no scheduler implementation dependency.
-            from research_agent.execution_plugins.schedulers import adapter_for
-            scheduler = adapter_for(self.config)
+            raise ValueError("remote scheduler adapter is required")
         self.scheduler_adapter = scheduler
         self.scheduler = self.scheduler_adapter.name
         self.ssh_config = self.config.get("ssh_config")
@@ -417,8 +413,3 @@ class RemoteSSHPlatform(RemoteExecutionPlatform):
             cwd=str(value["cwd"]), pid=value.get("pid"), metadata=value.get("metadata", {}),
             workspace_id=value.get("workspace_id"),
         )
-
-
-# Kept as a source-level alias for callers importing the old class name. New
-# configuration and plugin descriptors use RemoteSSHPlatform.
-TorqueSSHPlatform = RemoteSSHPlatform

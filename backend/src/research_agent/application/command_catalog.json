@@ -133,15 +133,8 @@
             "description": "Current task submission IDs used only to expose their exact Research Memory user_* bindings in the review context."
           },
           "view": {
-            "anyOf": [
-              {
-                "const": "decision"
-              },
-              {
-                "const": "review"
-              }
-            ],
-            "description": "Internal bounded orientation. review is a deterministic research-state brief; neither view authorizes writes or schedules work."
+            "const": "review",
+            "description": "Internal bounded research-state brief; it does not authorize writes or schedule work."
           },
           "waited_job_ids": {
             "type": "array",
@@ -154,9 +147,7 @@
             "type": "string",
             "enum": [
               "context_refresh",
-              "new_evidence",
-              "goal_changed",
-              "explicit"
+              "new_evidence"
             ],
             "description": "Internal Review refresh reason. It never authorizes writes or schedules work."
           }
@@ -1153,87 +1144,6 @@
               "next_offset"
             ],
             "additionalProperties": true
-          },
-          {
-            "type": "object",
-            "properties": {
-              "schema_version": {
-                "const": "research-decision/1"
-              },
-              "snapshot_id": {
-                "type": "string"
-              },
-              "read_basis": {
-                "type": "string"
-              },
-              "scope": {
-                "type": "object",
-                "additionalProperties": {
-                  "x-typescript-type": "JsonValue"
-                }
-              },
-              "nodes": {
-                "type": "array",
-                "items": {
-                  "x-typescript-type": "JsonValue"
-                }
-              },
-              "jobs": {
-                "type": "array",
-                "items": {
-                  "x-typescript-type": "JsonValue"
-                }
-              },
-              "relations": {
-                "type": "array",
-                "items": {
-                  "x-typescript-type": "JsonValue"
-                }
-              },
-              "diagnostics": {
-                "type": "array",
-                "items": {
-                  "x-typescript-type": "JsonValue"
-                }
-              },
-              "wake_events": {
-                "type": "object",
-                "additionalProperties": {
-                  "x-typescript-type": "JsonValue"
-                }
-              },
-              "bounds": {
-                "type": "object",
-                "additionalProperties": {
-                  "x-typescript-type": "JsonValue"
-                }
-              },
-              "read_more": {
-                "type": "object",
-                "additionalProperties": {
-                  "x-typescript-type": "JsonValue"
-                }
-              },
-              "projection": {
-                "type": "object",
-                "additionalProperties": {
-                  "x-typescript-type": "JsonValue"
-                }
-              }
-            },
-            "required": [
-              "schema_version",
-              "snapshot_id",
-              "read_basis",
-              "scope",
-              "nodes",
-              "jobs",
-              "relations",
-              "wake_events",
-              "bounds",
-              "read_more"
-            ],
-            "additionalProperties": false
           },
           {
             "type": "object",

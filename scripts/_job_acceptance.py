@@ -58,7 +58,7 @@ def run_job(root, request, timeout):
         if terminal and receipt.get('metadata', {}).get('remote_dir'):
             if not collected_outputs:
                 execute('job.collect', root, {'job_id': receipt['job_id']})
-            from research_agent.jobs.remote import TorqueSSHPlatform
+            from research_agent.jobs import platforms_from_config
             settings = load_job_config(os.environ['CORAGENT_JOB_CONFIG'])
             target = settings['environments'][request['platform']]
             remote = receipt['metadata']['remote_dir']
@@ -66,7 +66,8 @@ def run_job(root, request, timeout):
             expected = target['remote_root'].rstrip('/') + '/' + receipt['job_id'] + '-' + scope
             if remote != expected:
                 raise RuntimeError('acceptance_cleanup_path_mismatch')
-            TorqueSSHPlatform(target, platform_name=request['platform'])._run_ssh('rm -rf -- ' + shlex.quote(remote))
+            platform = platforms_from_config(Path(os.environ['CORAGENT_JOB_CONFIG']))[0][request['platform']]
+            platform._run_ssh('rm -rf -- ' + shlex.quote(remote))
 
 
 def accept(config, package, directory, targets, timeout, *, bindings_only=False):

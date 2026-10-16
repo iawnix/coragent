@@ -87,14 +87,6 @@ def read(root, *, ref=None, offset=0, limit=16000, session_id=None, event_ids=()
                          focus_node_ids=focus_node_ids, events=events, jobs=current, waited_job_ids=waited_job_ids,
                          projection={'pending': len(errors)}, trigger=trigger,
                          source_bindings=_source_bindings(root, source_submission_ids, session_id))
-        if view == 'decision':
-            if ref or field or offset:
-                raise ValueError('decision_view_requires_snapshot')
-            from research_agent.research.decision_view import build
-            events = [assess(root, event_id, session_id)['event'] for event_id in event_ids]
-            return build(root, max_bytes=max(2048, limit), session_id=session_id, entry_node_ids=entry_node_ids,
-                         focus_node_ids=focus_node_ids, events=events, jobs=current, waited_job_ids=waited_job_ids,
-                         projection={'pending': len(errors)})
         if ref:
             return retrieval.read(root, ref=ref, offset=offset, limit=limit, session_id=session_id, jobs=current, field=field)
         events = [assess(root, event_id, session_id)['event'] for event_id in event_ids]

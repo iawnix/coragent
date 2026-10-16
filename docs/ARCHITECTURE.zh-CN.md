@@ -63,7 +63,7 @@ uses / cites 必须来自确证材料输入或明确结果引用。文件名相�
 
 CoRAgent 在 Pi durable 历史上统一管理上下文。`GenerationTask.prepareContext` 在首次进入研究范围、切换焦点或采用新要求来源时追加被动 `pi.context` 记录，与请求截止位置原子提交；记录归属于 generation，不作为用户输入接收。外部读取通过 memo 固定，重启和正常工具回合复用已有背景。Monitor 事件已有认证输入记录，不再触发另一份完整快照。背景读取失败会明确说明，并可在下一次接收输入时重试。
 
-背景采用内部 `research.read view=review`，返回通用的 `research-review/1` 派生审查，而不是把完整 Research Snapshot 放入默认上下文。Review 汇总当前范围的事实、矛盾、未知项、限制和带引用的后续建议，并绑定 `state_digest`；Node、Result、Job 和 Artifact 仍是事实来源，完整快照及具体对象仍可通过原有工具分页读取。旧的 `research.read view=decision` 在滚动升级期间保留为兼容导航投影，不作为默认上下文。研究 Review 通常以 2,000 tokens 为目标，发现失败或矛盾时可扩至 4,000；任务原文可超出软目标，但最终请求仍需通过预算检查。自动背景不授予字段读取凭据，显式 research_read 与 Monitor 保留完整分页查询。
+背景采用内部 `research.read view=review`，返回通用的 `research-review/1` 派生审查，而不是把完整 Research Snapshot 放入默认上下文。Review 汇总当前范围的事实、矛盾、未知项、限制和带引用的后续建议，并绑定 `state_digest`；Node、Result、Job 和 Artifact 仍是事实来源，完整快照及具体对象仍可通过原有工具分页读取。Review 通过唯一的 `research.read view=review` 合同生成，并不作为写入或调度授权。研究 Review 通常以 2,000 tokens 为目标，发现失败或矛盾时可扩至 4,000；任务原文可超出软目标，但最终请求仍需通过预算检查。自动背景不授予字段读取凭据，显式 research_read 与 Monitor 保留完整分页查询。
 
 `CompactionTask.prepareSummary` 只从选定的不可变旧历史范围生成指引和元数据。补充材料在原生摘要调用前固定，重试和恢复保持一致；摘要记录保留非模型可见的范围标记，后续完整历史中的新背景优先。不读取最新研究状态并倒填到旧摘要，不从摘要推导授权或读取凭据。Pi 继续负责安全切分、摘要调用、重试、用量记录以及原子提交和过期判断；reset 会重新建立背景。
 

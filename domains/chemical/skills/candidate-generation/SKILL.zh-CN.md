@@ -35,7 +35,7 @@ description: 根据映射端点、键变化、约束和已有结构证据，为�
 NEB 可用性与前提见 [ase_neb_executor.zh-CN.md](references/ase_neb_executor.zh-CN.md)。
 把候选交给 IRC 或 validation 时，使用统一的[反应搜索任务接口](references/reaction_task_interface.zh-CN.md)。
 
-脚本职责和兼容入口见 [脚本布局](references/script_layout.zh-CN.md)。只有使用可选的兼容性
+脚本职责和分类路径见 [脚本布局](references/script_layout.zh-CN.md)。只有使用可选的
 路径准备器时，才需要阅读其专用说明。
 
 阅读[专用路径准备](references/gaussian_path.zh-CN.md)；

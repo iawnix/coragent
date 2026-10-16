@@ -47,7 +47,7 @@ Check the input and validation scope before reuse; an unsupported preparation ca
 does not make the research method unavailable. Other methods can use shared runners,
 explicit solver inputs or task scripts.
 
-See [script layout](references/script_layout.md) for the implementation boundaries and compatibility entrypoints.
+See [script layout](references/script_layout.md) for the implementation boundaries and canonical script paths.
 
 Read [candidate_generation.md](references/candidate_generation.md) for method
 criteria and [ase_neb_executor.md](references/ase_neb_executor.md) for NEB availability and prerequisites.
@@ -55,7 +55,7 @@ Use the shared [reaction-search task interface](references/reaction_task_interfa
 when handing a candidate to IRC or validation.
 
 Read [specialized path preparation](references/gaussian_path.md) only when using
-that optional compatibility recipe; its local contract does not define the scope
+that optional recipe; its local contract does not define the scope
 of candidate generation as a whole. Pass a selected candidate to `validation` for
 saddle evidence and bidirectional IRC connectivity; preserve endpoint and solver
 metadata when that validation prepares IRC inputs.

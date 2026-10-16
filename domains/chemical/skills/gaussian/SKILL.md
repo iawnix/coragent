@@ -52,7 +52,7 @@ The parser distinguishes supported reference SCF energies and records unsupporte
 or incomplete evidence as such. `--validation none` only disables the runner
 check; it does not broaden parser support. Use the operation Skill's evidence
 checks for any scientific conclusion. Gaussian path gradients and NEB use the
-separate `path_gaussian` adapter under `candidate-generation`. Legacy links to the old
-Gaussian validation and scan references are retained as compatibility pointers: see
+separate `path_gaussian` adapter under `candidate-generation`. Use the
+Gaussian validation and scan references directly: see
 [validation-owned Gaussian checks](references/gaussian_validation.md) and
 [Gaussian scan recipes](references/relaxed_scans.md).

@@ -9,9 +9,8 @@ The scripts are grouped by operation and execution role:
   contract; it does not define the scientific operation's scope.
 - `scripts/neb/` owns the ASE/NEB calculator loop and its CLI.
 - `scripts/da/` contains the local legacy Diels–Alder geometry helper only.
-  It is an optional compatibility strategy, not a general reaction restriction.
+  It is an optional strategy, not a general reaction restriction.
 
-Root-level files remain compatibility entrypoints for existing Jobs and tests.
-They load the categorized implementation, so moving a file does not remove an
-executable script. New executor declarations should use categorized entries and
-include the corresponding categorized module paths in their staging closure.
+Root-level forwarding scripts are removed. Jobs and executors must use the
+categorized paths directly and include the corresponding module paths in their
+staging closure.

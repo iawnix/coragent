@@ -30,4 +30,4 @@ under `candidate-generation` as `chemical.scan-xtb@1` and
 `chemical.gradient-xtb@1`; the optional `path_xtb` binding also serves
 `chemical.neb-xtb@2`. Those entries own operation-specific restraint, gradient
 and NEB evidence. This backend Skill only supplies the xTB adapter and its
-parser boundary. The legacy [xTB execution pointer](references/xtb_executor.md) remains for existing links.
+parser boundary. Use the [xTB execution reference](references/xtb_executor.md) for the canonical execution contract.

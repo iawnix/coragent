@@ -62,7 +62,7 @@ def test_pending_delivery_does_not_read_research_memory(tmp_path):
 
 def test_long_queue_emits_one_diagnostic_event_without_poll_wakes(tmp_path, monkeypatch):
     from types import SimpleNamespace
-    from research_agent.jobs import JobReceipt, JobState, TorqueSSHPlatform
+    from research_agent.jobs import JobReceipt, JobState, RemoteSSHPlatform
     from research_agent.application import job_monitor
     workspace(tmp_path)
     config = tmp_path/'job.toml'
@@ -78,7 +78,7 @@ def test_long_queue_emits_one_diagnostic_event_without_poll_wakes(tmp_path, monk
                              workspace_id=spec.workspace_id)
         (spec.cwd/'receipt.json').write_text(json.dumps(receipt.__dict__))
         return receipt
-    monkeypatch.setattr(TorqueSSHPlatform, 'start', submit)
+    monkeypatch.setattr(RemoteSSHPlatform, 'start', submit)
     dispatch('start',{'root':str(tmp_path),'request_id':'job_queue','session_id':'s',
         'command':['/bin/true']})
     status = SimpleNamespace(state=JobState.QUEUED,exit_code=None,error=None,diagnostics={'wait_seconds':10})

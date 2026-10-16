@@ -329,7 +329,7 @@ CoRHub 页面继续延期。本方案只规划终端/现有 Monitor 的最小读
 - `apps/agent/tasks/{controller,tools,projection}.mjs`：唯一引用写动作、验证、回执、任务投影。
 - `apps/agent/pi/setup.mjs`、`apps/agent/context/manager.mjs`：在首次进入研究或入口/焦点变化时补入持久背景，通过 Pi 历史和压缩延续；请求前仅检查预算并附加当前控制信息。
 - `backend/src/research_agent/research/{retrieval,views}.py`：结构/方案有界投影、双向包含遍历与现有字段分页的读取入口；同时更新 `application/` 中既有命令分派的参数传递。
-- `contracts/commands/{research,results,shared}.json`、Monitor 合同与对应生成文件：只更新规范读写合同，不另造兼容入口。
+- `contracts/commands/{research,results,shared}.json`、Monitor 合同与对应生成文件：只更新规范读写合同，不另造额外入口。
 
 验收：重启和压缩后仍恢复整体及焦点；大图有界且可继续读取；任务范围明确；摘要没有完整编辑权限；创建与绑定间崩溃不复制 Node。
 

@@ -9,9 +9,10 @@ import sys
 
 import pytest
 
-from research_agent.jobs import JobOutput, JobSpec, JobState, TorqueSSHPlatform
+from research_agent.jobs import JobOutput, JobSpec, JobState, RemoteSSHPlatform
 from research_agent.jobs.config_contract import job_config_schema, resolve_submission, validate_job_config
 from research_agent.jobs import remote as remote_module
+from tests.unit.remote_scheduler_fixture import pbs, torque
 
 
 @pytest.fixture
@@ -51,8 +52,9 @@ print('123.fixture')
         local = [value.removeprefix('fixture:') for value in local]
         return original_capture(local, timeout=timeout)
     monkeypatch.setattr(remote_module, '_capture', transport)
-    platform = TorqueSSHPlatform({'ssh_host': 'fixture', 'remote_root': str(target),
-                                 'allowed_queues': ['batch'], 'transfer_timeout_seconds': 900})
+    config = {'ssh_host': 'fixture', 'remote_root': str(target),
+              'allowed_queues': ['batch'], 'transfer_timeout_seconds': 900}
+    platform = RemoteSSHPlatform(config, scheduler=torque(config))
     return platform, calls, target
 
 
@@ -151,7 +153,8 @@ def test_adapter_requires_resolved_queue_even_when_config_has_defaults(cluster, 
 
 
 def test_pbs_resources_use_select_and_the_shorter_execution_limit(tmp_path):
-    platform = TorqueSSHPlatform({'ssh_host': 'fixture', 'remote_root': '/scratch', 'scheduler': 'pbs'})
+    config = {'ssh_host': 'fixture', 'remote_root': '/scratch', 'scheduler': 'pbs'}
+    platform = RemoteSSHPlatform(config, scheduler=pbs(config))
     spec = job(tmp_path, timeout_seconds=30, resources={'cpus': 2, 'memory_mb': 128, 'walltime': '00:00:20'})
     args = platform._qsub_arguments(spec)
     assert 'select=1:ncpus=2:mem=128mb' in args and 'walltime=00:00:20' in args

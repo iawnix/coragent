@@ -6,7 +6,7 @@ import time
 
 import pytest
 
-from research_agent.jobs import JobOutput, JobRuntime, JobSpec, JobState, LocalProcessPlatform, TorqueSSHPlatform, platforms_from_config
+from research_agent.jobs import JobOutput, JobRuntime, JobSpec, JobState, LocalProcessPlatform, RemoteSSHPlatform, platforms_from_config
 from research_agent.jobs.local import _process_state
 from research_agent.application.execution import _spec
 
@@ -100,7 +100,7 @@ remote_root = \"/scratch/coragent\"
     platforms, default = platforms_from_config(config)
     assert default == "local"
     assert isinstance(platforms["local"], LocalProcessPlatform)
-    assert isinstance(platforms["cluster"], TorqueSSHPlatform)
+    assert isinstance(platforms["cluster"], RemoteSSHPlatform)
     assert "remote" not in platforms
     assert platforms["cluster"].host == "compute.example"
 

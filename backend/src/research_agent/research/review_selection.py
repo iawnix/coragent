@@ -1,14 +1,10 @@
-"""Request-only research orientation, derived from canonical records.
-
-This is not a second memory store. Explicit reads and the Monitor retain the
-full snapshot. Selection never writes focus, assessments or handled markers.
-"""
+"""Internal selection of bounded facts for the canonical Research Review."""
 import json
 import re
 
-from . import basis, relations
+from . import relations
 from .context import result_notices
-from .records import digest, journal, record
+from .records import journal, record
 from .results import get_result, publication_order
 
 
@@ -82,13 +78,12 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
     candidates.sort(key=lambda j: (j['job_id'] not in event_jobs, j['job_id'] not in waited,
                                    not bool(j.get('execution_conflict')), j.get('state') in running, j['job_id']))
     diagnostics = [d for d in relations.diagnostics(root) if any(ref in reasons for ref in d['node_ids'])]
-    view = {'schema_version': 'research-decision/1', 'scope': {'selection': selection},
+    view = {'scope': {'selection': selection},
             'nodes': [], 'jobs': [], 'relations': [],
             'wake_events': {'requested': len(events), 'included': 0, 'omitted': len(events)},
             'bounds': {'max_bytes': max_bytes, 'omitted': {'nodes': len(reasons), 'jobs': len(candidates),
                                                         'relations': len(edges), 'diagnostics': len(diagnostics)}},
-            'read_more': {'nodes': {'tool': 'research_read'}, 'history': {'tool': 'research_search'}},
-            'read_basis': 'read_' + '0' * 64, 'snapshot_id': 'snapshot_' + '0' * 64}
+            'read_more': {'nodes': {'tool': 'research_read'}, 'history': {'tool': 'research_search'}}}
     # Scope counts are fixed even if a small transport budget cannot fit a card.
     view['scope'].update(entry_count=len(entries), focus_count=len(focus))
     if projection and projection.get('pending'):
@@ -123,7 +118,7 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         ref = result['node_id']
         if ref in reasons and result['id'] != graph['nodes'][ref].get('assessment_ref') and result['id'] not in superseded:
             other_results.setdefault(ref, []).append(result)
-    assessments, cards, visible = {}, {}, {}
+    assessments, cards = {}, {}
     # Bound identity lists too: a flood must not consume all room for findings
     # and failures. Counts and read paths make any omitted questions explicit.
     node_ceiling = size(view) + (max_bytes - size(view) - 64) * (0.45 if candidates else 0.65)
@@ -148,7 +143,6 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
             card['omitted_fields'].append('review_notices')
         if add('nodes', card, node_ceiling):
             cards[ref] = card
-            visible[ref] = {'status', 'assessment_ref'} | ({'title'} if title == node['title'] else set())
 
     # Events are folded into the current Job state, never duplicate job cards.
     job_details = []
@@ -201,7 +195,6 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
             value = excerpt(original, text_budget) if isinstance(original, str) else original
             if field(card, name, value) and value == original:
                 card['omitted_fields'].remove(name)
-                visible[ref].add(name)
 
     for ref, card in cards.items():
         # Do not infer that collection, delivery or a newer output means review.
@@ -216,8 +209,6 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
     if diagnostics:
         for item in diagnostics:
             add('diagnostics', {'code': item['code'], 'node_ids': item['node_ids'][:3], 'node_count': len(item['node_ids'])})
-    view['read_basis'] = basis.issue(root, [graph['nodes'][ref] for ref in cards], session_id, fields_by_node=visible)
-    view['snapshot_id'] = 'snapshot_' + digest({key: value for key, value in view.items() if key not in {'snapshot_id', 'bounds', 'read_basis'}})
     if size(view) > max_bytes:
-        raise ValueError('snapshot_budget_too_small')
+        raise ValueError('review_selection_budget_too_small')
     return view

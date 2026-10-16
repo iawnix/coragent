@@ -65,15 +65,8 @@
             "description": "Current task submission IDs used only to expose their exact Research Memory user_* bindings in the review context."
           },
           "view": {
-            "anyOf": [
-              {
-                "const": "decision"
-              },
-              {
-                "const": "review"
-              }
-            ],
-            "description": "Internal bounded orientation. review is a deterministic research-state brief; neither view authorizes writes or schedules work."
+            "const": "review",
+            "description": "Internal bounded research-state brief; it does not authorize writes or schedule work."
           },
           "waited_job_ids": {
             "type": "array",
@@ -86,9 +79,7 @@
             "type": "string",
             "enum": [
               "context_refresh",
-              "new_evidence",
-              "goal_changed",
-              "explicit"
+              "new_evidence"
             ],
             "description": "Internal Review refresh reason. It never authorizes writes or schedules work."
           }

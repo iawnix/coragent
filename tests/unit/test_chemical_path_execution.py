@@ -18,7 +18,7 @@ sys.path[:0]=[str(SKILLS/'_shared'),str(SKILLS/'gaussian/scripts')]
 from reaction_checks import reaction, path_spec, ordered_molecule
 from path_validation import validate, topology
 from gaussian_io import read_xyz, parse_log
-spec=importlib.util.spec_from_file_location('chemical_candidate_path',SKILLS/'candidate-generation/scripts/prepare_path.py')
+spec=importlib.util.spec_from_file_location('chemical_candidate_path',SKILLS/'candidate-generation/scripts/path/prepare_path.py')
 helper=importlib.util.module_from_spec(spec);spec.loader.exec_module(helper)
 irc_spec=importlib.util.spec_from_file_location('chemical_irc_preparation',SKILLS/'validation/scripts/irc_preparation.py')
 irc_helper=importlib.util.module_from_spec(irc_spec);irc_spec.loader.exec_module(irc_helper)

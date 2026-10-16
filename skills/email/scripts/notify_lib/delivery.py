@@ -57,11 +57,6 @@ class EmailConfig:
     smtp_password_file: Path | None = None
 
 
-# Kept as a source-level alias for callers that imported the old descriptive
-# name. The transport itself has no notification or domain semantics.
-EmailNotificationConfig = EmailConfig
-
-
 class _DeliveryNotStarted(RuntimeError):
     """The provider process was not started, so no message was sent."""
 
@@ -103,11 +98,6 @@ def validate_email_message(request: dict[str, Any]) -> None:
     if not isinstance(request, dict):
         raise ValueError("email message must be an object")
     _validate_message(request)
-
-
-def notify_user(root: Path, request_file: Path) -> dict[str, Any]:
-    """Compatibility alias for the generic email interface."""
-    return send_email(root, request_file)
 
 
 def _send_email(workspace: Path, request: dict[str, Any]) -> dict[str, Any]:

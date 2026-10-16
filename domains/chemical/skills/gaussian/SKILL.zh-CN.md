@@ -38,4 +38,4 @@ L101 解析错误见 [L101 输入文件说明](references/l101_input_guide.zh-CN
 
 解析器区分受支持的参考 SCF 能量，并将不支持或不完整的证据明确记录。`--validation none` 只
 关闭 runner 检查，不扩大解析范围。科学结论使用操作 Skill 的证据检查。Gaussian 路径梯度和
-NEB 使用 `candidate-generation` 下独立的 `path_gaussian` 适配器。旧 Gaussian 验证和扫描链接保留为兼容指针，见[validation 所有的 Gaussian 检查](references/gaussian_validation.zh-CN.md)和[Gaussian 扫描配方](references/relaxed_scans.zh-CN.md)。
+NEB 使用 `candidate-generation` 下独立的 `path_gaussian` 适配器。直接使用 Gaussian 验证和扫描说明，见[validation 所有的 Gaussian 检查](references/gaussian_validation.zh-CN.md)和[Gaussian 扫描配方](references/relaxed_scans.zh-CN.md)。

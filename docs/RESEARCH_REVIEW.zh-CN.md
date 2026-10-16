@@ -23,7 +23,7 @@ Review 包含：
 
 Review 只总结已记录的事实。它不把 Job 成功提升为科学结论，不替 Node 关闭问题，不授予写权限，也不发起计算。
 
-上下文管理器在新的研究范围或需要重新建立研究背景的输入边界上调用 `research.read(view="review")`，默认注入压缩后的 Review，并保留 `review_id`、`review_digest` 和 `state_digest`。新的 Monitor 事件批次、Job 终态或收集、Result/Artifact 写入，以及用户改变研究要求时，才会建立新的 Review 边界；普通日志、运行中间状态和普通工具回合复用已有锚点。多个 Monitor 事件在 admission 层合并，同一 `state_digest` 不重复综合。当 Review 标记为 `pending` 时，当前模型可进行一次无工具、限长的综合；综合结果只作为运行时上下文缓存，必须引用 Review 的 `source_refs`，不会写入 Research Memory。失败时继续使用确定性 Review。完整快照和具体 Node、Result、Job 仍通过原有读取工具获得。旧的 `research-decision/1` 在滚动升级期间只作为兼容输入，不会把 `read_basis` 放进模型上下文。
+上下文管理器在新的研究范围或需要重新建立研究背景的输入边界上调用 `research.read(view="review")`，默认注入压缩后的 Review，并保留 `review_id`、`review_digest` 和 `state_digest`。新的 Monitor 事件批次、Job 终态或收集、Result/Artifact 写入，以及用户改变研究要求时，才会建立新的 Review 边界；普通日志、运行中间状态和普通工具回合复用已有锚点。多个 Monitor 事件在 admission 层合并，同一 `state_digest` 不重复综合。当 Review 标记为 `pending` 时，当前模型可进行一次无工具、限长的综合；综合结果只作为运行时上下文缓存，必须引用 Review 的 `source_refs`，不会写入 Research Memory。失败时继续使用确定性 Review。完整快照和具体 Node、Result、Job 仍通过原有读取工具获得。Review 只接受并输出 `research-review/1`，不会把读取凭据放进模型上下文。
 
 Task Controller 仍只负责任务状态和是否允许 `next_run`。Review 不创建第二个调度器。Monitor 的多个 terminal 事件由已有 admission 合并；暂停、等待或取消状态不会因为 Review 自动获得运行权限。
 

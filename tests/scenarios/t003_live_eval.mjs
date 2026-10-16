@@ -53,7 +53,7 @@ try {
       let request = { messages };
       const snapshots = [];
       if (injected) {
-        const snapshot = {schema_version:"research-decision/1",snapshot_id:`ctx_${scenario.id}`,nodes:[],jobs:[],...scenario.state};
+        const snapshot = {schema_version:'research-review/1',review_id:`review_${scenario.id}`,state_digest:'sha256:state',review_digest:'sha256:review',status:'oriented',review_status:'current',trigger:'context_refresh',scope:{},coverage:{},findings:[],contradictions:[],uncertainties:[],limitations:[],follow_up:[],source_refs:[],read_more:{},guidance:'review',...scenario.state};
         const manager = createContextManager({sessionId:"evaluation",estimateContextTokens,
           bridge:{execute_command:async()=>snapshot}, coordinator:{commit_files:async row=>snapshots.push(row.payload)} });
         const memo = new Map();

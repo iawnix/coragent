@@ -12,9 +12,8 @@ for implementation and resource maintenance.
 Skills guide scientific operations, method/backend adapters, and research
 coordination using bundled helpers or task-specific inputs and scripts.
 The catalog intentionally distinguishes those roles. A catalog classification
-does not require moving a script directory: existing executor paths and imports
-remain compatibility interfaces. Convenience entries in `execution.json` do not
-set a capability ceiling.
+uses categorized executor paths as the canonical interfaces. Convenience entries in
+`execution.json` do not set a capability ceiling.
 
 ### Scientific operations and evidence
 

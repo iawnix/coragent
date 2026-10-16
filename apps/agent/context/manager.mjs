@@ -58,22 +58,7 @@ export function createContextManager({ bridge, coordinator, sessionId, estimateC
         if (event_ids.length) request.event_ids = event_ids;
         if (trigger !== "context_refresh") request.trigger = trigger;
         decision = await bridge.execute_command("research.read", request);
-        // Older bridge fixtures and rolling upgrades may still return the
-        // navigation view. Keep it readable during migration; production
-        // bridges return research-review/1.
-        const compatible = decision?.schema_version === "research-review/1"
-          ? decision
-          : decision?.schema_version === "research-decision/1" && decision.snapshot_id
-            ? { schema_version: "research-review/1", review_id: decision.snapshot_id,
-              state_digest: null, review_digest: null, status: "uncertain", review_status: "current",
-              trigger: "context_refresh", scope: decision.scope || {}, coverage: decision.bounds || {},
-              findings: decision.nodes || [], contradictions: decision.diagnostics || [], uncertainties: [],
-              limitations: [{ ref: "migration", kind: "legacy_projection", summary: "Bridge returned the legacy decision view." }],
-              follow_up: [], source_refs: [], read_more: decision.read_more || {},
-              guidance: "Read current research records before making scientific or completion decisions." }
-            : null;
-        if (!compatible) throw new Error("Invalid research context projection");
-        decision = compatible;
+        if (decision?.schema_version !== "research-review/1") throw new Error("Invalid research context projection");
         if (Buffer.byteLength(JSON.stringify(decision)) > limit) throw new Error("Research context projection exceeds its byte budget");
         if (synthesizeReview && decision.schema_version === "research-review/1"
           && decision.review_status === "pending" && decision.review_digest !== lastReviewDigest) {
@@ -91,19 +76,19 @@ export function createContextManager({ bridge, coordinator, sessionId, estimateC
           required_action: "Read current research before scientific or completion decisions; execution records and delivery receipts remain authoritative." };
       }
       if (decision.contradictions?.length || decision.findings?.some(n => n.review_notice_count)) target = 4000;
-      const { read_basis: _receipt, snapshot_id, review_id, review_digest, state_digest, bounds, runtime_synthesis, ...research } = decision;
+      const { review_id, review_digest, state_digest, bounds, runtime_synthesis, ...research } = decision;
       message = envelope("research_context", { ...control, research_review: { ...research,
         ...(runtime_synthesis ? { synthesis: runtime_synthesis } : {}),
         ...(bounds ? { omitted: bounds.omitted } : {}) },
         ...(decision.availability ? { research: { availability: decision.availability } } : {}),
         provenance: { review_id: review_id ?? null, review_digest: review_digest ?? null,
-          state_digest: state_digest ?? null, snapshot_id: snapshot_id ?? null, scope, observed_at: new Date().toISOString() },
+          state_digest: state_digest ?? null, scope, observed_at: new Date().toISOString() },
         notice: "Derived research review at this entry, not live state or a read receipt. Read current fields before replacing them." });
       const tokens = estimateContextTokens([message]).tokens;
       if (tokens <= target || limit === 2048 || attempt === 2 || decision.availability) break;
       limit = Math.max(2048, Math.floor(limit * Math.max(0.25, (target - taskTokens) / Math.max(1, tokens - taskTokens)) * 0.9));
     }
-    return { message, availability: decision.availability ?? "available", status: decision.status ?? "uncertain", snapshot_id: decision.snapshot_id ?? null,
+    return { message, availability: decision.availability ?? "available", status: decision.status ?? "uncertain",
       review_id: decision.review_id ?? null, review_digest: decision.review_digest ?? null,
       state_digest: decision.state_digest ?? null, review_status: decision.review_status ?? null,
       trigger: decision.trigger ?? "context_refresh" };
