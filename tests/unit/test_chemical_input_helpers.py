@@ -6,8 +6,9 @@ import sys
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPTS = ROOT/'domains/chemical/skills/chemical-input/scripts'
-sys.path.insert(0, str(SCRIPTS))
+SCRIPTS = ROOT/'domains/chemical/skills/chemical-input/scripts/reaction'
+from tests.unit.chemical_paths import configure
+configure()
 spec = importlib.util.spec_from_file_location('chemical_input_helper', SCRIPTS/'prepare.py')
 helper = importlib.util.module_from_spec(spec); spec.loader.exec_module(helper)
 

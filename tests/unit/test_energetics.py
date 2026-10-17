@@ -10,7 +10,8 @@ import time
 import pytest
 
 SKILLS = Path(__file__).resolve().parents[2] / 'domains/chemical/skills'
-sys.path.insert(0, str(SKILLS/'energetics/scripts'))
+from tests.unit.chemical_paths import configure
+configure()
 import energy
 from energy_analysis import ensemble, profile, scan_slice
 from energy_common import HARTREE_J_MOL, R, UNITS, canonical, standard_correction

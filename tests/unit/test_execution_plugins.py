@@ -39,8 +39,14 @@ remote_root = "/scratch/coragent"
 
 def test_slurm_submission_uses_scheduler_native_resource_flags(tmp_path: Path) -> None:
     from research_agent.jobs import JobSpec
+    import sys
 
-    platform = RemoteSSHPlatform({"ssh_host": "login", "remote_root": "/scratch", "scheduler": "slurm"})
+    plugin_src = Path(__file__).resolve().parents[2] / "plugins" / "tspi-execution-slurm" / "src"
+    sys.path.insert(0, str(plugin_src))
+    from tspi_execution_slurm.scheduler import SlurmRemoteScheduler
+
+    config = {"ssh_host": "login", "remote_root": "/scratch", "scheduler": "slurm"}
+    platform = RemoteSSHPlatform(config, scheduler=SlurmRemoteScheduler(config))
     spec = JobSpec(command=("/bin/true",), cwd=tmp_path, job_id="job_1",
                    metadata={"queue": "short", "resources": {"cpus": 2, "memory_mb": 512}})
     args = platform._submit_arguments(spec)

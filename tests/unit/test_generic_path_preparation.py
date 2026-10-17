@@ -98,7 +98,7 @@ def test_supplied_multifragment_coordinates_preserve_mapping_and_produce_irc(tmp
         text = Path(item['path']).read_text()
         assert item['direction'].capitalize() in text and 'MaxPoints=12' in text
         assert 'Geom=AllCheck' in text and '%oldchk=ts.chk' in text
-    # Preparation support must not silently broaden the legacy DA acceptance criteria.
+    # Generic preparation must not silently broaden the specialized DA contract.
     with pytest.raises(ValueError, match='diels_alder'):
         path_spec(json.loads(branch.read_text()))
 

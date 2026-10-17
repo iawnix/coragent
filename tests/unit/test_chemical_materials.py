@@ -10,7 +10,9 @@ import time
 
 import pytest
 
-SCRIPTS = Path(__file__).resolve().parents[2] / 'domains/chemical/skills/chemical-input/scripts'
+SCRIPTS = Path(__file__).resolve().parents[2] / 'domains/chemical/skills/chemical-input/scripts/materials'
+from tests.unit.chemical_paths import configure
+configure()
 spec = importlib.util.spec_from_file_location('chemical_material_import', SCRIPTS / 'material.py')
 material = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(material)
@@ -86,7 +88,7 @@ def test_unresolved_name_keeps_original_without_network_or_invented_structure(tm
     assert result['atom_order']['new_to_old'] == []
 
 
-def test_selected_name_graph_remains_attributed_and_usable_by_legacy_compare(tmp_path):
+def test_selected_name_graph_remains_attributed_and_supports_structure_compare(tmp_path):
     result = run_import(tmp_path, request('乙醇', 'name', graph={
         'smiles': 'CCO', 'source': 'lookup', 'note': 'Selected candidate from a separately collected resolver result'}))
     assert result['source']['text'] == '乙醇'
@@ -94,7 +96,7 @@ def test_selected_name_graph_remains_attributed_and_usable_by_legacy_compare(tmp
     assert len(result['atoms']) == 9
     assert sum(a['origin'] == 'added_hydrogen' for a in result['atoms']) == 6
     from chemical_identity import compare
-    target = tmp_path / 'old-structure.json'
+    target = tmp_path / 'reference-structure.json'
     target.write_text(json.dumps({'smiles': 'CCO'}))
     assert compare(target, tmp_path / 'output/material.json')['status'] == 'match'
 

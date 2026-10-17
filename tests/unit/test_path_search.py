@@ -13,7 +13,8 @@ import numpy as np
 import pytest
 
 SKILLS = Path(__file__).resolve().parents[2] / 'domains/chemical/skills'
-sys.path.insert(0, str(SKILLS/'candidate-generation/scripts'))
+from tests.unit.chemical_paths import configure
+configure()
 import search
 from ensemble_material import canonical, checked, xyz_text
 from gradient_contract import calculation, evaluate_evidence

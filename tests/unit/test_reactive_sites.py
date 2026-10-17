@@ -11,8 +11,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 SKILLS = ROOT / 'domains' / 'chemical' / 'skills'
-for part in ('reactive-geometry/scripts', 'chemical-input/scripts', 'crest/scripts', '_shared'):
-    sys.path.insert(0, str(SKILLS / part))
+from tests.unit.chemical_paths import configure
+configure()
 
 from ensemble_material import canonical  # noqa: E402
 from material import build_material  # noqa: E402

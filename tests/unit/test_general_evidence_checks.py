@@ -10,7 +10,8 @@ import numpy as np
 import pytest
 
 SKILLS = Path(__file__).resolve().parents[2] / 'domains/chemical/skills'
-sys.path.insert(0, str(SKILLS / 'validation/scripts'))
+from tests.unit.chemical_paths import configure
+configure()
 import evidence_check
 from analysis_material import read_material, validate_material
 from check_common import content_digest, stationary

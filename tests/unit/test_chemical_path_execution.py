@@ -14,7 +14,8 @@ from rdkit import Chem
 
 ROOT=Path(__file__).resolve().parents[2]
 SKILLS=ROOT/'domains/chemical/skills'
-sys.path[:0]=[str(SKILLS/'_shared'),str(SKILLS/'gaussian/scripts')]
+from tests.unit.chemical_paths import configure
+configure()
 from reaction_checks import reaction, path_spec, ordered_molecule
 from path_validation import validate, topology
 from gaussian_io import read_xyz, parse_log

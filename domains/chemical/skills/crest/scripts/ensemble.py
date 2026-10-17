@@ -3,7 +3,10 @@ import json
 from pathlib import Path
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'chemical-input/scripts'))
+_skills = Path(__file__).resolve().parents[2]
+for _part in ('chemical-input/scripts/materials', 'chemical-input/scripts/reaction',
+              'chemical-input/scripts/geometry', 'chemical-input/scripts/tensor'):
+    sys.path.insert(0, str(_skills / _part))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / '_shared'))
 from analysis_material import read_json, read_material
 from complex_sample import sample_complex

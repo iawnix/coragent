@@ -4,7 +4,7 @@ from pathlib import Path
 import sys
 
 SKILLS = Path(__file__).resolve().parents[2]
-for part in ('_shared', 'chemical-input/scripts'):
+for part in ('_shared', 'chemical-input/scripts/materials', 'structure-cognition/scripts'):
     # Keep this skill's own cli.py ahead of shared chemical-input CLI modules.
     sys.path.append(str(SKILLS / part))
 

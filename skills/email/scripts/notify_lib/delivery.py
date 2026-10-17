@@ -345,7 +345,7 @@ def _load_smtp_config(
             },
         },
     }
-    return EmailNotificationConfig(
+    return EmailConfig(
         source=source,
         enabled=enabled,
         recipient=recipient,

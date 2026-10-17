@@ -4,7 +4,8 @@ from pathlib import Path
 import sys
 
 SKILLS=Path(__file__).resolve().parents[2]
-for part in ('_shared','chemical-input/scripts','validation/scripts','energetics/scripts'):
+for part in ('_shared','chemical-input/scripts/materials','chemical-input/scripts/reaction',
+             'validation/scripts','energetics/scripts'):
     sys.path.insert(0,str(SKILLS/part))
 from analysis_material import read_json
 from pathway import pathway

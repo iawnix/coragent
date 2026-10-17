@@ -8,8 +8,9 @@ import time
 import numpy as np
 import pytest
 
-SCRIPTS = Path(__file__).resolve().parents[2] / 'domains/chemical/skills/chemical-input/scripts'
-sys.path.insert(0, str(SCRIPTS))
+SCRIPTS = Path(__file__).resolve().parents[2] / 'domains/chemical/skills/chemical-input/scripts/materials'
+from tests.unit.chemical_paths import configure
+configure()
 from material import build_material, graph_material
 from analysis_material import make_order, read_material
 from correspondence import mappings

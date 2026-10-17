@@ -7,9 +7,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 SKILLS = ROOT / 'domains/chemical/skills'
-sys.path.insert(0, str(SKILLS / 'structure-cognition/scripts'))
-sys.path.insert(0, str(SKILLS / 'chemical-input/scripts'))
-sys.path.insert(0, str(SKILLS / '_shared'))
+from tests.unit.chemical_paths import configure
+configure()
 
 from cognition import cognize  # noqa: E402
 from material import build_material  # noqa: E402

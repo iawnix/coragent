@@ -5,7 +5,10 @@ import subprocess
 
 SKILLS = next(parent for parent in Path(__file__).resolve().parents if (parent / '_shared').is_dir())
 SCRIPTS = SKILLS / 'candidate-generation' / 'scripts'
-for part in ('_shared','chemical-input/scripts','crest/scripts','gaussian/scripts','candidate-generation/scripts/path','candidate-generation/scripts/search','candidate-generation/scripts/backends','candidate-generation/scripts/neb'):
+for part in ('_shared','chemical-input/scripts/materials','chemical-input/scripts/reaction',
+             'crest/scripts','gaussian/scripts','candidate-generation/scripts/path',
+             'candidate-generation/scripts/search','candidate-generation/scripts/backends',
+             'candidate-generation/scripts/neb'):
     sys.path.insert(0,str(SKILLS/part))
 from analysis_material import read_json
 from ensemble_material import canonical

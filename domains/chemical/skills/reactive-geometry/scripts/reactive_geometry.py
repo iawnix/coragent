@@ -5,7 +5,8 @@ import json
 import sys
 
 SKILLS = Path(__file__).resolve().parents[2]
-for part in ('_shared', 'chemical-input/scripts', 'crest/scripts', 'candidate-generation/scripts'):
+for part in ('_shared', 'chemical-input/scripts/materials', 'chemical-input/scripts/reaction',
+             'crest/scripts', 'candidate-generation/scripts/path'):
     sys.path.insert(0, str(SKILLS / part))
 
 import numpy as np

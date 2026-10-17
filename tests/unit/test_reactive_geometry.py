@@ -11,7 +11,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 SKILLS = ROOT/'domains/chemical/skills'
-sys.path.insert(0, str(SKILLS/'reactive-geometry/scripts'))
+from tests.unit.chemical_paths import configure
+configure()
 from reactive_geometry import generate, run, diagnostics
 from geometry_contract import validate
 from geometry_ops import apply

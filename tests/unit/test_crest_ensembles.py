@@ -12,7 +12,8 @@ import numpy as np
 import pytest
 
 SKILLS = Path(__file__).resolve().parents[2] / 'domains/chemical/skills'
-sys.path.insert(0, str(SKILLS / 'crest/scripts'))
+from tests.unit.chemical_paths import configure
+configure()
 import ensemble
 from analysis_material import read_material
 from complex_sample import combine, sample_complex

@@ -4,7 +4,8 @@ import json
 import sys
 
 SKILLS = next(parent for parent in Path(__file__).resolve().parents if (parent / '_shared').is_dir())
-for part in ('_shared','crest/scripts'):
+for part in ('_shared','chemical-input/scripts/materials','chemical-input/scripts/geometry',
+             'crest/scripts'):
     sys.path.insert(0,str(SKILLS/part))
 _SCRIPTS = SKILLS / 'chemical-input' / 'scripts'
 for _part in ('materials', 'reaction', 'geometry', 'diagnostics', 'tensor'):
