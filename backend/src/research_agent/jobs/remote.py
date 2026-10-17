@@ -236,7 +236,7 @@ class RemoteSSHPlatform(RemoteExecutionPlatform):
             self._rsync(local_wrapper, remote_dir + '/.coragent/run.sh')
         finally:
             local_wrapper.unlink(missing_ok=True)
-        if not self.scheduler_adapter.requires_queue:
+        if not getattr(self.scheduler_adapter, "uses_scheduler", self.scheduler_adapter.requires_queue):
             result = self._run_ssh(
                 f"cd {shlex.quote(remote_dir)} && chmod 700 .coragent/run.sh && "
                 f"nohup .coragent/run.sh > .coragent/process.stdout 2> .coragent/process.stderr </dev/null & "

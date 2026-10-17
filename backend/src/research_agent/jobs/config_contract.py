@@ -296,11 +296,15 @@ def validate_submission(result, *, kind, scheduler='torque', require_queue=True,
     for allowed in allowed_queues:
         if queue and allowed and queue not in allowed:
             raise ValueError("submission queue is not allowed")
+    if scheduler == 'tri' and {'queue', 'queue_wait_seconds'} & result.keys():
+        raise ValueError('TRI submission does not support scheduler queues')
     resources = result.get("resources", {})
     if not isinstance(resources, dict):
         raise ValueError("submission.resources must be a table")
-    if set(resources) - {"cpus", "memory_mb", "walltime", "select"}:
+    if set(resources) - {"cpus", "memory_mb", "gpus", "walltime", "select"}:
         raise ValueError("unsupported submission resource")
+    if "gpus" in resources and scheduler != "tri":
+        raise ValueError("submission.resources.gpus requires a TRI target")
     if "select" in resources and (not isinstance(resources['select'], str)
             or not re.fullmatch(r'[A-Za-z0-9_=:+.-]+', resources['select'])):
         raise ValueError("submission.resources.select is invalid")
@@ -309,7 +313,7 @@ def validate_submission(result, *, kind, scheduler='torque', require_queue=True,
             raise ValueError('submission.resources.select requires a PBS target')
         if {'cpus', 'memory_mb'} & resources.keys():
             raise ValueError('use PBS select or cpus/memory_mb, not both')
-    for field in ("cpus", "memory_mb"):
+    for field in ("cpus", "memory_mb", "gpus"):
         if field in resources and (type(resources[field]) is not int or resources[field] < 1):
             raise ValueError("submission.resources." + field + " must be positive")
     if "walltime" in resources:
@@ -347,7 +351,7 @@ def job_config_schema():
     queues = {'type': 'array', 'uniqueItems': True, 'items': text('^' + QUEUE_PATTERN + '$')}
     python = record({'manager': {'const': 'conda'}, **{key: absolute for key in ('conda_executable', 'prefix', 'lock_ref')}},
                     ('manager', 'conda_executable', 'prefix', 'lock_ref'))
-    resources = record({'cpus': integer(), 'memory_mb': integer(),
+    resources = record({'cpus': integer(), 'memory_mb': integer(), 'gpus': integer(),
                         'walltime': text(r'^(?!0+:00:00$)[0-9]+:[0-5][0-9]:[0-5][0-9]$'), 'select': text(r'^[A-Za-z0-9_=:+.-]+$')})
     resources['not'] = {'anyOf': [{'required': ['select', name]} for name in ('cpus', 'memory_mb')]}
     submission = record({'queue': text('^' + QUEUE_PATTERN + '$'), 'queue_wait_seconds': integer(), 'resources': resources})

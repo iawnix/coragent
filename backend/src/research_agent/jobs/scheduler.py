@@ -13,6 +13,11 @@ class RemoteScheduler(ABC):
 
     name: str
     requires_queue = True
+    # Queue-less schedulers such as TRI still submit through their scheduler
+    # service.  ``requires_queue`` therefore only controls submission
+    # validation; ``uses_scheduler`` controls whether the SSH platform uses
+    # the scheduler command or starts the wrapper directly.
+    uses_scheduler = True
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = dict(config)

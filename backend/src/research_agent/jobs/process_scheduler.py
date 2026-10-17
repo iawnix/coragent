@@ -13,6 +13,7 @@ class ProcessRemoteScheduler(RemoteScheduler):
 
     name = "process"
     requires_queue = False
+    uses_scheduler = False
 
     def submit_arguments(self, spec):
         return []
