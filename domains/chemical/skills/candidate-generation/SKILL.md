@@ -1,80 +1,47 @@
 ---
 name: candidate-generation
-description: Generate candidate geometries for transition-state and reaction-path searches from mapped endpoints, bond changes, constraints and available structural evidence.
+description: Build and search transition-state and reaction-path candidate geometries from mapped endpoints, reaction coordinates, and structural evidence.
 ---
 
-# CoRAgent TS Candidate Generation
+# Transition-state candidate generation
 
 [Chinese version](SKILL.zh-CN.md)
 
-Use this Skill to produce candidate geometries for a proposed elementary step.
-Candidate generation does not establish a transition state; validation belongs
-to `validation`, and method or Backend choice belongs to
-`method-selection`.
-This is the scientific search-operation layer. Gaussian, xTB and other software
-recipes remain backend concerns; their presence here only describes how a search
-can be executed through the existing Job interface.
+Use this Skill to turn a reaction hypothesis into one or more geometries that a TS or path solver can search. The input is a mapped elementary step: reactants/products or fragments, bond changes, charge, multiplicity, relevant conformers, and any evidence about approach, proton transfer, or stereochemistry. The output is a candidate set with method, constraints, source frame, and the next validation action.
 
-Within a reaction investigation, follow the [reaction-investigation loop](../reaction-investigation/references/reaction_investigation.md).
-Return a selected candidate with its source, remaining validation and next operation,
-or a diagnosed failure with a changed construction/search action. A preparation Job
-that only writes inputs has not performed the search: execute and inspect the solver.
-Candidate status permits further exploration; a verified minimum of the complete
-reactant complex is not a prerequisite for every search method.
+## Choose a construction method
 
-Start from explicit reactant/product identities, atom mapping, charge,
-multiplicity, and relevant conformers. Choose chemically informed construction,
-a relaxed scan, QST2/QST3, direct TS optimization, NEB, or fragment orientation
-sampling according to the proposed bond changes and available evidence. Bind
-all seeds and generated structures as Artifacts with recorded production provenance and preserve the
-method, constraints, frame selection, and provenance.
+- **QST2**: use when mapped reactant and product geometries are available and the step is a single, smooth rearrangement. Keep atom order and charge/spin aligned.
+- **QST3**: use when the endpoints are reliable but the reaction-center structure needs a chemically informed middle guess. Supply an explicit mapped TS-like geometry; do not let an arbitrary interpolation choose the mechanism.
+- **Reactive pose + restrained scan**: use for separate fragments, association, substitution, cycloaddition, proton transfer, or unclear approach direction. Generate several faces/distances, then relax a forming/breaking coordinate with `chemical.scan-xtb@1` or `chemical.scan-gaussian@1`.
+- **Relaxed 1D/2D scan**: use when one or two bond distances, angles, or dihedrals control the event and endpoints are not enough to locate the ridge. Select high-energy or curvature-changing frames as TS seeds.
+- **NEB**: use when both endpoint minima are known and the path has several coupled coordinates. Start with compatible mapped endpoints; use `chemical.neb-xtb@2` or `chemical.neb-gaussian@2`, then refine the highest path region with a TS optimizer.
+- **Direct TS optimization**: use when an imaginary mode, previous TS, literature geometry, or a good QST/scan frame already identifies the reaction direction. Use `chemical.gaussian-input@1` or `chemical.cf22d@1` with the TS task.
+- **Conformer/pose enumeration**: use CREST or `reactive-geometry` before any of the above when torsion, face, or fragment orientation is the dominant uncertainty.
 
-When an existing candidate needs a new approach orientation, reaction-center distance, or
-evidence-supported local distortion, use the [reactive-geometry](../reactive-geometry/SKILL.md) Skill first and pass its
-provenance-preserving candidates to QST, scans, or NEB.
+Keep multiple site, face, conformer, and mechanism hypotheses until validation or energetics gives a reason to reduce them. A scan maximum, NEB image, or QST interpolation is a candidate record and a useful restart frame; it becomes a TS claim only after `validation`.
 
-Do not promote a scan maximum, NEB image, interpolation, or constrained
-structure as a verified saddle point. Record useful candidates as facts about
-the generated structure and failed or distorted searches as issues only when
-they inform the research question.
+## Recommended loop
 
-Describe each proposed step through mapped endpoints, bond changes and relevant
-coordinates or constraints. Choose a candidate-generation method from those inputs;
-reaction names do not select a mandatory script or validator. New reaction classes
-do not require new tools or Skill sections. Use explicit solver inputs or a bounded
-task script through the existing Job interface, preserving atom correspondence and
-checking each method's prerequisites. For Gaussian QST/TS inputs, use the
-[Gaussian Skill](../gaussian/SKILL.md).
+1. State the atom mapping, forming/breaking bonds, transfer coordinates, and electronic state.
+2. Prepare compatible endpoint geometries with `chemical.path-candidates@1` (`chemical.qst-prepare@1`) or supply a path specification.
+3. Generate or edit reactive poses with `chemical.reactive-sites@1` and `chemical.reactive-pose@1` when fragments or faces are uncertain.
+4. Run the bounded scan, gradient, QST, or NEB executor and inspect convergence, reaction-center distances, and path frames.
+5. Keep the best few chemically distinct frames, attach their source digests, and send them to a TS optimizer and `validation`.
+6. If a search collapses to a minimum or distorts, use the failure geometry to change the pose, coordinate, endpoint pair, or method before retrying.
 
-The [mapped path preparer](references/path_preparation.md) accepts explicit bond
-changes and either automatically embedded single-fragment endpoints or supplied
-mapped geometries. It writes QST2 inputs through the existing Job recipes. Its
-optional geometry strategies do not define the scientific verdict.
-Check the input and validation scope before reuse; an unsupported preparation case
-does not make the research method unavailable. Other methods can use shared runners,
-explicit solver inputs or task scripts.
+## Registered operations
 
-See [script layout](references/script_layout.md) for the implementation boundaries and canonical script paths.
+- `chemical.path-candidates@1`: mapped QST/path input preparation.
+- `chemical.qst-prepare@1`: QST2/QST3 request preparation.
+- `chemical.scan-xtb@1`, `chemical.scan-gaussian@1`: bounded relaxed scans.
+- `chemical.gradient-xtb@1`, `chemical.gradient-gaussian@1`: gradient/path calculators.
+- `chemical.neb-xtb@2`, `chemical.neb-gaussian@2`: ASE NEB v2 searches.
 
-Read [candidate_generation.md](references/candidate_generation.md) for method
-criteria and [ase_neb_executor.md](references/ase_neb_executor.md) for NEB availability and prerequisites.
-Use the shared [reaction-search task interface](references/reaction_task_interface.md)
-when handing a candidate to IRC or validation.
+Read [candidate-generation criteria](references/candidate_generation.md), [path operations](references/path_search.md), [QST preparation](references/path_preparation.md), and [NEB executor details](references/ase_neb_executor.md). Use [reactive geometry](../reactive-geometry/SKILL.md) for pose construction and [validation](../validation/SKILL.md) for saddle/IRC evidence.
 
-Read [specialized path preparation](references/gaussian_path.md) only when using
-that optional recipe; its local contract does not define the scope
-of candidate generation as a whole. Pass a selected candidate to `validation` for
-saddle evidence and bidirectional IRC connectivity; preserve endpoint and solver
-metadata when that validation prepares IRC inputs.
+## Further references
 
-For supplied material endpoints, use `chemical.qst-prepare@1` for QST2/QST3.
-For bounded 1D/2D grids use `chemical.scan-xtb@1` or `chemical.scan-gaussian@1`;
-for xTB gradients/NEB use `chemical.gradient-xtb@1` and `chemical.neb-xtb@2`.
-Read [material-based path operations](references/path_search.md) for schemas,
-optional path environment bindings, resume rules and actual calculator limits.
-
-Ground-spin Gaussian gradients and NEB are also available as `chemical.gradient-gaussian@1`
-and `chemical.neb-gaussian@2`; their separate electronic settings and scope are in
-[path operations](references/path_search.md).
-
-Use [ASE NEB v2](references/ase_neb_executor.md) for new xTB/Gaussian band searches. Diagnose failed or distorted searches with [search recovery](../method-selection/references/search_recovery.md); inspect [local geometry](../material-preparation/references/local_diagnostics.md) and [trajectories](../report/references/research_tools.md) before choosing a restart frame.
+- [gaussian path](references/gaussian_path.md)
+- [reaction task interface](references/reaction_task_interface.md)
+- [script layout](references/script_layout.md)

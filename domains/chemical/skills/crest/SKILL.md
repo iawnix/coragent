@@ -1,29 +1,40 @@
 ---
 name: crest
-description: Adapt declared CREST conformer and rigid-fragment ensemble jobs, preserving member identity, records and provenance.
+description: Explore conformers and rigid-fragment arrangements with CREST, then select traceable ensemble members for downstream reaction calculations.
 ---
 
-# CREST backend
+# CREST conformer and complex sampling
 
-This Skill owns the CREST executable binding, versioned input staging, ensemble
-receipt parsing and member-level provenance. It does not choose a reaction
-mechanism, rank a research hypothesis, certify a minimum or transition state, or
-interpret ensemble energies as free energies. Use `material-preparation`,
-`candidate-generation`, `energetics` or `method-selection` for those decisions.
+[Chinese version](SKILL.zh-CN.md)
 
-Registered adapters:
+Use CREST when uncertainty in conformation, fragment orientation, or weak-complex packing is likely to change a reaction search. It is useful for flexible reactants, catalysts with several rotamers, pre-reactive complexes, and rigid fragments whose relative pose must be sampled before transition-state work.
 
-- `chemical.crest@1` stages an explicit ground-state material for the configured
-  CREST 3.0.2 GFN1/GFN2 binding.
-- `chemical.crest-ensemble@1` imports a receipt and exact source material.
-- `chemical.ensemble-select@1` and `chemical.complex-sample@1` use the
-  structure binding for deterministic record operations around the CREST data.
+## What to prepare
 
-The adapter preserves source material, member IDs, coordinates, method/solvent
-metadata, energy fields, selection decisions and partial-result status. Unknown
-identity or state remains an explicit record field. Other CREST versions and
-native options require a generic Job with declared inputs and outputs; this
-registered adapter does not claim compatibility for them.
+Start from a material with explicit coordinates, charge, multiplicity, fragments, and the solvent model used by the study. Choose GFN2 for the normal search and GFN1 when a cheaper broad screen is useful. Set an energy window large enough to retain chemically distinct conformers; the adapter default is 6 kcal/mol and the maximum retained member count is 256.
 
-Prepare and submit through the normal Job lifecycle. The detailed schemas and
-staging boundaries are in the [backend contract](references/crest_backend_contract.md); ensemble operations are documented in [the ensemble contract](references/crest_ensemble.md).
+CREST can produce a conformer ensemble for one molecule, a rigid-fragment complex ensemble, a deterministic subset selected by energy/diversity/record ID, or perturbed and assembled complex samples for a reaction-center search.
+
+## Recommended workflow
+
+1. Prepare the parent material and keep its source digest as the ensemble parent.
+2. Run `chemical.crest@1` with the chosen GFN method, search/optimization level, solvent, thread count, timeout, and energy window.
+3. Import the run with `chemical.crest-ensemble@1` when the ensemble will be reused in a later Job.
+4. Use `chemical.ensemble-select@1` to retain members by a declared selection rule. Keep several low-energy members when their reactive torsions or faces differ.
+5. For separate reactants, use `chemical.complex-sample@1` in `assemble` or `perturb` mode, inspect contacts, and pass accepted poses to `reactive-geometry` or `candidate-generation`.
+6. Optimize or evaluate selected members at the study method, then compare reaction candidates with the same method and state.
+
+The run keeps member IDs, coordinates, source material, solvent, method, energies, selection decisions, and partial-run status. Use those IDs when a later calculation refers to a named conformer or complex pose.
+
+## Registered operations and scripts
+
+- `chemical.crest@1` -> `skills/crest/scripts/crest_run.py`; options include `--method gfn1|gfn2`, `--search-level normal|quick|squick|mquick`, `--opt-level normal|tight|vtight`, `--solvent`, `--energy-window`, `--max-members`, `--threads`, and `--timeout`.
+- `chemical.crest-ensemble@1` -> `ensemble.py`; imports a material and a CREST run.
+- `chemical.ensemble-select@1` -> `ensemble.py`; applies a declared selection to an ensemble.
+- `chemical.complex-sample@1` -> `ensemble.py`; assembles or perturbs rigid fragments.
+
+Prepare these through the standard executor and Job lifecycle. Read [the backend contract](references/crest_backend_contract.md) for input schema and [the ensemble contract](references/crest_ensemble.md) for selection and complex records.
+
+## Choosing the handoff
+
+Use the lowest few members for a low-energy population. Use a broader member set when the reaction center has several torsions, faces, or approach directions. Treat ensemble members as starting geometries; frequency, TS, IRC, and free-energy interpretation belong to the corresponding operation Skills.

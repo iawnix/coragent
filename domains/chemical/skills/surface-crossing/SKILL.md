@@ -1,21 +1,19 @@
 ---
 name: surface-crossing
-description: Search and check regular crossings of two distinct-spin Gaussian HF/DFT surfaces, with energy-gap, projected-gradient and optional seam-curvature evidence.
+description: Search and check distinct-spin Gaussian crossing candidates using energy-gap, projected-gradient, and seam-curvature evidence.
 ---
 
-# Different-spin surface crossings
+# Distinct-spin surface crossings
 
-[中文说明](SKILL.zh-CN.md)
+[Chinese version](SKILL.zh-CN.md)
 
-Use `chemical.mecp-gaussian@1` for a bounded crossing candidate search and
-`chemical.crossing-check@1` for independent numerical evidence. Read the
-[contracts and scientific scope](references/crossing_execution.md) first.
-The native solver uses the optional `path_gaussian` binding; the checker uses
-`structure`. Both accept input role `input` and use ordinary Jobs.
+Use this Skill for a crossing between two Gaussian HF/DFT surfaces with different spin multiplicities. The native search is `chemical.mecp-gaussian@1`; independent numerical evidence is `chemical.crossing-check@1`.
 
-A small energy gap alone is insufficient: inspect the projected gradient and
-constrained curvature. Keep numerical seam stationarity separate from electronic
-state identity, SCF stability and global minimality. Distinct spin multiplicities
-and acceptable S² values do not prove continuous wavefunction identity.
-This implementation is not QBICS, a same-spin conical-intersection optimizer,
-spin-orbit coupling, nonadiabatic dynamics or an ordinary TS/IRC validator.
+## Workflow
+
+1. Prepare an input containing the two state definitions, charge, multiplicities, starting geometry, Gaussian method/basis, and convergence settings.
+2. Run `chemical.mecp-gaussian@1` through the path_gaussian environment and retain the candidate geometry, state energies, gradients, projected-gradient norm, gap, and convergence record.
+3. Run `chemical.crossing-check@1` on the collected candidate. Inspect energy gap, projected gradient, and optional constrained seam curvature together.
+4. Compare state-character continuity and SCF stability with the numerical seam evidence. Feed a geometry with a useful crossing direction to `candidate-generation` or `validation` only with its crossing context attached.
+
+The registered checker uses the `structure` binding and ordinary Jobs. Read [crossing execution](references/crossing_execution.md) for schema and thresholds. A small gap is a screening signal; the crossing decision uses the gradient/curvature and state records as a package.

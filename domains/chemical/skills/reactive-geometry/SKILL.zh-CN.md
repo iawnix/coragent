@@ -1,65 +1,30 @@
 ---
 name: reactive-geometry
-description: 根据反应中心局部坐标系、显式几何编辑和计算模式证据，定向构建反应复合物并修正失败的过渡态初猜。
+description: 使用反应中心局部坐标、显式编辑和有来源的模式位移构建反应复合物并修正 TS 猜测。
 ---
 
-# 反应构象编辑与修正
+# 反应几何构建
 
-[English](SKILL.md)
+[English version](SKILL.md)
 
-当需要按机制假设摆放分离反应物，或根据扫描、NEB、优化、IRC 结果修正下一轮初猜时使用。
-`chemical.reactive-geometry@1` 通过普通 Job 生命周期编辑已有坐标，不决定机理、不运行量化求解器。
+分离反应物需要化学上合理的接近几何，或失败的扫描、NEB、优化、IRC 帧需要定向修正时使用本 Skill。它编辑坐标并保留来源，再把候选交给候选生成或受限精修。
 
-反应研究中，将接受的姿态和被拒候选原因交回[机理研究闭环](../reaction-investigation/references/reaction_investigation.zh-CN.md)。
-接受姿态只是约束精修或候选生成的交接，不能因此停止。交接时保留来源材料、片段内部几何、
-映射、成键变化和真实局部接触。
+## 构建反应姿态
 
-把这个 Skill 当作工具箱和判断手册使用。Agent 根据证据选择、组合工具；工具负责输入、坐标和
-来源不变量，不强制固定的研究顺序。选择工具时先读[能力地图](references/capability_map.zh-CN.md)
-和[调用卡片](references/call_cards.zh-CN.md)，几何被拒绝或路径失败后读[恢复手册](references/recovery_playbook.zh-CN.md)。
+从显式原子 ID 和 `bond_changes` 开始。`chemical.reactive-sites@1` 根据映射结构生成反应中心角色、局部坐标、可选进攻面和接近假设；再把每个合理假设交给 `chemical.reactive-pose@1`，采样片段距离、进攻锥、扭转角和无碰撞刚性放置。
 
-如果已经有产物映射和显式键变化，先调用 `chemical.reactive-sites@1`。它把键变化转换为反应中心
-角色、局部坐标系、备选反应面和反应类型相关的起始假设；它不生成产物，也不替 Agent 决定机理。
-再把一个或多个返回的假设交给 `chemical.reactive-pose@1`。证据不能区分多个位点或反应面时，保留
-这些备选。
+若存在多个亲核位点、亲电面、催化剂取向、质子接力或构象，应保留多个姿态。根据局部取代基方向和空间可达性选择进攻轴；按预期键级和扫描范围设置距离。姿态生成期间保持片段内部几何。
 
-对于由 SMILES 生成且包含独立片段的反应物，在 QST/NEB 前使用
-`chemical.reactive-pose@1`。它接收带显式坐标的 material 和映射后的 `bond_changes`，
-根据反应中心邻域生成局部外向方向，采样片段间距离、接近圆锥和扭转角，并在排除非反应区域
-短接触后返回多个刚性取向候选。这是取向集合，不是机理推断或 TS 认证。
+## 精修和修正
 
-用原子 ID 和显式 `bond_changes` 表达假设。根据分子图、几何及已有化学证据选择局部接近轴、
-平面、移动原子组和距离，不按反应名称选择配方。可能存在不同位点、进攻面、质子穿梭或
-构象时保留多个假设，不能将一个几何检查通过的种子当作确定结论。
+用 `chemical.scan-xtb@1` 或 `chemical.scan-gaussian@1` 围绕成键/断键距离、角度或二面角做受限预优化。一点或短程松弛扫描可消除碰撞并保留反应中心应变；结果帧交给 `candidate-generation`，不直接当作 TS。
 
-自动取向执行器不能替代显式化学假设：它生成的局部外向方向只是基于几何的起始假设。
-应检查返回的变换；当证据不能区分位点或反应面时，保留多个候选。
+恢复失败搜索时，根据梯度、虚频模式、路径和反应中心证据选择来源帧。`chemical.reactive-geometry@1` 支持定向刚性放置、群组距离/角/二面角编辑和 Cartesian 模式位移。应用模式或梯度前绑定精确 material digest、原子顺序和坐标轴。若第一次搜索坍缩，改变方向、群组、构象或机理后重用操作。
 
-取向生成后，使用现有的 `chemical.scan-xtb@1` 做约束预优化：围绕选定的反应距离、角度或二面角
-提交一个单点约束扫描。它使用带约束的 xTB 势能优化，检查最终实际坐标，并在同一几何上补做无约束
-物理能量评估。这是候选结构准备，不是 TS 搜索；如果初始取向可能塌缩，不要直接使用无约束的
-`chemical.xtb@1`。
+## 已注册操作与交接
 
-构建、编辑和可执行示例见[输入与执行合同](references/reactive_geometry.zh-CN.md)。
-支持定向刚性摆放、原子组距离/角度/二面角调整以及笛卡尔模式位移；检查碰撞、受保护键
-畸变和最终约束，同时导出通过与拒绝的几何及来源。
+`chemical.reactive-sites@1` 做局部位点/坐标分析，`chemical.reactive-pose@1` 生成片段姿态集合，`chemical.reactive-geometry@1` 执行显式编辑和模式位移，扫描 executor 做受限精修。schema 和例子见[能力图](references/capability_map.zh-CN.md)、[调用卡](references/call_cards.zh-CN.md)、[恢复手册](references/recovery_playbook.zh-CN.md)。编辑后、电子结构 Job 前运行 `geometry-preflight`，并把父 digest、键变化、姿态假设、约束和拒绝原因交给 `candidate-generation`。
 
-根据上一轮计算修正时：
+## Further references
 
-- 结合几何、梯度、模式和路径证据选择明确的源帧，失败 TS 搜索中最低能帧经常只是稳定
-  势阱。先参照[搜索恢复](../method-selection/references/search_recovery.zh-CN.md)。
-- 模式向量必须绑定源材料摘要、完整原子顺序和坐标轴。重排 XYZ 不会自动旋转或重排张量。
-  质量加权模式或梯度先显式转换；不能逐原子归一化向量。
-- 将真实电荷、键级、自旋或轨道分析解释为编辑假设，再转成几何操作。缺少分析时通过适合
-  的求解器补算；这个执行器不提取或编造电子结构证据。
-- 检查最终反应中心和拒绝原因。检查失败时修订方向、移动原子组、构象或机理；重复同一
-  编辑不构成新证据。遵守当前研究范围与 Job 预算。
-
-按需要用 [CREST](../crest/SKILL.zh-CN.md) 探索内部构象。受限预优化复用现有 Gaussian/xTB
-Job，显式保持方法、态、溶剂与约束。无约束极小化可能破坏 TS 初猜，反应物的经典力场
-也可能把成断键拉回原状。精修后复核几何并保留初猜来源，几何评分不是能量或 TS 成功率。
-
-将选定的 material/XYZ 交给[候选搜索](../candidate-generation/SKILL.zh-CN.md)：QST3
-仍需明确 guess 映射，QST2/ASE NEB 仍需独立准备的相容端点。经典 TS 后续通过
-[validation](../validation/SKILL.zh-CN.md) 检查虚频模式和双向 IRC；缺失的优化、电子态
-或连通性证据保持未决。
+- [reactive geometry.zh CN](references/reactive_geometry.zh-CN.md)

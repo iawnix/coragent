@@ -1,31 +1,24 @@
 ---
 name: geometry-preflight
-description: 在电子结构 Job 前执行跨任务坐标安全检查，同时允许声明的反应中心处于非平衡几何。
+description: 在电子结构计算前筛查坐标，同时保留声明的非平衡反应中心几何。
 ---
 
 # 几何预检
 
-当坐标即将进入 Gaussian、xTB、QST、NEB 或其它电子结构计算时使用，或需要客观筛查失败路径
-image 时使用。
+[English version](SKILL.md)
 
-这是输入安全检查，不是过渡态验证。必须拒绝非有限坐标、原子身份/顺序错误、原子核塌陷和
-非反应区域的严重短接触；必须允许声明反应中心中的成键、断键、角度和配位处于非平衡状态。
-不能用正常极小值的键长或角度筛掉 TS 初猜。
+Gaussian、xTB、CF22D、QST、NEB 或重启帧进入求解器前，对 XYZ 或 Gaussian 输入运行此检查。它捕获非有限坐标、原子数/标题不一致、核塌缩和严重的非反应短接触，同时允许 TS 种子中有意形成/断裂的键处于非平衡距离。
 
-使用 `skills/_shared/geometry_safety.py` 中的确定性检查器。原始 Gaussian 输入要检查每个显式
-笛卡尔坐标块。`Geom=AllCheck` 的坐标在文本中不存在，该部分必须报告为 `not_assessed`，不能
-声称通过。
+## profile 与输入
 
-结果有两个独立含义：
+选择 `general`、`reaction_seed`、`ts_candidate` 或 `path_image`。知道反应上下文时提供从零开始的反应对索引，让检查器区分成键接触和意外碰撞。Gaussian 文本逐个检查显式 Cartesian 块；`Geom=AllCheck` 没有可检查坐标，会记录为未评估。
 
-- `verdict=unsafe`：不要启动计算，保留硬失败原因；
-- `verdict=safe`：只表示坐标没有明显崩坏，不代表极小点、鞍点或机理结论。
+通过 `chemical.geometry-safety@1` 使用共享 `skills/_shared/geometry_safety.py`：
 
-声明的反应原子对可以免除非键短接触阈值，但永远不能免除绝对塌陷阈值。已知反应上下文时提供
-从零开始的反应原子对索引。按输入选择 `general`、`reaction_seed`、`ts_candidate` 或 `path_image`
-profile。
+```text
+--input <xyz-or-gjf> --output <report.json>
+```
 
-本 Skill 不规定研究顺序。Agent 仍可根据证据选择 QST、NEB、扫描、直接 TS 优化或诊断；它只
-阻止明显损坏的坐标进入求解器，并记录反应中心非平衡几何的警告。
+结果包含硬失败、警告、反应对豁免、profile 和 `safe`/`unsafe`/`not_assessed`。safe 只表示可以准备求解器输入，优化、模式、IRC 和结构评估仍由相应 Skill 完成。
 
-需要输入格式和 CLI 合同时阅读[geometry_safety.zh-CN.md](references/geometry_safety.zh-CN.md)。
+schema、阈值和 Gaussian 块处理见[几何安全](references/geometry_safety.zh-CN.md)。`reactive-geometry` 编辑后再次运行，并把报告 digest 交给候选 Job。

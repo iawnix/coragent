@@ -1,61 +1,30 @@
 ---
 name: report
-description: 根据研究证据编写图文报告，包含分子结构、能量曲线、数据表、方法、结论和可追溯的来源。
+description: 根据结构、计算、验证证据、能量数据、图形和结论组装可追溯研究报告。
 ---
 
 # 研究报告
 
-围绕用户的研究问题写出结论、依据、方法和局限，使用用户要求的语言与交付格式。
-完整研究报告应图文并茂：有结构证据时展示分子图，有可比能量时展示能量图，并用表格汇总数值与验证状态。
-根据已有数据选择图表，不能为凑齐版式编造结构、路径、能量或误差。
+[English version](SKILL.md)
 
-先阅读[图表与报告制作](references/illustrated_report.zh-CN.md)，据此准备可重现的数据表、绘图脚本、
-图片和最终文档。默认可交付 Markdown 与图片目录；用户要求 HTML/PDF 等格式时按可用工具导出。
-必须在正文嵌入图表并写出图注，不能只提供图片路径清单。
+需要可读证据包时使用本 Skill。报告应回答研究问题，展示方法和来源记录，区分观察与解释，并显式呈现缺失或冲突证据。
 
-## 基础数据表
+## 报告流程
 
-对于 `science-result` 格式的已有结果，可通过原生 bash 调用 [scripts/build.py](scripts/build.py)：
+1. 收集 result JSON、CSV、几何、日志、验证记录和来源 digest；建立每行对应一个结构、候选、能量状态或路径帧的数据集。
+2. 用 `scripts/build.py` 先生成证据表：
 
 ```bash
-"$CORAGENT_PYTHON" <已安装的报告Skill>/scripts/build.py --result local=<工作区>/path/to/result.json --output-dir <工作区>/reports/comparison-v1
+"$CORAGENT_PYTHON" <installed-report-skill>/scripts/build.py --result local=<workspace>/path/to/result.json --output-dir <workspace>/reports/comparison-v1
 ```
 
-每份结果对应一个 `--result environment=path`，输出目录须不存在或为空。该脚本只生成
-`report.md` 基础表格和 `report.json` 来源摘要；不会自动生成能量曲线、分子图或完整科学论述。
-读取生成内容后补齐研究问题、证据分析、图表和结论。其他格式直接从已收集的材料建立报告数据集。
+3. 用 `chemical.render@1` 渲染给定几何（`--style`、`--size`、`--charge`、`--multiplicity`），图注写明 Artifact 和电子态。
+4. 根据收集数据绘制能量剖面、扫描切片、集合人口和轨迹；图或图注保留单位、标准态、温度、能隙和排除行。
+5. 在证据旁写结论。TS 研究展示候选身份、虚频模式、IRC 端点和验证状态；能量研究展示 E/ZPE/H/G 标签及方法/条件；动力学展示 TST 假设、前体范围、浓度、守恒诊断和终止状态。
+6. 将报告、图、数据和脚本注册为材料并在研究结论引用。插图 Markdown 包使用 `chemical.research-report@1`，固定视角 GIF/XYZ/CSV 路径产品使用 `chemical.trajectory@1`。
 
-## 图像与交付
+## 交付与审阅
 
-分子图可用 `chemical.render@1`，输入角色为 `geometry=<XYZ 文件>`，选择具有 `render` 绑定的环境。
-该 Job 生成 SVG、PNG 和来源摘要，可设置 `--style`、`--size`、`--charge`、`--multiplicity`。
-渲染只展示给定坐标；图像不能证明结构优化、连接关系或过渡态有效性。
+默认可用带图片目录的 Markdown，也可导出 HTML、PDF 或用户指定格式。打开最终文档检查链接、坐标轴、图注、单位、表格和来源。邮件适配器只有在用户授权发送后使用，准备/检查/状态操作见 [报告邮件交付](references/report_email_delivery.zh-CN.md)。
 
-整理已有结果可用文件和脚本工具；额外科学计算通过 `job_*` 执行。绘图需使用实际可用的绘图库，
-渲染 Job 使用配置的环境。交付前打开最终文档与图像，核对链接、坐标轴、图注、单位、表格和来源。
-将报告及依赖的图表、数据、脚本登记为材料，并在研究结论中引用。
-报告 Skill 负责交付决策：消息属于进度、报告就绪、失败、不确定还是完成，哪些报告包成员可以作为附件，
-如何表述科学状态与局限，以及如何将交付登记到研究记录。详见[报告邮件交付](references/report_email_delivery.zh-CN.md)。
-准备好领域请求并取得明确发送授权后，再调用通用的[email 运输 Skill](../../../../skills/email/SKILL.md)。
-报告专用适配器是 `scripts/email_delivery.py`；它负责把报告请求转换为通用邮件消息，并在运输层返回后登记报告交付。
-
-## 能量分析数据
-
-对于已收集的 chemical-thermochemistry-result/1、chemical-free-energy-ensemble-result/1、
-chemical-energy-profile-result/1、chemical-scan-slice-result/1，联合读取 JSON 与配套 CSV，
-见[能量合同](../energetics/references/energy_execution.zh-CN.md)。缺失量标为不可用；
-保留 E/H/G 类型、条件与参考，并引用来源摘要/Artifact。只绘制成功扫描点，排除点
-保留空缺；剖面标明离散状态或采样势能切片。活化能比较和集合布居都不证明 TS 连通性、
-网络选择性或穷尽采样。
-
-动力学报告须标出 TST 假设、共同前体分支范围及网络温度、初始浓度、守恒/误差诊断、
-终态 status；部分轨迹不能证明请求终点的产率。动力学预测与产物 G 排序分别报告。
-电子态/交叉报告区分目标与参考能量、态特征连续性、数值驻点和曲率；未验证态身份或
-缺 Hessian 必须保留在结论中。
-
-独立 `chemical.trajectory@1` 和 `chemical.research-report@1` Job 可生成固定视角 GIF/XYZ/CSV 剖面及图文 Markdown 报告，保留未完整路径、作者解释和来源证据，能量比较由既有 energetics 合同重算。见[轨迹与报告合同](references/research_tools.zh-CN.md)。
-
-如果上下文提供通用的 `research-review/1` 投影，应在报告输入的
-`research_review` 字段中带入。报告会校验其摘要，并保留其中的来源引用、矛盾和
-不确定性。Research Review 只是有界的事实索引；提出化学结论或完成声明前，仍须读取
-它引用的 Result 和 Artifact 原始记录。
+能量数据集见[能量合同](../energetics/references/energy_execution.zh-CN.md)，轨迹和报告包见[研究工具](references/research_tools.zh-CN.md)与[插图报告](references/illustrated_report.zh-CN.md)。

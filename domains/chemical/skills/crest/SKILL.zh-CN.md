@@ -1,22 +1,40 @@
 ---
 name: crest
-description: 适配已声明的 CREST 构象和刚性片段集合 Job，保留成员身份、记录和来源。
+description: 使用 CREST 搜索构象和刚性片段排列，并将可追溯的集合成员交给后续反应计算。
 ---
 
-# CREST 后端
+# CREST 构象与复合物采样
 
-本 Skill 负责 CREST 可执行程序绑定、版本化输入暂存、集合回执解析和逐成员来源。它不选择
-反应机理、不排序研究假设、不认证极小点或过渡态，也不把集合能量解释为自由能；这些决策
-属于 `material-preparation`、`candidate-generation`、`energetics` 或 `method-selection`。
+[English version](SKILL.md)
 
-已注册的适配器：
+当构象、片段取向或弱复合物堆积可能改变反应搜索时使用 CREST。典型场景包括柔性反应物、多个转子构象的催化剂、预反应复合物，以及需要在过渡态搜索前采样相对姿态的刚性片段。
 
-- `chemical.crest@1` 为配置的 CREST 3.0.2 GFN1/GFN2 绑定暂存明确声明的 ground 态材料。
-- `chemical.crest-ensemble@1` 导入回执和精确来源材料。
-- `chemical.ensemble-select@1`、`chemical.complex-sample@1` 使用 structure 绑定对 CREST 数据执行确定性记录操作。
+## 输入与输出
 
-适配器保留来源材料、成员 ID、坐标、方法/溶剂元数据、能量字段、筛选决定和部分结果状态；
-未知身份或电子态保持为明确记录字段。其它 CREST 版本和原生选项必须通过声明输入/输出的
-通用 Job 执行；注册适配器不宣称兼容这些功能。
+从带有显式坐标、电荷、多重度、片段信息和研究溶剂模型的 material 开始。常规搜索用 GFN2；需要便宜宽筛选时用 GFN1。能量窗口要能保留化学上不同的构象，适配器默认 6 kcal/mol，最多保留 256 个成员。
 
-通过标准 Job 生命周期准备、提交和收集。后端 schema 与暂存边界见[后端合同](references/crest_backend_contract.zh-CN.md)；集合操作见[集合合同](references/crest_ensemble.zh-CN.md)。
+CREST 可以生成单分子构象集合、刚性片段复合物集合、按能量/多样性/记录 ID 选择的子集，以及供反应中心搜索使用的扰动或组装复合物。
+
+## 推荐流程
+
+1. 准备母体 material，并把来源 digest 作为集合父记录。
+2. 用 `chemical.crest@1` 设置 GFN 方法、搜索/优化级别、溶剂、线程、超时和能量窗口。
+3. 需要在后续 Job 复用时，用 `chemical.crest-ensemble@1` 导入运行结果。
+4. 用 `chemical.ensemble-select@1` 按声明规则选成员。若反应扭转角或进攻面不同，应保留多个低能成员。
+5. 对分离反应物，用 `chemical.complex-sample@1` 的 `assemble` 或 `perturb` 模式采样，检查接触后交给 `reactive-geometry` 或 `candidate-generation`。
+6. 在研究方法下优化或单点评估选中的成员，再用相同方法和电子态比较反应候选。
+
+运行记录保留成员 ID、坐标、母体、溶剂、方法、能量、筛选决定和部分完成状态。后续引用某个构象或复合物姿态时使用这些 ID。
+
+## 已注册操作与脚本
+
+- `chemical.crest@1` -> `skills/crest/scripts/crest_run.py`；参数包括 `--method gfn1|gfn2`、`--search-level`、`--opt-level`、`--solvent`、`--energy-window`、`--max-members`、`--threads` 和 `--timeout`。
+- `chemical.crest-ensemble@1` -> `ensemble.py`，导入 material 与 CREST 运行结果。
+- `chemical.ensemble-select@1` -> `ensemble.py`，按规则筛选集合。
+- `chemical.complex-sample@1` -> `ensemble.py`，组装或扰动刚性片段。
+
+通过标准 executor 和 Job 生命周期执行。输入 schema 见[后端合同](references/crest_backend_contract.zh-CN.md)，集合选择和复合物记录见[集合合同](references/crest_ensemble.zh-CN.md)。
+
+## 如何交给下一步
+
+追求低能人口时使用最低的几个成员；反应中心存在多个扭转角、进攻面或取向时扩大成员集。集合成员是后续计算的起始几何，频率、过渡态、IRC 和自由能解释由对应操作 Skill 完成。

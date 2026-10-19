@@ -1,99 +1,45 @@
 ---
 name: material-preparation
-description: Prepare molecular materials and explicit reaction definitions from names, SMILES or supplied coordinates, preserving identity, state and provenance for later scientific operations.
+description: Prepare molecular materials and explicit reaction definitions from names, SMILES, or coordinates while preserving identity, state, mapping, and provenance.
 ---
 
 # Material preparation
 
 [Chinese version](SKILL.zh-CN.md)
 
-Use this Skill to prepare structures for the user's research. Keep the original
-input, chosen structure, source, charge and multiplicity with the resulting files.
-This is the structure and reaction-definition layer; it does not choose a quantum
-method, run a solver, or certify a transition state.
+Use this Skill at the start of a calculation or reaction study. It converts names, SMILES, supplied XYZ, and reaction descriptions into material records that downstream geometry and electronic-structure Jobs can consume.
 
-For reaction work, return prepared materials to the [reaction-investigation loop](../reaction-investigation/references/reaction_investigation.md),
-binding the original graph to explicit-H order and selected geometry. Reuse collected
-optimized fragments by explicit transforms/permutations; check composition, graph and
-intrafragment geometry separately from clash screening. Construct missing mapping when
-the supplied species make it determinable.
+## Preparation workflow
 
-Use `chemical.material@1` when handing off a name, SMILES or supplied XYZ with its
-original text, graph/coordinates, fragments, unknown settings, state declaration
-and reversible atom order. Preserve XYZ coordinates and complex orientations;
-do not regenerate them through SMILES embedding. No product is required for
-independent import/calculation. See [material input](references/material_input.md).
-This entry does not resolve names online, optimize, or infer XYZ bonds.
+1. Preserve the user's original text or coordinates as the source record.
+2. For a name, use `chemical.resolve@1` with the configured resolver preference. For a SMILES or XYZ, use `chemical.material@1` directly. Keep fragments, charge, multiplicity, explicit-H order, stereochemistry, and source metadata.
+3. If a name cannot be resolved, write one or more candidate SMILES with a rationale and use `chemical.resolve-candidates@1`; inspect valence, charge, stereochemistry, and formula before selecting a working branch.
+4. Use `chemical.inspect@1` for graph and valence checks. Use `chemical.seed@1` to generate a missing 3D geometry; preserve and inspect supplied coordinates instead of replacing them with a new embedding.
+5. For reactions, use `chemical.reaction@1` with explicit reactant/product mapping and `--transformation`. Add `chemical.map-candidates@1` when several atom correspondences are possible.
+6. Compare calculated and target structures with `chemical.compare@1`; use `chemical.conformer-compare@1` for symmetry-aware geometry comparison and `chemical.reorder-tensors@1` for gradients, Hessians, and modes.
+7. Use `chemical.local-diagnostics@1` for reaction-center distances, contacts, and local alignment, then hand a complete material and mapping record to `reaction-investigation`.
 
-## From input to calculation
-
-1. Use an explicitly supplied structure, such as SMILES, directly. For a name,
-   try PubChem then OPSIN using `chemical.resolve@1` (an explicit installation
-   resolver preference takes priority). Preserve the original name; use
-   `--lookup-name` for a translated or normalized query when useful.
-2. When lookup yields no usable structure, including unavailable services or
-   missing configuration, infer candidate SMILES from the user's description.
-   The current Agent performs this reasoning. Write candidates with `source=llm`,
-   a short rationale and relevant assumptions, then run `chemical.resolve-candidates@1`.
-   This local step checks the proposals without repeating the network lookup.
-3. Use structure checks to repair parsing, valence, charge or multiplicity errors.
-   With multiple plausible structures, select and explain a working choice or
-   study separate branches within the task's scope. Enumerate unspecified stereo
-   when appropriate. Ask only when missing information prevents choosing a useful
-   research approach; a lookup failure alone should lead to inference.
-4. Generate missing geometries with `chemical.seed@1`; preserve and inspect supplied
-   coordinates instead. Then continue the requested
-   optimization, single-point or reaction work. Candidate source is provenance;
-   it does not impose a confirmation step before subsequent calculations.
-
-Prepare each entry with the generic executor CLI and submit its returned file and
-digest through `job_start`. The selected target's `structure` Python binding
-provides RDKit. Collect the Job's JSON and geometries as research materials.
-
-Do not run `scripts/prepare.py`, `scripts/material.py` or the other chemical
-scripts directly with native `bash` or the control-plane `$CORAGENT_PYTHON`.
-Those scripts import scientific packages such as RDKit and are valid only as
-executor entries after Job Runtime has selected and probed the `structure`
-binding. Native `bash` may create the input JSON and inspect returned files;
-the executor CLI must perform the chemical operation. A direct
-`ModuleNotFoundError` is an environment-routing failure: do not install a
-package into the control-plane Python or retry the same command; prepare the
-executor request and submit it through `job_start` instead.
-
-Before generating files, explicitly cd in the command to the work_dir returned by research_create/research_read, or use absolute output paths beneath it; before Node association, use workspace research/work/. work_dir is returned guidance, not a bash parameter. The relative paths below assume that directory was selected in the same command; use absolute paths for inputs stored elsewhere. Put reports in reports/; avoid loose files in the workspace root and leave historical requests in place.
+## Registered operations and examples
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.resolve --version 1 --output prepared/lookup.json -- --name 'ethanol'
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.resolve-candidates --version 1 --input candidates=candidates.json --output prepared/candidates.json
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.seed --version 1 --output prepared/seed.json -- --smiles CCO --charge 0 --multiplicity 1
+chemical.resolve@1                 name -> resolved structure
+chemical.resolve-candidates@1      candidate SMILES -> checked alternatives
+chemical.material@1                SMILES/XYZ -> material record
+chemical.inspect@1                 graph/valence inspection
+chemical.seed@1                    SMILES -> initial 3D geometry
+chemical.reaction@1                mapped reaction definition
+chemical.map-candidates@1          correspondence candidates
+chemical.conformer-compare@1       symmetry-aware geometry comparison
+chemical.reorder-tensors@1         atom-order tensor transform
+chemical.local-diagnostics@1       local geometry evidence
 ```
 
-Use `chemical.inspect@1` for supplied or revised SMILES when graph checks are needed.
-Avoid repeating checks already present in a collected candidate result. An initial
-geometry is the starting point for the requested calculations; report computed
-results after inspecting their outputs.
+Prepare requests with the generic executor, submit with `job_start`, and collect the JSON/geometry Artifacts. Keep outputs under the research work directory and cite source digests when handing them to `reactive-geometry`, `candidate-generation`, or `method-selection`.
 
-## Reactions and comparison
+Read [material input](references/material_input.md), [name resolution](references/name_resolution.md), [reaction mapping](references/reaction_mapping.md), and [structure analysis](references/structure_analysis.md) for schemas and examples.
 
-For bounded automatic correspondence candidates, use `chemical.map-candidates@1`.
-Use `chemical.conformer-compare@1` for symmetry-aware comparison of supplied
-geometries and `chemical.reorder-tensors@1` for consistent coordinate, gradient,
-Hessian and mode permutations. Read [structure_analysis.md](references/structure_analysis.md)
-for contracts, independent calls, search coverage and state boundaries. Geometry
-agreement is not electronic-state identity, and mapping candidates are not mechanisms.
+## Further references
 
-Use `chemical.reaction@1` when the task needs reactant/product atom mapping. Check
-composition, charge and explicit mappings, and supply the intended bond changes
-with `--transformation`. These steps apply to reaction work; a single-molecule
-optimization or single-point calculation needs no reaction mapping.
-Retain the chosen target structure as an Artifact and use `chemical.compare@1` to
-compare a calculated structure with it when the study calls for that check. Cite
-checks and source structures in the research record and explain relevant differences.
-See [script layout](references/script_layout.md) for implementation boundaries and canonical script paths.
-## References
-
-- [name_resolution.md](references/name_resolution.md): lookup, inference input and result fields.
-- [structure_input.md](references/structure_input.md): graph checks, geometries and structure comparison.
-- [reaction_mapping.md](references/reaction_mapping.md): atom mapping and reaction graph checks.
-
-Use `chemical.local-diagnostics@1` for explicit reaction-center coordinates, short contacts and reference/local alignment; it is independently callable and does not certify bonds, electronic structure or TS identity. See [local diagnostics](references/local_diagnostics.md).
+- [local diagnostics](references/local_diagnostics.md)
+- [script layout](references/script_layout.md)
+- [structure input](references/structure_input.md)

@@ -1,27 +1,28 @@
 ---
 name: energetics
-description: 评估电子能、ZPE 与热校正、自由能和反应能、势垒、有限范围的 TST 速率及能量剖面。
+description: 根据相容的计算结果计算电子能、热校正、自由能、反应能、势垒、集合能量和有限范围动力学量。
 ---
 
-# CoRAgent 能量学
+# 能量学与动力学
 
 [English version](SKILL.md)
 
-使用本 Skill 处理 `E`、`E+ZPE`、`H`、`G`、反应能与活化能、标准态校正、有限范围的
-过渡态理论速率和能量剖面。必须明确能量类型、单位、温度、压力或浓度、标准态、相态、
-溶剂、方法、电子态、化学计量与频率处理。
+在结构和电子结构结果收集完成后使用本 Skill。它把相容的能量和频率转成热化学、反应/活化能剖面、构象人口、条件 TST 速率、分支估计和显式动力学网络轨迹。
 
-只有结构、原子顺序、方法和声明的组合处理一致时，才能组合电子与热结果。不要用电子
-势垒替代 Gibbs 势垒，不要推断未支持的同位素校正，也不要把定性路径枚举当作动力学。
-数值与局限应分别记录为引用来源 Artifact 的研究记录。
+## 计算流程
 
-使用 `chemical.thermochemistry@1`、`chemical.ensemble-free-energy@1`、
-`chemical.energy-profile@1`、`chemical.scan-slice@1`，通过普通 Job、输入角色
-`input` 和 `structure` 环境执行。准备输入前阅读
-[执行合同与数值范围](references/energy_execution.zh-CN.md)。输出可追溯 JSON/CSV，
-保留缺失值，拒绝不一致来源、条件和计量。目前这些分析执行器只接受明确基态。
+1. 对每个物种收集电子能；需要时再收集同一几何、原子顺序、方法、电荷、多重度、溶剂和标准态下的频率/热化学结果。
+2. 用 `chemical.thermochemistry@1` 组合电子能、零点能、热焓、熵和 Gibbs 自由能。记录温度、压力或浓度标准态，以及低频模式处理方式。
+3. 对构象或复合物集合使用 `chemical.ensemble-free-energy@1`，按声明的人口模型计算集合自由能和成员权重。
+4. 对反应物/中间体/TS/产物离散状态使用 `chemical.energy-profile@1`；对坐标网格使用 `chemical.scan-slice@1`。明确计量和参考态。
+5. 对已有频率处理的候选使用 `chemical.tst@1`；对共享前体的路径用 `chemical.branching@1`；对给定速率常数和初始浓度的质量作用网络用 `chemical.kinetic-network@1`。
 
-结果解释见[科学检查](references/energetics.zh-CN.md)。使用 chemical.tst@1、chemical.branching@1、chemical.kinetic-network@1
-执行[条件速率、分支与显式质量作用网络](references/kinetics_execution.zh-CN.md)，比较路径前
-核对其适用假设。离散剖面和扫描切片不能证明完整 PES、TS 连通性或自由能采样。
-本地确定性合同及 Job 验证不代表真实求解器科学精度基准。
+## 数值含义
+
+电子反应能是 dE，加 ZPE 得到 d(E+ZPE)，加入热焓得 dH，标准态 Gibbs 值给出 dG。势垒使用同一参考：Ea = E_TS - E_R，dG‡ = dG_TS - dG_R。按结果中的单位字段在 Hartree、kcal/mol、kJ/mol 间转换。气相 1 atm、溶液 1 M 等标准态必须明确记录。
+
+构象集合存在多个有占比成员时，用人口加权自由能而不是只看最低成员。TST 和分支结果要同时报告假设与前体范围。剖面或扫描切片只是采样状态集合；连通性依赖 IRC/validation，展示交给 `report`。
+
+## 已注册脚本与合同
+
+适配器位于 `skills/energetics/scripts/energy.py` 和 `thermochemistry.py`；CLI 的 operation 可选 `thermochemistry`、`ensemble`、`profile`、`scan-slice`、`tst`、`branching`、`network`，并接收 `--input` 与 `--output-dir`。结果含可追溯 JSON/CSV 并保留缺失值。比较路径前阅读[能量执行合同](references/energy_execution.zh-CN.md)、[科学检查](references/energetics.zh-CN.md)和[动力学执行合同](references/kinetics_execution.zh-CN.md)。

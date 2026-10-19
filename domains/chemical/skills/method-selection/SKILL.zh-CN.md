@@ -1,51 +1,35 @@
 ---
 name: method-selection
-description: 协调科学方法、后端与命名计算环境；用户已经指定方法时同样负责执行准备。
+description: 根据目标观测量、体系、电子态、环境和不确定性预算选择科学方法与执行后端。
 ---
 
-# CoRAgent 方法选择
+# 方法与后端选择
 
 [English version](SKILL.md)
 
-选择方法或准备已指定方法的执行时使用本 Skill。辅助脚本生成通用 Job 请求，由 Agent 提交执行。
-本 Skill 属于跨任务协调层，不实现求解器，也不替代科学操作、后端适配或证据验证。
+需要选方法、比较方法或在命名计算环境中准备固定方法时使用。本 Skill 从研究需要的量开始，把方法选择写入研究 Node 和 Job intent。
 
-判断内置能力、原生命令/脚本途径与专用检查范围时，先读[当前能力与边界](references/capabilities.zh-CN.md)。Skill 描述或安装了可执行文件本身，不代表完整支持。
-使用[科学操作与后端映射](references/operation_backend_map.zh-CN.md)区分操作归属、后端归属和证据归属。
-核对注册执行器和验证器的操作归属时，使用[完整操作/后端注册表](references/operation_backend_registry.zh-CN.md)。
+## 选择流程
 
-从用户要求的可观测量或待解决的科学问题出发，考虑体系大小、电荷、自旋、电子态、金属或多参考
-风险、溶剂、约束、目标可观测量、预期误差、候选质量与成本。先根据方法 Skill 选择输入、
-命令或脚本，再选择 `job.toml` 中的软件绑定与命名的本地或远端环境。`job_probe` 检查平台；
-准备请求时核验所选软件和已声明依赖。需要诊断或使用原生命令时，见
-[定向环境检查](references/runtime_environment.zh-CN.md)。
+1. 写明目标观测量：几何、相对能、势垒、频率、IRC、自旋交叉或动力学。
+2. 记录体系大小、电荷、多重度、溶剂、约束、柔性、金属/多参考迹象，以及精度和成本预算。
+3. 选择探索层和精修层。常见组合是 CREST/xTB 做构象和姿态，xTB/CF22D 做筛选和梯度，Gaussian 或声明的高层方法做最终 TS/频率证据。
+4. 用[操作/后端图](references/operation_backend_map.zh-CN.md)和[注册表](references/operation_backend_registry.zh-CN.md)把操作映射到后端，保持操作、后端和证据的职责分开。
+5. 用 `job_probe` 检查命名环境，用方法 Skill 准备 executor 请求，再启动、提交和收集 Job。
+6. 方法矩阵先展开每个“方法 × 环境 × 操作”单元再启动；每个不可用单元独立记录，成功单元保持可比较设置。
+7. 搜索失败时区分环境、输入、数值和假设问题，按[搜索恢复](references/search_recovery.zh-CN.md)改变下一动作。
 
-只有低成本探索能回答已声明问题时才使用它。明确何时需要更高层级计算、替代方法或稳健性
-检查，并把选择与理由保存在研究 Node 和不可变 calculation intent 中。
+## 实用组合
 
-对于明确要求优化/单点并比较多个方法和执行环境的请求，先展开完整的
-`方法 × environment × {opt, sp}` 矩阵，再逐项探测环境并分别记录单元失败。方法 Skill
-指导通过预设入口、原生命令或任务专用脚本执行；没有预设入口不代表软件缺失。
-上述比较中，每个 `sp` 依赖同一方法、
-同一环境的 `opt` 输出。
-其它研究可选择明确的固定几何或 TS/Freq/IRC/scan 输入，由 Agent 定义计算依赖。
-某个矩阵单元不可用时只阻塞该单元，不能静默替换方法或停止其他独立单元。
+用 xTB/CREST 探索构象、片段姿态、扫描和宽泛路径候选；需要一致 PySCF 方法时用 CF22D 做筛选、优化、频率或有限 TS 搜索；需要显式 route、QST/TS/频率/IRC 和原生日志证据时用 Gaussian。未注册后端通过 generic Job 并声明输入输出。
 
-自定义 Python 脚本需要科学库时，按[脚本准备示例](references/request_preparation.zh-CN.md)
-选择 backend。`job_start.platform` 只选择执行目标，不激活科学 Python 环境。导入失败后先诊断
-所选绑定，再决定重试或报告方法不可用。
+方法选择属于科学结果的一部分：记录基组、色散、溶剂、电子态、温度、约束、可执行文件版本和环境。端点与 TS 的设置匹配后再比较能量或频率。证据要求由 `candidate-generation`、`validation`、`energetics` 等操作 Skill 决定。
 
-## 参考资料
+科学判据、后端合同、运行时诊断和请求准备见 [method_selection.zh-CN.md](references/method_selection.zh-CN.md)、[backend_contract.zh-CN.md](references/backend_contract.zh-CN.md)、[runtime_environment.zh-CN.md](references/runtime_environment.zh-CN.md) 和 [request_preparation.zh-CN.md](references/request_preparation.zh-CN.md)。
 
-- [method_selection.zh-CN.md](references/method_selection.zh-CN.md)：科学判据。
-- [backend_contract.zh-CN.md](references/backend_contract.zh-CN.md)：科学 Job 合同与执行边界。
-- [job_probes.zh-CN.md](references/job_probes.zh-CN.md)：命名的本地/远端环境及远端
-  Platform 细节。
-- [runtime_environment.zh-CN.md](references/runtime_environment.zh-CN.md)：安装级科学运行时诊断。
+## Further references
 
-- [请求准备](references/request_preparation.zh-CN.md)：声明入口、显式输入与恢复。
-- [Runner 结果、单位与电子态](references/runner_results.zh-CN.md)
-- [xTB 操作配方](references/xtb_operation_recipes.zh-CN.md)：原生命令示例和操作层证据边界。
-- [操作/后端注册表](references/operation_backend_registry.zh-CN.md)：完整的运行时归属清单。
-
-搜索失败或反复得到相同结果时，按[搜索诊断与恢复](references/search_recovery.zh-CN.md)先区分执行、数值和假设问题，再修改设置或种子。
+- [capabilities.zh CN](references/capabilities.zh-CN.md)
+- [job probes.zh CN](references/job_probes.zh-CN.md)
+- [runner results.zh CN](references/runner_results.zh-CN.md)
+- [xtb operation recipes.zh CN](references/xtb_operation_recipes.zh-CN.md)

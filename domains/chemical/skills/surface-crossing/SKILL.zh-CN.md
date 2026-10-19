@@ -1,18 +1,19 @@
 ---
 name: surface-crossing
-description: 搜索并检查两个不同自旋 Gaussian HF/DFT 表面的规则交叉，核对能隙、投影梯度与可选交叉缝曲率。
+description: 使用能隙、投影梯度和 seam 曲率证据搜索并检查不同自旋 Gaussian 交叉候选。
 ---
 
 # 不同自旋表面交叉
 
-[English](SKILL.md)
+[English version](SKILL.md)
 
-使用 `chemical.mecp-gaussian@1` 做有界交叉候选搜索，使用
-`chemical.crossing-check@1` 独立核对数值证据。先阅读
-[执行合同与科学范围](references/crossing_execution.zh-CN.md)。原生求解采用可选
-`path_gaussian` 绑定；检查器使用 `structure`。均以 `input` 输入角色执行普通 Job。
+研究两个不同自旋多重度 Gaussian HF/DFT 表面的交叉时使用。原生搜索为 `chemical.mecp-gaussian@1`，独立数值证据为 `chemical.crossing-check@1`。
 
-小能隙本身不足以证明 MECP：还需检查投影梯度与约束曲率。数值交叉缝驻点与态身份、
-SCF 稳定性、全局最优须分别说明。多重度不同且 S² 合理，也不能证明波函数连续。
-本实现不是 QBICS，不支持同自旋圆锥交叉、旋轨耦合或非绝热动力学，也不能以普通
-TS/IRC 验证器代替专用交叉检查。
+## 工作流
+
+1. 准备含两个态定义、电荷、多重度、起始几何、Gaussian 方法/基组和收敛设置的输入。
+2. 在 path_gaussian 环境运行 `chemical.mecp-gaussian@1`，保留候选几何、态能量、梯度、投影梯度范数、能隙和收敛记录。
+3. 对收集的候选运行 `chemical.crossing-check@1`，一起检查能隙、投影梯度和可选约束 seam 曲率。
+4. 把态特征连续性和 SCF 稳定性与 seam 数值证据比较。若几何有有用的交叉方向，可带着交叉上下文交给 `candidate-generation` 或 `validation`。
+
+检查器使用 `structure` binding 和普通 Job。schema 与阈值见[交叉执行合同](references/crossing_execution.zh-CN.md)。小能隙只是筛选信号，交叉决定要结合梯度/曲率和态记录。

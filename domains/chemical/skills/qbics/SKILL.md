@@ -1,30 +1,20 @@
 ---
 name: qbics
-description: Assess QBICS applicability and verify an installed command, its inputs and validation needs before running a bounded research Job.
+description: Plan and execute a QBICS crossing-point study through a declared installation, with explicit electronic states, inputs, and evidence.
 ---
 
-# CoRAgent QBICS
+# QBICS crossing studies
 
 [Chinese version](SKILL.zh-CN.md)
 
-Use this Skill when considering QBICS for crossing-point or related searches.
-The package does not bundle a QBICS preparation or parsing runner. This does
-not determine whether a selected local or remote environment has QBICS installed.
+Use QBICS when the study concerns a same-spin crossing or related crossing-point optimization supported by an installed QBICS program. This Skill supplies the scientific setup and generic Job handoff because the repository does not register a dedicated QBICS runner.
 
-Inspect the installation bindings and the installed program's documentation or
-bounded help/version output. Verify its intended scientific task, electronic
-states, input format, resources, required files and result interpretation.
-If a usable command or shared runner exists, stage explicit inputs and invoke it
-through generic `job_start`, preserving outputs and execution receipts. No
-scientific workflow registry is required. Do not invent command-line options or
-claim that a generic platform probe proves QBICS readiness.
+## Recommended workflow
 
-If an execution or validation piece is missing, identify that concrete gap and
-continue independent authorized work. Record unknown capability as unverified;
-a missing script in this Skill alone is not an execution failure or scientific result.
+1. Define the two electronic states, spin/electronic character, crossing coordinates, geometry input, charge, multiplicity, solvent, and expected outputs.
+2. Inspect the selected environment's QBICS executable with its version/help output and read the installed program documentation. Record the executable digest and required files.
+3. Prepare a generic Job with an explicit script/backend, staged input files, control parameters, and collected output paths. Use the [method-selection request pattern](../method-selection/references/request_preparation.md).
+4. Run the crossing search, parse the native evidence with a declared script, and retain state energies, gradients, convergence, and seam/character diagnostics.
+5. Compare the candidate with `surface-crossing` checks when its distinct-spin Gaussian crossing contract applies; use the installed QBICS documentation for QBICS-specific criteria.
 
-For a task-specific wrapper, use the generic preparer with `--script` and an explicit `--backend`, as described in [method selection](../method-selection/SKILL.md). That path records scripts, environment, inputs and outputs. This Skill supplies scientific guidance; a bundled executable for this method is not currently provided.
-
-A separate bundled projected-gradient implementation is available through
-[surface-crossing](../surface-crossing/SKILL.md). It is not a QBICS wrapper and
-must not be described as verified QBICS availability.
+A task-specific wrapper may be invoked through generic `job_start` with `--script` and `--backend`. Preserve the exact command, environment, inputs, outputs, and parser version in the research record. The repository's bundled projected-gradient implementation is described in [surface-crossing](../surface-crossing/SKILL.md) and is a separate operation.

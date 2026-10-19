@@ -1,58 +1,33 @@
 ---
 name: validation
-description: 根据鞍点、目标振动模式、结构、电子态、立体化学和双向 IRC 连通性证据验证过渡态候选。
+description: 为过渡态候选建立鞍点、振动模式、电子态、结构和 IRC 证据。
 ---
 
-# CoRAgent 过渡态验证
+# 过渡态验证
 
 [English version](SKILL.md)
 
-使用本 Skill 判断候选结构能否作为可信的过渡态。候选生成提供候选结构；双向 IRC 连通性属于
-验证维度，用于检查候选是否连接到已声明的反应物和产物势阱。
+候选生成和实际 TS 优化或路径搜索完成后使用本 Skill。它把一个候选的独立证据组合成决定：已验证鞍点、需要指定检查的候选，或带下一步搜索动作的失败。
 
-反应研究中，验证必须将决定交回[机理研究闭环](../reaction-investigation/references/reaction_investigation.zh-CN.md)：
-已验证鞍点、需要补充检查的候选，或带下一项构造/搜索操作的失败诊断。缺失判据属于未解决
-证据；只要仍能生成有依据的候选或诊断实验，就不应将其变成任务阻塞。验证闭合的是一个
-候选的证据环，不是整个反应研究。
+## 验证顺序
 
-规范化证据可分别使用 `chemical.stationary-check@1`、`chemical.mode-check@1`、
-`chemical.irc-check@1` 作通用独立检查；`chemical.gaussian-evidence@1` 转换指定原始日志
-section。合同、调用示例、阈值和范围见[通用证据检查](references/general_checks.zh-CN.md)。
-它们是 executor Job，不增加新的研究准入门槛。
-使用 `chemical.path-irc@1` 从已验证的鞍点检查点准备有界正向和反向 IRC 输入，再用声明的
-Gaussian 或其它有依据的后端执行并收集验证证据。
-输入准备合同和来源要求见 [IRC 输入准备](references/irc_preparation.zh-CN.md)。
-候选生成向 validation 交付的输入边界见[反应搜索任务接口](../candidate-generation/references/reaction_task_interface.zh-CN.md)。
+1. **求解器证据**：读取主输出，确认正常结束、优化收敛、电荷/多重度、方法和几何 digest。
+2. **驻点**：用 `chemical.stationary-check@1` 或 `chemical.gaussian-evidence@1` 检查最终梯度/Hessian 字段和驻点记录。
+3. **模式**：用 `chemical.mode-check@1` 检查频率和振动向量。经典一级鞍点应有一个相关虚频，其位移沿着假设的成键/断键、原子转移或扭转坐标。
+4. **结构与电子态**：对照反应假设检查原子映射、组成、立体化学、关键距离、自旋/电子态和模式方向。
+5. **连通性**：用 `chemical.path-irc@1` 准备正反 IRC，执行声明的 IRC 计算，再用 `chemical.irc-check@1` 将端点与选定反应物/产物 Artifact 比较。
+6. **决定**：记录满足的标准、未解决证据、来源 Artifact 和改变后的下一操作。模式正确但到达错误盆地时，返回候选生成并修正端点或几何。
 
-核验优化与驻点证据、经典一阶鞍点所需的唯一相关虚频、沿所提反应坐标的位移、电荷与
-多重度、电子态一致性、原子映射、几何和立体化学。必须检查原始输出和振动向量；正常
-终止或单个负频本身不充分。
+## 已注册检查
 
-在研究笔记中明确检查标准、支持证据、未解决问题和下一步，引用实际收集的材料。计算完成不能代替对科学结论的判断。
+`chemical.stationary-check@1` 检查驻点和结束字段；`chemical.mode-check@1` 检查虚频数量、大小和与反应坐标的对应；`chemical.gaussian-evidence@1` 规范化 Gaussian 输出；`chemical.path-irc@1` 从 checkpoint 准备正反 IRC；`chemical.irc-check@1` 检查路径完整性与端点。`chemical.gaussian_saddle`、`chemical.gaussian_irc_connectivity` 是针对支持拓扑的 Gaussian 专用检查。
 
-鞍点与振动模式证据见
-[transition_state_validation.zh-CN.md](references/transition_state_validation.zh-CN.md)，路径
-计算后的盆地身份判据见
-[connectivity_validation.zh-CN.md](references/connectivity_validation.zh-CN.md)，映射、对齐
-与立体化学比较见 [structure_validation.zh-CN.md](references/structure_validation.zh-CN.md)。
+独立检查应作为证据记录，并结合主输出阅读。把执行失败、证据不可读和检查完成但未满足标准分开记录。每个 IRC 分支保留来源鞍点、方向、路径 Artifact、端点 Artifact 和 digest。
 
+详见[过渡态验证](references/transition_state_validation.zh-CN.md)、[IRC 验证](references/irc_validation.zh-CN.md)、[连通性验证](references/connectivity_validation.zh-CN.md)、[结构验证](references/structure_validation.zh-CN.md)，候选与验证的交接合同见[reaction task interface](../candidate-generation/references/reaction_task_interface.zh-CN.md)。
 
-注册验证器：调用 `job_start`，提供 `validator_id="chemical.gaussian_frequency"`、新的 `request_id` 和 `input_artifact_ids=[已收集的 parsed.json Artifact ID]`。验证器版本为 `1`。运行时记录实际执行及输入摘要。它仅检查正常结束和恰好一个负频率；振动模式性质、几何与 IRC 连通性仍须分别验证。
+## Further references
 
-按当前反应假设定义成键、断键、原子迁移或其他相关坐标。已收集的原始输出可以交给
-适用的分析脚本或上述独立检查通过 Job 验证；不要求先注册特定反应的验证器。
-选用随包的[专用路径验证器](../candidate-generation/references/gaussian_path.zh-CN.md)前，
-先核对其拓扑和输入范围；不能把该专用路径的判据当成通用过渡态定义。
-
-尤其是 `chemical.reaction_mapping`、`chemical.gaussian_saddle` 和
-`chemical.gaussian_irc_connectivity` 的版本 1，名称虽通用，实际使用 DA 契约。
-其它变换返回未评估的适用范围，不代表反应失败，详见[能力清单](../method-selection/references/capabilities.zh-CN.md)。
-
-检查提供有限范围的证据，不是通用研究门禁。区分工具执行失败、材料无法解析和已完成检查但条件不满足。parsing.status、scientific_verdict（若提供）与回执 provenance 分别表达这些状态。Job 输入输出摘要证明记录的来源；求解器标题标记只是附加核对。证据未确定不禁止有理由的后续实验，但需要明确记录不确定性，不声称检查通过。
-
-Gaussian 专用检查参考由本 Skill 负责，见 [gaussian_validation.zh-CN.md](references/gaussian_validation.zh-CN.md)。
-
-对每个 IRC 方向保留来源鞍点、方向、路径 Artifact、端点 Artifact 与摘要。检查起始几何与已验证
-鞍点一致、程序终止、路径完整性、最终几何及可用时的最终梯度。将每个端点与显式选择的反应物
-或产物 Artifact 比较，核验 mapping、电荷、电子态、成断键、关键内坐标、构象和立体化学。
-详细判据见 [IRC 验证](references/irc_validation.zh-CN.md)；部分路径和未确定的端点身份都应保留为未解决证据。
+- [gaussian validation.zh CN](references/gaussian_validation.zh-CN.md)
+- [general checks.zh CN](references/general_checks.zh-CN.md)
+- [irc preparation.zh CN](references/irc_preparation.zh-CN.md)

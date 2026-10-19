@@ -1,24 +1,20 @@
 ---
 name: qbics
-description: 判断 QBICS 的适用性，核实已安装命令、输入与验证需求后执行有界研究 Job。
+description: 在声明的 QBICS 安装环境中规划和执行交叉点研究，明确电子态、输入和证据。
 ---
 
-# CoRAgent QBICS
+# QBICS 交叉点研究
 
 [English version](SKILL.md)
 
-考虑用 QBICS 搜索交叉点或相关结构时使用本 Skill。当前包不内置 QBICS 准备或解析 runner；
-这不能说明所选本地或远端环境是否安装了 QBICS。
+研究同自旋交叉或其它由已安装 QBICS 程序支持的交叉点优化时使用。本 Skill 提供科学设置和 generic Job 交接；仓库目前没有专用 QBICS runner。
 
-检查安装绑定、程序文档或有界 help/version 输出，核实预期科学任务、电子态、输入格式、
-资源、必需文件及结果解释。若有可用命令或共享 runner，暂存显式输入并通过通用
-`job_start` 执行，保留输出和执行回执，无需科学 workflow registry。不要编造命令行参数，
-也不要把通用平台探测当作 QBICS 已就绪。
+## 推荐流程
 
-缺少执行或验证环节时，明确具体缺口并继续独立的已授权工作。未知能力应记为未核实；
-本 Skill 缺少脚本本身不是执行失败，也不是科学结果。
+1. 明确两个电子态、自旋/电子特征、交叉坐标、几何输入、电荷、多重度、溶剂和预期输出。
+2. 用版本/帮助输出检查选定环境的 QBICS 可执行文件，并阅读已安装程序文档。记录可执行文件 digest 和所需文件。
+3. 按[方法选择的请求模式](../method-selection/references/request_preparation.zh-CN.md)准备 generic Job，声明脚本/后端、暂存输入、控制参数和收集输出。
+4. 运行搜索，用声明的脚本解析原生证据，保留态能量、梯度、收敛和 seam/态特征诊断。
+5. 若适用 distinct-spin Gaussian crossing 合同，用 `surface-crossing` 做检查；QBICS 专属判据按安装程序文档执行。
 
-临时包装脚本通过通用准备器的 `--script` 和明确的 `--backend` 提交，见[方法选择](../method-selection/SKILL.zh-CN.md)。此路径记录脚本、环境、输入和输出。本 Skill 提供科学方法指导，当前没有内置该方法的执行入口。
-
-另有独立内置投影梯度实现，见 [surface-crossing](../surface-crossing/SKILL.zh-CN.md)。
-它不是 QBICS 封装，不能据此声称 QBICS 已安装或已验证。
+任务包装器可通过 generic `job_start` 的 `--script` 和 `--backend` 调用。研究记录保留命令、环境、输入、输出和解析器版本。仓库自带的 projected-gradient 实现在 [surface-crossing](../surface-crossing/SKILL.zh-CN.md)，是独立操作。

@@ -1,27 +1,22 @@
 ---
 name: structure-assessment
-description: 基于可追溯证据整理分子或反应候选结构的角色、反应中心、局部几何和不确定性，不认证过渡态。
+description: 将分子或反应候选几何整理成有证据边界的结构描述，供下一项计算使用。
 ---
 
 # 结构评估
 
-当 Agent 需要在选择或修正计算前形成统一的结构描述时使用。该 Skill 整理材料的身份、分子图、坐标、
-反应中心假设和可选参考结构，适用于反应物、产物、中间体、反应复合物、优化结构和过渡态候选。
+[English version](SKILL.md)
 
-这是一份认知报告，不是流程门禁。角色或反应中心无法确定时应报告不确定，不能从坐标擅自推断机理、
-轨迹、电子态、极小点、鞍点或过渡态身份。已知信息通过 `role_hint`、`reaction_center` 和 `bond_changes`
-显式提供；竞争假设应使用独立上下文保留，不能合并成一个结论。
+在选择或修正计算前使用本 Skill，建立 material 的共同描述：身份、分子图、片段、电子态声明、反应中心几何和与参考结构的比较。
 
-确定性执行器报告：
+## 检查内容
 
-- 结构身份、分子图是否存在、原子顺序、片段和电子态声明；
-- 几何安全状态，以及压缩、拉长、塌陷或片段散开的观察；
-- 反应中心附近的局部距离和每个成键/断键假设的几何关系；
-- 可选的相同原子顺序参考结构比较；
-- 缺失信息、证据边界和建议使用的后续 Skill。
+提供 material JSON 和 context JSON；context 可包含 `role_hint`、`reaction_center`、`bond_changes` 及同原子顺序的参考结构。执行器报告原子顺序、图是否可用、片段、电荷/多重度、局部距离、压缩/伸长、片段分离和几何观察，也列出未解决输入与后续操作。
 
-`safe` 只表示坐标没有明显不可用的问题。声明的成键或断键可以处于非平衡几何；严重重叠和非有限坐标
-仍由 `geometry-preflight` 报告，不能被重新解释为有效 TS 几何。
+根据报告决定生成种子、采样构象、改变反应姿态、准备路径或进入电子计算。把真实反应中心距离和片段接触与键变化对照；非平衡距离可以是有意的 TS 种子。
 
-输入和输出合同见[structure_assessment.zh-CN.md](references/structure_assessment.zh-CN.md)。独立执行器为
-`chemical.structure-cognition@1`，接收材料 JSON 和小型上下文 JSON；除非输入合同本身错误，否则总是输出报告。
+## 已注册执行器
+
+`chemical.structure-cognition@1` 位于 `skills/structure-assessment/scripts/run.py`，参数为 `--material`、`--context`、`--output`。通过 Job 执行，并把报告附到 material 或 candidate Artifact。坐标筛选配合 `geometry-preflight`，图和映射修复配合 `material-preparation`。
+
+context schema 和输出字段见[结构评估](references/structure_assessment.zh-CN.md)。报告是观察记录；机理、TS 和能量学决定由对应 Skill 基于它完成。

@@ -1,33 +1,26 @@
 ---
 name: xtb
-description: Adapt declared xTB inputs, native commands and parser evidence to the registered xTB bindings without choosing the scientific operation.
+description: Run GFN2-xTB single points and optimizations, and provide xTB calculators for scans, gradients, and path searches.
 ---
 
 # xTB backend
 
-This Skill owns xTB command binding, input staging, electronic-state/solvent
-field translation and supported output parsing. It does not choose between
-screening, optimization, scan, dynamics or path operations and does not certify
-transition states or interpret a research result. Use the operation Skill and
-`method-selection` for those decisions.
+[Chinese version](SKILL.zh-CN.md)
 
-`chemical.xtb@1` is the registered wrapper for GFN2-xTB `sp`, `opt` and
-`opt-sp` tasks. It translates charge and multiplicity to the native command,
-records the requested solvent/state fields and returns raw-output provenance.
-Prepare it through the Job interface:
+Use xTB for fast conformer refinement, fixed-geometry energy screening, constrained scans, gradient evaluation, and early reaction-path exploration. Keep charge, multiplicity, solvent, and optimization level explicit so results from different stages remain comparable.
+
+## Registered wrapper
+
+`chemical.xtb@1` runs GFN2-xTB `sp`, `opt`, or `opt-sp` from XYZ input. The main options are `--charge`, `--multiplicity`, `--opt-level normal|tight|verytight`, `--executable`, and `--output-dir`.
 
 ```bash
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.xtb --version 1 --input geometry=input.xyz --output prepared/xtb.json -- --task opt-sp --charge 0 --multiplicity 1
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.xtb --version 1 --input geometry=input.xyz --output prepared/xtb.json -- --task opt-sp --charge 0 --multiplicity 1 --opt-level tight
 ```
 
-Other native xTB commands are run through a generic Job with explicit control
-files and collected outputs. Start those Jobs with `job_start`; their native options are not wrapper `--task`
-values. The parser and receipt fields are defined in [xTB backend contract](references/xtb_backend_contract.md)
-and the shared [runner contract](../method-selection/references/runner_results.md).
+The result contains the optimized geometry when requested, energy and convergence summary, native output, state/solvent fields, and source digests. Prepare and start the request with the standard `job_start` lifecycle, then inspect the parser summary before handing a geometry onward.
 
-Material-based bounded scans and Cartesian gradient calculators are registered
-under `candidate-generation` as `chemical.scan-xtb@1` and
-`chemical.gradient-xtb@1`; the optional `path_xtb` binding also serves
-`chemical.neb-xtb@2`. Those entries own operation-specific restraint, gradient
-and NEB evidence. This backend Skill only supplies the xTB adapter and its
-parser boundary. Use the [xTB execution reference](references/xtb_executor.md) for the canonical execution contract.
+## Reaction-path operations
+
+`chemical.scan-xtb@1` is the constrained scan/preoptimization calculator used by `candidate-generation` and `reactive-geometry`; `chemical.gradient-xtb@1` supplies gradients; `chemical.neb-xtb@2` runs the optional path_xTB calculator through ASE NEB v2. These operations accept their own path specifications and preserve restraint, frame, and endpoint metadata. Use them for broad searches, then refine promising frames with CF22D or Gaussian when the study requires higher-level evidence.
+
+Read [xTB executor](references/xtb_executor.md) and [backend contract](references/xtb_backend_contract.md) for fields and native output parsing. Other native xTB features can run in a generic Job with explicit control files and collected outputs.

@@ -1,39 +1,24 @@
 ---
 name: geometry-preflight
-description: Apply a cross-task coordinate safety screen before electronic-structure jobs while allowing declared non-equilibrium reaction-center geometry.
+description: Screen coordinates before electronic-structure work while preserving declared non-equilibrium reaction-center geometry.
 ---
 
 # Geometry preflight
 
-Use this skill when a coordinate set is about to enter Gaussian, xTB, QST, NEB,
-or another electronic-structure calculation, or when a failed path image needs
-an objective geometry screen.
+[Chinese version](SKILL.zh-CN.md)
 
-This skill is an input-safety check, not a transition-state validator. It must
-reject non-finite coordinates, atom identity/order errors, nuclear collapse and
-severe non-reaction short contacts. It must allow forming and breaking bonds,
-angles and coordination in the declared reaction center to be non-equilibrium.
-Never impose equilibrium bond lengths or ordinary-minimum angles on a TS seed.
+Run this check on an XYZ or Gaussian input before Gaussian, xTB, CF22D, QST, NEB, or a restart frame enters a solver. It catches non-finite coordinates, atom/header mismatches, nuclear collapse, and severe non-reaction contacts while allowing deliberate forming/breaking bonds in a TS seed.
 
-Use the deterministic shared checker in `skills/_shared/geometry_safety.py`.
-For a raw Gaussian input, assess every explicit Cartesian geometry block. An
-`Geom=AllCheck` input has no assessable coordinates in the text and must be
-reported as `not_assessed` for that part; do not claim that it passed.
+## Profiles and inputs
 
-The result has two separate meanings:
+Choose `general`, `reaction_seed`, `ts_candidate`, or `path_image`. When a reaction context is known, provide zero-based reaction-pair indexes so the checker can distinguish a forming contact from an accidental clash. For Gaussian text, assess every explicit Cartesian block; a `Geom=AllCheck` section has no coordinates to screen and is recorded as not assessed.
 
-- `verdict=unsafe`: do not start the calculation; retain the hard failures;
-- `verdict=safe`: the coordinates are not obviously broken, but they are not a
-  minimum, a saddle, or a mechanistic conclusion.
+Use the shared checker `skills/_shared/geometry_safety.py` through `chemical.geometry-safety@1`:
 
-Reaction pairs may be exempt from the non-bonded short-contact threshold, but
-never from the absolute collapse threshold. Supply zero-based reaction-pair
-indexes when the reaction context is known. Keep the profile appropriate to the
-input (`general`, `reaction_seed`, `ts_candidate`, or `path_image`).
+```text
+--input <xyz-or-gjf> --output <report.json>
+```
 
-This skill does not impose a research sequence. The Agent may choose QST, NEB,
-scan, direct TS optimization, or diagnostics based on the current evidence. It
-only prevents an obviously damaged coordinate set from being passed to a
-solver and records warnings for non-equilibrium reaction-center geometry.
+The result gives hard failures, warnings, reaction-pair exemptions, profile, and a `safe`/`unsafe`/`not_assessed` verdict. A safe result authorizes solver input preparation; it does not replace optimization, mode, IRC, or structure assessment.
 
-For the schema and CLI contract, read [geometry_safety.md](references/geometry_safety.md).
+Read [geometry safety](references/geometry_safety.md) for schema, thresholds, and Gaussian block handling. After `reactive-geometry` edits, run this check again and carry the report digest into the candidate Job.

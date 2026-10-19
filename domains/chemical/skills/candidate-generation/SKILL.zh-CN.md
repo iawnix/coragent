@@ -1,58 +1,45 @@
 ---
 name: candidate-generation
-description: 根据映射端点、键变化、约束和已有结构证据，为过渡态与反应路径搜索生成候选几何。
+description: 根据映射端点、反应坐标和结构证据构建并搜索过渡态与反应路径候选几何。
 ---
 
-# CoRAgent 过渡态候选生成
+# 过渡态候选生成
 
 [English version](SKILL.md)
 
-使用本 Skill 为所提出的基元步骤生成候选几何。候选生成不能证明其为过渡态；验证由
-`validation` 负责，方法与 Backend 选择由 `method-selection` 负责。
-本 Skill 属于科学搜索操作层。Gaussian、xTB 等软件配方仍属于后端适配；此处提到它们
-只是为了说明如何通过既有 Job 接口执行搜索。
+把反应假设转成可供 TS 或路径求解器搜索的几何时使用本 Skill。输入是一个有映射的基元步骤：反应物/产物或片段、键变化、电荷、多重度、相关构象，以及进攻方向、质子转移或立体化学证据。输出是带方法、约束、来源帧和下一项验证动作的候选集合。
 
-反应研究遵循[机理研究闭环](../reaction-investigation/references/reaction_investigation.zh-CN.md)。
-交回选定候选及其来源、待验证事项和下一项操作；失败则交回诊断及有变化的构造/搜索行动。
-只写出输入文件的准备 Job 尚未完成搜索，还须执行并检查求解器。候选身份允许继续探索；
-并非每种搜索方法都要求整个反应物复合物先成为已验证极小点。
+## 方法选择经验
 
-从明确的反应物/产物身份、原子映射、电荷、多重度与相关构象出发。根据成键变化和
-已有证据选择化学构造、松弛扫描、QST2/QST3、直接 TS 优化、NEB 或片段取向采样。
-所有种子和生成结构都应作为研究 Node 所属 Artifact 保存，并保留方法、约束、帧选择和来源。
+- **QST2**：映射的反应物和产物几何可靠、步骤近似单一平滑重排时使用；保持原子顺序、电荷和自旋一致。
+- **QST3**：端点可靠但反应中心需要中间猜测时使用；提供显式映射的 TS 样几何，避免任意插值替你选择机理。
+- **反应姿态 + 受限扫描**：分离片段、缔合、取代、环加成、质子转移或进攻方向不清楚时使用。生成多个面/距离，再用 `chemical.scan-xtb@1` 或 `chemical.scan-gaussian@1` 松弛成键/断键坐标。
+- **松弛一维/二维扫描**：一两个距离、角或二面角控制事件且端点不足以定位势垒时使用；把高能或曲率改变的帧作为 TS 种子。
+- **NEB**：两个端点极小点已知、路径包含多个耦合坐标时使用；用 `chemical.neb-xtb@2` 或 `chemical.neb-gaussian@2`，再把路径最高区域交给 TS 优化。
+- **直接 TS 优化**：已有虚频方向、旧 TS、文献几何或可靠 QST/扫描帧时使用；用 `chemical.gaussian-input@1` 或 `chemical.cf22d@1` 的 TS 任务。
+- **构象/姿态枚举**：扭转角、进攻面或片段取向是主要不确定性时，先用 CREST 或 `reactive-geometry`。
 
-已有候选因取向、反应中心距离或上一轮路径/振动证据而需要修正时，先使用
-[reactive-geometry](../reactive-geometry/SKILL.zh-CN.md) Skill 生成带来源记录的反应构象候选，再交给 QST、扫描或 NEB。
+在 validation 或能量证据真正区分前，保留多个位点、进攻面、构象和机理假设。扫描极大值、NEB 图像和 QST 插值是候选/重启帧，经过 `validation` 后才可形成 TS 结论。
 
-不要把扫描极大值、NEB 图像、插值结构或受限结构当作已验证鞍点。候选结构本身可记录
-为事实；失败或畸变的搜索只有在影响研究问题时才记录为研究记录。
+## 推荐闭环
 
-用映射端点、键变化及相关坐标或约束表达所提出的步骤，再据此选择候选生成方法。
-反应名称不决定必须调用哪个脚本或验证器；新增反应类型不要求新增工具或 Skill 分支。
-通过现有 Job 接口运行显式求解器输入或有界任务脚本，保留原子对应关系，并核验所选
-方法的前提。Gaussian QST/TS 输入见 [Gaussian Skill](../gaussian/SKILL.zh-CN.md)。
+1. 明确原子映射、成键/断键、转移坐标和电子态。
+2. 用 `chemical.path-candidates@1`（`chemical.qst-prepare@1`）准备相容端点，或提供 path specification。
+3. 片段或进攻面不清楚时，用 `chemical.reactive-sites@1` 和 `chemical.reactive-pose@1` 生成/编辑反应姿态。
+4. 运行扫描、梯度、QST 或 NEB，并检查收敛、反应中心距离和路径帧。
+5. 保留若干化学上不同的帧，附上来源 digest，交给 TS 优化和 `validation`。
+6. 若搜索坍缩到极小点或出现畸变，根据失败几何改变姿态、坐标、端点或方法后再试。
 
-[映射路径准备器](references/path_preparation.zh-CN.md) 接收显式键变化，支持单片段端点
-自动构象生成或用户提供的映射几何，通过已有 Job 配方生成 QST2 输入。
-可选几何策略不决定科学验收结论，使用前核对输入与验证范围。准备器不支持某种输入
-不等于研究方法不可用；其他方法仍可使用共享 runner、显式求解器输入或任务脚本。
-方法判据见 [candidate_generation.zh-CN.md](references/candidate_generation.zh-CN.md)，
-NEB 可用性与前提见 [ase_neb_executor.zh-CN.md](references/ase_neb_executor.zh-CN.md)。
-把候选交给 IRC 或 validation 时，使用统一的[反应搜索任务接口](references/reaction_task_interface.zh-CN.md)。
+## 已注册操作
 
-脚本职责和分类路径见 [脚本布局](references/script_layout.zh-CN.md)。只有使用可选的
-路径准备器时，才需要阅读其专用说明。
+`chemical.path-candidates@1`：映射 QST/路径输入；`chemical.qst-prepare@1`：QST2/QST3；`chemical.scan-xtb@1`、`chemical.scan-gaussian@1`：受限松弛扫描；`chemical.gradient-xtb@1`、`chemical.gradient-gaussian@1`：梯度/路径计算；`chemical.neb-xtb@2`、`chemical.neb-gaussian@2`：ASE NEB v2。
 
-阅读[专用路径准备](references/gaussian_path.zh-CN.md)；
-其中的局部契约不定义候选生成整体的适用范围。候选应交给 `validation` 获取鞍点证据和双向
-IRC 连通性验证；验证准备 IRC 输入时仍须保留端点和求解器元数据。
+方法判据见 [candidate_generation.zh-CN.md](references/candidate_generation.zh-CN.md)，路径操作见 [path_search.zh-CN.md](references/path_search.zh-CN.md)，QST 和 NEB 细节见对应 reference。姿态构建使用 [reactive-geometry](../reactive-geometry/SKILL.zh-CN.md)，鞍点/IRC 证据使用 [validation](../validation/SKILL.zh-CN.md)。
 
-已有材料端点的 QST2/QST3 使用 `chemical.qst-prepare@1`；有界一维/二维扫描使用
-`chemical.scan-xtb@1` 或 `chemical.scan-gaussian@1`；xTB 梯度与 NEB 使用
-`chemical.gradient-xtb@1`、`chemical.neb-xtb@2`。输入合同、可选路径环境绑定、
-续算规则及 calculator 实际边界见[材料路径操作](references/path_search.zh-CN.md)。
+## Further references
 
-基态自旋 Gaussian 梯度与 NEB 另有 chemical.gradient-gaussian@1、chemical.neb-gaussian@2，
-独立电子设置与范围见[路径操作](references/path_search.zh-CN.md)。
-
-新 xTB/Gaussian 路径搜索使用 [ASE NEB v2](references/ase_neb_executor.zh-CN.md)。失败或畸变时按[搜索恢复](../method-selection/references/search_recovery.zh-CN.md)诊断，结合[局部几何](../material-preparation/references/local_diagnostics.zh-CN.md)和[轨迹](../report/references/research_tools.zh-CN.md)选择重启帧。
+- [ase neb executor.zh CN](references/ase_neb_executor.zh-CN.md)
+- [gaussian path.zh CN](references/gaussian_path.zh-CN.md)
+- [path preparation.zh CN](references/path_preparation.zh-CN.md)
+- [reaction task interface.zh CN](references/reaction_task_interface.zh-CN.md)
+- [script layout.zh CN](references/script_layout.zh-CN.md)
