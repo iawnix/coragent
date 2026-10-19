@@ -1,4 +1,5 @@
 /local_debug/
+/data/
 /config/models.json
 /config/auth.json
 /config/job.toml

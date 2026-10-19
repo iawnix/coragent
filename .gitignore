@@ -1,5 +1,7 @@
 __pycache__/
 /local_debug/
+# Local TRI scheduler state. Test runs must place it below local_debug/.
+/data/
 # Local CoRHub planning drafts.
 /docs/CORHUB_CLIENT_PLAN.zh-CN.md
 /docs/CORHUB_MONITOR_PAGE_PLAN.zh-CN.md

@@ -137,10 +137,15 @@ def args_seed() -> int:
 
 def child_environment(root: Path, run: Path, dependencies: dict[str,Path]) -> dict[str,str]:
     # Do not inherit provider credentials, user plugins, Python paths or agents.
+    tri_root = run / 'data' / 'tri'
+    tri_root.mkdir(parents=True, exist_ok=True)
     env={name:os.environ[name] for name in ('PATH','LANG','LC_ALL','TERM','CI','GITHUB_ACTIONS','CORAGENT_TEST_CONDA') if name in os.environ}
     env.update({'HOME':str(run/'config/home'),'CORAGENT_HOST_ENV_ROOT':str(run/'install/host-envs'),'PYTHONNOUSERSITE':'1','PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(run/'source/backend/src')+os.pathsep+str(run/'source'),
         'TMPDIR':str((run/'tmp').resolve()),'XDG_CONFIG_HOME':str(run/'config'),'XDG_CACHE_HOME':str(run/'cache'),
         'XDG_DATA_HOME':str(run/'data'),'XDG_RUNTIME_DIR':str((run/'sockets').resolve()),
+        # TRI defaults to ./data when unset; pin its state inside this private
+        # run so scheduler smoke tests cannot write into the source checkout.
+        'TRI_DATA_DIR':str(tri_root.resolve()),'TRI_DB':str((tri_root/'tri.db').resolve()),
         'CORAGENT_TEST_SOCKET_ROOT':str((run/'sockets').resolve()),
         'CORAGENT_TEST_ENV_ROOT':str(root),'CORAGENT_TEST_ROOT':str((run/'tmp').resolve()),
         'CORAGENT_TEST_RUN_ROOT':str(run),'CORAGENT_TEST_DEPENDENCIES':json.dumps([str(path) for path in dependencies.values() if (path/'.prepared.json').is_file()]),'CORAGENT_PYTHON':str(dependencies['python']/'bin/python'),

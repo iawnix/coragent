@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-from tools.test.runner import changes
+from tools.test.runner import changes, child_environment
 from tools.test.supervisor import Supervisor, alive, identity
 from tests.support.repo import REPO_ROOT
 import pytest
@@ -14,6 +14,22 @@ import pytest
 def run_layout(tmp_path):
     for name in ('logs','report','sockets'): (tmp_path/name).mkdir()
     return tmp_path
+
+
+def test_child_environment_pins_tri_state_inside_private_run(tmp_path):
+    run = tmp_path / "runs" / "test"
+    run.mkdir(parents=True)
+    dependencies = {
+        "python": tmp_path / "python",
+        "node": tmp_path / "node",
+        "pi": tmp_path / "pi",
+    }
+
+    env = child_environment(tmp_path, run, dependencies)
+
+    assert Path(env["TRI_DATA_DIR"]) == run / "data" / "tri"
+    assert Path(env["TRI_DB"]) == run / "data" / "tri" / "tri.db"
+    assert Path(env["TRI_DB"]).is_relative_to(tmp_path)
 
 
 @pytest.mark.parametrize('previous', [0, 1])
