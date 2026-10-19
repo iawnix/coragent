@@ -26,6 +26,9 @@ def test_release_inventory_is_shared_by_checker_and_installer() -> None:
 @pytest.mark.parametrize("retired", [
     "apps/app-server/app_server.mjs",
     "packages/agent-runtime/runtime.mjs",
+    "domains/chemical/skills/candidate-generation/scripts/da/da_geometry.py",
+    "domains/chemical/skills/candidate-generation/references/gaussian_path.md",
+    "domains/chemical/skills/validation/scripts/gaussian_saddle.py",
 ])
 def test_retired_runtime_is_rejected_even_if_allowlisted(retired: str, monkeypatch: pytest.MonkeyPatch) -> None:
     allowlisted = check_package.expanded_allowlisted_files() | {retired}

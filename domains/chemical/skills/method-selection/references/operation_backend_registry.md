@@ -13,7 +13,6 @@ This cross-reference is exhaustive for the current `execution.json`: every execu
 | `chemical.crest` | `executor` | `crest` | `crest` | `skills/crest/scripts/crest_run.py` | `skills/crest/scripts/crest_cli.py` |
 | `chemical.crest-ensemble` | `executor` | `crest` | `structure` | `skills/crest/scripts/ensemble.py` | `skills/crest/scripts/ensemble_cli.py` |
 | `chemical.crossing-check` | `executor` | `surface-crossing` | `structure` | `skills/surface-crossing/scripts/crossing.py` | `skills/surface-crossing/scripts/crossing_cli.py` |
-| `chemical.diels_alder_path` | `profile` | `validation` | `acceptance-profile` | `—` | `—` |
 | `chemical.electronic-gaussian` | `executor` | `gaussian` | `path_gaussian` | `skills/gaussian/scripts/electronic.py` | `skills/gaussian/scripts/electronic_cli.py` |
 | `chemical.energy-profile` | `executor` | `energetics` | `structure` | `skills/energetics/scripts/energy.py` | `skills/energetics/scripts/energy_cli.py` |
 | `chemical.ensemble-free-energy` | `executor` | `energetics` | `structure` | `skills/energetics/scripts/energy.py` | `skills/energetics/scripts/energy_cli.py` |
@@ -22,8 +21,6 @@ This cross-reference is exhaustive for the current `execution.json`: every execu
 | `chemical.gaussian-evidence` | `executor` | `validation` | `structure` | `skills/validation/scripts/evidence_check.py` | `skills/validation/scripts/check_cli.py` |
 | `chemical.gaussian-input` | `executor` | `gaussian` | `gaussian` | `skills/gaussian/scripts/run.py` | `skills/gaussian/scripts/cli.py` |
 | `chemical.gaussian_frequency` | `validator` | `validation` | `validation` | `skills/validation/scripts/gaussian_frequency.py` | `—` |
-| `chemical.gaussian_irc_connectivity` | `validator` | `validation` | `validation` | `skills/validation/scripts/gaussian_irc_connectivity.py` | `—` |
-| `chemical.gaussian_saddle` | `validator` | `validation` | `validation` | `skills/validation/scripts/gaussian_saddle.py` | `—` |
 | `chemical.geometry-safety` | `executor` | `geometry-preflight` | `structure` | `skills/geometry-preflight/scripts/run.py` | `skills/geometry-preflight/scripts/cli.py` |
 | `chemical.gradient-gaussian` | `executor` | `candidate-generation` | `path_gaussian` | `skills/candidate-generation/scripts/backends/gaussian_path.py` | `skills/candidate-generation/scripts/search/search_cli.py` |
 | `chemical.gradient-xtb` | `executor` | `candidate-generation` | `path_xtb` | `skills/candidate-generation/scripts/search/search.py` | `skills/candidate-generation/scripts/search/search_cli.py` |
@@ -42,8 +39,6 @@ This cross-reference is exhaustive for the current `execution.json`: every execu
 | `chemical.pathway-check` | `executor` | `reaction-investigation` | `structure` | `skills/reaction-investigation/scripts/pathway_job.py` | `skills/reaction-investigation/scripts/pathway_cli.py` |
 | `chemical.qst-prepare` | `executor` | `candidate-generation` | `structure` | `skills/candidate-generation/scripts/search/search.py` | `skills/candidate-generation/scripts/search/search_cli.py` |
 | `chemical.reaction` | `executor` | `material-preparation` | `structure` | `skills/material-preparation/scripts/reaction/prepare.py` | `skills/material-preparation/scripts/reaction/cli.py` |
-| `chemical.reaction_mapping` | `profile` | `validation` | `acceptance-profile` | `—` | `—` |
-| `chemical.reaction_mapping` | `validator` | `validation` | `validation` | `skills/validation/scripts/reaction_mapping.py` | `—` |
 | `chemical.reactive-geometry` | `executor` | `reactive-geometry` | `structure` | `skills/reactive-geometry/scripts/reactive_geometry.py` | `skills/reactive-geometry/scripts/reactive_cli.py` |
 | `chemical.reactive-pose` | `executor` | `reactive-geometry` | `structure` | `skills/reactive-geometry/scripts/reactive_pose.py` | `skills/reactive-geometry/scripts/pose_cli.py` |
 | `chemical.reactive-sites` | `executor` | `reactive-geometry` | `structure` | `skills/reactive-geometry/scripts/reactive_sites.py` | `skills/reactive-geometry/scripts/reactive_sites_cli.py` |

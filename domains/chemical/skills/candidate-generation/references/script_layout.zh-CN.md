@@ -7,7 +7,6 @@
 - `scripts/search/` 编排 QST、受限扫描和梯度证据。
 - `scripts/backends/` 将 Gaussian 与 xTB 适配到共享路径合同，不定义科学操作的范围。
 - `scripts/neb/` 负责 ASE/NEB 计算循环及 CLI。
-- `scripts/da/` 只保留局部的旧 Diels–Alder 几何 helper，不是通用反应限制。
 
 脚本根目录不再提供转发入口。Job 和 executor 必须直接引用分类路径，并在 staging
 闭包中声明相应的分类模块路径。

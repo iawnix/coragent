@@ -33,10 +33,7 @@ internal coordinates; the overall sign of an eigenvector has no physical meaning
 Check a helper's scope before selecting it. `chemical.gaussian_frequency@1`
 checks normal termination without an error marker and one negative frequency in
 a finite numeric table, and cannot certify a
-transition state. The [specialized path validators](../../candidate-generation/references/gaussian_path.md)
-have additional topology and input constraints and apply only to the systems
-specified there. For other systems, use primary outputs and analysis scripts
-suited to the actual reaction; no specialized acceptance profile is required.
+transition state. Use `chemical.stationary-check@1`, `chemical.mode-check@1`, and `chemical.irc-check@1` with the reaction coordinates and endpoint identities selected for the current hypothesis.
 
 Validate element count, atom mapping, charge, multiplicity, electronic state,
 key distances and dihedrals, stereochemistry, and the absence of unintended

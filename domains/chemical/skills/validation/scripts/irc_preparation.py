@@ -72,12 +72,11 @@ def validate_spec(spec: dict) -> tuple[dict, list]:
     """Validate the reaction declaration needed to bind an IRC request."""
     calculation_spec(spec)
     transformation = spec.get("transformation")
-    if not isinstance(transformation, dict) or transformation.get("kind") not in {"explicit", "diels_alder"}:
-        raise ValueError("IRC preparation requires an explicit or supported diels_alder transformation")
+    if not isinstance(transformation, dict) or transformation.get("kind") != "explicit":
+        raise ValueError("IRC preparation requires kind=explicit with bond_changes")
     sides = molecules(spec.get("mapped_smiles", ""))
     atom_ids = {atom.GetAtomMapNum() for atom in sides[0].GetAtoms()}
-    if transformation["kind"] == "explicit":
-        _validate_explicit_rows(spec, transformation, atom_ids)
+    _validate_explicit_rows(spec, transformation, atom_ids)
     checks = reaction(spec["mapped_smiles"], transformation)
     required = ("element_charge_balance", "map_identity", "declared_transformation")
     if any(checks["checks"][key]["verdict"] != "pass" for key in required):

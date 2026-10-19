@@ -11,7 +11,6 @@
 | 过渡态/路径候选生成 | `candidate-generation` | Gaussian、xTB、ASE | `chemical.qst-prepare`、`chemical.scan-*`、`chemical.path-candidates`、`chemical.gradient-*`、`chemical.neb-*` | 候选来源记录；不作鞍点结论 |
 | 过渡态鞍点证据 | `validation` | Gaussian 证据解析器或规范化证据 | `chemical.gaussian-evidence`、`chemical.stationary-check`、`chemical.mode-check` | 驻点、模式方向、电子态和几何检查 |
 | TS IRC 连通性验证和势阱归属 | `validation` | Gaussian 或通用 Job | `chemical.path-irc`、`chemical.irc-check` | 双向路径完整性和端点势阱身份 |
-| 局部旧 DA 证据 | `validation` | structure/Gaussian 证据 | `chemical.reaction_mapping`、`chemical.gaussian_saddle`、`chemical.gaussian_irc_connectivity`；profile 为 `chemical.diels_alder_path`、`chemical.reaction_mapping` | 仅限 DA 的拓扑、鞍点和端点检查；超出声明 DA 范围时返回未评估 |
 | 能量与热化学 | `energetics` | structure 加声明的方法结果 | `chemical.thermochemistry`、`chemical.energy-profile`、`chemical.ensemble-free-energy`、`chemical.scan-slice` | 单位、电子态、化学计量和条件兼容性 |
 | 不同自旋表面交叉 | `surface-crossing` | Gaussian | `chemical.mecp-gaussian`、`chemical.crossing-check` | 能隙、投影梯度、态身份和可选曲率 |
 | Gaussian 计算后端 | `gaussian` | Gaussian 绑定 | `chemical.gaussian`、`chemical.gaussian-input`、`chemical.electronic-gaussian`、`chemical.state-tracking` | 原始输出和操作层证据 |

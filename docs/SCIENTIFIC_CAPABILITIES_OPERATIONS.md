@@ -84,8 +84,7 @@ NEB uses ASE with Gaussian/xTB calculators through version-2 entries; the former
 verified command/script route; the bundled crossing search uses Gaussian and a
 local NumPy algorithm. State tracking requires supplied AO density/overlap tensors;
 automatic extraction from Gaussian checkpoints is not implemented. Classical
-TS/IRC checks do not certify crossings or excited-state continuity. Legacy DA
-validators are explicit specialized options; other reactions use the
+TS/IRC checks do not certify crossings or excited-state continuity. Use the
 [general checks](../domains/chemical/skills/validation/references/general_checks.md).
 See the [report Skill](../domains/chemical/skills/report/SKILL.md) for molecular images,
 data tables, energy plots, standalone trajectory/report Jobs and their evidence requirements. Local geometry diagnostics and practical search-recovery guidance are linked from the input and method-selection Skills.

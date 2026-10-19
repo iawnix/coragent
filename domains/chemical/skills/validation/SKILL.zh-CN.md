@@ -20,7 +20,7 @@ description: 为过渡态候选建立鞍点、振动模式、电子态、结构�
 
 ## 已注册检查
 
-`chemical.stationary-check@1` 检查驻点和结束字段；`chemical.mode-check@1` 检查虚频数量、大小和与反应坐标的对应；`chemical.gaussian-evidence@1` 规范化 Gaussian 输出；`chemical.path-irc@1` 从 checkpoint 准备正反 IRC；`chemical.irc-check@1` 检查路径完整性与端点。`chemical.gaussian_saddle`、`chemical.gaussian_irc_connectivity` 是针对支持拓扑的 Gaussian 专用检查。
+`chemical.stationary-check@1` 检查驻点和结束字段；`chemical.mode-check@1` 检查虚频数量、大小和与反应坐标的对应；`chemical.gaussian-evidence@1` 规范化 Gaussian 输出；`chemical.path-irc@1` 从 checkpoint 准备正反 IRC；`chemical.irc-check@1` 检查路径完整性与端点。
 
 独立检查应作为证据记录，并结合主输出阅读。把执行失败、证据不可读和检查完成但未满足标准分开记录。每个 IRC 分支保留来源鞍点、方向、路径 Artifact、端点 Artifact 和 digest。
 

@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from tests.unit.test_chemical_path_execution import helper
-from reaction_checks import molecules, ordered_molecule, path_spec
+from reaction_checks import molecules, ordered_molecule
 from path_specification import preparation_spec
 from input_job import inspect_input
 from gaussian_io import read_xyz
@@ -119,8 +119,6 @@ def test_supplied_multifragment_coordinates_preserve_mapping_and_produce_irc(tmp
         assert item['direction'].capitalize() in text and 'MaxPoints=12' in text
         assert 'Geom=AllCheck' in text and '%oldchk=ts.chk' in text
     # Generic preparation must not silently broaden the specialized DA contract.
-    with pytest.raises(ValueError, match='diels_alder'):
-        path_spec(json.loads(branch.read_text()))
 
 
 def test_explicit_mapped_hydrogen_transfer_retains_the_same_atom_identity(tmp_path):

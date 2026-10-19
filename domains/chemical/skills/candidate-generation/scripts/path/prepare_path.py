@@ -9,7 +9,7 @@ from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnum
 SCRIPTS = Path(__file__).resolve().parent
 SKILLS = next(parent for parent in Path(__file__).resolve().parents if (parent / '_shared').is_dir())
 SHARED = SKILLS / '_shared'
-sys.path[:0] = [str(SCRIPTS), str(SHARED), str(SCRIPTS.parent / 'search'), str(SCRIPTS.parent / 'backends'), str(SCRIPTS.parent / 'neb'), str(SCRIPTS.parent / 'da')]
+sys.path[:0] = [str(SCRIPTS), str(SHARED), str(SCRIPTS.parent / 'search'), str(SCRIPTS.parent / 'backends'), str(SCRIPTS.parent / 'neb')]
 from reaction_checks import ordered_molecule
 from path_specification import preparation_spec, provided_coordinates, select_strategy
 from path_geometry import align, coordinates, embed
@@ -62,13 +62,9 @@ def prepare_candidates(spec_file, output, conformers=1, enumerate_stereo=False):
                 else:
                     reactant = embed(reactant, seed)
                     product_full = embed(product_full, seed)
-                    if strategy == 'diels_alder':
-                        from da_geometry import da_endpoints
-                        rxyz, pxyz = da_endpoints(spec, reactant, product_full)
-                    else:
-                        rxyz, pxyz = coordinates(reactant), coordinates(product_full)
-                        rotation, left, right = align(pxyz, rxyz)
-                        pxyz = (pxyz-left) @ rotation+right
+                    rxyz, pxyz = coordinates(reactant), coordinates(product_full)
+                    rotation, left, right = align(pxyz, rxyz)
+                    pxyz = (pxyz-left) @ rotation+right
                 files = write_qst2(folder, local_spec, reactant, product_full, rxyz, pxyz, atom_order, branch)
                 row.update(status='prepared', atom_count=len(atom_order), seed=None if supplied is not None else seed, files=files)
             except (ValueError, RuntimeError) as exc:
@@ -79,15 +75,12 @@ def prepare_candidates(spec_file, output, conformers=1, enumerate_stereo=False):
         'path_specification.py': SCRIPTS / 'path_specification.py',
         'path_geometry.py': SCRIPTS / 'path_geometry.py',
         'gaussian_path_inputs.py': SCRIPTS / 'gaussian_path_inputs.py',
-        'da_geometry.py': SCRIPTS.parent / 'da' / 'da_geometry.py',
     }
     modules = ['prepare_path.py', 'path_specification.py', 'path_geometry.py', 'gaussian_path_inputs.py']
-    if strategy == 'diels_alder':
-        modules.append('da_geometry.py')
     implementation = {name:digest(module_paths[name]) for name in modules}
     implementation.update({'_shared/'+name:digest(SHARED/name) for name in ('reaction_checks.py', 'xyz.py')})
     result = {'schema_version':'chemical-candidates/1', 'source_spec_sha256':digest(spec_file),
-              'strategy':'mapped_da_qst2' if strategy == 'diels_alder' else strategy,
+              'strategy':strategy,
               'rdkit_version':rdBase.rdkitVersion, 'script_sha256':digest(__file__),
               'implementation_sha256':implementation,
               'candidates':rows, 'mapping_checks':checks,

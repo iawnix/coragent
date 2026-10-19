@@ -5,10 +5,6 @@ import re
 from rdkit import Chem
 
 
-class UnsupportedReactionScope(ValueError):
-    """Valid molecular input outside the bundled candidate/validator method."""
-
-
 def molecules(smiles):
     if not isinstance(smiles, str):
         raise ValueError('use a mapped reactants>>products SMILES string')
@@ -51,51 +47,6 @@ def ordered_molecule(mol):
     return Chem.RenumberAtoms(full, order), [list(keys[i]) for i in order]
 
 
-def expected_da(transformation):
-    d = transformation.get('diene', [])
-    e = transformation.get('dienophile', [])
-    if len(d) != 4 or len(e) != 2 or any(type(x) is not int or x < 1 for x in d + e) or len(set(d + e)) != 6:
-        raise ValueError('diels_alder requires six distinct diene/dienophile atom-map IDs')
-    formed = transformation.get('forming_bonds', [])
-    valid = [{tuple(sorted((d[0], e[0]))), tuple(sorted((d[3], e[1])))},
-             {tuple(sorted((d[0], e[1]))), tuple(sorted((d[3], e[0])))}]
-    if not isinstance(formed, list) or len(formed) != 2 or any(not isinstance(p, list) or len(p) != 2 for p in formed):
-        raise ValueError('diels_alder requires two explicit forming_bonds')
-    pairs = {tuple(sorted(p)) for p in formed}
-    if pairs not in valid:
-        raise ValueError('forming_bonds must pair opposite diene termini with the two dienophile atoms')
-    result = {tuple(sorted((d[0], d[1]))): (2., 1.), tuple(sorted((d[1], d[2]))): (1., 2.),
-              tuple(sorted((d[2], d[3]))): (2., 1.), tuple(sorted(e)): (2., 1.)}
-    result.update({p: (0., 1.) for p in pairs})
-    return result
-
-
-def _product_graph_matches(reactant, product, expected_changes):
-    """Compare the declared product constitution without certifying an atom trajectory."""
-    before = bonds(reactant)
-    if any(before.get(pair, 0.) != old for pair, (old, _) in expected_changes.items()):
-        return None
-    candidate = Chem.RWMol(reactant)
-    indexes = {atom.GetAtomMapNum(): atom.GetIdx() for atom in candidate.GetAtoms()}
-    bond_types = {1.: Chem.BondType.SINGLE, 2.: Chem.BondType.DOUBLE}
-    for pair, (old, new) in expected_changes.items():
-        i, j = [indexes[number] for number in pair]
-        if old:
-            candidate.RemoveBond(i, j)
-        if new:
-            candidate.AddBond(i, j, bond_types[new])
-    Chem.SanitizeMol(candidate)
-    graphs = []
-    for molecule in (candidate, product):
-        molecule = Chem.Mol(molecule)
-        for atom in molecule.GetAtoms():
-            atom.SetAtomMapNum(0)
-        # Geometry/stereochemical correspondence is a separate check. Isotopes and charge remain.
-        Chem.RemoveStereochemistry(molecule)
-        graphs.append(Chem.MolToSmiles(molecule, canonical=True, isomericSmiles=True))
-    return graphs[0] == graphs[1]
-
-
 def reaction(smiles, transformation=None):
     sides = molecules(smiles)
     inventories = [Counter((a.GetSymbol(), a.GetIsotope()) for a in Chem.AddHs(m).GetAtoms()) for m in sides]
@@ -117,28 +68,7 @@ def reaction(smiles, transformation=None):
               'stereochemical_correspondence': {'verdict': 'not_assessed'}}
     if transformation is not None:
         kind = transformation.get('kind')
-        if kind == 'diels_alder':
-            expected = expected_da(transformation)
-            atoms = {a.GetAtomMapNum(): a for a in sides[0].GetAtoms()}
-            active = transformation['diene'] + transformation['dienophile']
-            neutral_carbon = all(n in atoms and atoms[n].GetAtomicNum() == 6 and atoms[n].GetFormalCharge() == 0 and not atoms[n].GetIsAromatic() for n in active)
-            # Comparing all changed bonds preserves substituent attachment and untouched skeleton.
-            actual = {tuple(c['atoms']): (c['before'], c['after']) for c in changes}
-            topology = mapped and balanced and neutral_carbon and actual == expected
-            checks['declared_transformation'] = {'verdict': 'pass' if topology else 'fail',
-                'kind': kind, 'expected_bond_changes': [{'atoms': list(p), 'before': v[0], 'after': v[1]} for p, v in sorted(expected.items())]}
-            graph_matches = _product_graph_matches(sides[0], sides[1], expected) if neutral_carbon else None
-            checks['declared_transformation'].update(product_graph_matches=graph_matches,
-                reason='declared_atom_mapping_matches' if topology else
-                    'product_graph_equivalent_but_atom_mapping_differs' if graph_matches else
-                    'product_graph_differs' if graph_matches is False else 'reactant_does_not_match_declared_transformation',
-                comparison_scope='Product connectivity, charge and isotope ignoring atom-map labels and stereochemistry; not proof of atom correspondence')
-            if mapped and balanced and all(n in atoms for n in active) and not neutral_carbon:
-                checks['declared_transformation'].update(verdict='not_assessed',
-                    reason='unsupported_diels_alder_scope',
-                    supported_scope='Six neutral, non-aromatic carbon reaction centers only; use explicit bond changes for other substrates. Kekule SMILES do not bypass aromaticity perception.')
-            checks['atom_hydrogen_changes']['verdict'] = 'pass' if mapped and not hchanges else 'fail'
-        elif kind == 'explicit':
+        if kind == 'explicit':
             expected = transformation.get('bond_changes')
             if not isinstance(expected, list):
                 raise ValueError('explicit transformation requires bond_changes')
@@ -148,7 +78,7 @@ def reaction(smiles, transformation=None):
             if expected_h is not None:
                 checks['atom_hydrogen_changes']['verdict'] = 'pass' if sorted(hchanges, key=lambda r:r['atom']) == sorted(expected_h, key=lambda r:r['atom']) else 'fail'
         else:
-            raise ValueError('unsupported declared transformation; use diels_alder or explicit')
+            raise ValueError('transformation requires kind=explicit with bond_changes')
     return {'schema_version': 'chemical-reaction/2', 'balanced': balanced, 'mapping_valid': mapped,
             'charges': charges, 'bond_changes': changes, 'hydrogen_changes': hchanges, 'checks': checks,
             'limitations': ['Graph checks do not establish a transition state, IRC connection, or stereochemical mechanism.',
@@ -165,29 +95,3 @@ def calculation_spec(value):
     for key in ('charge', 'multiplicity', 'threads', 'memory_mb'):
         if type(value.get(key)) is not int or key != 'charge' and value[key] < 1:
             raise ValueError('explicit charge, multiplicity, threads and memory_mb required')
-
-
-def path_spec(value):
-    """Legacy DA validator contract; generic input preparation has a separate scope."""
-    calculation_spec(value)
-    transformation = value.get('transformation')
-    if not isinstance(transformation, dict) or not isinstance(transformation.get('kind'), str):
-        raise ValueError('an explicit transformation kind is required')
-    if transformation['kind'] != 'diels_alder':
-        raise UnsupportedReactionScope('this specialized validator assesses diels_alder only; use reaction-independent analysis for other transformations')
-    checked = reaction(value.get('mapped_smiles', ''), value['transformation'])
-    if checked['checks']['declared_transformation'].get('reason') == 'unsupported_diels_alder_scope':
-        raise UnsupportedReactionScope('unsupported DA candidate scope: neutral non-aromatic carbon centers required; use an independently prepared path and explicit transformation checks')
-    if any(checked['checks'][key]['verdict'] != 'pass' for key in
-           ('element_charge_balance', 'map_identity', 'declared_transformation', 'atom_hydrogen_changes')):
-        raise ValueError('reaction does not match the declared diels_alder topology and hydrogen correspondence')
-    sides = molecules(value['mapped_smiles'])
-    if any(Chem.GetFormalCharge(m) != value['charge'] for m in sides):
-        raise ValueError('requested charge differs from the molecular graphs')
-    if any(a.GetIsotope() or a.GetNumRadicalElectrons() for mol in sides for a in mol.GetAtoms()):
-        raise UnsupportedReactionScope('DA candidate path excludes isotope-specific and open-shell structures')
-    if value['multiplicity'] != 1:
-        raise UnsupportedReactionScope('DA candidate path supports closed-shell singlets only')
-    if len(Chem.GetMolFrags(sides[0])) != 2 or len(Chem.GetMolFrags(sides[1])) != 1:
-        raise UnsupportedReactionScope('DA candidate path requires two reactant fragments and one product')
-    return checked, sides

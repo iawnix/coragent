@@ -1,19 +1,20 @@
 # Structure preparation
 
-inspect --smiles checks the RDKit graph, formula, charge and unspecified stereo.
-seed --smiles --charge --multiplicity --output-dir generates explicit-H XYZ with a fixed ETKDG seed.
-The output directory must be empty; incompatible electron-count/multiplicity parity is rejected.
-Every XYZ has a SHA256 and isomer provenance. Select a stereoisomer based on the task or
-use --enumerate-stereo to study alternatives. Source=llm requires no separate confirmation.
-reaction --smiles accepts mapped reactants>>products and checks total elements, charge,
-a bijection of explicit atoms, and lists bond changes. It does not verify that those changes
-match an intended reaction class unless `--transformation` supplies a JSON object
-with `kind=diels_alder` (diene/dienophile map IDs and forming_bonds) or `kind=explicit`
-(bond_changes and optional hydrogen_changes). The DA check preserves every other bond
-and every mapped atom's H count. Individual implicit-H correspondence and the
-stereochemical mechanism remain unverified. Results use scoped `chemical-reaction/2` checks.
-Single-molecule optimization does not require reaction mapping. Seeds and mappings do not
-replace quantum calculations or mechanistic interpretation.
+Use `chemical.inspect@1` to check the SMILES graph, formula, charge, and unspecified
+stereochemistry. Select a stereoisomer for the study or enumerate alternatives
+with `--enumerate-stereo`.
+
+For a reaction study, first prepare atom identities and correspondence using the
+[mapping procedure](reaction_mapping.md). `chemical.reaction@1` accepts mapped
+`reactants>>products`, checks element/charge balance and atom correspondence, and
+reports bond changes. Supply `--transformation <file.json>` with `kind: "explicit"`,
+`bond_changes`, and optional `hydrogen_changes` to compare the current hypothesis
+with those graphs. Results use `chemical-reaction/2`.
+
+Use `chemical.seed@1` with `--smiles`, `--charge`, `--multiplicity`, and an empty
+`--output-dir` to generate explicit-H XYZ with a fixed ETKDG seed. Choose charge
+and multiplicity consistent with the graph and electron count. Each seed records
+its SHA256, isomer provenance, and atom table for subsequent calculations.
 
 ## Compare structures
 

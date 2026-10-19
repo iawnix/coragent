@@ -4,7 +4,7 @@ import math
 import numpy as np
 from rdkit import Chem
 
-from reaction_checks import calculation_spec, molecules, ordered_molecule, path_spec, reaction
+from reaction_checks import calculation_spec, molecules, ordered_molecule, reaction
 from xyz import validate_electronic_state
 
 
@@ -13,8 +13,6 @@ def preparation_spec(spec):
     transformation = spec.get('transformation')
     if not isinstance(transformation, dict):
         raise ValueError('transformation requires kind=explicit and the complete bond_changes list')
-    if transformation.get('kind') == 'diels_alder':
-        return path_spec(spec)  # Preserve the existing specialized strategy's contract.
     if transformation.get('kind') != 'explicit':
         raise ValueError('use kind=explicit with bond_changes; new reaction names do not need new kinds')
     sides = molecules(spec.get('mapped_smiles', ''))
@@ -63,13 +61,10 @@ def preparation_spec(spec):
 
 
 def select_strategy(spec):
-    default = ('provided_endpoints' if 'endpoints' in spec else
-               'diels_alder' if spec['transformation']['kind'] == 'diels_alder' else 'mapped_endpoints')
+    default = 'provided_endpoints' if 'endpoints' in spec else 'mapped_endpoints'
     strategy = spec.get('candidate_strategy', default)
-    if strategy not in ('mapped_endpoints', 'provided_endpoints', 'diels_alder'):
-        raise ValueError('candidate_strategy must be mapped_endpoints, provided_endpoints or diels_alder')
-    if strategy == 'diels_alder':
-        path_spec(spec)
+    if strategy not in ('mapped_endpoints', 'provided_endpoints'):
+        raise ValueError('candidate_strategy must be mapped_endpoints or provided_endpoints')
     if 'endpoints' in spec and strategy != 'provided_endpoints':
         raise ValueError('endpoints requires candidate_strategy=provided_endpoints; supplied geometry must not be ignored')
     return strategy

@@ -94,7 +94,14 @@ def test_xyz_identity_detects_enantiomer_and_ignores_atom_order(tmp_path):
 
 REACTANTS = '[CH2:1]=[CH:2][CH:3]=[CH2:4].[CH2:5]=[CH:6][CH3:7]'
 PRODUCT = '[CH2:1]1[CH:2]=[CH:3][CH2:4][CH2:5][CH:6]1[CH3:7]'
-TRANSFORMATION = {'kind': 'diels_alder', 'diene': [1, 2, 3, 4], 'dienophile': [5, 6], 'forming_bonds': [[1, 6], [4, 5]]}
+# This solved development case stays in tests and is not a held-out evaluation.
+TRANSFORMATION = {'kind': 'explicit', 'bond_changes': [
+    {'atoms': [1, 2], 'before': 2, 'after': 1},
+    {'atoms': [2, 3], 'before': 1, 'after': 2},
+    {'atoms': [3, 4], 'before': 2, 'after': 1},
+    {'atoms': [5, 6], 'before': 2, 'after': 1},
+    {'atoms': [1, 6], 'before': 0, 'after': 1},
+    {'atoms': [4, 5], 'before': 0, 'after': 1}], 'hydrogen_changes': []}
 
 
 def test_symmetry_equivalent_product_does_not_prove_the_declared_atom_trajectory():
@@ -104,28 +111,25 @@ def test_symmetry_equivalent_product_does_not_prove_the_declared_atom_trajectory
     checked = reaction(REACTANTS + '>>' + equivalent, TRANSFORMATION)
     declared = checked['checks']['declared_transformation']
     assert declared['verdict'] == 'fail', 'explicit atom correspondence must remain strict'
-    assert declared['product_graph_matches'] is True
-    assert declared['reason'] == 'product_graph_equivalent_but_atom_mapping_differs'
     assert checked['checks']['atom_hydrogen_changes']['verdict'] == 'pass'
-    matching_declaration = {**TRANSFORMATION, 'forming_bonds': [[1, 5], [4, 6]]}
+    matching_declaration = {**TRANSFORMATION, 'bond_changes': TRANSFORMATION['bond_changes'][:4] + [
+        {'atoms': [1, 5], 'before': 0, 'after': 1}, {'atoms': [4, 6], 'before': 0, 'after': 1}]}
     corrected = reaction(REACTANTS + '>>' + equivalent, matching_declaration)
     assert corrected['checks']['declared_transformation']['verdict'] == 'pass'
-    assert corrected['checks']['declared_transformation']['product_graph_matches'] is True
 
 
 def test_graph_equivalence_does_not_hide_wrong_hydrogen_or_bond_correspondence():
     wrong_mapping = '[CH:1]1=[CH:2][CH2:3][CH2:4][CH:5]([CH3:7])[CH2:6]1'
     checked = reaction(REACTANTS + '>>' + wrong_mapping, TRANSFORMATION)
     assert checked['checks']['declared_transformation']['verdict'] == 'fail'
-    assert checked['checks']['declared_transformation']['product_graph_matches'] is True
+    assert identity(Chem.MolFromSmiles(PRODUCT)) == identity(Chem.MolFromSmiles(wrong_mapping))
     assert checked['checks']['atom_hydrogen_changes']['verdict'] == 'fail'
     # Move the methyl substituent onto the surviving double bond: a genuinely different constitutional isomer.
     isomer = '[CH2:1]1[C:2]([CH3:7])=[CH:3][CH2:4][CH2:5][CH2:6]1'
     checked = reaction(REACTANTS + '>>' + isomer, TRANSFORMATION)
     assert checked['balanced'] and checked['mapping_valid']
     assert checked['checks']['declared_transformation']['verdict'] == 'fail'
-    assert checked['checks']['declared_transformation']['product_graph_matches'] is False
-    assert checked['checks']['declared_transformation']['reason'] == 'product_graph_differs'
+    assert identity(Chem.MolFromSmiles(PRODUCT)) != identity(Chem.MolFromSmiles(isomer))
 
 
 def test_nonfinite_coordinates_are_input_errors_not_scientific_mismatches():
@@ -136,22 +140,3 @@ def test_nonfinite_coordinates_are_input_errors_not_scientific_mismatches():
         aligned_rmsd(geometry, invalid)
     with pytest.raises(ValueError, match='finite'):
         topology(mol, invalid)
-
-
-@pytest.mark.parametrize('smiles', [
-    '[CH2:1]=[CH:2][CH:3]=[CH2:4].[cH:5]1[cH:6][cH:7][cH:8][cH:9][cH:10]1',
-    '[CH2:1]=[CH:2][CH:3]=[CH2:4].[CH:5]1=[CH:6][CH:7]=[CH:8][CH:9]=[CH:10]1',
-    '[CH2:1]=[CH:2][CH:3]=[CH2:4].[NH:5]=[CH2:6]',
-    '[CH2:1]=[CH:2][CH:3]=[CH2:4].[NH2+:5]=[CH2:6]',
-])
-def test_unsupported_da_centers_are_not_chemical_counterevidence(smiles):
-    declared = reaction(smiles + '>>' + smiles, TRANSFORMATION)['checks']['declared_transformation']
-    assert declared['verdict'] == 'not_assessed'
-    assert declared['reason'] == 'unsupported_diels_alder_scope'
-    assert 'explicit bond changes' in declared['supported_scope']
-
-
-def test_missing_declared_da_atom_is_invalid_not_unsupported_scope():
-    declaration = {**TRANSFORMATION, 'dienophile': [5, 99], 'forming_bonds': [[1, 99], [4, 5]]}
-    checked = reaction(REACTANTS + '>>' + PRODUCT, declaration)
-    assert checked['checks']['declared_transformation']['verdict'] == 'fail'

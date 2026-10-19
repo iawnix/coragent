@@ -16,7 +16,7 @@ def parse_arguments(argv=None):
     seed.add_argument('--charge', type=int, required=True); seed.add_argument('--multiplicity', type=int, required=True)
     seed.add_argument('--output-dir', type=Path, required=True); seed.add_argument('--enumerate-stereo', action='store_true')
     mapping = sub.add_parser('reaction', allow_abbrev=False); mapping.add_argument('--smiles', required=True)
-    mapping.add_argument('--transformation', type=Path, help='JSON declaring diels_alder or explicit bond/hydrogen changes')
+    mapping.add_argument('--transformation', type=Path, help='JSON with kind=explicit, bond_changes and optional hydrogen_changes')
     compare = sub.add_parser('compare', allow_abbrev=False)
     compare.add_argument('--target', type=Path, required=True)
     compare.add_argument('--actual', type=Path, required=True)

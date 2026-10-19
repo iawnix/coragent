@@ -3,7 +3,7 @@
 [中文](general_checks.zh-CN.md). These version-1 executors run independently on the
 `structure` backend through ordinary Jobs. They produce `results/result.json`,
 preserve input digests and never alter Node state or make a search conditional on
-passing validation. They do not import the DA topology or its acceptance profile.
+passing validation.
 
 ## Contents
 

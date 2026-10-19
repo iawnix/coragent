@@ -23,9 +23,7 @@
 
 选择脚本前核对其适用范围。`chemical.gaussian_frequency@1` 检查没有错误标记的正常终止，
 以及全部为有限数值的频率表中恰好一个负频率，
-不能单独认证过渡态。[专用路径验证器](../../candidate-generation/references/gaussian_path.zh-CN.md)
-具有额外的拓扑和输入约束，只适用于该参考明确说明的体系。其他体系使用原始输出与
-适合当前反应的分析脚本完成上述检查，不需要套用专用验收 profile。
+不能单独认证过渡态。用 `chemical.stationary-check@1`、`chemical.mode-check@1` 和 `chemical.irc-check@1`，结合当前假设选定的反应坐标与端点身份完成检查。
 
 核验元素计数、原子 mapping、电荷、多重度、电子态、关键距离与二面角、立体化学，并确认
 没有意外片段或构象变化。将 SCF 不稳定、自旋污染、态歧义、方法敏感性与缺失稳健性检查

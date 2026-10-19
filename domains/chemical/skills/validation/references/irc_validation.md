@@ -29,8 +29,6 @@ path direction alone.
 Combine stationary, mode, forward/reverse path and structure-comparison evidence
 in an assessment. Bind each extracted endpoint to the expected Artifact explicitly.
 Choose endpoint comparisons for the current research question.
-The [specialized path checks](../../candidate-generation/references/gaussian_path.md)
-cover only their declared systems; analyze other reactions using their actual
-atom mapping, bond changes, and transfers. Missing checks remain unresolved.
+Use `chemical.irc-check@1` with the source saddle, both paths, and the selected endpoint materials; see [general checks](general_checks.md).
 
 Record the observations, scientific criteria, unresolved questions and next steps with research_update using the existing node_id and a note. Publish a reusable conclusion with research_result, citing collected materials and stating limitations. A completed computation does not establish a scientific conclusion.

@@ -20,7 +20,7 @@
 | Gaussian SP/optimization | `chemical.gaussian` | XYZ sp/opt/opt-sp; target energy interpretation has the HF/DFT SCF boundary below |
 | Gaussian TS/frequency/QST/IRC/scan | `chemical.gaussian-input` | Explicit GJF execution and limited checks; termination/frequency count does not prove the target path; no complete scan validator |
 | CF22D | `chemical.cf22d`, `chemical.cf22d-doctor` | PySCF sp/opt/opt-sp/ts/freq/thermo/opt_freq/ts_freq and diagnostics; includes RRHO, not IRC/NEB/crossings |
-| Mapped endpoints and TS-validation IRC inputs | `chemical.path-candidates`, `chemical.path-irc` | Candidate endpoint preparation and post-saddle IRC input preparation; explicit transformations, compatible single-fragment embedding or provided mapped geometries; optional DA geometry; preparation does not run Gaussian |
+| Mapped endpoints and TS-validation IRC inputs | `chemical.path-candidates`, `chemical.path-irc` | Candidate endpoint preparation and post-saddle IRC input preparation; explicit transformations, compatible single-fragment embedding or provided mapped geometries; preparation does not run Gaussian |
 | CREST ensembles | `chemical.crest`, `chemical.crest-ensemble`, `chemical.ensemble-select` | Bounded 3.0.2 GFN1/GFN2 ground-state search, primary consistency, inferred identity and geometric/electronic-energy screening; partial results retained; no exhaustive coverage or free energies |
 | Complex placements | `chemical.complex-sample` | Seeded rigid-fragment assembly/perturbation, collision/distance checks and lineage; supplied coordinates required, unknown total spin preserved; no optimization |
 | Material QST2/QST3 | `chemical.qst-prepare` | Supplied mapped endpoint/guess geometries, explicit compatible states, permutation and GJF export; no minimum or elementary-step certification |
@@ -42,13 +42,8 @@ NEB uses version `2` (ASE); its version `1` entries have been removed. Other ent
 | Registered validator / profile | Actual scope |
 | --- | --- |
 | `chemical.gaussian_frequency@1` | Normal termination and exactly one negative value in a finite frequency table; excludes mode identity, full stationary-point evidence and IRC identity |
-| `chemical.reaction_mapping@1` | **DA-specific** mapping, topology and per-atom H correspondence; distinct from generic `chemical.reaction` input checks |
-| `chemical.gaussian_saddle@1` | **DA-specific** input binding, stationary point, frequency table and two forming-bond displacements; not the default for other reactions |
-| `chemical.gaussian_irc_connectivity@1` | **DA-specific** source saddle, bidirectional paths and mapped endpoints |
-| `chemical.diels_alder_path@1` | Combines DA path checks; does not establish exhaustive mechanism/conformer coverage |
-| `chemical.reaction_mapping@1` profile | DA mapping checks only, not generic TS acceptance |
 
-Outside the specialized scope, `verdict=inconclusive`, `scientific_verdict=not_assessed` and `method_scope` explain what was not assessed. Invalid inputs, binding errors and in-scope scientific failures remain distinguishable. Analyze other reactions using their actual coordinates, modes and endpoints; neither a validator per reaction name nor a fabricated DA spec is required.
+Use `chemical.stationary-check`, `chemical.mode-check`, and `chemical.irc-check` with the current hypothesis and collected evidence. Their contracts are in [general checks](../../validation/references/general_checks.md).
 
 ## Gaussian energy interpretation
 

@@ -41,7 +41,6 @@ description: 根据映射端点、反应坐标和结构证据构建并搜索过�
 ## Further references
 
 - [ase neb executor.zh CN](references/ase_neb_executor.zh-CN.md)
-- [gaussian path.zh CN](references/gaussian_path.zh-CN.md)
 - [path preparation.zh CN](references/path_preparation.zh-CN.md)
 - [reaction task interface.zh CN](references/reaction_task_interface.zh-CN.md)
 - [script layout.zh CN](references/script_layout.zh-CN.md)

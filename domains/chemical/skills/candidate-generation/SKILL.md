@@ -44,6 +44,5 @@ Read [candidate-generation criteria](references/candidate_generation.md), [path 
 
 ## Further references
 
-- [gaussian path](references/gaussian_path.md)
 - [reaction task interface](references/reaction_task_interface.md)
 - [script layout](references/script_layout.md)

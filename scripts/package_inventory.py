@@ -10,7 +10,13 @@ LAYOUT = json.loads((ROOT / "config/source-layout.json").read_text())
 PACKAGE_FILES = [*LAYOUT["roots"], *LAYOUT["files"], *LAYOUT["generated"], *("!" + value for value in LAYOUT["exclude"])]
 REQUIRED_RUNTIME_FILES = frozenset(LAYOUT["required"])
 REQUIRED_TARBALL_FILES = REQUIRED_RUNTIME_FILES | {"package.json", *LAYOUT["files"]}
-RETIRED_RUNTIME_PATHS = ("apps/app-server/", "extensions/", "packages/agent-core/", "packages/agent-runtime/", "packages/runtime-bridge/", "packages/research-state/")
+RETIRED_RUNTIME_PATHS = ("apps/app-server/", "extensions/", "packages/agent-core/", "packages/agent-runtime/", "packages/runtime-bridge/", "packages/research-state/",
+    "domains/chemical/skills/candidate-generation/scripts/da/",
+    "domains/chemical/skills/candidate-generation/references/gaussian_path.md",
+    "domains/chemical/skills/candidate-generation/references/gaussian_path.zh-CN.md",
+    "domains/chemical/skills/validation/scripts/reaction_mapping.py",
+    "domains/chemical/skills/validation/scripts/gaussian_saddle.py",
+    "domains/chemical/skills/validation/scripts/gaussian_irc_connectivity.py")
 SKILL_ENTRIES = ["./skills", "./domains/chemical/skills"]
 SKILL_ENTRY_FILES = sorted(str(p.relative_to(ROOT)) for root in (ROOT / "skills", ROOT / "domains/chemical/skills") for p in root.rglob("SKILL.md"))
 FORBIDDEN_PARTS = {"local_debug", ".git", ".agents", "__pycache__", ".pytest_cache", "node_modules", "tests"}

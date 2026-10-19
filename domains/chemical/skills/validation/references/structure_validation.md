@@ -30,17 +30,9 @@ stereochemistry alongside the global RMSD and rendered structure.
 
 ## Execution boundary
 
-There is no built-in mapped-structure comparison executor in this package.
-Use an available analysis tool or implement a bounded script with explicit mapping,
-atom selections and tolerances, then execute and register the result. Preserve
-input digests and report symmetry ambiguity. `artifact_derive` records a descriptor;
-it does not align structures or check stereochemistry.
-
-The existing DA path validator aligns its supplied atom order using proper rotations
-only and checks explicitly specified tetrahedral and E/Z stereochemistry against
-endpoint coordinates. Nonfinite coordinates are input errors, not evidence against
-a chemical hypothesis. Equivalent atom permutations are valid only when the
-correspondence is changed consistently; the RMSD helper does not search alternative
-mappings. The `chemical.compare` executor compares molecular identity, including
-specified stereo, independently of input atom order; XYZ bond orders remain an
-explicit inference. Neither check establishes a transition state or mechanism.
+Use `chemical.map-candidates@1 --mode identity` to establish graph correspondence,
+`chemical.conformer-compare@1` for proper-rotation alignment and internal-coordinate
+comparison, and `chemical.compare@1` for molecular identity and specified stereo.
+Retain source digests, selected atom correspondence, and symmetry alternatives.
+For XYZ identity checks, record the inferred graph and declared charge alongside
+the comparison. See [structure analysis](../../material-preparation/references/structure_analysis.md).

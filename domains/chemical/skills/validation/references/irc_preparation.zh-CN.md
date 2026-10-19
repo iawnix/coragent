@@ -16,7 +16,4 @@ IRC 准备接收相同的显式变换契约，不依赖端点几何策略。它�
 和生产证据。先提交并收集输入准备 Job，
 再按 Gaussian Skill 分别运行两方向输入，暂存 ts.chk，使用 `--validation irc`。
 
-已有 chemical.reaction_mapping、chemical.gaussian_saddle、chemical.gaussian_irc_connectivity
-路径验证器和 chemical.diels_alder_path 验收 profile 仍使用 DA 专用契约。通用准备成功
-不会扩展这些检查的适用范围。应针对声明键变化、模式和端点，用适当分析检查收集的输出，
-明确记录尚未评估的条件。
+用 `chemical.gaussian-evidence@1` 和 `chemical.irc-check@1` 分析收集的路径，关联选定的来源鞍点和映射端点材料。详见[通用检查](general_checks.zh-CN.md)。

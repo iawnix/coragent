@@ -25,7 +25,6 @@ Use this Skill after candidate generation and an actual TS optimization or path 
 - `chemical.gaussian-evidence@1`: normalize selected Gaussian output sections.
 - `chemical.path-irc@1`: prepare bounded forward/reverse IRC inputs from a checkpoint.
 - `chemical.irc-check@1`: inspect path completeness and endpoint comparison.
-- `chemical.gaussian_saddle` and `chemical.gaussian_irc_connectivity`: specialized Gaussian evidence checks for their supported topology.
 
 Use the independent checks as evidence records, not as a substitute for reading the primary output. Keep execution failure, unreadable evidence, and a completed check that fails a criterion as separate statuses. Preserve the source saddle, direction, path artifact, endpoint artifact, and digest for each IRC branch.
 

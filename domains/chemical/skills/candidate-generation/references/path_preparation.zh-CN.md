@@ -1,6 +1,6 @@
 # 映射 QST2 输入准备
 
-`scripts/prepare_path.py` 根据声明的基元步骤准备 Gaussian 输入，不推断产物、不选择机理、
+`scripts/path/prepare_path.py` 根据声明的基元步骤准备 Gaussian 输入，不推断产物、不选择机理、
 不执行 Gaussian，也不认证鞍点。显式变换使用 `chemical.path-candidates@1`，不需要按反应名称
 新增工具。IRC 输入准备由 `validation` 独立实现；候选生成不提供也不导入 IRC 实现。
 
@@ -13,26 +13,17 @@
 ## 输入说明
 
 登记 `chemical-path-spec/1` JSON Artifact，提供映射反应物/产物、完整的预期键变化和
-显式 Gaussian 设置。以下开环假设使用通用的单片段策略：
+显式 Gaussian 设置：
 
-```json
-{
-  "schema_version": "chemical-path-spec/1",
-  "mapped_smiles": "[CH2:1]1[CH:2]=[CH:3][CH2:4]1>>[CH2:1]=[CH:2][CH:3]=[CH2:4]",
-  "transformation": {
-    "kind": "explicit",
-    "bond_changes": [
-      {"atoms": [1, 2], "before": 1, "after": 2},
-      {"atoms": [1, 4], "before": 1, "after": 0},
-      {"atoms": [2, 3], "before": 2, "after": 1},
-      {"atoms": [3, 4], "before": 1, "after": 2}
-    ]
-  },
-  "candidate_strategy": "mapped_endpoints",
-  "method": "M062X", "basis": "6-31G**", "charge": 0,
-  "multiplicity": 1, "threads": 2, "memory_mb": 1000
-}
-```
+| 字段 | 如何准备 |
+| --- | --- |
+| `schema_version` | `chemical-path-spec/1` |
+| `mapped_smiles` | 当前假设的映射反应物与产物，以 `>>` 连接 |
+| `transformation` | `kind: "explicit"`，以及完整的 `bond_changes` 列表；每项包含 map 原子对 `atoms`、键级 `before` 和 `after` |
+| `candidate_strategy` | 按下表选择几何来源 |
+| `method`、`basis` | 本次计算选定的方法与基组 |
+| `charge`、`multiplicity` | 体系电荷和自旋多重度 |
+| `threads`、`memory_mb` | 分配给作业的计算资源 |
 
 两端 atom-map ID 必须唯一且对应，键级 0 表示无键。可选 `hydrogen_changes` 使用
 `{atom, before, after}` 计数。迁移的 H 必须在 SMILES 中显式映射，仅氢计数不足以保留
@@ -46,7 +37,6 @@
 | --- | --- |
 | `mapped_endpoints` | 显式 spec 未提供 endpoints 时的默认策略。两侧各需一个连通片段，通过确定性 RDKit 嵌入、可选 UFF 松弛和刚体对齐生成 QST2 种子，不附加特定反应几何规则。 |
 | `provided_endpoints` | 提供 endpoints 时的默认策略。保留输入坐标，包括多片段取向。要求 `--conformers 1` 且不使用 `--enumerate-stereo`；每组明确几何单独提交。 |
-| `diels_alder` | 旧 DA spec 的兼容策略，见其[范围和验证器](gaussian_path.zh-CN.md)。其他反应不受该策略的契约限制。 |
 
 提供几何时，`endpoints` 恰好包含 `reactants` 和 `product`。每端逐原子提供记录，包括 H；
 输入行顺序可以不同。单行形如 `{"atom":[0,1,0],"element":"C","xyz":[0.0,0.0,0.0]}`：

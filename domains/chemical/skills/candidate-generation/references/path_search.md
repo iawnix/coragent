@@ -15,7 +15,7 @@ NEB uses [ASE](ase_neb_executor.md), with version-2 inputs and executors.
 ## Independent execution and environments
 
 The recipes below each take one `input` JSON Artifact; QST/scans/gradients use version 1 and NEB uses version 2. They do not
-require a reaction name, DA topology or a complete research workflow. Prepare via
+require a reaction name or a complete research workflow. Prepare via
 `research_agent.application.executors`, submit returned request_file/request_sha256
 with node_id to job_start and collect the terminal Job. Example (replace absolute
 paths and Artifact refs with the real returned values):

@@ -18,8 +18,4 @@ order, method, charge/spin and producer evidence; it does not reuse a stored Hes
 Submit and collect the preparation Job, then run each generated input using the
 Gaussian Skill, staging ts.chk and selecting `--validation irc`.
 
-The existing chemical.reaction_mapping, chemical.gaussian_saddle and
-chemical.gaussian_irc_connectivity path validators and chemical.diels_alder_path
-acceptance profile still use the specialized DA contract. Generic preparation does
-not make those checks applicable. Use collected outputs with suitable analysis for
-the declared bond changes, mode and endpoints; record unassessed criteria explicitly.
+Analyze the collected paths with `chemical.gaussian-evidence@1` and `chemical.irc-check@1`, using the selected source saddle and mapped endpoint materials. See [general checks](general_checks.md).

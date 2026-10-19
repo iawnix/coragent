@@ -2,7 +2,7 @@
 
 [English](general_checks.md)。以下版本 1 的 executor 通过普通 Job 在 `structure` 后端独立
 执行，输出 `results/result.json` 并保存输入摘要。不改变 Node 状态，也不将检查通过设为
-搜索的前置门槛；不导入 DA 拓扑或其验收 profile。
+搜索的前置门槛。
 
 ## 内容
 

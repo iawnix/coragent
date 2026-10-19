@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SKILLS = ROOT / 'domains/chemical/skills'
 sys.path[:0] = [str(SKILLS / '_shared'), str(SKILLS / 'gaussian/scripts')]
 from chemical_identity import identity, compare
-from path_validation import specification_markers, validate
+from path_validation import specification_markers
 
 
 def structure(path, smiles):
@@ -56,14 +56,6 @@ def test_wrapped_title_digest_is_bounded(marker):
     assert specification_markers(f'{marker} {digest[:cut]}\n Normal termination\n')[1]
     assert specification_markers(f'{marker} {digest}a\n')[1]
     assert specification_markers(f'{marker} unreadable\n') == ([], True)
-
-
-def test_unreadable_input_is_not_a_scientific_failure(tmp_path):
-    # A missing input is a parser/input failure, never evidence against a hypothesis.
-    result = validate('saddle', [tmp_path / 'missing.json'], {'inputs': [{'sha256': 'sha256:missing'}]})
-    assert result['verdict'] == 'inconclusive'
-    assert result['scientific_verdict'] == 'not_assessed'
-    assert result['parsing']['status'] == 'failed'
 
 
 def test_managed_doctor_imports_staged_shared_modules_without_pythonpath(tmp_path):

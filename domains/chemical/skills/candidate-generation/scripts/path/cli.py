@@ -7,7 +7,7 @@ def parse_arguments(argv=None):
     p=argparse.ArgumentParser(description="Prepare mapped QST2 candidate inputs",
         epilog="Use chemical-path-spec/1 with transformation.kind=explicit and complete bond_changes. "
                "Candidate strategies: mapped_endpoints (single-fragment embedding), provided_endpoints "
-               "(mapped geometry rows), or the legacy diels_alder strategy.",
+               "(mapped geometry rows).",
         allow_abbrev=False)
     sub=p.add_subparsers(dest='action',required=True)
     command=sub.add_parser('candidates',allow_abbrev=False)

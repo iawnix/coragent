@@ -15,7 +15,7 @@ NEB 统一使用 [ASE](ase_neb_executor.zh-CN.md)，输入和执行器为版本 
 ## 独立执行与环境
 
 以下入口的输入角色只有一个 `input` JSON Artifact；QST/扫描/梯度为版本 1，NEB 为版本 2。
-不要求反应名称、DA 拓扑或完整研究流程。通过既有准备器生成请求，
+不要求反应名称或完整研究流程。通过既有准备器生成请求，
 将 request_file/request_sha256 和 node_id 交给 job_start，终止后收集。
 占位符应换成真实绝对路径和 Artifact 引用：
 

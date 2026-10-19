@@ -16,7 +16,7 @@ reaction geometries. Follow its [mapping procedure](../../material-preparation/r
    per-row atom table with the XYZ through conformer search, optimization, and
    assembly. Preserve supplied coordinates together with their graph correspondence.
 4. Explore unspecified stereoisomers, conformers, and approach poses as distinct
-   choices. A diene's s-cis/s-trans adjustment retains its graph and atom labels.
+   choices. Conformational changes retain the molecular graph and atom labels.
    Assemble path endpoints in a common mapped order and record row permutations.
 
 Prepare these registered operations through the generic executor, submit with

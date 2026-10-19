@@ -19,7 +19,6 @@ _RELATIVE_PATHS = (
     "candidate-generation/scripts/search",
     "candidate-generation/scripts/backends",
     "candidate-generation/scripts/neb",
-    "candidate-generation/scripts/da",
     "reactive-geometry/scripts",
     "structure-assessment/scripts",
 )

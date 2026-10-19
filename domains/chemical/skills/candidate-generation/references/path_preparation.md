@@ -1,6 +1,6 @@
 # Mapped QST2 preparation
 
-`scripts/prepare_path.py` prepares Gaussian inputs from a declared elementary step.
+`scripts/path/prepare_path.py` prepares Gaussian inputs from a declared elementary step.
 It does not infer a product, select a mechanism, execute Gaussian or certify a saddle.
 Use `chemical.path-candidates@1` for explicit transformations; a reaction name does
 not require a new tool. IRC input preparation is a separate validation implementation; candidate generation does not provide or import it.
@@ -14,27 +14,17 @@ not require a new tool. IRC input preparation is a separate validation implement
 ## Specification
 
 Register a `chemical-path-spec/1` JSON Artifact. Supply mapped reactants and products,
-the complete proposed bond changes and explicit Gaussian settings. For example,
-this ring-opening hypothesis exercises the generic single-fragment strategy:
+the complete proposed bond changes and explicit Gaussian settings:
 
-```json
-{
-  "schema_version": "chemical-path-spec/1",
-  "mapped_smiles": "[CH2:1]1[CH:2]=[CH:3][CH2:4]1>>[CH2:1]=[CH:2][CH:3]=[CH2:4]",
-  "transformation": {
-    "kind": "explicit",
-    "bond_changes": [
-      {"atoms": [1, 2], "before": 1, "after": 2},
-      {"atoms": [1, 4], "before": 1, "after": 0},
-      {"atoms": [2, 3], "before": 2, "after": 1},
-      {"atoms": [3, 4], "before": 1, "after": 2}
-    ]
-  },
-  "candidate_strategy": "mapped_endpoints",
-  "method": "M062X", "basis": "6-31G**", "charge": 0,
-  "multiplicity": 1, "threads": 2, "memory_mb": 1000
-}
-```
+| Field | Preparation |
+| --- | --- |
+| `schema_version` | `chemical-path-spec/1` |
+| `mapped_smiles` | Mapped reactants and products for the current hypothesis, joined with `>>` |
+| `transformation` | `kind: "explicit"` and complete `bond_changes`; each entry gives mapped `atoms`, `before` and `after` bond orders |
+| `candidate_strategy` | Select the geometry source below |
+| `method`, `basis` | Method and basis chosen for this calculation |
+| `charge`, `multiplicity` | System charge and spin multiplicity |
+| `threads`, `memory_mb` | Allocated Job resources |
 
 Atom-map IDs must be unique and consistent across both sides. Bond order 0 means
 no bond. Optional `hydrogen_changes` uses `{atom, before, after}` counts. Map each
@@ -50,7 +40,6 @@ Gaussian writer rejects isotope-specific masses; use explicit solver inputs for 
 | --- | --- |
 | `mapped_endpoints` | Default for explicit specs without endpoints. Each side must contain one connected fragment. Deterministic RDKit embedding, optional UFF relaxation and rigid alignment generate QST2 seeds. No reaction-specific geometry rule is imposed. |
 | `provided_endpoints` | Default when `endpoints` is supplied. Preserves supplied coordinates, including multi-fragment placement. Requires `--conformers 1` and no `--enumerate-stereo`; submit each geometry pair separately. |
-| `diels_alder` | Compatibility strategy for legacy DA specs; see its [scope and validators](gaussian_path.md). It is optional and not the contract for other reactions. |
 
 For supplied geometries, `endpoints` has exactly `reactants` and `product`. Each
 contains one row per atom, including H; row order may differ between endpoints.

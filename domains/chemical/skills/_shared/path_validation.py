@@ -1,42 +1,15 @@
-"""Conservative deterministic checks for one explicitly mapped DA path."""
-import hashlib
-import json
+"""Geometry comparison and Gaussian input-binding utilities."""
 import re
 from pathlib import Path
 
 import numpy as np
 from rdkit import Chem
 
-from reaction_checks import UnsupportedReactionScope, ordered_molecule, path_spec
-from gaussian_io import parse_log, parse_irc_log, select_job_section, final_geometry
-
-
-def bindings(spec, manifest):
-    source = manifest['inputs'][0]
-    return {'spec_artifact_id':source['artifact_id'], 'spec_sha256':source['sha256'],
-            **{k:spec[k] for k in ('method','basis','charge','multiplicity','threads','memory_mb')}}
-
-
-def output(checks, binding, scope):
-    verdicts=[v['verdict'] for v in checks.values()]
-    verdict='fail' if 'fail' in verdicts else 'inconclusive' if any(v!='pass' for v in verdicts) else 'pass'
-    scientific = [v['verdict'] for k, v in checks.items() if not k.endswith('specification_binding')]
-    return {'schema_version':'validator-output/1','verdict':verdict,'checks':checks,'bindings':binding,'scope':scope,
-            'parsing': {'status': 'completed'},
-            'scientific_verdict': 'fail' if 'fail' in scientific else 'inconclusive' if any(v != 'pass' for v in scientific) else 'pass'}
+from gaussian_io import parse_log, select_job_section
 
 
 def record(value, details=None, missing=False):
     return {'verdict':'pass' if value else 'inconclusive' if missing else 'fail', **({'details':details} if details is not None else {})}
-
-
-def specification(path, manifest):
-    raw=Path(path).read_bytes(); source=manifest['inputs'][0]
-    if source['sha256'] != 'sha256:'+hashlib.sha256(raw).hexdigest():
-        raise ValueError('bound specification digest differs')
-    spec=json.loads(raw); checked,sides=path_spec(spec)
-    spec['_bound_spec_sha256']=hashlib.sha256(raw).hexdigest()
-    return spec,checked,sides
 
 
 def specification_markers(text):
@@ -95,34 +68,6 @@ def log_checks(path, spec, atoms):
     return parsed,checks,lines
 
 
-def saddle(spec, sides, path):
-    atoms,_=ordered_molecule(sides[0]);parsed,checks,_=log_checks(path,spec,atoms)
-    summary=parsed['summary']
-    convergence=summary['force_convergence']
-    complete_convergence=set(convergence)=={'Maximum Force','RMS Force','Maximum Displacement','RMS Displacement'}
-    checks['stationary_point']=record(summary['optimization_completed'],
-                                     {'completion_reason':summary['optimization_completion_reason'], 'criteria':convergence},
-                                     missing=not complete_convergence)
-    negative=[f for f in parsed['frequencies'] if f<0]
-    checks['frequency_table_complete']=record(len(parsed['frequencies'])==3*atoms.GetNumAtoms()-6 and np.isfinite(parsed['frequencies']).all(),{'expected':3*atoms.GetNumAtoms()-6,'actual':len(parsed['frequencies'])})
-    checks['one_imaginary_frequency']=record(len(negative)==1,{'frequencies_cm-1':parsed['frequencies']},missing=not parsed['frequencies'])
-    modes=[m for m in parsed['normal_modes'] if m['frequency_cm-1']<0]
-    derivatives=[]
-    valid=False
-    if len(modes)==1 and len(parsed['atoms'])==atoms.GetNumAtoms():
-        vector=np.asarray(modes[0]['displacements'],dtype=float)
-        geometry=np.asarray([a[1:] for a in parsed['atoms']],dtype=float)
-        norm=np.linalg.norm(vector)
-        indexes={a.GetAtomMapNum():a.GetIdx() for a in atoms.GetAtoms() if a.GetAtomMapNum()}
-        if norm>0 and modes[0]['atomic_numbers']==[a.GetAtomicNum() for a in atoms.GetAtoms()]:
-            for pair in spec['transformation']['forming_bonds']:
-                i,j=[indexes[n] for n in pair]; delta=geometry[j]-geometry[i]; distance=np.linalg.norm(delta)
-                derivatives.append(float(np.dot(delta/distance,vector[j]-vector[i])/norm) if distance>0 else 0.)
-            valid=len(derivatives)==2 and derivatives[0]*derivatives[1]>0 and min(abs(x) for x in derivatives)>=0.02
-    checks['forming_bond_mode']=record(valid,{'normalized_distance_derivatives':derivatives,'minimum_absolute_derivative':0.02},missing=not modes)
-    return checks,parsed
-
-
 def topology(mol, geometry):
     """Conservative all-atom connectivity by covalent radii; ambiguous distances never pass."""
     if len(geometry)!=mol.GetNumAtoms() or [a[0] for a in geometry]!=[a.GetSymbol() for a in mol.GetAtoms()]:
@@ -168,64 +113,3 @@ def aligned_rmsd(a,b):
     x-=x.mean(axis=0);y-=y.mean(axis=0)
     u,_,vt=np.linalg.svd(x.T@y);fix=np.eye(3);fix[-1,-1]=np.linalg.det(u@vt)
     return float(np.sqrt(np.mean(np.sum((x@u@fix@vt-y)**2,axis=1))))
-
-
-def _validate(kind, paths, manifest):
-    try:
-        spec,checked,sides=specification(paths[0],manifest)
-    except UnsupportedReactionScope as exc:
-        return {'schema_version': 'validator-output/1', 'verdict': 'inconclusive',
-                'checks': {'method_scope': record(False, str(exc), missing=True)},
-                'parsing': {'status': 'completed'}, 'scientific_verdict': 'not_assessed',
-                'scope': 'Input is outside the supported DA method; no chemical counterevidence is established'}
-    except (ValueError, KeyError) as exc:
-        return {'schema_version':'validator-output/1','verdict':'fail','checks':{'specification':record(False,str(exc))},
-                'parsing': {'status': 'failed' if isinstance(exc, json.JSONDecodeError) else 'completed'},
-                'scientific_verdict': 'not_assessed', 'scope':'declared input specification'}
-    binding=bindings(spec,manifest)
-    if kind=='mapping':
-        names=('molecular_graphs','element_charge_balance','map_identity','atom_hydrogen_changes','declared_transformation')
-        return output({n:checked['checks'][n] for n in names},binding,'declared DA topology, preserved skeleton and per-atom H counts; not TS or stereochemical mechanism proof')
-    if kind=='saddle':
-        checks,_=saddle(spec,sides,paths[1])
-        return output(checks,binding,'converged first-order saddle with simultaneous forming-bond displacement; not IRC or mechanism uniqueness')
-    if kind!='irc':raise ValueError('unknown validator')
-    saddle_checks,reference=saddle(spec,sides,paths[1])
-    checks={'saddle_'+k:v for k,v in saddle_checks.items()}
-    molecules=[ordered_molecule(m)[0] for m in sides]
-    assignments=[]
-    for direction,path in zip(('forward','reverse'),paths[2:]):
-        parsed,current,lines=log_checks(path,spec,molecules[0]);checks.update({direction+'_'+k:v for k,v in current.items()})
-        try:
-            irc=parse_irc_log(Path(path));summary=irc['summary']
-            checks[direction+'_path_complete']=record(summary['direction']==direction and summary['path_complete_marker'] and not summary['max_points_reached'],summary)
-            first_point=next((i for i,line in enumerate(lines) if re.search(r'Point Number:\s*\d+',line)),len(lines))
-            starting=final_geometry(lines[:first_point]);rmsd=aligned_rmsd(starting,reference['atoms'])
-            checks[direction+'_saddle_origin']=record(rmsd is not None and rmsd<=0.05,{'aligned_rmsd_angstrom':rmsd,'maximum':0.05},missing=rmsd is None)
-            matches=[topology(m,irc['atoms']) for m in molecules]
-            assigned=[i for i,m in enumerate(matches) if m['matches']]
-            assignments.append(assigned[0] if len(assigned)==1 else None)
-            checks[direction+'_endpoint_identity']=record(len(assigned)==1,{'reactant':matches[0],'product':matches[1]},missing=any(m.get('ambiguous') for m in matches))
-        except (ValueError,KeyError) as exc:
-            checks[direction+'_path_complete']=record(False,str(exc),missing=True);assignments.append(None)
-    checks['opposite_endpoint_basins']=record(sorted(x for x in assignments if x is not None)==[0,1],{'assignments':assignments})
-    return output(checks,binding,'bidirectional completed IRC from the supplied saddle to declared mapped connectivity; excludes bond-order determination and exhaustive pathways')
-
-
-def validate(kind, paths, manifest):
-    try:
-        return _validate(kind, paths, manifest)
-    except (ValueError, KeyError, IndexError, TypeError, OSError) as exc:
-        return {'schema_version': 'validator-output/1', 'verdict': 'inconclusive',
-                'scientific_verdict': 'not_assessed', 'checks': {},
-                'parsing': {'status': 'failed', 'exception_type': type(exc).__name__, 'reason': str(exc)},
-                'scope': 'Input could not be interpreted; no scientific conclusion is established'}
-
-
-def main(kind, paths):
-    manifest=json.loads(Path('validator_inputs.json').read_text())
-    expected={'mapping':1,'saddle':2,'irc':4}[kind]
-    if len(paths)!=expected or len(manifest.get('inputs',[]))!=expected:
-        raise ValueError('validator input roles/count differ')
-    result=validate(kind,paths,manifest)
-    Path('validator_result.json').write_text(json.dumps(result,sort_keys=True,allow_nan=False)+'\n')
