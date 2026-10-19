@@ -62,7 +62,7 @@ def test_qst_reorders_endpoints_and_preserves_separate_guess(tmp_path,guess):
     assert inspect_input(inp,'HF','STO-3G',0,1,1,256)['routes']
     assert result['correspondence']['product_to_reactant_order']==[1,0]
     assert text.count('\n0 1\n')==(3 if guess else 2)
-    assert '3 0 0' in text and ('2 0 0' in text)==guess
+    assert '3.0 0.0 0.0' in text and ('2.0 0.0 0.0' in text)==guess
 
 
 @pytest.mark.parametrize('fault',['missing_mapping','duplicate','wrong_element','spin','excited','isotope','missing_guess_mapping'])

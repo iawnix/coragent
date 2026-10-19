@@ -5,6 +5,14 @@ import re
 from geometry_safety import parse_gaussian_coordinate_blocks
 
 
+def coordinate_text(value, precision=12):
+    """Keep Cartesian coordinates unambiguous to Gaussian's integer flag parser."""
+    mantissa, separator, exponent = format(float(value), f'.{precision}g').partition('e')
+    if '.' not in mantissa:
+        mantissa += '.0'
+    return mantissa + separator + exponent
+
+
 def read_structures(body, count):
     parts = [part.strip() for part in re.split(r'\n[ \t]*\n', body) if part.strip()]
     if len(parts) != 2 * count:
@@ -54,7 +62,7 @@ def serialize_structures(structures):
         for atom in structure['atoms']:
             if len(atom) != 4 or any(not math.isfinite(float(v)) for v in atom[1:]):
                 raise ValueError('Cartesian atoms require an element and three finite coordinates')
-            rows.append(atom[0] + ' ' + ' '.join(f'{float(v):.12g}' for v in atom[1:]))
+            rows.append(atom[0] + ' ' + ' '.join(coordinate_text(v) for v in atom[1:]))
         parts.append(f'{title}\n\n{structure["charge"]} {structure["multiplicity"]}\n' + '\n'.join(rows) + '\n\n')
     body = ''.join(parts)
     verify_structures(body, structures)

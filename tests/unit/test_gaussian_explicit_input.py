@@ -54,7 +54,7 @@ def test_qst_serialization_roundtrip_preserves_mapped_coordinates_and_state(tmp_
     path.write_text(f'%nprocshared=12\n%mem=4000MB\n#p M062X/6-31G** Opt=QST{count}\n\n' + body)
     assert len(helper.inspect_input(path, 'M062X', '6-31G**', 0, 1, 12, 4000)['geometry_safety']['blocks']) == count
     # Same-element permutations are invisible to an element-order check.
-    changed = body.replace('C 0 0 0\nC 1.6 0 0', 'C 1.6 0 0\nC 0 0 0', 1)
+    changed = body.replace('C 0.0 0.0 0.0\nC 1.6 0.0 0.0', 'C 1.6 0.0 0.0\nC 0.0 0.0 0.0', 1)
     with pytest.raises(ValueError, match='coordinates differ'):
         verify_structures(changed, structures)
 
@@ -63,6 +63,16 @@ def test_serializer_rejects_coordinates_that_would_be_silently_truncated():
     from gaussian_input import serialize_structures
     with pytest.raises(ValueError, match='three finite'):
         serialize_structures([{'title': 'bad', 'charge': 0, 'multiplicity': 1, 'atoms': [('H', 0, 0, 0, 4)]}])
+
+
+@pytest.mark.parametrize('value', [0, -0.0, 1, -2, 1e-15, -1e20, 1.23456789123])
+def test_cartesian_coordinates_are_real_literals_for_gaussian(value):
+    from gaussian_input import serialize_structures
+    body = serialize_structures([{'title': 'coordinate', 'charge': 0, 'multiplicity': 2,
+                                  'atoms': [('H', value, 0, 0)]}])
+    row = next(line for line in body.splitlines() if line.startswith('H ')).split()[1:]
+    assert all('.' in token.split('e')[0] for token in row)
+    assert [float(token) for token in row] == [value, 0., 0.]
 
 
 def test_explicit_gaussian_input_requires_terminal_blank_line(tmp_path):

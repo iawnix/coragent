@@ -5,6 +5,7 @@ import numpy as np
 from analysis_material import validate_material, numeric_array
 from energy_common import canonical, fields, integer, label, number
 from xyz import validate_electronic_state
+from gaussian_input import coordinate_text
 
 BOHR_ANGSTROM=.529177210903
 EV_HARTREE=27.211386245988
@@ -62,5 +63,5 @@ def input_text(m,s,task,xyz=None):
     coords=m['coordinates'] if xyz is None else numeric_array(xyz,m['coordinates'].shape,'input geometry')
     text=f'%nprocshared={s["threads"]}\n%mem={s["memory_mb"]}MB\n'+route(m,s,task)+'\n\nBound state calculation\n\n'
     text+=f'{m["value"]["charge"]} {m["value"]["multiplicity"]}\n'
-    text+=''.join(a['element']+' '+' '.join(format(float(v),'.16g') for v in row)+'\n' for a,row in zip(m['atoms'],coords))
+    text+=''.join(a['element']+' '+' '.join(coordinate_text(v, 16) for v in row)+'\n' for a,row in zip(m['atoms'],coords))
     return text+'\n'
