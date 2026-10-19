@@ -63,11 +63,11 @@ def run_job(root, request, timeout):
             target = settings['environments'][request['platform']]
             remote = receipt['metadata']['remote_dir']
             scope = hashlib.sha256(str(Path(receipt['cwd']).resolve()).encode()).hexdigest()[:24]
-            expected = target['remote_root'].rstrip('/') + '/' + receipt['job_id'] + '-' + scope
+            expected = target['work_root'].rstrip('/') + '/' + receipt['job_id'] + '-' + scope
             if remote != expected:
                 raise RuntimeError('acceptance_cleanup_path_mismatch')
             platform = platforms_from_config(Path(os.environ['CORAGENT_JOB_CONFIG']))[0][request['platform']]
-            platform._run_ssh('rm -rf -- ' + shlex.quote(remote))
+            platform.run_command('rm -rf -- ' + shlex.quote(remote))
 
 
 def accept(config, package, directory, targets, timeout, *, bindings_only=False):
@@ -84,7 +84,8 @@ def accept(config, package, directory, targets, timeout, *, bindings_only=False)
             continue
         row = report['targets'][name] = {'status': 'configuration_validated', 'jobs': []}
         try:
-            selected = {'default_environment': name, 'environments': {name: target}}
+            selected = {'default_environment': name, 'environments': {name: target},
+                        **({'execution': settings['execution']} if 'execution' in settings else {})}
             row['environments'] = check_environments(selected)[name]
             row['status'] = 'environment_verified'
             root = directory / name

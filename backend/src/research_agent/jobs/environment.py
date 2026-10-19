@@ -108,8 +108,8 @@ def _run_target(settings, selected, script):
     command.append(target["ssh_host"])
     # The remote shell supplies its own HOME. No Host environment is forwarded.
     exports = "\n".join("export " + key + "=" + shlex.quote(value).replace("{scratch}", "'\"$research_agent_scratch\"'") for key, value in env.items())
-    remote = ("set -eu\numask 077\nmkdir -p -- " + shlex.quote(target["remote_root"]) + "\n"
-              "research_agent_scratch=$(mktemp -d " + shlex.quote(target["remote_root"].rstrip("/") + "/.environment-XXXXXX") + ")\n"
+    remote = ("set -eu\numask 077\nmkdir -p -- " + shlex.quote(target["work_root"]) + "\n"
+              "research_agent_scratch=$(mktemp -d " + shlex.quote(target["work_root"].rstrip("/") + "/.environment-XXXXXX") + ")\n"
               "trap 'rm -rf -- \"$research_agent_scratch\"' EXIT\nexport TMPDIR=\"$research_agent_scratch\"\n" + exports + "\n" + script)
     command.append('env -i PATH=/usr/bin:/bin HOME="$HOME" LANG=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1 '
                    + f'timeout --kill-after=5 {timeout} bash -c ' + shlex.quote(remote))

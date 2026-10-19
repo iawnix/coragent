@@ -41,13 +41,13 @@ job.toml 所选后端提供程序、Python 绑定、激活脚本及资源默认�
 
 应用提交的本地 Job 运行在独立 systemd 用户临时服务中，Host 重启不会连带终止它们。任务只接收最小环境和显式变量，资源请求通过 CPUQuota/MemoryMax 实施。Runtime 在 Job 内或配置的 scratch_root 下创建专属 scratch；显式环境值可引用 `{scratch}`。临时单元移除后，回执仍保留在工作区。
 
-资源默认值只在准备或提交边界合并一次，顺序为目标、后端、显式请求；已准备入口的资源固定后不能在提交时覆盖。Job 回执和执行指纹记录实际资源。`allowed_queues` 仅是权限范围，不能代替 `submission.queue`。本地不接受队列字段；Torque 将 cpus/memory_mb 转为 nodes/ppn 和 mem，PBS 使用 select（不能同时声明 select 和 cpus/memory_mb）。walltime 与程序 timeout_seconds 同时存在时取较短值。
+资源默认值只在准备或提交边界合并一次，顺序为目标、后端、显式请求；已准备入口的资源固定后不能在提交时覆盖。Job 回执和执行指纹记录实际资源。`allowed_queues` 仅是权限范围，不能代替 `submission.queue`。本机直接进程不接受队列字段；本机连接的外部目标可以提交队列任务；Torque 将 cpus/memory_mb 转为 nodes/ppn 和 mem，PBS 使用 select（不能同时声明 select 和 cpus/memory_mb）。walltime 与程序 timeout_seconds 同时存在时取较短值。
 
-远端 Job 使用配置的 SSH/PBS 目标，与本地共享最小进程环境、线程默认值和 scratch 规则；不继承登录 shell 的科学环境，需要的路径和激活脚本必须由绑定明确提供。每个远端目录带本地 Job 路径的摘要，不同工作区的同名 Job 不共享目录。已接受任务通过保存的实际目录和 scheduler.id 恢复，旧目录只用于恢复原任务。
+外部 Job 使用配置的本机/SSH 连接和队列脚本，与本地共享最小进程环境、线程默认值和 scratch 规则；不继承登录 shell 的科学环境，需要的路径和激活脚本必须由绑定明确提供。每个远端目录带本地 Job 路径的摘要，不同工作区的同名 Job 不共享目录。已接受任务通过保存的请求身份和脚本的只读查询恢复，见[外部任务接入](EXTERNAL_JOBS.zh-CN.md)。
 
-`command_timeout_seconds` 限制 SSH 控制命令（默认 60 秒），`transfer_timeout_seconds` 单独限制每次 rsync（默认 3600 秒），二者都不是科学程序的执行时限。回收排除本地 spec、receipt、status 等控制文件，计算输出不能覆盖它们。求解器结束和输出完整收集仍是两个独立事实。
+`command_timeout_seconds` 限制本机或 SSH 控制命令（默认 60 秒），`transfer_timeout_seconds` 单独限制每次 rsync（默认 3600 秒），二者都不是科学程序的执行时限。回收排除本地 spec、receipt、status 等控制文件，计算输出不能覆盖它们。求解器结束和输出完整收集仍是两个独立事实。
 
-远端提交明确关闭调度器自动邮件和自动重跑，通知与重复计算由研究流程管理。`qdel` 成功仅登记取消请求；查询到调度器终态或确认原记录已移除后才记录 cancelled。取消期间的连接故障仍为 unknown，程序先完成则保留实际退出结果。
+远端提交明确关闭调度器自动邮件和自动重跑，通知与重复计算由研究流程管理。`qdel` 成功仅登记取消请求；确认执行已结束后才记录 cancelled，查不到记录时保持 unknown。取消期间的连接故障仍为 unknown，程序先完成则保留实际退出结果。
 
 ## 证据与支持范围
 

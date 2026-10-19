@@ -56,13 +56,13 @@ def test_explicit_repeatable_options_override_environment_defaults(tmp_path, mon
 
 def test_existing_bindings_are_preserved_and_remote_is_not_contacted(tmp_path, monkeypatch):
     config = tmp_path/'job.toml'
-    config.write_text('default_environment="local"\n[environments.local]\nkind="local"\n'
-                      '[environments.local.backends.shell]\ncommand="/bin/sh"\n'
-                      '[environments.cluster]\nkind="remote"\nssh_host="fixture"\nremote_root="/jobs"\n'
-                      '[environments.cluster.submission]\nqueue="batch"\n')
+    config.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\n'
+                      '[execution.targets.local.bindings.shell]\ncommand="/bin/sh"\n'
+                      '[execution.targets.cluster]\ndriver="external"\ntransport="ssh"\nssh_host="fixture"\nwork_root="/jobs"\n'
+                      'handler=["/bin/true"]\n[execution.targets.cluster.submission]\nqueue="batch"\n')
     monkeypatch.setattr(subprocess, 'run', lambda *_a, **_k: pytest.fail('planning must not run commands'))
     value = jobs.plan(options(tmp_path, '--job-config', str(config)))
-    assert value['settings'] == tomllib.loads(config.read_text())
+    assert jobs.contract().configuration_document(value['settings'])['execution']['targets']['cluster']['work_root'] == '/jobs'
     assert value['targets'] == ['local']
     assert value['environments'] == []
     with pytest.raises(ValueError, match='job-software-root'):
@@ -151,11 +151,11 @@ def test_remote_acceptance_uses_scheduler_collects_results_and_removes_test_jobs
     resolver.write_text('default_resolver="auto"\n')
     structure = {**local['backends']['structure'],
                  'environment': {'CORAGENT_NAME_RESOLVER_CONFIG': str(resolver)}}
-    target = {'kind':'remote', **platform.config, 'scheduler':scheduler,
+    target = {**platform.config, 'handler': [*platform.handler[:-1], scheduler],
               'submission':{'queue':'batch','resources':{'cpus':1,'walltime':'00:00:20'}},
-              'backends':{'structure':structure}}
+              'bindings':{'structure':structure}}
     config = tmp_path/'remote-job.toml'
-    config.write_bytes(jobs.toml_bytes({'default_environment':'cluster','environments':{'cluster':target}}))
+    config.write_bytes(jobs.toml_bytes({'execution':{'default_target':'cluster','targets':{'cluster':target}}}))
     original_capture = environment._capture
     def transport(command, **kwargs):
         assert command[0] == 'ssh'

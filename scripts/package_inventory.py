@@ -10,7 +10,10 @@ LAYOUT = json.loads((ROOT / "config/source-layout.json").read_text())
 PACKAGE_FILES = [*LAYOUT["roots"], *LAYOUT["files"], *LAYOUT["generated"], *("!" + value for value in LAYOUT["exclude"])]
 REQUIRED_RUNTIME_FILES = frozenset(LAYOUT["required"])
 REQUIRED_TARBALL_FILES = REQUIRED_RUNTIME_FILES | {"package.json", *LAYOUT["files"]}
-RETIRED_RUNTIME_PATHS = ("apps/app-server/", "extensions/", "packages/agent-core/", "packages/agent-runtime/", "packages/runtime-bridge/", "packages/research-state/",
+RETIRED_RUNTIME_PATHS = ("plugins/", "backend/src/research_agent/execution_plugins/",
+    "backend/src/research_agent/jobs/registry.py", "backend/src/research_agent/jobs/scheduler.py",
+    "backend/src/research_agent/jobs/process_scheduler.py", "backend/src/research_agent/jobs/remote.py",
+    "apps/app-server/", "extensions/", "packages/agent-core/", "packages/agent-runtime/", "packages/runtime-bridge/", "packages/research-state/",
     "domains/chemical/skills/candidate-generation/scripts/da/",
     "domains/chemical/skills/candidate-generation/references/gaussian_path.md",
     "domains/chemical/skills/candidate-generation/references/gaussian_path.zh-CN.md",

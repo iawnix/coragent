@@ -200,24 +200,27 @@ def test_validator_on_remote_default_uses_remote_python_and_selected_resources(t
     (root / "package.json").write_text(json.dumps({"coragent": {"execution": ["execution.json"]}}))
     monkeypatch.setenv("CORAGENT_PACKAGE_ROOT", str(root))
     config = tmp_path / "job.toml"
-    config.write_text('''default_environment="cluster"
-[environments.cluster]
-kind="remote"
+    config.write_text('''[execution]
+default_target="cluster"
+[execution.targets.cluster]
+driver="external"
+transport="ssh"
+handler=["/bin/true"]
 ssh_host="fixture"
-remote_root="/scratch/jobs"
-[environments.cluster.submission]
+work_root="/scratch/jobs"
+[execution.targets.cluster.submission]
 queue="science"
-[environments.cluster.submission.resources]
+[execution.targets.cluster.submission.resources]
 cpus=3
-[environments.cluster.backends.validation]
-[environments.cluster.backends.validation.python]
+[execution.targets.cluster.bindings.validation]
+[execution.targets.cluster.bindings.validation.python]
 manager="conda"
 conda_executable="/cluster/conda/bin/conda"
 prefix="/cluster/validation"
 lock_ref="/cluster/validation.lock"
-[environments.local]
-kind="local"
-supervisor="process"
+[execution.targets.local]
+type="local"
+driver="process"
 ''')
     artifact = evidence("create", {"root": str(tmp_path), "content": "registered input"})
     params = {"validator_id": "external.validator", "validator_version": "1", "input_artifact_ids": [artifact["artifact_id"]]}
@@ -294,23 +297,28 @@ def test_one_executor_resolves_explicit_local_and_remote_targets(tmp_path, monke
     monkeypatch.setattr('research_agent.application.executors.probe_binding', probe)
     catalog(tmp_path / 'catalog', monkeypatch)
     config = tmp_path / 'job.toml'
-    config.write_text('''default_environment="local"
-[environments.local]
-kind="local"
-supervisor="process"
-[environments.local.backends.shell]
+    config.write_text('''[execution]
+default_target="local"
+[execution.targets.local]
+type="local"
+driver="process"
+[execution.targets.local.bindings.shell]
 command="/bin/sh"
-[environments.cluster]
-kind="remote"
+[execution.targets.cluster]
+driver="external"
+transport="ssh"
+handler=["/bin/true"]
 ssh_host="fixture"
-remote_root="/scratch/jobs"
-[environments.cluster.submission]
+work_root="/scratch/jobs"
+[execution.targets.cluster.submission]
 queue="science"
-[environments.cluster.backends.shell]
+[execution.targets.cluster.bindings.shell]
 command="/cluster/bin/sh"
-[environments.empty]
-kind="local"
-supervisor="process"
+[execution.targets.empty]
+driver="external"
+transport="local"
+work_root="/scratch/empty"
+handler=["/bin/true"]
 ''')
     source = tmp_path / 'input.txt'
     source.write_text('same scientific input')

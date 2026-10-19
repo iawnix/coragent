@@ -142,10 +142,8 @@ def plan(args, package=ROOT):
     raw = read_input(args.job_config, inputs, required=True) if args.job_config else installed_job
     settings = tomllib.loads(raw.decode()) if raw is not None else {'default_environment': 'local',
         'environments': {'local': {'kind': 'local', 'backends': {}}}}
-    if (not isinstance(settings, dict) or not isinstance(settings.get('environments'), dict)
-            or any(not isinstance(target, dict) or target.get('kind') not in {'local', 'remote'}
-                   for target in settings['environments'].values())):
-        raise ValueError('job configuration needs named local or remote environments')
+    if "execution" in settings:
+        settings = contract().validate_job_config(settings)
     settings = copy.deepcopy(settings)
     previous_raw = read_input(root / RECORD, inputs)
     previous = json.loads(previous_raw) if previous_raw else {'environments': []}
@@ -360,7 +358,7 @@ def prepare(value, args, package, python):
         if target['kind'] == 'local':
             target['backends']['structure']['environment']['CORAGENT_NAME_RESOLVER_CONFIG'] = str(resolver)
     config = stage / 'job.toml'
-    write_private(config, toml_bytes(candidate))
+    write_private(config, toml_bytes(contract().configuration_document(candidate)))
     report = stage / 'readiness.json'
     command = [python, '-B', str(package / 'scripts/_job_acceptance.py'), '--config', str(config),
                '--package-root', str(package), '--directory', str(stage / 'jobs'), '--report', str(report),
@@ -380,10 +378,10 @@ def publish(value):
     assert_inputs_unchanged(value)
     root = Path(value['install_root'])
     write_private(root / 'etc/name-resolver.toml', value['resolver'].encode())
-    write_private(root / 'etc/job.toml', toml_bytes(value['settings']))
+    write_private(root / 'etc/job.toml', toml_bytes(contract().configuration_document(value['settings'])))
     record = {key: value[key] for key in ('schema_version', 'environments', 'readiness', 'configuration_source')}
     write_private(root / RECORD, (json.dumps(record, indent=2) + '\n').encode())
-    current_digest = digest(toml_bytes(value['settings']))
+    current_digest = digest(toml_bytes(contract().configuration_document(value['settings'])))
     previous_digest = value['inputs'].get(str(root / 'etc/job.toml'))
     return {'job': {'status': 'configured', 'path': str(root / 'etc/job.toml'), 'readiness': value['readiness'],
                     'sha256': current_digest, 'previous_sha256': previous_digest,
@@ -393,7 +391,7 @@ def publish(value):
 
 def verify_publication(value, python):
     root = Path(value['install_root'])
-    if (root / 'etc/job.toml').read_bytes() != toml_bytes(value['settings']):
+    if (root / 'etc/job.toml').read_bytes() != toml_bytes(contract().configuration_document(value['settings'])):
         raise RuntimeError('published Job configuration changed')
     if (root / 'etc/name-resolver.toml').read_text() != value['resolver']:
         raise RuntimeError('published resolver configuration changed')

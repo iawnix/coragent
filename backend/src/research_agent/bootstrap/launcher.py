@@ -716,6 +716,12 @@ def configure_remote(installation: Installation) -> None:
     try:
         with path.open("rb") as handle:
             config = tomllib.load(handle)
+        # Load the stdlib configuration contract without importing the runtime.
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("job_configuration", Path(__file__).parents[1] / "jobs/config_contract.py")
+        contract = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(contract)
+        config = contract.validate_job_config(config)
         environment_name = config.get("default_environment")
         environments = config.get("environments", {})
         if (
@@ -760,7 +766,7 @@ def configure_remote(installation: Installation) -> None:
         host = environment.get("ssh_host")
         if not isinstance(host, str) or not host.strip():
             raise ValueError(f"remote environment {remote_name!r} is missing ssh_host")
-        scheduler = environment.get("scheduler", "torque")
+        scheduler = environment.get("cluster_name", "external")
         if not isinstance(scheduler, str) or not scheduler.strip():
             raise ValueError(f"remote environment {remote_name!r} has an invalid scheduler")
         scheduler = scheduler.title()

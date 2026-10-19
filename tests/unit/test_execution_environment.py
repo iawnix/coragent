@@ -236,7 +236,7 @@ def test_guard_cannot_be_reused_for_a_different_script(tmp_path):
 def test_ssh_probe_runs_target_checks_and_cleans_remote_scratch(tmp_path, monkeypatch):
     settings, selected = target()
     target_settings = settings['environments']['local']
-    target_settings.update(kind='remote', ssh_host='fixture.invalid', remote_root=str(tmp_path / 'new-remote-root'),
+    target_settings.update(kind='remote', ssh_host='fixture.invalid', work_root=str(tmp_path / 'new-remote-root'), driver='external',
                            ssh_config=str(tmp_path / 'ssh-config'), submission={'queue': 'science'})
     activation = tmp_path / 'activate.sh'
     activation.write_text('test -z "${CORAGENT_FIXTURE_PROVIDER_SECRET:-}"\nexport REMOTE_TEST_READY=1\n')
@@ -267,7 +267,8 @@ def test_probe_timeout_terminates_its_child_process_group(tmp_path):
     from research_agent.jobs.environment import _capture
     child = tmp_path / 'child.pid'
     with pytest.raises(subprocess.TimeoutExpired):
-        _capture(['bash', '-c', 'sleep 30 & echo $! > "$1"; wait', 'probe-fixture', str(child)], timeout=.2)
+        _capture(['/bin/bash', '-c', 'sleep 30 & echo $! > "$1"; wait', 'probe-fixture', str(child)],
+                 env={'PATH': os.defpath}, timeout=.2)
     pid = int(child.read_text())
     deadline = time.monotonic() + 3
     while Path('/proc', str(pid)).exists() and time.monotonic() < deadline:

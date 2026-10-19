@@ -1493,9 +1493,11 @@ def _bind_local_name_resolver(job: dict, resolver: Path) -> None:
     raw = destination.read_bytes()
     config = tomllib.loads(raw.decode())
     changed = []
-    for name, target in config["environments"].items():
-        structure = target.get("backends", {}).get("structure")
-        if target["kind"] != "local" or structure is None:
+    targets = config.get("execution", {}).get("targets", config.get("environments", {}))
+    for name, target in targets.items():
+        structure = target.get("bindings", target.get("backends", {})).get("structure")
+        local = target.get("transport") == "local" if target.get("driver") == "external" else target.get("type", target.get("kind")) == "local"
+        if not local or structure is None:
             continue
         variables = structure.setdefault("environment", {})
         # Explicit paths (including a target-specific installation root) win.

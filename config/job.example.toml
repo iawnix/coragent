@@ -51,71 +51,7 @@ conda_executable = "/opt/conda/bin/conda"
 prefix = "/opt/coragent/envs/cf22d-20261009"
 lock_ref = "/opt/coragent/locks/cf22d.lock"
 
-# Local remains the default. Select the remote explicitly with
-# platform = "remote" in the prepared Job request.
-# Remote paths below must exist on the remote host.
-# Commands are arrays because the remote scheduler script may need fixed arguments.
-
-[environments.remote]
-kind = "remote"
-ssh_host = "research-cluster"
-scheduler = "torque"
-remote_root = "/scratch/coragent/jobs"
-allowed_queues = ["batch", "fat", "fata"]
-connect_timeout_seconds = 15
-command_timeout_seconds = 60
-transfer_timeout_seconds = 3600
-
-# Choose an installation-approved queue explicitly; allowed_queues is not a default.
-[environments.remote.submission]
-queue = "batch"
-queue_wait_seconds = 900
-[environments.remote.submission.resources]
-cpus = 1
-memory_mb = 4096
-walltime = "01:00:00"
-
-[environments.remote.python]
-manager = "conda"
-conda_executable = "/opt/conda/bin/conda"
-prefix = "/opt/coragent/envs/wrapper-20261009"
-lock_ref = "/opt/coragent/locks/wrapper.lock"
-
-[environments.remote.backends.structure]
-[environments.remote.backends.structure.python]
-manager = "conda"
-conda_executable = "/opt/conda/bin/conda"
-prefix = "/opt/coragent/envs/structure-20261009"
-lock_ref = "/opt/coragent/locks/structure.lock"
-[environments.remote.backends.validation]
-[environments.remote.backends.validation.python]
-manager = "conda"
-conda_executable = "/opt/conda/bin/conda"
-prefix = "/opt/coragent/envs/structure-20261009"
-lock_ref = "/opt/coragent/locks/structure.lock"
-
-[environments.remote.commands]
-qsub = "qsub"
-qstat = "qstat"
-qdel = "qdel"
-checkjob = "checkjob"
-
-[environments.remote.backends.gaussian]
-command = ["g16"]
-activation_script = "/opt/gaussian/activate.sh"
-allowed_queues = ["batch", "fat", "fata"]
-
-[environments.remote.backends.xtb]
-command = ["/opt/xtb/bin/xtb"]
-allowed_queues = ["batch", "fat", "fata"]
-
-[environments.remote.backends.pyscf]
-
-[environments.remote.backends.pyscf.python]
-manager = "conda"
-conda_executable = "/opt/conda/bin/conda"
-prefix = "/opt/coragent/envs/cf22d-20261009"
-lock_ref = "/opt/coragent/locks/cf22d.lock"
+# Batch targets (local submission or SSH): see job.execution.example.toml.
 
 # Optional molecular images; text reports need no rendering libraries.
 [environments.local.backends.render.python]

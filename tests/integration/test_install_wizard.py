@@ -1110,16 +1110,19 @@ def test_job_toml_is_validated_and_written_private(tmp_path: Path) -> None:
     ])
     source = tmp_path / "job.toml"
     source.write_text("\n".join([
-        'default_environment = "local"',
-        '[environments."local"]',
-        'kind = "local"',
+        '[execution]',
+        'default_target = "local"',
+        '[execution.targets."local"]',
+        'type = "local"',
+        'driver = "process"',
         '',
-        '[environments."cluster"]',
-        'kind = "remote"',
+        '[execution.targets."cluster"]',
+        'driver = "external"',
+        'transport = "ssh"',
+        'handler = ["/bin/true"]',
         'ssh_host = "cluster"',
         f'ssh_config = "{ssh_config}"',
-        'scheduler = "torque"',
-        'remote_root = "/srv/coragent"',
+        'work_root = "/srv/coragent"',
         'allowed_queues = ["batch"]',
         '',
     ]) + "\n", encoding="utf-8")
@@ -1322,18 +1325,18 @@ def test_install_binds_local_resolver_and_preserves_explicit_and_remote_settings
     destination.parent.mkdir(parents=True)
     # Inline tables and dots in target names must survive configuration rewriting.
     python = '{manager="conda", conda_executable="/opt/conda/bin/conda", prefix="/opt/structure", lock_ref="/opt/structure.lock"}'
-    raw = ('default_environment="local.cpu"\n[environments."local.cpu"]\nkind="local"\npython=' + python + '\n'
-           '[environments."local.cpu".backends]\nstructure={environment={OMP_NUM_THREADS="2"}}\n'
-           '[environments.custom]\nkind="local"\npython=' + python + '\n'
-           '[environments.custom.backends.structure.environment]\nCORAGENT_NAME_RESOLVER_CONFIG="/custom/resolver.toml"\n'
-           '[environments.explicit_root]\nkind="local"\npython=' + python + '\n'
-           '[environments.explicit_root.backends.structure.environment]\nCORAGENT_INSTALL_ROOT="/custom/install"\n'
-           '[environments.cluster]\nkind="remote"\nssh_host="example.invalid"\nremote_root="/scratch/jobs"\npython=' + python + '\n'
-           '[environments.cluster.submission]\nqueue="batch"\n[environments.cluster.backends.structure]\n')
+    raw = ('[execution]\ndefault_target="local.cpu"\n[execution.targets."local.cpu"]\ndriver="external"\ntransport="local"\nwork_root="/shared/jobs"\nhandler=["/bin/true"]\npython=' + python + '\n'
+           '[execution.targets."local.cpu".bindings]\nstructure={environment={OMP_NUM_THREADS="2"}}\n'
+           '[execution.targets.custom]\ndriver="external"\ntransport="local"\nwork_root="/shared/jobs"\nhandler=["/bin/true"]\npython=' + python + '\n'
+           '[execution.targets.custom.bindings.structure.environment]\nCORAGENT_NAME_RESOLVER_CONFIG="/custom/resolver.toml"\n'
+           '[execution.targets.explicit_root]\ndriver="external"\ntransport="local"\nwork_root="/shared/jobs"\nhandler=["/bin/true"]\npython=' + python + '\n'
+           '[execution.targets.explicit_root.bindings.structure.environment]\nCORAGENT_INSTALL_ROOT="/custom/install"\n'
+           '[execution.targets.cluster]\ndriver="external"\ntransport="ssh"\nhandler=["/bin/true"]\nssh_host="example.invalid"\nwork_root="/scratch/jobs"\npython=' + python + '\n'
+           '[execution.targets.cluster.submission]\nqueue="batch"\n[execution.targets.cluster.bindings.structure]\n')
     source = tmp_path / 'source.toml' if imported else destination
     source.write_text(raw)
     expected = copy.deepcopy(tomllib.loads(raw))
-    expected['environments']['local.cpu']['backends']['structure']['environment']['CORAGENT_NAME_RESOLVER_CONFIG'] = str(root/'etc/name-resolver.toml')
+    expected['execution']['targets']['local.cpu']['bindings']['structure']['environment']['CORAGENT_NAME_RESOLVER_CONFIG'] = str(root/'etc/name-resolver.toml')
     args = SimpleNamespace(install_root=str(root), job_config=str(source) if imported else None)
     configs = wizard.configure_backend_configs(args)
     assert tomllib.loads(destination.read_text()) == expected

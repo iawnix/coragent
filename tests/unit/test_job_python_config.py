@@ -1,7 +1,7 @@
 import importlib.util
 from pathlib import Path
 import pytest
-from research_agent.jobs.config_contract import validate_job_config, resolve_python, python_command
+from research_agent.jobs.config_contract import validate_job_config, resolve_python, python_command, configuration_document
 
 
 def binding(prefix):
@@ -9,10 +9,11 @@ def binding(prefix):
 
 
 def config():
-    return {"default_environment": "local", "environments": {
-        "local": {"kind": "local"},
-        "remote": {"kind": "remote", "ssh_host": "fixture", "remote_root": "/scratch/jobs", "submission": {"queue":"test"}, "python": binding("/opt/runner"), "backends": {
-            "xtb": {"command": ["/opt/xtb"]}, "pyscf": {"python": binding("/opt/cf22d")}}}}}
+    return validate_job_config({"execution": {"default_target": "local", "targets": {
+        "local": {"type": "local", "driver": "local"},
+        "remote": {"driver": "external", "transport": "ssh", "ssh_host": "fixture", "work_root": "/scratch/jobs",
+                   "handler": ["/bin/true"], "submission": {"queue": "test"}, "python": binding("/opt/runner"), "bindings": {
+            "xtb": {"command": ["/opt/xtb"]}, "pyscf": {"python": binding("/opt/cf22d")}}}}}})
 
 
 def test_conda_selection_and_host_python_isolation():
@@ -35,21 +36,24 @@ def test_skill_preparation_uses_bound_conda_and_rejects_dual_pyscf_binding(tmp_p
     import tomllib
     from research_agent.application.executors import prepare
     path = tmp_path / "job.toml"
-    text = '''default_environment = "remote"
-[environments.remote]
-kind = "remote"
+    text = '''[execution]
+default_target = "remote"
+[execution.targets.remote]
+driver = "external"
+transport = "ssh"
+handler = ["/bin/true"]
 ssh_host = "fixture"
-remote_root = "/scratch/jobs"
-[environments.remote.submission]
+work_root = "/scratch/jobs"
+[execution.targets.remote.submission]
 queue = "test"
-[environments.remote.python]
+[execution.targets.remote.python]
 manager = "conda"
 conda_executable = "/opt/conda/bin/conda"
 prefix = "/opt/runner"
 lock_ref = "/opt/locks/runner.lock"
-[environments.remote.backends.xtb]
+[execution.targets.remote.bindings.xtb]
 command = ["/opt/xtb"]
-[environments.remote.backends.pyscf.python]
+[execution.targets.remote.bindings.pyscf.python]
 manager = "conda"
 conda_executable = "/opt/conda/bin/conda"
 prefix = "/opt/cf22d"
@@ -65,7 +69,7 @@ lock_ref = "/opt/locks/cf22d.lock"
         prepare(path, "remote", "chemical.xtb", "1", {"geometry": xyz}, ["--task", "opt-sp", "--method", "GFN2-xTB"])
     with pytest.raises(ValueError, match="owned by the execution descriptor"):
         prepare(path, "remote", "chemical.xtb", "1", {"geometry": xyz}, ["--task", "sp", "--output-dir", "/tmp/escaped"])
-    path.write_text(text.replace('[environments.remote.backends.pyscf.python]', '[environments.remote.backends.pyscf]\ncommand = ["/old/python"]\n[environments.remote.backends.pyscf.python]'))
+    path.write_text(text.replace('[execution.targets.remote.bindings.pyscf.python]', '[execution.targets.remote.bindings.pyscf]\ncommand = ["/old/python"]\n[execution.targets.remote.bindings.pyscf.python]'))
     with pytest.raises(ValueError, match="executor_binding_unused_command"):
         prepare(path, "remote", "chemical.cf22d", "1", {"geometry": xyz}, ["--task", "opt-sp"])
 
@@ -84,14 +88,14 @@ def test_example_and_python_binding_share_public_schema():
     validator.validate(example)
     validate_job_config(example)
     inherited = copy.deepcopy(example)
-    inherited['environments']['remote']['backends']['pyscf'] = {}
+    inherited['environments']['local']['backends']['pyscf'] = {}
     validator.validate(inherited)
     validate_job_config(inherited)
-    assert resolve_python(inherited, 'remote', 'pyscf') == inherited['environments']['remote']['python']
+    assert resolve_python(inherited, 'local', 'pyscf') == inherited['environments']['local']['python']
     for invalid in ['/usr/bin/python3', {**binding('/opt/env'), 'manager': 'venv'},
                     {**binding('/opt/env'), 'prefix': 'relative'}, {**binding('/opt/env'), 'extra': True}]:
         c = copy.deepcopy(example)
-        c['environments']['remote']['python'] = invalid
+        c['environments']['local']['python'] = invalid
         assert list(validator.iter_errors(c))
         with pytest.raises(ValueError):
             validate_job_config(c)
@@ -152,13 +156,13 @@ def test_remote_queue_selection_is_explicit_and_allowlisted():
     remote['submission']['queue']='forbidden'
     with pytest.raises(ValueError,match='not allowed'):resolve_submission(c,'remote','xtb')
     del remote['submission']
-    with pytest.raises(ValueError,match='queue_binding_missing'):resolve_submission(c,'remote','xtb')
+    assert 'queue' not in resolve_submission(c,'remote','xtb')
 
 
 @pytest.mark.parametrize('mutate', [
     lambda target: target.update(ssh_host='-oProxyCommand=bad'),
-    lambda target: target.update(remote_root='/scratch/../other'),
-    lambda target: target.update(scheduler='unsupported'),
+    lambda target: target.update(work_root='/scratch/../other'),
+    lambda target: target.update(driver='unsupported'),
     lambda target: target.update(command_timeout_seconds=0),
     lambda target: target.update(max_nodes=2),
     lambda target: target.update(commands={'pbsnodes': 'pbsnodes'}),
@@ -170,7 +174,7 @@ def test_runtime_and_generated_schema_reject_invalid_remote_settings(mutate):
     from research_agent.jobs.config_contract import job_config_schema
     value = config(); mutate(value['environments']['remote'])
     with pytest.raises(ValueError): validate_job_config(value)
-    assert list(Draft202012Validator(job_config_schema()).iter_errors(value))
+    assert list(Draft202012Validator(job_config_schema()).iter_errors(configuration_document(value)))
 
 
 def test_platform_selection_has_no_implicit_local_or_remote_alias(tmp_path, monkeypatch):
@@ -178,7 +182,7 @@ def test_platform_selection_has_no_implicit_local_or_remote_alias(tmp_path, monk
     monkeypatch.delenv('CORAGENT_JOB_CONFIG', raising=False)
     with pytest.raises(ValueError, match='job_config_required'): platforms_from_config()
     path = tmp_path / 'remote.toml'
-    path.write_text('default_environment="cluster_a"\n[environments.cluster_a]\nkind="remote"\nssh_host="fixture"\nremote_root="/scratch/jobs"\n')
+    path.write_text('[execution]\ndefault_target="cluster_a"\n[execution.targets.cluster_a]\ndriver="external"\ntransport="ssh"\nhandler=["/bin/true"]\nssh_host="fixture"\nwork_root="/scratch/jobs"\n')
     platforms, default = platforms_from_config(path)
     assert set(platforms) == {'cluster_a'} and default == 'cluster_a'
 
@@ -199,5 +203,5 @@ def test_local_supervisor_is_explicit_and_part_of_prepared_binding(tmp_path):
     platforms, _ = platforms_from_config(path)
     assert platforms['local'].supervisor == 'process'
     settings['environments']['remote']['supervisor'] = 'process'
-    with pytest.raises(ValueError, match='local supervisor'):
+    with pytest.raises(ValueError, match='unsupported fields'):
         validate_job_config(settings)

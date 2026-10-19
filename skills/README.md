@@ -59,3 +59,10 @@ adapters.
 | [report](../domains/chemical/skills/report/SKILL.md) | Write illustrated research reports from evidence, with molecular structures, energy plots, data tables, methods, conclusions, and traceable sources. |
 | [research-memory](research-memory/SKILL.md) | Resume research through persistent problem Nodes, explicit relations, execution observations and immutable Results. |
 | [research-workflow](research-workflow/SKILL.md) | Coordinate research problems, domain Skills, durable Jobs, materials and evidence-based Results through the native Pi loop. |
+
+### Compute infrastructure
+
+| Skill | Purpose |
+| --- | --- |
+| [tri-operations](tri-operations/SKILL.md) | Deploy and maintain TRI server and compute-node services, configure resources, and diagnose task scheduling, execution and recovery. |
+| [batch-schedulers](batch-schedulers/SKILL.md) | Configure PBS, Torque and Slurm targets, select resources and diagnose native queue/accounting results. |

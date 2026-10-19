@@ -22,10 +22,7 @@
             "type": "object",
             "properties": {
               "kind": {
-                "enum": [
-                  "local",
-                  "remote"
-                ]
+                "const": "local"
               },
               "supervisor": {
                 "enum": [
@@ -274,101 +271,6 @@
                   "required": [],
                   "additionalProperties": false
                 }
-              },
-              "ssh_host": {
-                "type": "string",
-                "minLength": 1,
-                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@:-]*$"
-              },
-              "ssh_config": {
-                "type": "string",
-                "minLength": 1,
-                "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
-              },
-              "scheduler": {
-                "enum": [
-                  "torque",
-                  "pbs",
-                  "slurm",
-                  "tri",
-                  "process"
-                ]
-              },
-              "remote_root": {
-                "type": "string",
-                "minLength": 1,
-                "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
-              },
-              "allowed_queues": {
-                "type": "array",
-                "uniqueItems": true,
-                "items": {
-                  "type": "string",
-                  "minLength": 1,
-                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$"
-                }
-              },
-              "connect_timeout_seconds": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 300
-              },
-              "command_timeout_seconds": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 3600
-              },
-              "transfer_timeout_seconds": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 86400
-              },
-              "commands": {
-                "type": "object",
-                "properties": {
-                  "qsub": {
-                    "type": "string",
-                    "minLength": 1,
-                    "pattern": "^\\S+$"
-                  },
-                  "qstat": {
-                    "type": "string",
-                    "minLength": 1,
-                    "pattern": "^\\S+$"
-                  },
-                  "qdel": {
-                    "type": "string",
-                    "minLength": 1,
-                    "pattern": "^\\S+$"
-                  },
-                  "submit": {
-                    "type": "string",
-                    "minLength": 1,
-                    "pattern": "^\\S+$"
-                  },
-                  "status": {
-                    "type": "string",
-                    "minLength": 1,
-                    "pattern": "^\\S+$"
-                  },
-                  "cancel": {
-                    "type": "string",
-                    "minLength": 1,
-                    "pattern": "^\\S+$"
-                  },
-                  "checkjob": {
-                    "type": "string",
-                    "minLength": 1,
-                    "pattern": "^\\S+$"
-                  },
-                  "sacct": {
-                    "type": "string",
-                    "minLength": 1,
-                    "pattern": "^\\S+$"
-                  }
-                },
-                "required": [],
-                "additionalProperties": false
               }
             },
             "required": [
@@ -377,73 +279,80 @@
             "additionalProperties": false,
             "allOf": [
               {
-                "if": {
-                  "properties": {
-                    "kind": {
-                      "const": "remote"
-                    }
-                  }
-                },
-                "then": {
-                  "required": [
-                    "ssh_host",
-                    "remote_root"
-                  ],
-                  "not": {
-                    "required": [
-                      "supervisor"
-                    ]
-                  }
-                },
-                "else": {
-                  "not": {
-                    "anyOf": [
-                      {
-                        "required": [
-                          "allowed_queues"
-                        ]
-                      },
-                      {
-                        "required": [
-                          "command_timeout_seconds"
-                        ]
-                      },
-                      {
-                        "required": [
-                          "commands"
-                        ]
-                      },
-                      {
-                        "required": [
-                          "connect_timeout_seconds"
-                        ]
-                      },
-                      {
-                        "required": [
-                          "remote_root"
-                        ]
-                      },
-                      {
-                        "required": [
-                          "scheduler"
-                        ]
-                      },
-                      {
-                        "required": [
-                          "ssh_config"
-                        ]
-                      },
-                      {
-                        "required": [
-                          "ssh_host"
-                        ]
-                      },
-                      {
-                        "required": [
-                          "transfer_timeout_seconds"
-                        ]
+                "properties": {
+                  "submission": {
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "queue"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "queue_wait_seconds"
+                          ]
+                        }
+                      ]
+                    },
+                    "properties": {
+                      "resources": {
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": [
+                                "select"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "gpus"
+                              ]
+                            }
+                          ]
+                        }
                       }
-                    ]
+                    }
+                  },
+                  "backends": {
+                    "additionalProperties": {
+                      "properties": {
+                        "submission": {
+                          "not": {
+                            "anyOf": [
+                              {
+                                "required": [
+                                  "queue"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "queue_wait_seconds"
+                                ]
+                              }
+                            ]
+                          },
+                          "properties": {
+                            "resources": {
+                              "not": {
+                                "anyOf": [
+                                  {
+                                    "required": [
+                                      "select"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "gpus"
+                                    ]
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               },
@@ -471,104 +380,6 @@
                             ]
                           }
                         ]
-                      }
-                    }
-                  }
-                }
-              },
-              {
-                "if": {
-                  "properties": {
-                    "kind": {
-                      "const": "local"
-                    }
-                  }
-                },
-                "then": {
-                  "properties": {
-                    "submission": {
-                      "not": {
-                        "anyOf": [
-                          {
-                            "required": [
-                              "queue"
-                            ]
-                          },
-                          {
-                            "required": [
-                              "queue_wait_seconds"
-                            ]
-                          }
-                        ]
-                      }
-                    },
-                    "backends": {
-                      "additionalProperties": {
-                        "properties": {
-                          "submission": {
-                            "not": {
-                              "anyOf": [
-                                {
-                                  "required": [
-                                    "queue"
-                                  ]
-                                },
-                                {
-                                  "required": [
-                                    "queue_wait_seconds"
-                                  ]
-                                }
-                              ]
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              },
-              {
-                "if": {
-                  "properties": {
-                    "kind": {
-                      "const": "remote"
-                    },
-                    "scheduler": {
-                      "const": "pbs"
-                    }
-                  },
-                  "required": [
-                    "scheduler"
-                  ]
-                },
-                "else": {
-                  "properties": {
-                    "submission": {
-                      "properties": {
-                        "resources": {
-                          "not": {
-                            "required": [
-                              "select"
-                            ]
-                          }
-                        }
-                      }
-                    },
-                    "backends": {
-                      "additionalProperties": {
-                        "properties": {
-                          "submission": {
-                            "properties": {
-                              "resources": {
-                                "not": {
-                                  "required": [
-                                    "select"
-                                  ]
-                                }
-                              }
-                            }
-                          }
-                        }
                       }
                     }
                   }
@@ -604,339 +415,785 @@
                 "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
               },
               "additionalProperties": {
-                "type": "object",
-                "properties": {
-                  "type": {
-                    "enum": [
-                      "local",
-                      "remote"
-                    ]
-                  },
-                  "driver": {
-                    "type": "string",
-                    "minLength": 1,
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
-                  },
-                  "cluster_name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
-                  },
-                  "ssh_host": {
-                    "type": "string",
-                    "minLength": 1,
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@:-]*$"
-                  },
-                  "ssh_config": {
-                    "type": "string",
-                    "minLength": 1,
-                    "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
-                  },
-                  "remote_root": {
-                    "type": "string",
-                    "minLength": 1,
-                    "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
-                  },
-                  "options": {
-                    "type": "object"
-                  },
-                  "submission": {
+                "oneOf": [
+                  {
                     "type": "object",
                     "properties": {
-                      "queue": {
-                        "type": "string",
-                        "minLength": 1,
-                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$"
+                      "type": {
+                        "const": "local"
                       },
-                      "queue_wait_seconds": {
-                        "type": "integer",
-                        "minimum": 1
+                      "driver": {
+                        "enum": [
+                          "local",
+                          "process",
+                          "systemd"
+                        ]
                       },
-                      "resources": {
+                      "supervisor": {
+                        "enum": [
+                          "process",
+                          "systemd"
+                        ]
+                      },
+                      "python": {
                         "type": "object",
                         "properties": {
-                          "cpus": {
-                            "type": "integer",
-                            "minimum": 1
+                          "manager": {
+                            "const": "conda"
                           },
-                          "memory_mb": {
-                            "type": "integer",
-                            "minimum": 1
-                          },
-                          "gpus": {
-                            "type": "integer",
-                            "minimum": 1
-                          },
-                          "walltime": {
+                          "conda_executable": {
                             "type": "string",
                             "minLength": 1,
-                            "pattern": "^(?!0+:00:00$)[0-9]+:[0-5][0-9]:[0-5][0-9]$"
+                            "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
                           },
-                          "select": {
+                          "prefix": {
                             "type": "string",
                             "minLength": 1,
-                            "pattern": "^[A-Za-z0-9_=:+.-]+$"
+                            "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
+                          },
+                          "lock_ref": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
                           }
                         },
-                        "required": [],
-                        "additionalProperties": false,
-                        "not": {
-                          "anyOf": [
-                            {
-                              "required": [
-                                "select",
-                                "cpus"
-                              ]
-                            },
-                            {
-                              "required": [
-                                "select",
-                                "memory_mb"
-                              ]
-                            }
-                          ]
-                        }
-                      }
-                    },
-                    "required": [],
-                    "additionalProperties": false
-                  },
-                  "bindings": {
-                    "type": "object",
-                    "propertyNames": {
-                      "type": "string",
-                      "minLength": 1,
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
-                    },
-                    "additionalProperties": {
-                      "type": "object",
-                      "properties": {
-                        "command": {
-                          "oneOf": [
-                            {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            {
-                              "type": "array",
-                              "minItems": 1,
-                              "items": {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            }
-                          ]
-                        },
-                        "python": {
-                          "type": "object",
-                          "properties": {
-                            "manager": {
-                              "const": "conda"
-                            },
-                            "conda_executable": {
-                              "type": "string",
-                              "minLength": 1,
-                              "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
-                            },
-                            "prefix": {
-                              "type": "string",
-                              "minLength": 1,
-                              "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
-                            },
-                            "lock_ref": {
-                              "type": "string",
-                              "minLength": 1,
-                              "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
-                            }
-                          },
-                          "required": [
-                            "manager",
-                            "conda_executable",
-                            "prefix",
-                            "lock_ref"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "activation_script": {
-                          "type": "string",
-                          "minLength": 1,
-                          "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
-                        },
-                        "scratch_root": {
-                          "type": "string",
-                          "minLength": 1,
-                          "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
-                        },
-                        "allowed_queues": {
-                          "type": "array",
-                          "uniqueItems": true,
-                          "items": {
+                        "required": [
+                          "manager",
+                          "conda_executable",
+                          "prefix",
+                          "lock_ref"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "submission": {
+                        "type": "object",
+                        "properties": {
+                          "queue": {
                             "type": "string",
                             "minLength": 1,
                             "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$"
+                          },
+                          "queue_wait_seconds": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "resources": {
+                            "type": "object",
+                            "properties": {
+                              "cpus": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "memory_mb": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "gpus": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "walltime": {
+                                "type": "string",
+                                "minLength": 1,
+                                "pattern": "^(?!0+:00:00$)[0-9]+:[0-5][0-9]:[0-5][0-9]$"
+                              },
+                              "select": {
+                                "type": "string",
+                                "minLength": 1,
+                                "pattern": "^[A-Za-z0-9_=:+.-]+$"
+                              }
+                            },
+                            "required": [],
+                            "additionalProperties": false,
+                            "not": {
+                              "anyOf": [
+                                {
+                                  "required": [
+                                    "select",
+                                    "cpus"
+                                  ]
+                                },
+                                {
+                                  "required": [
+                                    "select",
+                                    "memory_mb"
+                                  ]
+                                }
+                              ]
+                            }
                           }
                         },
-                        "submission": {
+                        "required": [],
+                        "additionalProperties": false
+                      },
+                      "bindings": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                        },
+                        "additionalProperties": {
                           "type": "object",
                           "properties": {
-                            "queue": {
-                              "type": "string",
-                              "minLength": 1,
-                              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$"
+                            "command": {
+                              "oneOf": [
+                                {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                {
+                                  "type": "array",
+                                  "minItems": 1,
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                }
+                              ]
                             },
-                            "queue_wait_seconds": {
-                              "type": "integer",
-                              "minimum": 1
-                            },
-                            "resources": {
+                            "python": {
                               "type": "object",
                               "properties": {
-                                "cpus": {
-                                  "type": "integer",
-                                  "minimum": 1
+                                "manager": {
+                                  "const": "conda"
                                 },
-                                "memory_mb": {
-                                  "type": "integer",
-                                  "minimum": 1
-                                },
-                                "gpus": {
-                                  "type": "integer",
-                                  "minimum": 1
-                                },
-                                "walltime": {
+                                "conda_executable": {
                                   "type": "string",
                                   "minLength": 1,
-                                  "pattern": "^(?!0+:00:00$)[0-9]+:[0-5][0-9]:[0-5][0-9]$"
+                                  "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
                                 },
-                                "select": {
+                                "prefix": {
                                   "type": "string",
                                   "minLength": 1,
-                                  "pattern": "^[A-Za-z0-9_=:+.-]+$"
+                                  "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
+                                },
+                                "lock_ref": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
+                                }
+                              },
+                              "required": [
+                                "manager",
+                                "conda_executable",
+                                "prefix",
+                                "lock_ref"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "activation_script": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
+                            },
+                            "scratch_root": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
+                            },
+                            "allowed_queues": {
+                              "type": "array",
+                              "uniqueItems": true,
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$"
+                              }
+                            },
+                            "submission": {
+                              "type": "object",
+                              "properties": {
+                                "queue": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$"
+                                },
+                                "queue_wait_seconds": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "resources": {
+                                  "type": "object",
+                                  "properties": {
+                                    "cpus": {
+                                      "type": "integer",
+                                      "minimum": 1
+                                    },
+                                    "memory_mb": {
+                                      "type": "integer",
+                                      "minimum": 1
+                                    },
+                                    "gpus": {
+                                      "type": "integer",
+                                      "minimum": 1
+                                    },
+                                    "walltime": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "pattern": "^(?!0+:00:00$)[0-9]+:[0-5][0-9]:[0-5][0-9]$"
+                                    },
+                                    "select": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "pattern": "^[A-Za-z0-9_=:+.-]+$"
+                                    }
+                                  },
+                                  "required": [],
+                                  "additionalProperties": false,
+                                  "not": {
+                                    "anyOf": [
+                                      {
+                                        "required": [
+                                          "select",
+                                          "cpus"
+                                        ]
+                                      },
+                                      {
+                                        "required": [
+                                          "select",
+                                          "memory_mb"
+                                        ]
+                                      }
+                                    ]
+                                  }
                                 }
                               },
                               "required": [],
-                              "additionalProperties": false,
-                              "not": {
-                                "anyOf": [
-                                  {
-                                    "required": [
-                                      "select",
-                                      "cpus"
-                                    ]
-                                  },
-                                  {
-                                    "required": [
-                                      "select",
-                                      "memory_mb"
-                                    ]
-                                  }
-                                ]
+                              "additionalProperties": false
+                            },
+                            "environment": {
+                              "type": "object",
+                              "propertyNames": {
+                                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                              },
+                              "additionalProperties": {
+                                "type": "string",
+                                "pattern": "^[^\\u0000]*$"
                               }
                             }
                           },
                           "required": [],
                           "additionalProperties": false
-                        },
-                        "environment": {
-                          "type": "object",
-                          "propertyNames": {
-                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                        }
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "driver"
+                    ],
+                    "additionalProperties": false,
+                    "allOf": [
+                      {
+                        "properties": {
+                          "submission": {
+                            "not": {
+                              "anyOf": [
+                                {
+                                  "required": [
+                                    "queue"
+                                  ]
+                                },
+                                {
+                                  "required": [
+                                    "queue_wait_seconds"
+                                  ]
+                                }
+                              ]
+                            },
+                            "properties": {
+                              "resources": {
+                                "not": {
+                                  "anyOf": [
+                                    {
+                                      "required": [
+                                        "select"
+                                      ]
+                                    },
+                                    {
+                                      "required": [
+                                        "gpus"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              }
+                            }
                           },
-                          "additionalProperties": {
-                            "type": "string",
-                            "pattern": "^[^\\u0000]*$"
+                          "bindings": {
+                            "additionalProperties": {
+                              "properties": {
+                                "submission": {
+                                  "not": {
+                                    "anyOf": [
+                                      {
+                                        "required": [
+                                          "queue"
+                                        ]
+                                      },
+                                      {
+                                        "required": [
+                                          "queue_wait_seconds"
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "properties": {
+                                    "resources": {
+                                      "not": {
+                                        "anyOf": [
+                                          {
+                                            "required": [
+                                              "select"
+                                            ]
+                                          },
+                                          {
+                                            "required": [
+                                              "gpus"
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
                           }
                         }
                       },
-                      "required": [],
-                      "additionalProperties": false
-                    }
-                  },
-                  "connect_timeout_seconds": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 300
-                  },
-                  "command_timeout_seconds": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 3600
-                  },
-                  "transfer_timeout_seconds": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 86400
-                  },
-                  "allowed_queues": {
-                    "type": "array",
-                    "uniqueItems": true,
-                    "items": {
-                      "type": "string",
-                      "minLength": 1,
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$"
-                    }
-                  },
-                  "commands": {
-                    "type": "object",
-                    "propertyNames": {
-                      "type": "string",
-                      "minLength": 1,
-                      "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
-                    },
-                    "additionalProperties": {
-                      "type": "string",
-                      "minLength": 1,
-                      "pattern": "^\\S+$"
-                    }
-                  }
-                },
-                "required": [
-                  "type",
-                  "driver"
-                ],
-                "additionalProperties": false,
-                "allOf": [
-                  {
-                    "if": {
-                      "properties": {
-                        "type": {
-                          "const": "remote"
-                        }
-                      }
-                    },
-                    "then": {
-                      "required": [
-                        "cluster_name",
-                        "ssh_host",
-                        "remote_root"
-                      ]
-                    },
-                    "else": {
-                      "not": {
-                        "anyOf": [
-                          {
+                      {
+                        "if": {
+                          "not": {
                             "required": [
-                              "cluster_name"
-                            ]
-                          },
-                          {
-                            "required": [
-                              "ssh_host"
-                            ]
-                          },
-                          {
-                            "required": [
-                              "ssh_config"
-                            ]
-                          },
-                          {
-                            "required": [
-                              "remote_root"
+                              "python"
                             ]
                           }
-                        ]
+                        },
+                        "then": {
+                          "properties": {
+                            "bindings": {
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "required": [
+                                      "command"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "python"
+                                    ]
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        }
                       }
-                    }
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "enum": [
+                          "local",
+                          "remote"
+                        ]
+                      },
+                      "driver": {
+                        "const": "external"
+                      },
+                      "transport": {
+                        "enum": [
+                          "local",
+                          "ssh"
+                        ]
+                      },
+                      "work_root": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
+                      },
+                      "handler": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "handler_environment": {
+                        "type": "object",
+                        "propertyNames": {
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "pattern": "^[^\\u0000]*$"
+                        }
+                      },
+                      "cluster_name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                      },
+                      "ssh_host": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@:-]*$"
+                      },
+                      "ssh_config": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
+                      },
+                      "python": {
+                        "type": "object",
+                        "properties": {
+                          "manager": {
+                            "const": "conda"
+                          },
+                          "conda_executable": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
+                          },
+                          "prefix": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
+                          },
+                          "lock_ref": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
+                          }
+                        },
+                        "required": [
+                          "manager",
+                          "conda_executable",
+                          "prefix",
+                          "lock_ref"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "submission": {
+                        "type": "object",
+                        "properties": {
+                          "queue": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$"
+                          },
+                          "queue_wait_seconds": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "resources": {
+                            "type": "object",
+                            "properties": {
+                              "cpus": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "memory_mb": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "gpus": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "walltime": {
+                                "type": "string",
+                                "minLength": 1,
+                                "pattern": "^(?!0+:00:00$)[0-9]+:[0-5][0-9]:[0-5][0-9]$"
+                              },
+                              "select": {
+                                "type": "string",
+                                "minLength": 1,
+                                "pattern": "^[A-Za-z0-9_=:+.-]+$"
+                              }
+                            },
+                            "required": [],
+                            "additionalProperties": false,
+                            "not": {
+                              "anyOf": [
+                                {
+                                  "required": [
+                                    "select",
+                                    "cpus"
+                                  ]
+                                },
+                                {
+                                  "required": [
+                                    "select",
+                                    "memory_mb"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "required": [],
+                        "additionalProperties": false
+                      },
+                      "bindings": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                        },
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "command": {
+                              "oneOf": [
+                                {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                {
+                                  "type": "array",
+                                  "minItems": 1,
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                }
+                              ]
+                            },
+                            "python": {
+                              "type": "object",
+                              "properties": {
+                                "manager": {
+                                  "const": "conda"
+                                },
+                                "conda_executable": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
+                                },
+                                "prefix": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
+                                },
+                                "lock_ref": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
+                                }
+                              },
+                              "required": [
+                                "manager",
+                                "conda_executable",
+                                "prefix",
+                                "lock_ref"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "activation_script": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
+                            },
+                            "scratch_root": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
+                            },
+                            "allowed_queues": {
+                              "type": "array",
+                              "uniqueItems": true,
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$"
+                              }
+                            },
+                            "submission": {
+                              "type": "object",
+                              "properties": {
+                                "queue": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$"
+                                },
+                                "queue_wait_seconds": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "resources": {
+                                  "type": "object",
+                                  "properties": {
+                                    "cpus": {
+                                      "type": "integer",
+                                      "minimum": 1
+                                    },
+                                    "memory_mb": {
+                                      "type": "integer",
+                                      "minimum": 1
+                                    },
+                                    "gpus": {
+                                      "type": "integer",
+                                      "minimum": 1
+                                    },
+                                    "walltime": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "pattern": "^(?!0+:00:00$)[0-9]+:[0-5][0-9]:[0-5][0-9]$"
+                                    },
+                                    "select": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "pattern": "^[A-Za-z0-9_=:+.-]+$"
+                                    }
+                                  },
+                                  "required": [],
+                                  "additionalProperties": false,
+                                  "not": {
+                                    "anyOf": [
+                                      {
+                                        "required": [
+                                          "select",
+                                          "cpus"
+                                        ]
+                                      },
+                                      {
+                                        "required": [
+                                          "select",
+                                          "memory_mb"
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [],
+                              "additionalProperties": false
+                            },
+                            "environment": {
+                              "type": "object",
+                              "propertyNames": {
+                                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                              },
+                              "additionalProperties": {
+                                "type": "string",
+                                "pattern": "^[^\\u0000]*$"
+                              }
+                            }
+                          },
+                          "required": [],
+                          "additionalProperties": false
+                        }
+                      },
+                      "allowed_queues": {
+                        "type": "array",
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$"
+                        }
+                      },
+                      "connect_timeout_seconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 300
+                      },
+                      "command_timeout_seconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 3600
+                      },
+                      "transfer_timeout_seconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 86400
+                      }
+                    },
+                    "required": [
+                      "driver",
+                      "transport",
+                      "work_root",
+                      "handler"
+                    ],
+                    "additionalProperties": false,
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "transport": {
+                              "const": "ssh"
+                            }
+                          }
+                        },
+                        "then": {
+                          "required": [
+                            "ssh_host"
+                          ],
+                          "properties": {
+                            "type": {
+                              "const": "remote"
+                            }
+                          }
+                        },
+                        "else": {
+                          "properties": {
+                            "type": {
+                              "const": "local"
+                            }
+                          },
+                          "not": {
+                            "anyOf": [
+                              {
+                                "required": [
+                                  "ssh_host"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "ssh_config"
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "if": {
+                          "not": {
+                            "required": [
+                              "python"
+                            ]
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "bindings": {
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "required": [
+                                      "command"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "python"
+                                    ]
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
                   }
                 ]
               }

@@ -50,3 +50,10 @@ Skill 提供科学操作、方法/后端适配和研究协调方面的指导，�
 | [report](../domains/chemical/skills/report/SKILL.zh-CN.md) | 根据研究证据编写图文报告，包含分子结构、能量曲线、数据表、方法、结论和可追溯的来源。 |
 | [research-memory](research-memory/SKILL.zh-CN.md) | 用持久问题 Node、显式关系、执行观察与不可变 Result 恢复和推进研究。 |
 | [research-workflow](research-workflow/SKILL.zh-CN.md) | 在 Pi 原生循环中协调研究问题、领域 Skill、持久 Job、材料和有依据的 Result。 |
+
+### 计算基础设施
+
+| Skill | 用途 |
+| --- | --- |
+| [tri-operations](tri-operations/SKILL.zh-CN.md) | 部署和维护 TRI 服务端与计算节点，配置资源，排查任务调度、执行与恢复问题。 |
+| [batch-schedulers](batch-schedulers/SKILL.zh-CN.md) | 配置 PBS、Torque、Slurm 执行目标，选择资源并诊断原生队列和记账结果。 |

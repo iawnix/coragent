@@ -6,7 +6,7 @@ import time
 
 import pytest
 
-from research_agent.jobs import JobOutput, JobRuntime, JobSpec, JobState, LocalProcessPlatform, RemoteSSHPlatform, platforms_from_config
+from research_agent.jobs import JobOutput, JobRuntime, JobSpec, JobState, LocalProcessPlatform, ExternalJobPlatform, platforms_from_config
 from research_agent.jobs.local import _process_state
 from research_agent.application.execution import _spec
 
@@ -81,30 +81,6 @@ def test_job_runtime_preserves_research_identity_without_domain_parsing(tmp_path
     assert runtime.job_collect(receipt)["job_id"] == "job_1"
 
 
-def test_job_config_wires_remote_environment_into_runtime(tmp_path: Path) -> None:
-    config = tmp_path / "job.toml"
-    config.write_text(
-        """default_environment = \"local\"\n
-[environments.local]
-kind = \"local\"
-
-[environments.cluster]
-kind = \"remote\"
-ssh_host = \"compute.example\"
-ssh_config = \"/tmp/ssh-config\"
-scheduler = \"torque\"
-remote_root = \"/scratch/coragent\"
-""",
-        encoding="utf-8",
-    )
-    platforms, default = platforms_from_config(config)
-    assert default == "local"
-    assert isinstance(platforms["local"], LocalProcessPlatform)
-    assert isinstance(platforms["cluster"], RemoteSSHPlatform)
-    assert "remote" not in platforms
-    assert platforms["cluster"].host == "compute.example"
-
-
 def test_execution_targets_support_one_local_and_multiple_ssh_targets(tmp_path: Path) -> None:
     config = tmp_path / "job.toml"
     config.write_text(
@@ -117,17 +93,21 @@ driver = "process"
 
 [execution.targets.cluster_1w]
 type = "remote"
-driver = "pbs"
+driver = "external"
+transport = "ssh"
+handler = ["/usr/bin/python3", "/opt/coragent/skills/batch-schedulers/scripts/queue.py", "pbs"]
 cluster_name = "1w"
 ssh_host = "login.1w"
-remote_root = "/scratch/coragent"
+work_root = "/scratch/coragent"
 
 [execution.targets.cluster_2w]
 type = "remote"
-driver = "pbs"
+driver = "external"
+transport = "ssh"
+handler = ["/usr/bin/python3", "/opt/coragent/skills/batch-schedulers/scripts/queue.py", "pbs"]
 cluster_name = "2w"
 ssh_host = "login.2w"
-remote_root = "/scratch/coragent"
+work_root = "/scratch/coragent"
 """,
         encoding="utf-8",
     )

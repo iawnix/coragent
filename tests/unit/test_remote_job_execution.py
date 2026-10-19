@@ -9,10 +9,10 @@ import sys
 
 import pytest
 
-from research_agent.jobs import JobOutput, JobSpec, JobState, RemoteSSHPlatform
+from research_agent.jobs import JobOutput, JobSpec, JobState, ExternalJobPlatform
 from research_agent.jobs.config_contract import job_config_schema, resolve_submission, validate_job_config
-from research_agent.jobs import remote as remote_module
-from tests.unit.remote_scheduler_fixture import pbs, torque
+from research_agent.jobs import transport as transport_module
+from research_agent.jobs.transport import SSHTransport
 
 
 @pytest.fixture
@@ -21,24 +21,16 @@ def cluster(tmp_path, monkeypatch):
     target.mkdir()
     binaries = tmp_path / 'scheduler'
     binaries.mkdir()
-    qsub = binaries / 'qsub'
-    qsub.write_text('#!' + sys.executable + '\n' + '''import json, subprocess, sys
-from pathlib import Path
-Path('qsub-arguments.json').write_text(json.dumps(sys.argv[1:]))
-count = Path('submission-count')
-count.write_text(str(int(count.read_text()) + 1) if count.exists() else '1')
-subprocess.run(['/bin/sh', sys.argv[-1]], check=False)
-print('123.fixture')
-''')
-    qsub.chmod(0o700)
-    for name in ('qstat', 'qdel'):
+    source = Path(__file__).with_name('batch_queue_fixture.py').read_text()
+    for name in ('qsub', 'qstat', 'qdel', 'sbatch', 'squeue', 'sacct', 'scancel'):
         path = binaries / name
-        path.write_text('#!/bin/sh\nexit 1\n')
+        path.write_text('#!' + sys.executable + '\n' + source)
         path.chmod(0o700)
+    monkeypatch.setenv('BATCH_FIXTURE_ROOT', str(binaries))
     scheduler_env = {**os.environ, 'PATH': str(binaries) + ':' + os.defpath,
                      'FIXTURE_PROVIDER_SECRET': 'must-not-reach-calculation', 'PYTHONPATH': '/fixture/host-only'}
     calls = []
-    original_capture = remote_module._capture
+    original_capture = transport_module._capture
     def transport(argv, *, timeout, **kwargs):
         calls.append((list(argv), timeout))
         if argv[0] == 'ssh':
@@ -51,10 +43,15 @@ print('123.fixture')
         del local[index:index+2]
         local = [value.removeprefix('fixture:') for value in local]
         return original_capture(local, timeout=timeout)
-    monkeypatch.setattr(remote_module, '_capture', transport)
-    config = {'ssh_host': 'fixture', 'remote_root': str(target),
+    config = {'driver': 'external', 'transport': 'ssh', 'ssh_host': 'fixture', 'work_root': str(target),
+              'handler': [sys.executable, str(Path(__file__).resolve().parents[2] / 'skills/batch-schedulers/scripts/queue.py'), 'torque'],
               'allowed_queues': ['batch'], 'transfer_timeout_seconds': 900}
-    platform = RemoteSSHPlatform(config, scheduler=torque(config))
+    # All runtime-created transports (including installation acceptance) use the simulation.
+    original_init = SSHTransport.__init__
+    def init(self, config, **kwargs):
+        original_init(self, config, capture=transport)
+    monkeypatch.setattr(SSHTransport, '__init__', init)
+    platform = ExternalJobPlatform(config)
     return platform, calls, target
 
 
@@ -96,7 +93,7 @@ Path('status.json').write_text('forged')
     assert json.loads((spec.cwd / 'spec.json').read_text())['metadata']['resources'] == spec.metadata['resources']
     assert json.loads((spec.cwd / 'receipt.json').read_text())['job_id'] == receipt.job_id
     assert json.loads((spec.cwd / 'status.json').read_text())['state'] == 'succeeded'
-    args = json.loads((spec.cwd / 'qsub-arguments.json').read_text())
+    args = json.loads((Path(receipt.metadata['remote_dir']) / 'qsub-arguments.json').read_text())
     assert 'nodes=1:ppn=2' in args and 'mem=128mb' in args and 'walltime=00:00:10' in args
     assert args[args.index('-m') + 1] == 'n' and args[args.index('-r') + 1] == 'n'
     assert {timeout for args, timeout in calls if args[0] == 'rsync'} == {900}
@@ -126,13 +123,13 @@ def test_same_job_name_in_different_workspaces_has_distinct_remote_execution(clu
 
 def test_lost_submit_response_recovers_scoped_directory_without_resubmission(cluster, tmp_path, monkeypatch):
     platform, _, _ = cluster
-    run = platform._run_ssh
+    run = platform.run_command
     def lose_response(script, **kwargs):
         result = run(script, **kwargs)
-        if 'qsub ' in script and 'scheduler.id' in script:
+        if '"action": "submit"' in script:
             raise subprocess.TimeoutExpired('fixture ssh', 1)
         return result
-    monkeypatch.setattr(platform, '_run_ssh', lose_response)
+    monkeypatch.setattr(platform, 'run_command', lose_response)
     spec = job(tmp_path)
     with pytest.raises(subprocess.TimeoutExpired):
         platform.start(spec)
@@ -142,23 +139,6 @@ def test_lost_submit_response_recovers_scoped_directory_without_resubmission(clu
     assert (Path(recovered.metadata['remote_dir']) / 'submission-count').read_text() == '1'
     with pytest.raises(ValueError, match='reconcile instead of resubmitting'):
         platform.start(spec)
-
-
-def test_adapter_requires_resolved_queue_even_when_config_has_defaults(cluster, tmp_path):
-    platform, calls, _ = cluster
-    platform.config['submission'] = {'queue': 'batch', 'resources': {'cpus': 9}}
-    with pytest.raises(ValueError, match='queue_binding_missing'):
-        platform.start(replace(job(tmp_path), metadata={}))
-    assert not calls
-
-
-def test_pbs_resources_use_select_and_the_shorter_execution_limit(tmp_path):
-    config = {'ssh_host': 'fixture', 'remote_root': '/scratch', 'scheduler': 'pbs'}
-    platform = RemoteSSHPlatform(config, scheduler=pbs(config))
-    spec = job(tmp_path, timeout_seconds=30, resources={'cpus': 2, 'memory_mb': 128, 'walltime': '00:00:20'})
-    args = platform._qsub_arguments(spec)
-    assert 'select=1:ncpus=2:mem=128mb' in args and 'walltime=00:00:20' in args
-    assert not any('nodes=' in arg for arg in args)
 
 
 def test_raw_job_submission_resolves_defaults_before_recording_attempt(tmp_path, monkeypatch):
@@ -188,9 +168,9 @@ def test_raw_job_submission_resolves_defaults_before_recording_attempt(tmp_path,
 @pytest.mark.parametrize('kind,scheduler,submission', [
     ('local', None, {'queue': 'batch'}),
     ('local', None, {'resources': {'select': '1:ncpus=2'}}),
-    ('remote', 'torque', {'resources': {'select': '1:ncpus=2'}}),
-    ('remote', 'pbs', {'resources': {'select': '1:ncpus=2', 'cpus': 2}}),
-    ('remote', 'pbs', {'resources': {'walltime': '00:00:00'}}),
+    ('remote', 'external', {'resources': {'select': '1:ncpus=2'}}),
+    ('remote', 'external', {'resources': {'select': '1:ncpus=2', 'cpus': 2}}),
+    ('remote', 'external', {'resources': {'walltime': '00:00:00'}}),
 ])
 def test_runtime_and_schema_agree_on_scheduler_resource_errors(kind, scheduler, submission):
     from jsonschema import Draft202012Validator

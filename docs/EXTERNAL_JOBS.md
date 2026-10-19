@@ -1,0 +1,118 @@
+# External tasks through documented commands
+
+[简体中文](EXTERNAL_JOBS.zh-CN.md)
+
+An external execution target lets a Skill or installation supply the small command
+bridge needed for a queue. CoRAgent manages Job identities, durable receipts,
+staging, restart recovery and collection. The bridge owns native submission
+syntax and state interpretation. It is an executable program, not a Python plugin
+imported into the CoRAgent process.
+
+## Configure a target
+
+On a login node running both CoRAgent and the queue CLI:
+
+```toml
+[execution]
+default_target = "compute"
+
+[execution.targets.compute]
+driver = "external"
+transport = "local"
+cluster_name = "compute"
+work_root = "/absolute/shared/coragent-jobs"
+handler = ["/usr/bin/python3", "/absolute/coragent/skills/tri-operations/scripts/queue.py"]
+
+[execution.targets.compute.handler_environment]
+TRI_SOCKET = "/absolute/runtime/tri/server.sock"
+
+[execution.targets.compute.submission.resources]
+cpus = 4
+memory_mb = 4096
+```
+
+Replace example paths with this installation's paths and create `work_root`.
+Add scientific software bindings under `execution.targets.compute.bindings` as
+for other execution targets. `transport = "local"` means commands run on the
+CoRAgent host; the queue chooses the compute node. Multiple local command targets
+can coexist with a direct process/systemd target and carry distinct cluster names.
+
+For submission from another host, change `transport` to `ssh` and set `ssh_host`
+and optionally `ssh_config`. `handler` and `work_root` are paths on that host.
+SSH targets use rsync to stage and collect files. Local targets copy between the
+controller Job directory and `work_root`; this directory must be visible at the
+same path on compute nodes. The generic runtime does not provision shared mounts.
+Local process/systemd targets use their built-in drivers. Batch schedulers use
+external handlers; Python scheduler plugin discovery has been removed.
+
+`handler_environment` configures the submission CLI separately from the
+calculation environment. Prefer existing protected service/connection
+configuration for credentials. The target configuration digest is saved with the
+Job; changing its endpoint or handler prevents old Jobs from being silently routed
+to the replacement target. Restore the original target to reconcile them.
+
+## Handler protocol
+
+CoRAgent executes `handler` as an argv, sends one JSON object on stdin and expects
+one JSON object on stdout with exit code zero. Diagnostics go to stderr. Both
+objects contain `schema_version: "coragent-external-job/1"`. The same executable
+handles these `action` values:
+
+| Action | Input | Required response |
+| --- | --- | --- |
+| `probe` | Protocol and action | `available` boolean; optional `error` |
+| `submit` | Stable `request_id`, `job_id`, execution `cwd`, absolute `script`, `resources`, optional `queue`, effective `timeout_seconds` | Nonempty string `scheduler_id` |
+| `status` | Original submission fields plus `scheduler_id` | Matching `scheduler_id`, normalized `state`, exit/finish evidence |
+| `cancel` | Original submission fields plus `scheduler_id` | Matching `scheduler_id`, `accepted` boolean |
+| `recover` | Original submission fields and stable `request_id` | Existing `scheduler_id`, or `found: false` after a conclusive lookup |
+
+The wrapper already contains the calculation argv, environment, stdin, timeout
+and stdout/stderr redirection. Submit that wrapper in the supplied `cwd`. It
+writes calculation logs under `logs/` and exit evidence in the execution
+directory. GPU visibility assigned by the scheduler is preserved for external
+Jobs. The Job runtime uses handler observations to determine completion.
+
+States are `submitted`, `queued`, `held`, `running`, `succeeded`, `failed`,
+`cancelled`, `timed_out`, and `unknown`. A terminal response requires
+`execution_finished: true`; success also requires integer `exit_code: 0`.
+Optional fields are `started_at`, `finished_at`, `error`, and a `diagnostics`
+object. A cancellation acknowledgment is followed by status observation. Report
+pending cancellation as a nonterminal state until execution has ended.
+
+```json
+{"schema_version":"coragent-external-job/1","scheduler_id":"42","state":"succeeded","exit_code":0,"execution_finished":true,"diagnostics":{"node":"compute-a"}}
+```
+
+`recover` is a lookup, using the stable identity recorded before submission.
+After a lost submission response, `job_reconcile` calls it without resubmitting.
+An unavailable service, malformed response, or ambiguous result remains unknown.
+Scope native idempotency/workflow identifiers to the supplied `request_id`, which
+distinguishes equal Job numbers in different workspaces and targets.
+
+## Skills and extension authors
+
+Describe resource selection, job-script conventions and native CLI usage in the
+Skill. Use a small helper only where persistent observation requires conversion
+to this protocol. A helper can be written in any executable language.
+
+The bundled [TRI helper](../skills/tri-operations/scripts/queue.py) calls
+`tri_sub`, `tri_stat` and `tri_del` and uses TRI's external identity for recovery.
+Its [usage reference](../skills/tri-operations/references/coragent-jobs.md)
+documents command overrides and node selection.
+
+The bundled [batch scheduler Skill](../skills/batch-schedulers/SKILL.md) supplies
+one standalone handler for PBS, Torque and Slurm. Its [target reference](../skills/batch-schedulers/references/targets.md)
+covers native commands, retained accounting and durable submission recovery.
+Scheduler-specific changes belong in these scripts and their documentation.
+
+Old `pbs`, `torque`, `slurm`, `tri`, and remote `process` driver configurations
+must be replaced with `driver="external"`, explicit transport and handler argv.
+Old Python plugin packages, registry and adapter API have been removed. Complete
+active jobs through the old installation before migrating; old receipts are not
+converted by this interface.
+
+Validate a new helper with queued, running, successful, failed, timeout and
+cancellation cases, plus a controller restart and a lost submit response. Check
+declared output collection from a separate execution directory. Use an isolated
+queue or deterministic command fixtures, and keep this repository's test state
+under `local_debug/`.

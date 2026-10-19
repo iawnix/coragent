@@ -8,16 +8,16 @@ import pytest
 
 from research_agent.application import environment_check, executors
 from research_agent.application.execution_catalog import installed_catalogs
-from research_agent.jobs.config_contract import load_job_config
+from research_agent.jobs.config_contract import load_job_config, validate_job_config
 from tests.unit.test_declarative_executors import binding, catalog
 
 
 def targets():
-    return {'default_environment': 'local', 'environments': {
-        'local': {'kind': 'local', 'supervisor': 'process', 'backends': {'shell': {'command': '/bin/sh'}}},
-        'cluster': {'kind': 'remote', 'ssh_host': 'unreachable.invalid', 'remote_root': '/scratch/jobs',
-                    'submission': {'queue': 'science'}, 'backends': {'shell': {'command': '/cluster/bin/sh'}}},
-        'empty': {'kind': 'local', 'supervisor': 'process'}}}
+    return validate_job_config({'execution': {'default_target': 'local', 'targets': {
+        'local': {'type': 'local', 'driver': 'process', 'bindings': {'shell': {'command': '/bin/sh'}}},
+        'cluster': {'driver': 'external', 'transport': 'ssh', 'ssh_host': 'unreachable.invalid', 'work_root': '/scratch/jobs',
+                    'handler': ['/bin/true'], 'submission': {'queue': 'science'}, 'bindings': {'shell': {'command': '/cluster/bin/sh'}}},
+        'empty': {'driver': 'external', 'transport': 'local', 'work_root': '/scratch/empty', 'handler': ['/bin/true']}}}})
 
 
 def cli(module, monkeypatch, capsys, *arguments):
@@ -76,6 +76,8 @@ def test_gaussian_recipes_check_wrapper_and_program_on_selected_local_target():
     settings = load_job_config(os.environ['CORAGENT_JOB_CONFIG'])
     backends = settings['environments']['local']['backends']
     backends['gaussian'] = {**copy.deepcopy(backends['validation']), 'command': '/bin/true'}
+    settings['environments']['local'].update(type='local', driver='process')
+    settings['execution'] = {}
     settings['environments']['cluster'] = targets()['environments']['cluster']
     for recipe in ('chemical.gaussian', 'chemical.gaussian-input'):
         report = environment_check.check_target(settings, 'local', executor=recipe, version='1', details=True)
