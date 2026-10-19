@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+try:
+    from .app_layout import paths as app_paths
+except ImportError:
+    from app_layout import paths as app_paths
+
 import json
 import os
 import re
@@ -9,7 +14,7 @@ import tempfile
 from pathlib import Path
 
 
-INSTALLATION_MARKER_SCHEMA = "coragent-installation/2"
+INSTALLATION_MARKER_SCHEMA = "coragent-installation/3"
 PACKAGE_STATE_SCHEMA = "coragent-package-install/1"
 WORKSPACE_ROOT_SCHEMA = "coragent-workspace-root/1"
 RELEASE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -21,8 +26,8 @@ def read_installation_metadata(
     require_ownership: bool = False,
     strict_package_state: bool = True,
 ) -> dict[str, object]:
-    marker_path = root / "etc/installation.json"
-    state_path = root / "var/state/installation/install-state.json"
+    marker_path = app_paths(root).marker
+    state_path = app_paths(root).install_state
     marker_valid = False
     if marker_path.exists() or marker_path.is_symlink():
         marker = _read_object(marker_path, "installation ownership marker")
@@ -87,7 +92,7 @@ def _layout(root):
 
 
 def read_workspace_root(root: Path) -> Path:
-    configured = _layout(root).read_config().get("workspace_root", str(root / "workspaces"))
+    configured = str(_layout(root).workspace_root)
     value = Path(configured)
     if not value.is_absolute(): raise ValueError("workspace_root must be absolute")
     return value

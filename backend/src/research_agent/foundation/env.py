@@ -7,6 +7,8 @@ modules.
 
 from __future__ import annotations
 
+from .layout import paths as app_paths
+
 import hashlib
 import json
 import os
@@ -107,7 +109,7 @@ def _suite_installation_root(stable: Path) -> Path | None:
     except OSError:
         return None
     for root in resolved.parents:
-        if not (root / "etc/installation.json").is_file(): continue
+        if not (root / "installation.json").is_file(): continue
         selected = (root / "current").resolve()
         if resolved.is_relative_to(selected): return root
     return None
@@ -218,7 +220,7 @@ def default_runtime_home(
     if os.environ.get("CORAGENT_INSTALL_ROOT"):
         from .layout import paths
         return paths(os.environ["CORAGENT_INSTALL_ROOT"]).runtime_home
-    return resolve_package_root(package_root).parent / "var/state/installation/python"
+    return app_paths(resolve_package_root(package_root).parent).state / 'installation/python'
 
 
 def runtime_manifest_path(

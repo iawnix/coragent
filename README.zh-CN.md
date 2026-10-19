@@ -34,8 +34,8 @@ cd coragent
 需要非交互安装时，参考 `config/` 中的示例准备本机私有配置，然后执行：
 
 ```bash
-./install.sh --source local --config-dir "$PWD/config" \
-  --install-root "$HOME/CoRAgent" --non-interactive --yes
+./install.sh --source local --config "$HOME/.config/coragent/config.toml" \
+  --non-interactive --yes
 ```
 
 安装、模型配置、远程计算、手机连接和服务管理见[安装与运维](docs/INSTALLATION.zh-CN.md)（[English](docs/INSTALLATION.md)）。

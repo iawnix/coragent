@@ -17,4 +17,4 @@ def test_native_and_fast_node_suites_do_not_overlap():
 
 
 def test_test_root_contains_only_configuration_files():
-    assert {path.name for path in (ROOT/'tests').iterdir() if path.is_file()} <= {'__init__.py','conftest.py'}
+    assert {path.name for path in (ROOT/'tests').iterdir() if path.is_file()} <= {'__init__.py','conftest.py','CHEMISTRY_EVALUATION.md'}

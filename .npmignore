@@ -22,3 +22,6 @@ tests/
 .pi/remote.toml
 PLAN_*.md
 PLAN-*.md
+
+/config/config.toml
+/config/credentials.json

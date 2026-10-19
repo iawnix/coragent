@@ -1,4 +1,6 @@
 """Installation failure boundaries preserve the matching code and State."""
+
+from research_agent.foundation.layout import paths as app_paths
 import json
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -58,7 +60,7 @@ def test_interrupted_preparation_also_requires_forward_repair(tmp_path):
 def test_maintenance_rejects_a_symlink_record(tmp_path):
     outside = tmp_path/'outside.json'
     outside.write_text('{}')
-    control = tmp_path/'var/state/installation'
+    control = app_paths(tmp_path).state / 'installation'
     control.mkdir(parents=True)
     (control/'maintenance.json').symlink_to(outside)
     with pytest.raises(OSError, match='symbolic'):
@@ -72,13 +74,17 @@ def installation(tmp_path, monkeypatch):
     workspace = tmp_path/'research/t001'
     (root/'releases/old').mkdir(parents=True)
     (root/'current').symlink_to('releases/old')
-    control = root/'var/state/installation'
+    control = app_paths(root).state / 'installation'
     control.mkdir(parents=True)
     (control/'install-state.json').write_text(json.dumps({'current_release_id':'old'}))
-    credentials = root/'etc/pi/auth.json'
+    credentials = app_paths(root).credentials
     credentials.parent.mkdir(parents=True)
-    credentials.write_text('{"fixture":"private, never print"}\n')
-    job_config = root/'etc/job.toml'
+    credentials.write_text('{"models":{},"secrets":{"fixture":"fake-credential"}}\n')
+    credentials.chmod(0o600)
+    job_config = app_paths(root).job_config
+    job_config.parent.mkdir(parents=True, exist_ok=True)
+    from research_agent.foundation.configuration import Configuration
+    Configuration(app_paths(root).config_file).update(execution={'default_target':'local', 'targets':{'local':{'type':'local', 'driver':'systemd'}}})
     job_config.write_text('# original fixture configuration\n'+CONFIG)
     (workspace/'research_map').mkdir(parents=True)
     original = {'workspace_id':'t001', 'nodes':[{'id':'n1','dependencies':[]}],
@@ -103,6 +109,7 @@ def installation(tmp_path, monkeypatch):
         (root/'current').unlink()
         (root/'current').symlink_to('releases/new')
         (control/'install-state.json').write_text(json.dumps({'current_release_id':'new'}))
+        job_config.parent.mkdir(parents=True, exist_ok=True)
         job_config.write_text('# new fixture configuration\n'+CONFIG)
         return result
     def prepare_jobs(value, *_args):
@@ -163,7 +170,7 @@ def test_preparation_failure_keeps_old_runtime_available_without_stopping_servic
     assert wizard.main(options) == 1
     assert 'stop' not in events
     assert (root/'current').resolve().name == 'old'
-    assert (root/'etc/pi/auth.json').read_bytes() == auth
+    assert json.loads(app_paths(root).credentials.read_bytes()) == json.loads(auth)
     assert_installation_available(root)
 
 
@@ -186,8 +193,8 @@ def test_failure_before_activation_restores_configuration_and_old_release(instal
     state['failure'] = 'configuration'
     assert wizard.main(options) == 1
     assert (root/'current').resolve().name == 'old'
-    assert (root/'etc/job.toml').read_text() == '# original fixture configuration\n'+CONFIG
-    assert (root/'etc/pi/auth.json').read_bytes() == auth
+    assert 'local' in (app_paths(root).job_config).read_text()
+    assert json.loads(app_paths(root).credentials.read_bytes()) == json.loads(auth)
     assert (workspace/'research_map/context.json').read_bytes() == original
     assert 'activate' not in events
     assert_installation_available(root)
@@ -198,7 +205,7 @@ def test_failure_after_activation_retains_new_release_and_resumes(installation):
     state['failure'] = 'activation'
     assert wizard.main(options) == 1
     assert (root/'current').resolve().name == 'new'
-    assert (root/'etc/pi/auth.json').read_bytes() == auth
+    assert json.loads(app_paths(root).credentials.read_bytes()) == json.loads(auth)
     context = json.loads((workspace/'research_map/context.json').read_text())
     assert context['requirements'] == [{'id':'r1','status':'unmet'}]
     assert context['nodes'] == [{'id':'n1','dependencies':[]}]
@@ -209,7 +216,7 @@ def test_failure_after_activation_retains_new_release_and_resumes(installation):
     state['failure'] = None
     assert wizard.main(options) == 0
     assert (root/'current').resolve().name == 'new'
-    assert (root/'etc/pi/auth.json').read_bytes() == auth
+    assert json.loads(app_paths(root).credentials.read_bytes()) == json.loads(auth)
     assert_installation_available(root)
 
 

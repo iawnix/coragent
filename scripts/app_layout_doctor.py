@@ -9,17 +9,21 @@ import sys
 from pathlib import Path
 
 try:
-    from .app_layout import inspect_installation
+    from .app_layout import inspect_installation, paths
 except ImportError:
-    from app_layout import inspect_installation
+    from app_layout import inspect_installation, paths
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--install-root", required=True, type=Path)
+    parser.add_argument("--install-root", type=Path)
+    parser.add_argument("--config", type=Path)
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     args = parser.parse_args(argv)
-    report = inspect_installation(args.install_root)
+    layout = paths(args.install_root, config_file=args.config)
+    import os
+    os.environ["CORAGENT_CONFIG"] = str(layout.config_file)
+    report = inspect_installation(layout.root)
     if args.json or not sys.stdout.isatty():
         print(json.dumps(report, indent=2, sort_keys=True))
     else:

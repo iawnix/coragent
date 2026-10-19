@@ -40,7 +40,7 @@ def test_config_directory_preview_is_private_and_has_no_side_effects(tmp_path: P
     (config / "auth.json").write_text('{"test":{"type":"api_key","key":"fake-auth-secret"}}')
     root = tmp_path / "installation"
     completed = subprocess.run([
-        str(ROOT / "install.sh"), "--source", "local", "--config-dir", str(config),
+        str(ROOT / "install.sh"), "--source", "local", "--import-config", str(config),
         "--install-root", str(root), "--dry-run",
     ], text=True, capture_output=True, check=True)
     plan = json.loads(completed.stdout)["plan"]

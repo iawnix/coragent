@@ -68,6 +68,8 @@
     "environment.lock.txt",
     "uninstall.sh",
     "python-dist/*.whl",
+    "!config/config.toml",
+    "!config/credentials.json",
     "!config/models.json",
     "!config/auth.json",
     "!config/job.toml",

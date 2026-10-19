@@ -36,8 +36,8 @@ cd coragent
 For non-interactive installation, prepare private files using the templates in `config/`, then run:
 
 ```bash
-./install.sh --source local --config-dir "$PWD/config" \
-  --install-root "$HOME/CoRAgent" --non-interactive --yes
+./install.sh --source local --config "$HOME/.config/coragent/config.toml" \
+  --non-interactive --yes
 ```
 
 See [Installation and Operations](docs/INSTALLATION.md) for model configuration,

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from research_agent.foundation.layout import paths as app_paths
+
 import fcntl
 import hashlib
 import json
@@ -25,7 +27,7 @@ class SessionGuardError(RuntimeError):
 
 
 def installation_is_guarded(installation: Path) -> bool:
-    path = installation / "var/state/installation/install-state.json"
+    path = app_paths(installation).install_state
     if not path.exists() and not path.is_symlink():
         return False
     try:

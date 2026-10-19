@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from research_agent.foundation.layout import paths as app_paths
+
 import json
 from pathlib import Path
 import subprocess
@@ -29,13 +31,13 @@ def test_github_selection_runs_the_resolved_checkout_and_keeps_private_inputs_lo
         assert root == seen[0] and root.exists()
         assert commit == COMMIT
         assert component == "agent"
-        assert remaining[remaining.index("--config-dir") + 1] == str(config)
+        assert remaining[remaining.index("--import-config") + 1] == str(config)
         assert "fake-private-key" not in " ".join(remaining)
         return 0
     monkeypatch.setattr(install_from_github, "checkout_github", checkout)
     monkeypatch.setattr(installer, "run_selected", run_selected)
     assert installer.main(["install", "--source", "github", "--coragent-ref", "release-tag",
-                           "--config-dir", str(config), "--install-root", str(tmp_path / "install"),
+                           "--import-config", str(config), "--install-root", str(tmp_path / "install"),
                            "--non-interactive", "--yes"]) == 0
     assert not seen[0].exists()
     assert (config / "auth.json").is_file()
@@ -85,8 +87,8 @@ def test_failed_install_cleans_only_the_new_owned_relay(tmp_path, monkeypatch):
     # incorrectly passed current/services/relay as the installation root.
     root = tmp_path / "install"
     relay = root / "runtimes/link-relay"
-    state = root / "var/state/link-relay"
-    marker = root / "etc/link-relay.json"
+    state = app_paths(root).state / 'link-relay'
+    marker = app_paths(root).generated / 'link-relay.json'
     marker.parent.mkdir(parents=True)
     marker.write_text("{}")
     args = install_wizard.parse_args(["--install-root", str(root)])
@@ -113,7 +115,7 @@ def test_configuration_cli_overrides_directory_and_email_secrets_wait_for_confir
     (config / "smtp-password").chmod(0o600)
     root = tmp_path / "installation"
     args = install_wizard.parse_args([
-        "--config-dir", str(config), "--install-root", str(root),
+        "--import-config", str(config), "--install-root", str(root),
         "--job-config", str(tmp_path / "explicit-job.toml"), "--email-recipient", "override@example.invalid",
     ])
     _install_inputs.apply_config_directory(args)
@@ -122,7 +124,7 @@ def test_configuration_cli_overrides_directory_and_email_secrets_wait_for_confir
     assert args.email_username == "sender@example.invalid"
     assert not root.exists()
 
-    existing = root / "etc/email.toml"
+    existing = app_paths(root).email_config
     existing.parent.mkdir(parents=True)
     existing.write_text('[notifications.email]\nenabled=true\nprovider="smtp"\nrecipient="old@example.invalid"\n')
     install_wizard._load_existing_email_defaults(args, root)
@@ -133,7 +135,7 @@ def test_configuration_cli_overrides_directory_and_email_secrets_wait_for_confir
     # including when that file is absent on this machine.
     (config / "smtp-password").unlink()
     overridden = install_wizard.parse_args([
-        "--config-dir", str(config), "--email-password-env", "EXAMPLE_SMTP_PASSWORD",
+        "--import-config", str(config), "--email-password-env", "EXAMPLE_SMTP_PASSWORD",
     ])
     _install_inputs.apply_config_directory(overridden)
     assert overridden.email_password_file is None

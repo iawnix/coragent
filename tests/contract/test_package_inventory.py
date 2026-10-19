@@ -59,7 +59,7 @@ def test_required_release_members_are_in_the_npm_allowlist() -> None:
 
 def test_private_installation_inputs_are_excluded_from_release_and_npm(tmp_path: Path) -> None:
     private = {
-        "config/models.json", "config/auth.json", "config/job.toml", "config/name-resolver.toml",
+        "config/config.toml", "config/credentials.json", "config/models.json", "config/auth.json", "config/job.toml", "config/name-resolver.toml",
         "config/email.toml", "config/smtp-password", "config/secrets/smtp-password",
     }
     examples = {"config/models.example.json", "config/auth.example.json", "config/email.example.toml"}

@@ -66,7 +66,8 @@ def write_test_runtime_manifest(package_root: Path, install_root: Path) -> Path:
     environment_spec = package_root / "environment.yml"
     package = json.loads((package_root / "package.json").read_text(encoding="utf-8"))
     payload_sha256 = python_payload_sha256(package_root)
-    runtime_home = install_root / "var/state/installation/python"
+    from research_agent.foundation.layout import paths
+    runtime_home = paths(install_root).runtime_home
     runtime_home.mkdir(parents=True, exist_ok=True)
     manifest_path = runtime_home / "env.json"
     payload = {

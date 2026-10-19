@@ -1,4 +1,6 @@
 """Installation plans and ordinary Job acceptance use deterministic local inputs."""
+
+from research_agent.foundation.layout import paths as app_paths
 import copy
 import importlib.util
 import json
@@ -18,22 +20,26 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def options(tmp_path, *extra):
-    return wizard.parse_args(['--install-root', str(tmp_path/'install'), '--conda-root', str(tmp_path/'conda'),
-                              '--job-software-root', 'local=' + str(tmp_path/'software'), *extra], use_environment=False)
+    # These tests exercise the independent environment maintenance helper.
+    profiles, remaining = [], []
+    iterator = iter(extra)
+    for value in iterator:
+        if value == '--job-profile': profiles.append(next(iterator))
+        else: remaining.append(value)
+    args = wizard.parse_args(['--install-root', str(tmp_path/'install'), '--conda-root', str(tmp_path/'conda'),
+                              '--job-software-root', 'local=' + str(tmp_path/'software'), *remaining], use_environment=False)
+    args.job_profile = profiles
+    return args
 
 
-def test_fresh_plan_generates_default_bindings_and_no_files(tmp_path):
+def test_fresh_plan_only_references_execution_and_creates_no_environments(tmp_path):
     args = options(tmp_path)
     plan = jobs.plan(args)
-    structure = plan['settings']['environments']['local']['backends']['structure']
-    assert structure['python'] == plan['settings']['environments']['local']['backends']['validation']['python']
-    assert structure['python']['prefix'].startswith(str(tmp_path/'software/structure-'))
+    assert plan['settings']['environments']['local']['backends'] == {}
+    assert plan['environments'] == []
     assert plan['targets'] == ['local']
-    assert plan['configuration_source'] == 'generated'
-    assert structure['environment']['CORAGENT_NAME_RESOLVER_CONFIG'] == str(tmp_path/'install/etc/name-resolver.toml')
     assert not (tmp_path/'install').exists()
     assert not (tmp_path/'software').exists()
-    assert jobs.plan(options(tmp_path, '--without-default-job-environment'))['environments'] == []
 
 
 def test_profile_completes_partial_native_binding_and_rejects_unknown_target(tmp_path):
@@ -47,11 +53,12 @@ def test_profile_completes_partial_native_binding_and_rejects_unknown_target(tmp
         jobs.plan(options(tmp_path, '--job-conda', 'typo=/bin/conda'))
 
 
-def test_explicit_repeatable_options_override_environment_defaults(tmp_path, monkeypatch):
-    monkeypatch.setenv('CORAGENT_JOB_PROFILE','local:render,local:pyscf')
-    args = wizard.parse_args(['--job-profile','local:structure','--job-profile','local:wrapper'])
-    assert args.job_profile == ['local:structure','local:wrapper']
-    assert wizard.parse_args([]).job_profile == ['local:render','local:pyscf']
+def test_core_installer_rejects_cluster_provisioning_options(tmp_path, monkeypatch):
+    with pytest.raises(ValueError, match='separately'):
+        wizard.parse_args(['--job-profile','local:structure'])
+    monkeypatch.setenv('CORAGENT_JOB_PROFILE','local:render')
+    with pytest.raises(ValueError, match='separately'):
+        wizard.parse_args([])
 
 
 def test_existing_bindings_are_preserved_and_remote_is_not_contacted(tmp_path, monkeypatch):
@@ -75,13 +82,14 @@ def test_existing_bindings_are_preserved_and_remote_is_not_contacted(tmp_path, m
 
 
 def test_managed_upgrade_reuses_identity_and_detects_concurrent_config_change(tmp_path):
-    args = options(tmp_path)
+    args = options(tmp_path, '--job-profile', 'local:structure')
+    app_paths(args.install_root).initialize()
     first = jobs.plan(args)
     first['readiness'] = {'targets': {}}
     jobs.publish(first)
     second = jobs.plan(args)
     assert second['environments'][0]['binding'] == first['environments'][0]['binding']
-    config = Path(args.install_root)/'etc/job.toml'
+    config = app_paths(Path(args.install_root)).config_file
     config.write_text(config.read_text() + '\n# operator edit\n')
     with pytest.raises(ValueError, match='input changed'):
         jobs.publish(second)
@@ -122,7 +130,7 @@ def test_candidate_and_published_config_work_inside_real_jobs(tmp_path):
     assert report['external_services'] == 'not_checked'
     plan['readiness'] = report
     jobs.publish(plan)
-    result = accept(Path(args.install_root)/'etc/job.toml', ROOT, stage/'published', ['local'], 20, bindings_only=True)
+    result = accept(app_paths(Path(args.install_root)).job_config, ROOT, stage/'published', ['local'], 20, bindings_only=True)
     assert result['targets']['local']['status'] == 'execution_verified', result
 
 
@@ -228,7 +236,7 @@ def test_purge_selects_only_owned_unreferenced_local_environments(tmp_path):
     store.mkdir()
     (store/'installation-owner.json').write_text(json.dumps({'installation_id':jobs.digest(os.fsencode(root))[:16]}))
     record = {'environments':[{'kind':'local','managed':True,'store':str(store)}]}
-    jobs.write_private(root/jobs.RECORD,json.dumps(record).encode())
+    jobs.write_private(app_paths(root).state/jobs.RECORD,json.dumps(record).encode())
     with ExitStack() as guards:
         removed, retained = jobs.cleanup_stores(root, workspace, guards)
         assert removed == [store] and retained == []
@@ -243,8 +251,8 @@ def test_failed_preparation_store_is_kept_while_acceptance_job_is_unfinished(tmp
     root, store = tmp_path/'install', tmp_path/'software'
     store.mkdir()
     (store/'installation-owner.json').write_text(json.dumps({'installation_id':jobs.digest(os.fsencode(root))[:16]}))
-    jobs.write_private(root/jobs.STORES,json.dumps([{'kind':'local','store':str(store)}]).encode())
-    job = root/'var/cache/job-install/candidate/jobs/local/operations/executions/job_fixture.json'
+    jobs.write_private(app_paths(root).state/jobs.STORES,json.dumps([{'kind':'local','store':str(store)}]).encode())
+    job = app_paths(root).cache / 'job-install/candidate/jobs/local/operations/executions/job_fixture.json'
     jobs.write_private(job,b'{"state":"running"}')
     with ExitStack() as guards:
         assert jobs.cleanup_stores(root,tmp_path/'research',guards) == ([],[str(store)])

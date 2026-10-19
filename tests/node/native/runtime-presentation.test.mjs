@@ -34,3 +34,38 @@ test("runtime continuation renderer recognizes current and legacy messages", asy
   assert.match(rendered, /Continuing authorized task/);
   assert.match(rendered, /internal runtime/);
 });
+
+test("unified credentials preserve other secrets through native Pi refresh and deletion", async () => {
+  const { mkdtemp, readFile, writeFile, rm } = await import("node:fs/promises");
+  const { TEST_ROOT } = await import("./test-environment.mjs");
+  const root = await mkdtemp(join(TEST_ROOT, "credentials-"));
+  const credentialPath = join(root, "credentials.json");
+  const previous = process.env.CORAGENT_CREDENTIALS_FILE;
+  try {
+    await writeFile(credentialPath, JSON.stringify({
+      models: { fixture: { type: "oauth", access: "fake-old", refresh: "fake-refresh", expires: 0 } },
+      secrets: { smtp_password: "fake-smtp", tri_token: "fake-tri" },
+    }), { mode: 0o600 });
+    process.env.CORAGENT_CREDENTIALS_FILE = credentialPath;
+    const { AuthStorage } = await import(pathToFileURL(join(source, "packages/coding-agent/src/core/auth-storage.ts")));
+    const first = AuthStorage.create();
+    const second = AuthStorage.create();
+    await first.modify("fixture", async credential => ({ ...credential, access: "fake-refreshed" }));
+    assert.equal((await second.read("fixture")).access, "fake-refreshed");
+    await Promise.all([
+      first.modify("other", async () => ({ type: "api_key", key: "fake-other" })),
+      second.modify("third", async () => ({ type: "api_key", key: "fake-third" })),
+    ]);
+    const updated = JSON.parse(await readFile(credentialPath, "utf8"));
+    assert.deepEqual(updated.secrets, { smtp_password: "fake-smtp", tri_token: "fake-tri" });
+    assert.deepEqual(Object.keys(updated.models).sort(), ["fixture", "other", "third"]);
+    await first.delete("fixture");
+    const deleted = JSON.parse(await readFile(credentialPath, "utf8"));
+    assert.equal(deleted.models.fixture, undefined);
+    assert.deepEqual(deleted.secrets, updated.secrets);
+  } finally {
+    if (previous === undefined) delete process.env.CORAGENT_CREDENTIALS_FILE;
+    else process.env.CORAGENT_CREDENTIALS_FILE = previous;
+    await rm(root, { recursive: true, force: true });
+  }
+});

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from research_agent.foundation.layout import paths as app_paths
+
 import json
 import os
 import re
@@ -34,7 +36,7 @@ class LinkConfig:
 
 
 def load_link_config(install_root: Path, *, required: bool) -> LinkConfig | None:
-    state = install_root / "var/state/host"
+    state = app_paths(install_root).state / 'host'
     manifest = state / "link.json"
     token_file = state / "host.token"
     manifest_present = manifest.exists() or manifest.is_symlink()

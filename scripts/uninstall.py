@@ -3,6 +3,11 @@
 
 from __future__ import annotations
 
+try:
+    from .app_layout import paths as app_paths
+except ImportError:
+    from app_layout import paths as app_paths
+
 import argparse
 import json
 import os
@@ -30,13 +35,14 @@ SERVICE_NAMES = (
     "coragent-web.service",
     "coragent-relay.service",
 )
-LINK_RELAY_MARKER = "etc/link-relay.json"
+LINK_RELAY_MARKER = "link-relay.json"
 ENTRYPOINTS = ("coragent", "coragent-web")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--install-root")
+    parser.add_argument("--config", help="Single CoRAgent config.toml.")
     parser.add_argument("--service-scope", choices=("auto", "user", "system", "none"), default="auto")
     parser.add_argument("--purge-workspaces", action="store_true", help="Delete research workspaces and Pi session files.")
     parser.add_argument("--purge-config", action="store_true", help="Delete installation configuration and Phone/Web credentials.")
@@ -48,7 +54,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--non-interactive", action="store_true")
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--json", action="store_true")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    try:
+        from ._configuration import apply
+    except ImportError:
+        from _configuration import apply
+    apply(args, validate_credentials=False)
+    return args
 
 
 def installation_identity(root: Path) -> dict[str, str | None]:
@@ -71,7 +83,7 @@ def validate_root(path: Path) -> Path:
     resolved = path.expanduser().resolve()
     if resolved == Path("/") or resolved == Path.home() or resolved == Path.home().parent:
         raise ValueError(f"refusing to remove broad path: {resolved}")
-    for relative in ("etc", "var", "var/state", "releases", "runtimes"):
+    for relative in ("releases", "runtimes"):
         if (resolved / relative).is_symlink():
             raise ValueError(f"installation state directory cannot be a symbolic link: {resolved / relative}")
     installation_identity(resolved)
@@ -193,7 +205,7 @@ def stop_services(args: argparse.Namespace, root: Path) -> list[str]:
 
 
 def _owned_relay(root: Path) -> dict[str, object] | None:
-    marker = root / LINK_RELAY_MARKER
+    marker = app_paths(root).generated / LINK_RELAY_MARKER
     try:
         value = json.loads(marker.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
@@ -235,7 +247,7 @@ def remove_owned_relay(args: argparse.Namespace, root: Path) -> dict[str, object
         result = json.loads(completed.stdout)
     except json.JSONDecodeError:
         result = {"ok": True, "output": completed.stdout[-4096:]}
-    (root / LINK_RELAY_MARKER).unlink(missing_ok=True)
+    (app_paths(root).generated / LINK_RELAY_MARKER).unlink(missing_ok=True)
     return result
 
 
@@ -317,7 +329,7 @@ def remove_paths(paths: list[Path]) -> list[str]:
 
 def prune_empty_parents(root: Path) -> None:
     for relative in (
-        "runtimes", "var/cache", "var/log", "var/state", "var",
+        "runtimes",
     ):
         directory = root / relative
         if not directory.is_dir():
@@ -331,17 +343,12 @@ def prune_empty_parents(root: Path) -> None:
 def uninstall(args: argparse.Namespace, *, show_progress: bool = False) -> dict[str, object]:
     root = validate_root(Path(args.install_root))
     choose_options(args, root)
-    try:
-        workspace_root = read_workspace_root(root)
-    except ValueError:
-        if args.purge_workspaces:
-            raise
-        workspace_root = root / "workspaces"
+    workspace_root = read_workspace_root(root)
     if args.purge_workspaces:
         workspace_root = _validated_workspace_purge_target(root, workspace_root)
     activity = Spinner("Stopping CoRAgent services", stream=sys.stderr, enabled=show_progress)
     guards = ExitStack()
-    lock = root / 'var/state/installation/maintenance.lock'
+    lock = app_paths(root).state / 'installation/maintenance.lock'
     lock.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     if lock.is_symlink():
         raise ValueError('maintenance lock cannot be a symlink')
@@ -360,29 +367,26 @@ def uninstall(args: argparse.Namespace, *, show_progress: bool = False) -> dict[
         service_units = remove_service_units(args, root)
         activity.update("Removing installed application files")
         removed = remove_entrypoints(root)
-        managed = [root / "releases", root / "runtimes/pi", root / "var/cache",
-                   root / "var/state/installation/install-state.json",
-                   root / "var/state/installation/source-provenance.json"]
+        managed = [root / "releases", root / "runtimes/pi", app_paths(root).cache,
+                   app_paths(root).install_state,
+                   app_paths(root).state / 'installation/source-provenance.json']
         retained_job_environments = []
         if args.purge_runtime:
-            scientific, retained_job_environments = _job_install.cleanup_stores(root, workspace_root, guards)
-            managed.extend(scientific)
-            if not retained_job_environments:
-                managed.extend([root / _job_install.RECORD, root / _job_install.STORES, root / 'var/state/installation/job-readiness.json'])
+            # Cluster software and scientific environments have independent ownership.
             # External environments require a matching installation ownership receipt.
-            config = json.loads((root / "etc/installation.json").read_text())
+            config = json.loads((app_paths(root).marker).read_text())
             env_root = Path(config["env_root"])
             receipt = env_root / "installation-owner.json"
             if receipt.is_file() and json.loads(receipt.read_text()).get("install_root") == str(root):
                 managed.append(env_root)
-            managed.append(root / "var/state/installation/python")
+            managed.append(app_paths(root).state / 'installation/python')
         if args.purge_config:
-            managed.extend([root / "etc", root / "runtimes/maintenance", root / "uninstall.sh", root / "var/state/host/link.json", root / "var/state/host/host.token"])
+            managed.extend([app_paths(root).pi_config, app_paths(root).marker, app_paths(root).locator, app_paths(root).config_file, app_paths(root).credentials, app_paths(root).generated, root / "runtimes/maintenance", root / "uninstall.sh", app_paths(root).state / 'host/link.json', app_paths(root).state / 'host/host.token'])
         if args.purge_workspaces:
             managed.extend([
                 workspace_root,
-                root / "var/state/pi/sessions",
-                root / "var/state/host",
+                app_paths(root).state / 'pi/sessions',
+                app_paths(root).state / 'host',
             ])
         removed.extend(remove_paths(managed))
         prune_empty_parents(root)
@@ -403,6 +407,10 @@ def uninstall(args: argparse.Namespace, *, show_progress: bool = False) -> dict[
 
 
 def _validated_workspace_purge_target(root: Path, configured: Path) -> Path:
+    marker = app_paths(root).marker
+    recorded = json.loads(marker.read_text()).get('workspace_root') if marker.is_file() else None
+    if not recorded or Path(recorded).resolve() != configured.resolve():
+        raise ValueError('workspace_root differs from the installation ownership record')
     if not configured.is_absolute() or configured.is_symlink():
         raise ValueError(f"configured workspace root is unsafe: {configured}")
     resolved = configured.resolve()
@@ -415,7 +423,7 @@ def _validated_workspace_purge_target(root: Path, configured: Path) -> Path:
         or resolved in root.parents
     ):
         raise ValueError(f"refusing to purge broad workspace root: {resolved}")
-    for protected in (root / "etc", root / "var", root / "runtimes", root / "releases"):
+    for protected in (app_paths(root).generated, app_paths(root).state, root / "runtimes", root / "releases"):
         if resolved == protected or protected in resolved.parents:
             raise ValueError(f"refusing to purge workspace root inside installation state: {resolved}")
     return resolved
@@ -430,7 +438,7 @@ def main(argv: list[str] | None = None) -> int:
             title("CoRAgent Uninstaller", "Remove CoRAgent while keeping research data by default.", tone="warning")
         if not args.install_root and not args.non_interactive:
             bundled = Path(__file__).resolve()
-            default = str(bundled.parents[2]) if bundled.parent.name == "maintenance" and bundled.parent.parent.name == "runtimes" else str(Path.home() / ".local/share/coragent")
+            default = str(bundled.parents[2]) if bundled.parent.name == "maintenance" and bundled.parent.parent.name == "runtimes" else str(Path.home() / "soft/coragent")
             args.install_root = ask("CoRAgent installation directory", default)
         if not args.install_root:
             raise ValueError("--install-root is required")

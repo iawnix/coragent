@@ -6,6 +6,8 @@ data is migrated and no credentials live here.
 """
 from __future__ import annotations
 
+from research_agent.foundation.layout import paths as app_paths
+
 import fcntl
 import os
 from pathlib import Path
@@ -22,7 +24,7 @@ _STATES = _TERMINAL | {"preparing", "starting", "failed"}
 
 def _paths(root):
     root = lexical_path(root)
-    directory = root / "var/state/installation"
+    directory = app_paths(root).state / 'installation'
     if path_has_symlink(directory):
         raise ValueError("installation maintenance path cannot contain symbolic links")
     return root, directory / "maintenance.json", directory / "maintenance.lock"

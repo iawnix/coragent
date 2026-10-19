@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from research_agent.foundation.layout import paths as app_paths
+
 import json
 import subprocess
 from pathlib import Path
@@ -35,10 +37,10 @@ def test_uninstall_preserves_workspace_and_config_by_default(tmp_path: Path) -> 
     from research_agent.foundation.layout import paths
     paths(root).initialize()
     (root / "workspaces/ts_001").mkdir(parents=True)
-    web_token = root / "etc/web/auth.token"
+    web_token = app_paths(root).generated / 'web/auth.token'
     web_token.parent.mkdir(parents=True, exist_ok=True)
     web_token.write_text("w" * 43)
-    phone_connection = root / "var/state/host/link.json"
+    phone_connection = app_paths(root).state / 'host/link.json'
     phone_connection.parent.mkdir(parents=True, exist_ok=True)
     phone_connection.write_text('{"schema_version":"coragent-link/1"}\n', encoding="utf-8")
     download = root / "downloads/client.apk"
@@ -103,7 +105,7 @@ def test_uninstall_refuses_to_purge_an_installation_ancestor(tmp_path: Path) -> 
     paths(root).initialize()
     paths(root).update_config(workspace_root=str(tmp_path))
 
-    with pytest.raises(ValueError, match="broad workspace root"):
+    with pytest.raises(ValueError, match="separate|broad workspace root"):
         uninstall(_args(root, purge_workspaces=True))
 
     assert root.is_dir()
@@ -115,7 +117,7 @@ def test_interactive_defaults_run_safe_uninstall_and_preserve_data(tmp_path: Pat
     paths(root).initialize()
     workspace = root / "workspaces/ts_001"
     workspace.mkdir(parents=True)
-    config = root / "etc/job.toml"
+    config = app_paths(root).job_config
     config.write_text("[remote]\n", encoding="utf-8")
     runtime = paths(root).env_root / "base/test"
     runtime.mkdir(parents=True)
@@ -246,7 +248,7 @@ def test_uninstall_rejects_a_source_checkout_without_installation_metadata(tmp_p
 
 def test_uninstall_rejects_non_object_package_state(tmp_path: Path) -> None:
     root = tmp_path / "install"
-    state = root / "var/state/installation/install-state.json"
+    state = app_paths(root).install_state
     state.parent.mkdir(parents=True)
     state.write_text("[]\n")
 
@@ -256,7 +258,7 @@ def test_uninstall_rejects_non_object_package_state(tmp_path: Path) -> None:
 
 def test_valid_ownership_marker_allows_cleanup_of_damaged_package_state(tmp_path: Path) -> None:
     root = tmp_path / "install"
-    state = root / "var/state/installation/install-state.json"
+    state = app_paths(root).install_state
     state.parent.mkdir(parents=True)
     state.write_text("[]\n")
     args = _args(root)
@@ -265,7 +267,7 @@ def test_valid_ownership_marker_allows_cleanup_of_damaged_package_state(tmp_path
 
     assert result["ok"] is True
     assert not (root / "releases").exists()
-    assert (root / "etc/installation.json").is_file()
+    assert (app_paths(root).marker).is_file()
 
 
 def test_purge_config_removes_local_uninstaller_and_ownership_marker(tmp_path: Path) -> None:
@@ -273,17 +275,17 @@ def test_purge_config_removes_local_uninstaller_and_ownership_marker(tmp_path: P
     from research_agent.foundation.layout import paths
     paths(root).initialize()
     install_uninstaller(root, Path(__file__).resolve().parents[2])
-    web_token = root / "etc/web/auth.token"
+    web_token = app_paths(root).generated / 'web/auth.token'
     web_token.parent.mkdir(parents=True, exist_ok=True)
     web_token.write_text("w" * 43)
-    resolver_config = root / "etc/name-resolver.toml"
+    resolver_config = app_paths(root).resolver_config
     resolver_config.write_text("default_resolver = 'pubchem'\n", encoding="utf-8")
 
     result = uninstall(_args(root, purge_config=True))
 
     assert result["ok"] is True
     assert not (root / "uninstall.sh").exists()
-    assert not (root / "etc").exists()
+    assert not (app_paths(root).generated).exists()
     assert not web_token.exists()
     assert not resolver_config.exists()
 
@@ -292,28 +294,28 @@ def test_purge_removes_unified_host_sessions_and_credentials(tmp_path: Path) -> 
     root = tmp_path / "install"
     from research_agent.foundation.layout import paths
     paths(root).initialize()
-    host_session = root / "var/state/pi/sessions/workspace/session/session.sqlite"
+    host_session = app_paths(root).state / 'pi/sessions/workspace/session/session.sqlite'
     host_session.parent.mkdir(parents=True)
     host_session.write_text("session\n", encoding="utf-8")
-    (root / "var/state/host/server-id").write_text("server\n", encoding="utf-8")
-    phone_connection = root / "var/state/host/link.json"
+    (app_paths(root).state / 'host/server-id').write_text("server\n", encoding="utf-8")
+    phone_connection = app_paths(root).state / 'host/link.json'
     phone_connection.write_text("{}\n", encoding="utf-8")
-    host_token = root / "var/state/host/host.token"
+    host_token = app_paths(root).state / 'host/host.token'
     host_token.write_text("secret\n", encoding="utf-8")
-    (root / "etc/pi/auth.json").parent.mkdir(parents=True, exist_ok=True)
-    (root / "etc/pi/auth.json").write_text("{}\n", encoding="utf-8")
-    (root / "etc/secrets/smtp-password").parent.mkdir(parents=True, exist_ok=True)
-    (root / "etc/secrets/smtp-password").write_text("secret\n", encoding="utf-8")
+    (app_paths(root).pi_config / 'auth.json').parent.mkdir(parents=True, exist_ok=True)
+    (app_paths(root).pi_config / 'auth.json').write_text("{}\n", encoding="utf-8")
+    (app_paths(root).generated / 'secrets/smtp-password').parent.mkdir(parents=True, exist_ok=True)
+    (app_paths(root).generated / 'secrets/smtp-password').write_text("secret\n", encoding="utf-8")
 
     result = uninstall(_args(root, purge_workspaces=True, purge_config=True))
 
     assert result["ok"] is True
     assert not host_session.exists()
-    assert not (root / "var/state/host/server-id").exists()
+    assert not (app_paths(root).state / 'host/server-id').exists()
     assert not phone_connection.exists()
     assert not host_token.exists()
-    assert not (root / "etc/pi").exists()
-    assert not (root / "etc/secrets").exists()
+    assert not (app_paths(root).pi_config).exists()
+    assert not (app_paths(root).generated / 'secrets').exists()
 
 
 def test_installed_uninstaller_removes_owned_relay_without_source_tree(tmp_path: Path) -> None:
@@ -323,10 +325,10 @@ def test_installed_uninstaller_removes_owned_relay_without_source_tree(tmp_path:
     install_uninstaller(root, Path(__file__).resolve().parents[2])
     relay_root = root / 'runtimes/link-relay'
     (relay_root / 'releases').mkdir(parents=True)
-    state = root / 'var/state/link-relay'
+    state = app_paths(root).state / 'link-relay'
     state.mkdir(parents=True)
     (state / 'relay.db').write_bytes(b'preserved state')
-    (root / 'etc/link-relay.json').write_text(json.dumps({
+    (app_paths(root).generated / 'link-relay.json').write_text(json.dumps({
         'schema': 'coragent-install-link-relay/1', 'owned': True, 'install_root': str(root),
         'relay_install_root': str(relay_root), 'state_dir': str(state), 'service_scope': 'none',
     }))

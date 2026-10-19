@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PIN_PATH = ROOT / "config" / "pi-source.json"
 PATCH_ROOT = ROOT / "config" / "pi-patches"
-PATCH_NAMES = ("001-workspaces.patch", "002-worker-launch.patch", "003-client-connection.patch", "004-client-lifecycle.patch", "005-client-history.patch", "006-tool-presentation.patch", "007-client-status.patch", "008-request-admission.patch", "009-input-identity.patch", "010-context-lifecycle.patch", "011-markdown-presentation.patch", "012-skill-presentation.patch", "013-monitor-presentation.patch", "014-runtime-presentation.patch")
+PATCH_NAMES = ("001-workspaces.patch", "002-worker-launch.patch", "003-client-connection.patch", "004-client-lifecycle.patch", "005-client-history.patch", "006-tool-presentation.patch", "007-client-status.patch", "008-request-admission.patch", "009-input-identity.patch", "010-context-lifecycle.patch", "011-markdown-presentation.patch", "012-skill-presentation.patch", "013-monitor-presentation.patch", "014-runtime-presentation.patch", "015-configuration-credentials.patch")
 class PiSourceError(RuntimeError): pass
 
 def pin():

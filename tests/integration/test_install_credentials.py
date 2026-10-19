@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from research_agent.foundation.layout import paths as app_paths
+
 import stat
 from pathlib import Path
 
@@ -44,7 +46,7 @@ def test_no_web_requires_no_service_credentials(tmp_path: Path) -> None:
     root = tmp_path / "install"
     root.mkdir()
     assert provision_service_credentials(root, with_web=False) == {}
-    assert not (root / "etc").exists()
+    assert not (app_paths(root).generated).exists()
 
 
 def test_credential_rejects_symlink(tmp_path: Path) -> None:
@@ -52,9 +54,9 @@ def test_credential_rejects_symlink(tmp_path: Path) -> None:
     target = tmp_path / "target"
     root.mkdir()
     target.write_text("not-a-token\n", encoding="ascii")
-    token = root / "etc/web/auth.token"
-    (root / "etc").mkdir(mode=0o700)
-    token.parent.mkdir(mode=0o700)
+    token = app_paths(root).generated / 'web/auth.token'
+    (app_paths(root).generated).mkdir(mode=0o700, parents=True, exist_ok=True)
+    token.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     token.symlink_to(target)
     with pytest.raises(ValueError, match="symbolic link"):
         provision_service_credentials(root, with_web=True)

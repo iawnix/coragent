@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from research_agent.foundation.layout import paths as app_paths
+
 import json
 from pathlib import Path
 from typing import Any
@@ -15,7 +17,7 @@ HOST_TOKEN = "cah_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ"
 
 
 def _write_link_config(root: Path, *, relay_url: str = "https://link.example.test") -> None:
-    state = root / "var/state/host"
+    state = app_paths(root).state / 'host'
     state.mkdir(parents=True, mode=0o700)
     state.chmod(0o700)
     manifest = state / "link.json"
@@ -58,7 +60,7 @@ def test_load_link_config_requires_owner_only_files(tmp_path: Path) -> None:
     assert config is not None
     assert config.relay_url == "https://link.example.test"
     assert config.host_id == HOST_ID
-    assert config.token_file == tmp_path / "var/state/host/host.token"
+    assert config.token_file == app_paths(tmp_path).state / 'host/host.token'
 
     config.token_file.chmod(0o644)
     with pytest.raises(link.LinkError, match="owner-only"):
@@ -140,7 +142,7 @@ def test_link_config_rejects_invalid_relay_origins(tmp_path: Path, relay_url: st
 
 
 def test_optional_link_config_rejects_broken_manifest_symlink(tmp_path: Path) -> None:
-    state = tmp_path / "var/state/host"
+    state = app_paths(tmp_path).state / 'host'
     state.mkdir(parents=True)
     (state / "link.json").symlink_to(state / "missing.json")
 

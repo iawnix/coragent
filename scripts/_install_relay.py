@@ -1,6 +1,11 @@
 """Lifecycle of the optional installation-owned Link Relay."""
 from __future__ import annotations
 
+try:
+    from .app_layout import paths as app_paths
+except ImportError:
+    from app_layout import paths as app_paths
+
 import argparse
 import json
 import os
@@ -87,7 +92,7 @@ def _write_json_private(path: Path, value: dict[str, object]) -> None:
 
 def _relay_paths(args: argparse.Namespace, install_root: Path) -> tuple[Path, Path]:
     relay_root = Path(args.link_relay_root).expanduser().resolve() if args.link_relay_root else install_root / "runtimes/link-relay"
-    state_root = Path(args.relay_state_dir).expanduser().resolve() if args.relay_state_dir else install_root / "var/state/link-relay"
+    state_root = Path(args.relay_state_dir).expanduser().resolve() if args.relay_state_dir else app_paths(install_root).state / 'link-relay'
     return relay_root, state_root
 
 
@@ -105,8 +110,8 @@ def install(args: argparse.Namespace, install_root: Path) -> tuple[dict[str, obj
         except ImportError:
             from install_wizard import _existing_link_configuration
         existing = _existing_link_configuration(install_root)
-        token = install_root / "var/state/host/host.token"
-        identity = install_root / "var/state/host/server-id"
+        token = app_paths(install_root).state / 'host/host.token'
+        identity = app_paths(install_root).state / 'host/server-id'
         if (not args.link_enrollment_code and existing is not None
                 and existing[0] == discovered["relay_url"]
                 and token.is_file() and not token.is_symlink()
@@ -163,7 +168,7 @@ def install(args: argparse.Namespace, install_root: Path) -> tuple[dict[str, obj
         raise RuntimeError("Link Relay installer returned invalid JSON") from exc
     if not isinstance(result, dict) or not isinstance(result.get("enrollment"), dict):
         raise RuntimeError("Link Relay installer did not return enrollment metadata")
-    _write_json_private(install_root / "etc" / RELAY_MARKER_NAME, {
+    _write_json_private(app_paths(install_root).generated / RELAY_MARKER_NAME, {
         "schema": "coragent-install-link-relay/1",
         "install_root": str(install_root),
         "relay_install_root": str(relay_root),
@@ -192,4 +197,4 @@ def rollback(args: argparse.Namespace, relay_result: dict[str, object]) -> None:
         "--purge-state", "--non-interactive", "--yes", "--json",
     ]
     subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-    (Path(args.install_root) / "etc" / RELAY_MARKER_NAME).unlink(missing_ok=True)
+    (app_paths(Path(args.install_root)).generated / RELAY_MARKER_NAME).unlink(missing_ok=True)

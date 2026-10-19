@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+try:
+    from .app_layout import paths as app_paths
+except ImportError:
+    from app_layout import paths as app_paths
+
 import errno
 import os
 import re
@@ -29,13 +34,13 @@ def provision_service_credentials(
     root = expanded_root.resolve()
     specifications: list[tuple[str, Path]] = []
     if with_web:
-        token = web_token_path.expanduser() if web_token_path is not None else root / "etc/web" / "auth.token"
+        token = web_token_path.expanduser() if web_token_path is not None else app_paths(root).generated / 'web' / "auth.token"
         if not token.is_absolute():
-            raise ValueError("CoRAgent Web token path must be an absolute path inside the installation root")
+            raise ValueError("CoRAgent Web token path must be an absolute path inside the local state directory")
         if token.is_symlink():
             raise ValueError(f"CoRAgent Web token path cannot be a symbolic link: {token}")
-        if root not in token.resolve().parents:
-            raise ValueError("CoRAgent Web token path must be an absolute path inside the installation root")
+        if app_paths(root).state not in token.resolve().parents:
+            raise ValueError("CoRAgent Web token path must be an absolute path inside the local state directory")
         specifications.append(("web_http", token.resolve()))
     if not specifications:
         return {}
@@ -45,10 +50,11 @@ def provision_service_credentials(
 
     directories: list[Path] = []
     for _, path in specifications:
-        for directory in (root / "etc", path.parent):
+        for directory in (app_paths(root).generated, path.parent):
             if directory not in directories:
                 directories.append(directory)
     for directory in directories:
+        directory.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         _ensure_private_directory(directory)
 
     existing: dict[str, str] = {}

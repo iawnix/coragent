@@ -1,4 +1,6 @@
 """Installed external executors use generic preparation and ordinary Jobs."""
+
+from research_agent.foundation.layout import paths as app_paths
 import hashlib
 import json
 from pathlib import Path
@@ -383,13 +385,13 @@ def test_installed_resolver_is_used_by_an_isolated_name_resolution_job(tmp_path,
         thread.start()
         try:
             root = tmp_path / 'install'
-            job = root / 'etc/job.toml'
+            job = app_paths(root).job_config
             job.parent.mkdir(parents=True)
             settings = tomllib.loads(Path(os.environ['CORAGENT_JOB_CONFIG']).read_text())
             local = settings['environments']['local']
             local['backends'] = {'structure': local['backends']['structure']}
             job.write_bytes(wizard._job_config_bytes(settings))
-            resolver = root / 'etc/name-resolver.toml'
+            resolver = app_paths(root).resolver_config
             resolver.write_text('default_resolver="opsin"\n[backends.opsin]\ncache=false\nendpoint=' +
                                 json.dumps(f'http://127.0.0.1:{server.server_port}/opsin') + '\n')
             wizard.configure_backend_configs(SimpleNamespace(install_root=str(root)))

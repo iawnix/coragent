@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from research_agent.foundation.layout import paths as app_paths
+
 import json
 import os
 import stat
@@ -22,7 +24,7 @@ from research_agent.research.workspace import admit_research_workspace, initiali
 
 
 def _install_state(root: Path) -> Path:
-    state = root / "var/state/installation/install-state.json"
+    state = app_paths(root).install_state
     release = root / "releases/release-1"
     state.parent.mkdir(parents=True)
     release.mkdir(parents=True)
@@ -109,7 +111,7 @@ def test_upgrade_uses_persisted_external_workspace_root(tmp_path: Path) -> None:
     workspace = external_root / "ts_001"
     initialize_workspace(workspace, "workspace_external", "research")
     admit_research_workspace(workspace)
-    control = tmp_path / "etc"
+    control = app_paths(tmp_path).generated
     control.mkdir(parents=True)
     (control / "workspace-root.json").write_text(
         json.dumps({

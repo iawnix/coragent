@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from research_agent.foundation.layout import paths as app_paths
 from research_agent.foundation.layout import paths as layout_paths
 
 import json
@@ -61,7 +63,7 @@ def test_non_interactive_defaults_to_a_started_user_host(tmp_path: Path) -> None
 
 def test_existing_unmanaged_host_is_migrated_to_user_service(tmp_path: Path) -> None:
     root = tmp_path / "install"
-    service_config = root / "etc/service.json"
+    service_config = app_paths(root).generated / 'service.json'
     service_config.parent.mkdir(parents=True)
     service_config.write_text(
         json.dumps({"schema_version": "coragent-service/1", "scope": "none", "runtime_dir": None}),
@@ -265,7 +267,7 @@ def test_review_does_not_reload_email_defaults_after_disable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root = tmp_path / "install"
-    config = root / "etc/email.toml"
+    config = app_paths(root).email_config
     config.parent.mkdir(parents=True)
     config.write_text("[notifications.email]\nenabled = true\n", encoding="utf-8")
     args = wizard.parse_args(["--install-root", str(root)])
@@ -320,7 +322,7 @@ def test_interactive_menu_can_disable_existing_email_configuration(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root = tmp_path / "install"
-    config = root / "etc/email.toml"
+    config = app_paths(root).email_config
     config.parent.mkdir(parents=True)
     config.write_text("[notifications.email]\nenabled = true\n", encoding="utf-8")
     args = wizard.parse_args(["--install-root", str(root)])
@@ -402,7 +404,7 @@ def test_update_preserves_workspace_root_and_link_defaults(tmp_path: Path) -> No
     root = tmp_path / "install"
     workspace_root = tmp_path / "research"
     layout_paths(root).initialize().update_config(workspace_root=str(workspace_root))
-    phone = root / "var/state/host/link.json"
+    phone = app_paths(root).state / 'host/link.json'
     phone.parent.mkdir(parents=True, exist_ok=True)
     phone.write_text(json.dumps({
         "schema_version": "coragent-link/1",
@@ -471,13 +473,14 @@ def test_pi_agent_configuration_is_imported_once_and_kept_private(
     monkeypatch.setattr(wizard.pwd, "getpwnam", lambda _name: account)
     args = wizard.parse_args([
         "--install-root", str(tmp_path / "install"),
+        "--agent-config-dir", str(home / ".pi/agent"),
         "--without-web", "--service-scope", "user", "--non-interactive",
     ])
     wizard.validate_options(args)
 
     imported = wizard.provision_pi_agent_configuration(args)
 
-    destination = Path(args.install_root) / "etc/pi"
+    destination = app_paths(Path(args.install_root)).pi_config
     assert imported["status"] == "imported"
     assert imported["files"] == {"models.json": "imported", "auth.json": "imported"}
     assert destination.joinpath("models.json").read_bytes() == source.joinpath("models.json").read_bytes()
@@ -511,6 +514,7 @@ def test_pi_agent_configuration_rejects_symlinked_source_directory(
     monkeypatch.setattr(wizard.pwd, "getpwnam", lambda _name: account)
     args = wizard.parse_args([
         "--install-root", str(tmp_path / "install"),
+        "--agent-config-dir", str(home / ".pi/agent"),
         "--without-web", "--service-scope", "user", "--non-interactive",
     ])
     wizard.validate_options(args)
@@ -532,6 +536,7 @@ def test_pi_agent_configuration_rejects_oversized_source(
     monkeypatch.setattr(wizard.pwd, "getpwnam", lambda _name: account)
     args = wizard.parse_args([
         "--install-root", str(tmp_path / "install"),
+        "--agent-config-dir", str(home / ".pi/agent"),
         "--without-web", "--service-scope", "user", "--non-interactive",
     ])
     wizard.validate_options(args)
@@ -553,7 +558,7 @@ def test_install_configuration_rollback_restores_owned_files_and_removes_new_rel
         "--without-web", "--service-scope", "none", "--non-interactive",
     ])
     wizard.validate_options(args)
-    phone = root / "var/state/host/link.json"
+    phone = app_paths(root).state / 'host/link.json'
     phone.parent.mkdir(parents=True, exist_ok=True)
     phone.write_text("old-phone\n", encoding="utf-8")
     release = root / "./releases/old"
@@ -561,10 +566,10 @@ def test_install_configuration_rollback_restores_owned_files_and_removes_new_rel
     snapshot = wizard.snapshot_install_configuration(root, args)
 
     phone.write_text("new-phone\n", encoding="utf-8")
-    (root / "etc/job.toml").parent.mkdir(parents=True, exist_ok=True)
-    (root / "etc/job.toml").write_text("new\n", encoding="utf-8")
-    (root / "etc/pi").mkdir(parents=True)
-    (root / "etc/pi/auth.json").write_text("{}\n", encoding="utf-8")
+    (app_paths(root).job_config).parent.mkdir(parents=True, exist_ok=True)
+    (app_paths(root).job_config).write_text("new\n", encoding="utf-8")
+    (app_paths(root).pi_config).mkdir(parents=True)
+    (app_paths(root).pi_config / 'auth.json').write_text("{}\n", encoding="utf-8")
     new_release = root / "./releases/new"
     nested = new_release / "nested"
     nested.mkdir(parents=True)
@@ -575,19 +580,19 @@ def test_install_configuration_rollback_restores_owned_files_and_removes_new_rel
     new_release.chmod(0o300)
     package_home = root / "."
     (package_home / "current").symlink_to("releases/new")
-    state = root / "var/state/installation/install-state.json"
+    state = app_paths(root).install_state
     state.parent.mkdir(parents=True, exist_ok=True)
     state.write_text("new-state\n")
 
     wizard.restore_install_configuration(root, snapshot)
 
     assert phone.read_text(encoding="utf-8") == "old-phone\n"
-    assert not (root / "etc/job.toml").exists()
-    assert not (root / "etc/pi/auth.json").exists()
+    assert not (app_paths(root).job_config).exists()
+    assert not (app_paths(root).pi_config / 'auth.json').exists()
     assert release.is_dir()
     assert not (root / "./releases/new").exists()
     assert not (package_home / "current").is_symlink()
-    assert not (root / "var/state/installation/install-state.json").exists()
+    assert not (app_paths(root).install_state).exists()
 
 
 def test_non_interactive_smtp_options_write_only_a_secure_credential_reference(tmp_path: Path) -> None:
@@ -610,7 +615,7 @@ def test_non_interactive_smtp_options_write_only_a_secure_credential_reference(t
 
     result = wizard.configure_notification_config(args)
 
-    config = root / "etc/email.toml"
+    config = app_paths(root).email_config
     assert result["binding"] == "smtp"
     assert stat.S_IMODE(config.stat().st_mode) == 0o600
     assert stat.S_IMODE(password_file.stat().st_mode) == 0o600
@@ -625,7 +630,7 @@ def test_non_interactive_smtp_options_write_only_a_secure_credential_reference(t
 
 def test_interactive_smtp_password_is_written_to_the_default_private_file(tmp_path: Path) -> None:
     root = tmp_path / "install"
-    password_file = root / "etc/secrets/smtp-password"
+    password_file = app_paths(root).generated / 'secrets/smtp-password'
     args = wizard.parse_args([
         "--install-root", str(root),
         "--without-web",
@@ -644,7 +649,7 @@ def test_interactive_smtp_password_is_written_to_the_default_private_file(tmp_pa
 
     assert password_file.read_text(encoding="utf-8") == "163-authorization-code\n"
     assert stat.S_IMODE(password_file.stat().st_mode) == 0o600
-    assert "163-authorization-code" not in (root / "etc/email.toml").read_text(encoding="utf-8")
+    assert "163-authorization-code" not in (app_paths(root).email_config).read_text(encoding="utf-8")
 
 
 def test_app_server_service_is_one_installation_host(tmp_path: Path) -> None:
@@ -657,10 +662,10 @@ def test_app_server_service_is_one_installation_host(tmp_path: Path) -> None:
     assert "Environment=CORAGENT_SYSTEMD_HOST=1" in unit
     assert "CORAGENT_SERVER_EXTENSIONS" not in unit
     assert 'Environment="XDG_RUNTIME_DIR=' in unit
-    assert f'PI_CODING_AGENT_DIR={root / "etc/pi"}' in unit
+    assert f'PI_CODING_AGENT_DIR={app_paths(root).pi_config}' in unit
     assert str(Path(os.environ["XDG_RUNTIME_DIR"]) / "coragent") in unit
-    assert f'ReadWritePaths="{root / "var/state"}"' in unit
-    assert f'ReadWritePaths="{root / "workspaces"}"' in unit
+    assert f'ReadWritePaths="{app_paths(root).state}"' in unit
+    assert f'ReadWritePaths="{app_paths(root).workspace_root}"' in unit
     assert "WantedBy=default.target" in unit
     assert "CoRHub" not in unit
     assert "session-host" not in unit
@@ -675,10 +680,10 @@ def test_web_service_uses_installed_launcher_and_workspace_root(tmp_path: Path) 
     assert f'ExecStart="{root / "coragent-web"}"' in unit
     assert '"--provider"' in unit
     assert '"--binding"' not in unit
-    assert str(root / "workspaces") in unit
-    assert str(root / "etc/web/auth.token") in unit
-    assert f'ReadOnlyPaths="{root / "workspaces"}"' in unit
-    assert f'ReadWritePaths="{root / "workspaces"}"' not in unit
+    assert str(app_paths(root).workspace_root) in unit
+    assert str(app_paths(root).generated / 'web/auth.token') in unit
+    assert f'ReadOnlyPaths="{app_paths(root).workspace_root}"' in unit
+    assert f'ReadWritePaths="{app_paths(root).workspace_root}"' not in unit
 
 
 def test_service_readiness_treats_restart_loop_as_failed() -> None:
@@ -720,6 +725,9 @@ def test_remote_terminal_profile_is_written_private_and_reloaded(tmp_path: Path)
     document = json.loads(path.read_text(encoding="utf-8"))
     assert document["ssh_host"] == "pi.example"
     assert document["ssh_options"] == ["-i", "/home/test/.ssh/id_ed25519"]
+    from scripts._configuration import publish
+    app_paths(args.install_root).initialize()
+    publish(args)
 
     reloaded = wizard.parse_args([
         "--install-root", str(tmp_path / "install"), "--without-web", "--service-scope", "none", "--non-interactive", "--yes",
@@ -924,7 +932,7 @@ def test_component_summary_exposes_app_server_and_phone_connection(tmp_path: Pat
         {"web_http": {"path": "/token", "status": "created", "mode": "0600"}},
     )
     assert components["app_server"]["runtime"] == str(runtime)
-    assert components["app_server"]["server_id"].endswith("/var/state/host/server-id")
+    assert components["app_server"]["server_id"].endswith("/state/coragent/host/server-id")
     assert components["app_server"]["start"] == "systemctl --user start coragent.service"
     assert components["phone"]["tool_access"] == "same_as_terminal"
     assert components["phone"]["protocol"] == "coragent-link.v1"
@@ -966,7 +974,7 @@ def test_workspace_root_rejects_an_installation_ancestor(tmp_path: Path) -> None
 def test_link_manifest_is_secret_free_and_host_token_is_private(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     args = _options(tmp_path)
     root = Path(args.install_root)
-    (root / "etc").mkdir(parents=True)
+    (app_paths(root).generated).mkdir(parents=True)
     wizard.configure_workspace_root(args)
     args.phone_access = "link"
     args.link_url = "https://relay.example.test"
@@ -986,7 +994,7 @@ def test_link_manifest_is_secret_free_and_host_token_is_private(tmp_path: Path, 
     assert result["tool_access"] == "same_as_terminal"
     assert "token" not in manifest
     assert "secret" not in manifest
-    token_file = root / "var/state/host/host.token"
+    token_file = app_paths(root).state / 'host/host.token'
     assert token_file.read_text(encoding="utf-8").strip().startswith("cah_")
     assert stat.S_IMODE(token_file.stat().st_mode) == 0o600
 
@@ -994,7 +1002,7 @@ def test_link_manifest_is_secret_free_and_host_token_is_private(tmp_path: Path, 
 def test_changing_relay_requires_a_new_host_enrollment(tmp_path: Path) -> None:
     args = _options(tmp_path)
     root = Path(args.install_root)
-    state = root / "var/state/host"
+    state = app_paths(root).state / 'host'
     state.mkdir(parents=True)
     (state / "link.json").write_text(json.dumps({
         "schema_version": "coragent-link/1",
@@ -1067,7 +1075,7 @@ def test_custom_smtp_provider_writes_explicit_host(tmp_path: Path) -> None:
 
     wizard.configure_notification_config(args)
 
-    content = (Path(args.install_root) / "etc/email.toml").read_text(encoding="utf-8")
+    content = (app_paths(Path(args.install_root)).email_config).read_text(encoding="utf-8")
     assert 'preset = "custom"' in content
     assert 'host = "mail.example.test"' in content
 
@@ -1095,9 +1103,10 @@ def test_logged_package_step_is_kept_in_date_named_log(tmp_path: Path) -> None:
     )
 
     assert result == {"ok": True}
-    log = root / "var/log" / f"install.{wizard.datetime.now().strftime('%Y.%m.%d')}.log"
+    log = app_paths(root).log / f"install.{wizard.datetime.now().strftime('%Y.%m.%d')}.log"
     assert log.is_file()
     assert '"ok": true' in log.read_text(encoding="utf-8")
+    assert not (root / 'var').exists()
 
 
 def test_job_toml_is_validated_and_written_private(tmp_path: Path) -> None:
@@ -1130,7 +1139,7 @@ def test_job_toml_is_validated_and_written_private(tmp_path: Path) -> None:
     wizard.validate_options(args)
     configs = wizard.configure_backend_configs(args)
 
-    destination = root / "etc/job.toml"
+    destination = app_paths(root).job_config
     assert configs["job"]["status"] == "configured"
     assert destination.read_text(encoding="utf-8") == source.read_text(encoding="utf-8")
     assert stat.S_IMODE(destination.stat().st_mode) == 0o600
@@ -1146,7 +1155,7 @@ def test_legacy_scientific_config_is_rejected_before_install_copy(tmp_path):
         wizard.validate_options(args)
     with pytest.raises(ValueError, match="python_binding_missing"):
         wizard.configure_backend_configs(args)
-    assert not (root / "etc/job.toml").exists()
+    assert not (app_paths(root).job_config).exists()
 
 
 def test_configured_install_checks_science_before_relay_or_secret_copy(tmp_path, monkeypatch):
@@ -1157,7 +1166,7 @@ def test_configured_install_checks_science_before_relay_or_secret_copy(tmp_path,
         pytest.fail("invalid scientific config must fail before installation side effects")
     monkeypatch.setattr(_install_relay, "install", unexpected)
     monkeypatch.setattr(wizard, "run_install", unexpected)
-    assert wizard.main(["--non-interactive", "--yes", "--config-dir", str(source), "--install-root", str(tmp_path / "install")]) == 1
+    assert wizard.main(["--non-interactive", "--yes", "--import-config", str(source), "--install-root", str(tmp_path / "install")]) == 1
 
 
 def _configured_email_fixture(tmp_path):
@@ -1169,7 +1178,7 @@ def _configured_email_fixture(tmp_path):
     (config / "job.toml").write_text('default_environment="local"\n[environments.local]\nkind="local"\n')
     root = tmp_path / "install"
     args = wizard.parse_args([
-        "--config-dir", str(config), "--install-root", str(root),
+        "--import-config", str(config), "--install-root", str(root),
         "--phone-access", "disabled", "--without-web", "--service-scope", "none",
         "--non-interactive", "--yes",
     ])
@@ -1188,13 +1197,13 @@ def test_configured_email_uses_explicit_file_and_private_password_copy(tmp_path)
     assert options.email_recipient == "recipient@example.invalid"
     assert options.email_username == "sender@example.invalid"
     assert options.email_host == "smtp.example.invalid"
-    password = root / "etc/secrets/smtp-password"
+    password = app_paths(root).generated / 'secrets/smtp-password'
     assert not root.exists()
     wizard.configure_notification_config(options)
     assert options.email_password_file == str(password)
     assert password.read_text() == "synthetic-smtp-authorization-code\n"
     assert stat.S_IMODE(password.stat().st_mode) == 0o600
-    installed = (root / "etc/email.toml").read_text()
+    installed = (app_paths(root).email_config).read_text()
     assert "recipient@example.invalid" in installed
     assert "synthetic-smtp-authorization-code" not in installed
 
@@ -1236,13 +1245,13 @@ def test_configured_invalid_email_fails_before_relay_or_secret_copy(tmp_path, mo
     def unexpected(*args):
         pytest.fail("invalid email must fail before installation side effects")
     monkeypatch.setattr(_install_relay, "install", unexpected)
-    assert wizard.main(["--non-interactive", "--yes", "--config-dir", str(config), "--install-root", str(root)]) == 1
+    assert wizard.main(["--non-interactive", "--yes", "--import-config", str(config), "--install-root", str(root)]) == 1
     assert not root.exists()
 
 
 def test_installed_execution_readiness_probes_unregistered_native_binding(tmp_path, monkeypatch):
     root = tmp_path / 'install'
-    config = root / 'etc/job.toml'
+    config = app_paths(root).job_config
     config.parent.mkdir(parents=True)
     binary = tmp_path / 'native-program'
     binary.write_text('#!/bin/sh\nexit 0\n'); binary.chmod(0o700)
@@ -1259,7 +1268,7 @@ def test_installed_execution_readiness_probes_unregistered_native_binding(tmp_pa
     row = backends['job']['readiness']['local']['binding:fixture_native']
     assert row['status'] == 'verified'
     assert row['environment_evidence']['observation']['files']['executable']['path'] == str(binary)
-    assert (root / 'var/state/installation/job-readiness.json').is_file()
+    assert (app_paths(root).state / 'installation/job-readiness.json').is_file()
     binary.unlink()
     with pytest.raises(RuntimeError, match='environment verification failed'):
         wizard.verify_job_bindings(SimpleNamespace(install_root=str(root)), installed, backends)
@@ -1279,7 +1288,7 @@ def test_name_resolver_toml_is_validated_and_written_private(tmp_path: Path) -> 
     wizard.validate_options(args)
     configs = wizard.configure_backend_configs(args)
 
-    destination = root / "etc/name-resolver.toml"
+    destination = app_paths(root).resolver_config
     assert configs["name_resolver"]["status"] == "configured"
     assert configs["name_resolver"]["enabled_backends"] == "pubchem"
     assert configs["name_resolver"]["automatic_lookup"] == "ready"
@@ -1297,13 +1306,13 @@ def test_name_resolver_config_uses_bundled_pubchem_default(tmp_path: Path) -> No
     assert configs["name_resolver"]["status"] == "configured"
     assert configs["name_resolver"]["enabled_backends"] == "opsin,pubchem"
     assert configs["name_resolver"]["automatic_lookup"] == "ready"
-    assert configs["name_resolver"]["path"].endswith("/etc/name-resolver.toml")
-    assert stat.S_IMODE((tmp_path / "install/etc/name-resolver.toml").stat().st_mode) == 0o600
+    assert configs["name_resolver"]["path"].endswith("/generated/name-resolver.toml")
+    assert stat.S_IMODE(app_paths(tmp_path / "install").resolver_config.stat().st_mode) == 0o600
 
 
 def test_invalid_preserved_name_resolver_config_fails_install_configuration(tmp_path: Path) -> None:
     root = tmp_path / "install"
-    destination = root / "etc/name-resolver.toml"
+    destination = app_paths(root).resolver_config
     destination.parent.mkdir(parents=True)
     destination.write_text("default_resolver = \"invalid\"\n", encoding="utf-8")
     args = wizard.parse_args([
@@ -1321,7 +1330,7 @@ def test_install_binds_local_resolver_and_preserves_explicit_and_remote_settings
     import hashlib
     import tomllib
     root = tmp_path / 'install'
-    destination = root / 'etc/job.toml'
+    destination = app_paths(root).job_config
     destination.parent.mkdir(parents=True)
     # Inline tables and dots in target names must survive configuration rewriting.
     python = '{manager="conda", conda_executable="/opt/conda/bin/conda", prefix="/opt/structure", lock_ref="/opt/structure.lock"}'
@@ -1336,7 +1345,7 @@ def test_install_binds_local_resolver_and_preserves_explicit_and_remote_settings
     source = tmp_path / 'source.toml' if imported else destination
     source.write_text(raw)
     expected = copy.deepcopy(tomllib.loads(raw))
-    expected['execution']['targets']['local.cpu']['bindings']['structure']['environment']['CORAGENT_NAME_RESOLVER_CONFIG'] = str(root/'etc/name-resolver.toml')
+    expected['execution']['targets']['local.cpu']['bindings']['structure']['environment']['CORAGENT_NAME_RESOLVER_CONFIG'] = str(app_paths(root).resolver_config)
     args = SimpleNamespace(install_root=str(root), job_config=str(source) if imported else None)
     configs = wizard.configure_backend_configs(args)
     assert tomllib.loads(destination.read_text()) == expected
@@ -1358,14 +1367,14 @@ def test_install_uninstaller_copies_recovery_files_and_marks_ownership(tmp_path:
     assert uninstaller == root / "uninstall.sh"
     assert uninstaller.is_file()
     assert (root / "runtimes/maintenance/uninstall.py").is_file()
-    marker = json.loads((root / "etc/installation.json").read_text(encoding="utf-8"))
-    assert marker["schema_version"] == "coragent-installation/2"
+    marker = json.loads((app_paths(root).marker).read_text(encoding="utf-8"))
+    assert marker["schema_version"] == "coragent-installation/3"
 
 
 def test_configured_update_preserves_existing_relay_host_enrollment(tmp_path, monkeypatch):
     from scripts import _install_relay
     root = tmp_path / 'install'
-    state = root / 'var/state/host'
+    state = app_paths(root).state / 'host'
     state.mkdir(parents=True)
     host_id = '431e9e39-0d9c-4353-9f8b-d934eeab8323'
     relay_url = 'https://relay.example'
@@ -1374,7 +1383,7 @@ def test_configured_update_preserves_existing_relay_host_enrollment(tmp_path, mo
     (state / 'link.json').write_text(json.dumps({'schema_version':'coragent-link/1','relay_url':relay_url,'host_id':host_id}))
     monkeypatch.setattr(_install_relay, 'discover_link_relay', lambda path: {
         'service_root': str(root / 'runtimes/link-relay/current/services/relay'), 'relay_url':relay_url,
-        'state': str(root / 'var/state/link-relay/relay.db')})
+        'state': str(app_paths(root).state / 'link-relay/relay.db')})
     def unexpected(*args, **kwargs):
         pytest.fail('must not create another enrollment for an enrolled Host')
     monkeypatch.setattr(_install_relay.subprocess, 'run', unexpected)

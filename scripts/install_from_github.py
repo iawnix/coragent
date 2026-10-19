@@ -3,6 +3,11 @@
 
 from __future__ import annotations
 
+try:
+    from .app_layout import paths as app_paths
+except ImportError:
+    from app_layout import paths as app_paths
+
 import argparse
 import json
 import os
@@ -140,6 +145,8 @@ def install_uninstaller(install_root: Path, source_root: Path) -> Path:
         (source_root / "scripts" / "_installation_metadata.py", private / "_installation_metadata.py", 0o600),
         (source_root / "scripts" / "_job_install.py", private / "_job_install.py", 0o600),
         (source_root / "backend/src/research_agent/foundation/layout.py", private / "app_layout.py", 0o600),
+        (source_root / "backend/src/research_agent/foundation/configuration.py", private / "configuration.py", 0o600),
+        (source_root / "scripts/_configuration.py", private / "_configuration.py", 0o600),
     ):
         descriptor, temporary_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
         os.close(descriptor)
@@ -228,7 +235,7 @@ def main(argv: list[str] | None = None) -> int:
                            else install_uninstaller(Path(args.install_root), checkout))
             emit_progress(args.progress, "Preparing the managed runtime and release")
             installed = json.loads(run(install, cwd=checkout))
-            provenance = Path(args.install_root).expanduser().resolve() / "var/state/installation/source-provenance.json"
+            provenance = app_paths(Path(args.install_root).expanduser().resolve()).state / 'installation/source-provenance.json'
             provenance.parent.mkdir(parents=True, exist_ok=True)
             provenance_data = {"schema_version": "coragent-source-provenance/1", "repo": args.repo, "ref": args.ref, "commit": commit, "tree_digest": digest, "installed_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")}
             if not args.prepare_only:

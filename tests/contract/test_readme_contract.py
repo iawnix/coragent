@@ -60,17 +60,8 @@ def test_public_document_set_covers_install_architecture_and_maintenance() -> No
 
     installation = INSTALLATION.read_text(encoding="utf-8")
     for heading in [
-        "## Prerequisites",
-        "## Install Or Select A Release",
-        "## Managed Python Runtime",
-        "## Configure execution targets",
-        "## Configure Notifications",
-        "## Start The Installation Host",
-        "## Workspace Bootstrap",
-        "## Run The Research Explorer",
-        "## Upgrade",
-        "## Installation Failure Recovery",
-        "## Operational Recovery",
+        "## Layout", "## Configuration", "## Install and update",
+        "## Cluster boundary", "## Uninstall", "## Local verification",
     ]:
         assert heading in installation
 

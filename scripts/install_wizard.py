@@ -3,6 +3,11 @@
 
 from __future__ import annotations
 
+try:
+    from .app_layout import paths as app_paths
+except ImportError:
+    from app_layout import paths as app_paths
+
 import argparse
 import hashlib
 import getpass
@@ -80,9 +85,7 @@ SMTP_PRESETS = {
 ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 WEB_TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{8,100}$")
 SERVICE_CONFIG_SCHEMA = "coragent-service/1"
-SERVICE_CONFIG_RELATIVE = Path("etc/installation.json")
 REMOTE_HOST_CONFIG_SCHEMA = "coragent-remote-host/1"
-REMOTE_HOST_CONFIG_RELATIVE = Path("etc/remote-host.json")
 PI_AGENT_CONFIG_FILES = ("models.json", "auth.json")
 PI_AGENT_CONFIG_MAX_BYTES = 2 * 1024 * 1024
 DEFAULT_SERVICE_SCOPE = "user"
@@ -168,7 +171,7 @@ def require_preflight(checks: list[dict[str, object]], *, require_conda: bool = 
 
 def inspect_installation(root: Path) -> dict[str, str | None]:
     package_home = root
-    state_path = root / "var/state/installation/install-state.json"
+    state_path = app_paths(root).install_state
     try:
         metadata = read_installation_metadata(root)
     except ValueError as error:
@@ -202,7 +205,8 @@ def inspect_installation(root: Path) -> dict[str, str | None]:
 def parse_args(argv: list[str] | None = None, *, use_environment: bool = True) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--install-root")
-    parser.add_argument("--config-dir", help="Private directory containing optional job.toml, models.json, auth.json and email.toml.")
+    parser.add_argument("--config", help="Single CoRAgent config.toml (default: ~/.config/coragent/config.toml).")
+    parser.add_argument("--import-config", dest="config_dir", help="Explicit one-time import of component configuration files.")
     parser.add_argument("--dry-run", action="store_true", help="Print a redacted plan without downloading, installing or starting services.")
     parser.add_argument("--workspace-root", help="Absolute directory containing named research workspaces.")
     parser.add_argument("--coragent-repo", default=DEFAULT_REPO)
@@ -218,19 +222,19 @@ def parse_args(argv: list[str] | None = None, *, use_environment: bool = True) -
     parser.add_argument("--web-port", type=int, help="CoRAgent Web HTTP port.")
     parser.add_argument("--web-host", default="127.0.0.1", help="CoRAgent Web listen address.")
     parser.add_argument("--allow-remote", action="store_true", help="Allow CoRAgent Web to listen on a non-loopback address.")
-    parser.add_argument("--web-auth-token-file", help="CoRAgent Web token file (must be inside the installation root).")
+    parser.add_argument("--web-auth-token-file", help="CoRAgent Web token file (must be inside the local state directory).")
     parser.add_argument(
         "--web-auth-token",
         help="Explicit CoRAgent Web token (8-100 URL-safe characters; prefer --web-auth-token-file for secrets).",
     )
-    parser.add_argument("--job-config", help="Unified job.toml to install as etc/job.toml.")
+    parser.add_argument("--job-config", help="Explicitly import execution settings into config.toml.")
     parser.add_argument(
         "--agent-config-dir",
         help="Directory containing installation-owned Pi models.json and auth.json.",
     )
     parser.add_argument(
         "--name-resolver-config",
-        help="Deterministic chemical name resolver TOML to install as etc/name-resolver.toml.",
+        help="Explicitly import name resolver settings into config.toml.",
     )
     parser.add_argument("--conda-root")
     parser.add_argument('--job-profile', action='append', metavar='TARGET:PROFILE', help='Prepare a domain environment (structure, pyscf, render, wrapper, path). Repeat for multiple targets.')
@@ -306,7 +310,16 @@ def parse_args(argv: list[str] | None = None, *, use_environment: bool = True) -
         from _install_inputs import environment_defaults
     if use_environment:
         environment_defaults(parser, sys.argv[1:] if argv is None else argv)
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    supplied = sys.argv[1:] if argv is None else argv
+    args._explicit_options = {action.dest for action in parser._actions
+                              if any(token.split('=', 1)[0] in action.option_strings for token in supplied)}
+    try:
+        from ._configuration import apply
+    except ImportError:
+        from _configuration import apply
+    apply(args)
+    return args
 
 
 def interactive_options(args: argparse.Namespace) -> argparse.Namespace:
@@ -314,7 +327,7 @@ def interactive_options(args: argparse.Namespace) -> argparse.Namespace:
         raise RuntimeError("interactive installation requires a TTY; use --non-interactive")
 
     section("Source and destination")
-    args.install_root = args.install_root or ask("Installation directory", str(Path.home() / ".local/share/coragent"))
+    args.install_root = args.install_root or ask("Installation directory", str(Path.home() / "soft/coragent"))
     args.workspace_root = args.workspace_root or ask(
         "Workspace root",
         str(read_workspace_root(Path(args.install_root).expanduser())),
@@ -358,7 +371,7 @@ def interactive_options(args: argparse.Namespace) -> argparse.Namespace:
             "CoRAgent Link Relay URL",
             args.link_url or (existing_link[0] if existing_link else ""),
         ).strip()
-        token_exists = (Path(args.install_root) / "var/state/host/host.token").is_file()
+        token_exists = (app_paths(Path(args.install_root)).state / 'host/host.token').is_file()
         enrolled_for_url = token_exists and existing_link is not None and args.link_url.rstrip("/") == existing_link[0]
         if not enrolled_for_url and args.link_enrollment_code is None:
             # The package/runtime installation can take longer than the
@@ -385,7 +398,7 @@ def _load_existing_menu_defaults(args: argparse.Namespace) -> None:
     if args.workspace_root is None:
         args.workspace_root = str(read_workspace_root(root))
     if args.with_web is None:
-        args.with_web = (root / "coragent-web").exists() or not (root / "var/state/installation/install-state.json").is_file()
+        args.with_web = (root / "coragent-web").exists() or not (app_paths(root).install_state).is_file()
     if args.web_port is None:
         args.web_port = 8766
     if args.phone_access is None:
@@ -393,7 +406,7 @@ def _load_existing_menu_defaults(args: argparse.Namespace) -> None:
     if args.link_url is None:
         existing_link = _existing_link_configuration(root)
         args.link_url = existing_link[0] if existing_link else _discover_relay_url(args)
-    service_config = root / "etc/installation.json"
+    service_config = app_paths(root).marker
     if args.service_scope is None:
         try:
             document = json.loads(service_config.read_text(encoding="utf-8"))
@@ -430,11 +443,7 @@ def _load_existing_menu_defaults(args: argparse.Namespace) -> None:
 def _load_existing_remote_host_defaults(args: argparse.Namespace, root: Path) -> None:
     if args.remote_host is not None or any((args.remote_host_socket, args.remote_proxy_path, args.ssh_config, *(args.ssh_option or []))):
         return
-    remote_config = root / REMOTE_HOST_CONFIG_RELATIVE
-    try:
-        document = json.loads(remote_config.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        return
+    document = app_paths(root).configuration.read(required=False).get('remote_host', {})
     if isinstance(document, dict) and document.get("schema_version") == REMOTE_HOST_CONFIG_SCHEMA:
         args.remote_host = document.get("ssh_host")
         args.remote_host_socket = document.get("host_socket")
@@ -446,14 +455,11 @@ def _load_existing_remote_host_defaults(args: argparse.Namespace, root: Path) ->
 def _load_existing_email_defaults(args: argparse.Namespace, root: Path) -> None:
     if args.email_binding is not None or getattr(args, "_clear_email", False):
         return
-    config = root / "etc/email.toml"
-    try:
-        document = tomllib.loads(config.read_text(encoding="utf-8"))
-        email = document.get("notifications", {}).get("email", {})
-    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError, AttributeError):
+    layout = app_paths(root)
+    email = layout.configuration.read(required=False).get('notifications', {}).get('email', {})
+    if not email or not email.get('enabled', True):
         return
-    if not isinstance(email, dict) or not email.get("enabled"):
-        return
+    email = layout.configuration.resolve_credentials(email)
     provider = email.get("provider", "smtp")
     if provider != "smtp":
         raise ValueError("invalid email configuration")
@@ -466,6 +472,9 @@ def _load_existing_email_defaults(args: argparse.Namespace, root: Path) -> None:
     args.email_username = email.get("username")
     args.email_password_env = email.get("password_env")
     args.email_password_file = email.get("password_file")
+    if 'password' in email:
+        args._email_password = email['password']
+        args.email_password_file = str(layout.generated / 'secrets/smtp-password')
 
 
 def _menu_choice(args: argparse.Namespace) -> str:
@@ -476,9 +485,9 @@ def _menu_choice(args: argparse.Namespace) -> str:
     field("CoRAgent Web", "enabled" if args.with_web else "disabled")
     field("Phone", "Link Relay" if args.phone_access == "link" else "disabled")
     field("Services", args.service_scope or "none")
-    field("Email", args.email_binding or ("configured" if (root / "etc/email.toml").is_file() else "not configured"))
-    field("Job platform", "configured" if (root / "etc/job.toml").is_file() else "not configured")
-    field("Chemical name resolver", "configured" if (root / "etc/name-resolver.toml").is_file() else "not configured")
+    field("Email", args.email_binding or ("configured" if (app_paths(root).email_config).is_file() else "not configured"))
+    field("Job platform", "configured" if (app_paths(root).job_config).is_file() else "not configured")
+    field("Chemical name resolver", "configured" if (app_paths(root).resolver_config).is_file() else "not configured")
     print()
     print("  1) Installation and workspace")
     print("  2) CoRAgent Web")
@@ -544,7 +553,7 @@ def _configure_menu_phone(args: argparse.Namespace) -> None:
     args.phone_access = "link"
     existing_link = _existing_link_configuration(Path(args.install_root))
     args.link_url = ask("CoRAgent Link Relay URL", args.link_url or (existing_link[0] if existing_link else "")).strip()
-    token_file = Path(args.install_root) / "var/state/host/host.token"
+    token_file = app_paths(Path(args.install_root)).state / 'host/host.token'
     enrolled_for_url = token_file.is_file() and existing_link is not None and args.link_url.rstrip("/") == existing_link[0]
     if not enrolled_for_url:
         args.link_enrollment_code = None
@@ -578,7 +587,7 @@ def _initialize_interactive_menu(args: argparse.Namespace) -> None:
         return
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         raise RuntimeError("interactive installation requires a TTY; use --non-interactive")
-    args.install_root = args.install_root or ask("Installation directory", str(Path.home() / ".local/share/coragent"))
+    args.install_root = args.install_root or ask("Installation directory", str(Path.home() / "soft/coragent"))
     args.install_root = str(Path(args.install_root).expanduser())
     _load_existing_menu_defaults(args)
     if args.phone_access == "link" and not _link_host_enrolled_for_url(args):
@@ -641,7 +650,7 @@ def configure_email_interactively(args: argparse.Namespace, *, force: bool = Fal
     args.__dict__.pop("_email_password", None)
     args.__dict__.pop("_clear_email", None)
     root = Path(args.install_root)
-    existing = root / "etc/email.toml"
+    existing = app_paths(root).email_config
     prompt = "Reconfigure email notifications" if existing.is_file() else "Configure email notifications"
     if not ask_yes_no(prompt, False):
         if force and existing.is_file() and ask_yes_no("Disable email notifications", False):
@@ -668,7 +677,7 @@ def configure_email_interactively(args: argparse.Namespace, *, force: bool = Fal
         args.email_password_env = ask("Password environment variable", "CORAGENT_EMAIL_PASSWORD")
         args.email_password_file = None
         return
-    default_password_file = root / "etc/secrets" / "smtp-password"
+    default_password_file = app_paths(root).generated / 'secrets' / "smtp-password"
     args.email_password_env = None
     args.email_password_file = ask("SMTP authorization-code file", getattr(args, "email_password_file", None) or str(default_password_file))
     password_path = Path(args.email_password_file).expanduser()
@@ -753,7 +762,7 @@ def show_install_plan(args: argparse.Namespace, installation: dict[str, str | No
         else:
             configuration = (
                 "preserve existing"
-                if (Path(args.install_root) / "etc/email.toml").is_file()
+                if (app_paths(Path(args.install_root)).email_config).is_file()
                 else "not configured"
             )
         field("Configuration", configuration, tone="muted")
@@ -774,8 +783,8 @@ def show_install_plan(args: argparse.Namespace, installation: dict[str, str | No
         field("Launcher", root / "coragent-web")
         field("Listen", f"http://{args.web_host}:{args.web_port}")
         field("Workspace root", args.workspace_root)
-        field("State directory", root / "var/state/web")
-        token_path = Path(args.web_auth_token_file).expanduser() if args.web_auth_token_file else root / "etc/web/auth.token"
+        field("State directory", app_paths(root).state / 'web')
+        token_path = Path(args.web_auth_token_file).expanduser() if args.web_auth_token_file else app_paths(root).generated / 'web/auth.token'
         field("HTTP token", _planned_credential(token_path))
         field(
             "Service",
@@ -849,9 +858,11 @@ def validate_options(args: argparse.Namespace) -> None:
         except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
             raise ValueError(f"invalid job TOML configuration: {source}: {error}") from error
         _validate_job_config(_job_install.plan(args)['settings'] if args.job_profile else parsed_job)
-    elif (Path(args.install_root) / "etc/job.toml").is_file():
-        _validate_job_config(_job_install.plan(args)['settings'] if args.job_profile else
-                             tomllib.loads((Path(args.install_root) / "etc/job.toml").read_text()))
+    else:
+        layout = app_paths(args.install_root)
+        execution = layout.configuration.read(required=False).get('execution')
+        if execution is not None:
+            _validate_job_config({'execution': layout.configuration.resolve_credentials(execution)})
     if args.name_resolver_config:
         source = Path(args.name_resolver_config).expanduser()
         if not source.is_absolute() or source.is_symlink() or not source.is_file():
@@ -908,8 +919,8 @@ def validate_options(args: argparse.Namespace) -> None:
         if args.web_auth_token_file:
             token_path = Path(args.web_auth_token_file).expanduser()
             root = Path(args.install_root).resolve()
-            if not token_path.is_absolute() or token_path.is_symlink() or root not in token_path.resolve().parents:
-                raise ValueError("--web-auth-token-file must be an absolute path inside the installation root")
+            if not token_path.is_absolute() or token_path.is_symlink() or app_paths(root).state not in token_path.resolve().parents:
+                raise ValueError("--web-auth-token-file must be an absolute path inside the local state directory")
     elif args.allow_remote:
         raise ValueError("--allow-remote requires --with-web")
     args.service_scope = args.service_scope or DEFAULT_SERVICE_SCOPE
@@ -943,7 +954,7 @@ def validate_options(args: argparse.Namespace) -> None:
         args.link_url = _validate_link_url(args.link_url)
         if args.link_enrollment_url:
             args.link_enrollment_url = _validate_link_url(args.link_enrollment_url)
-        token_file = Path(args.install_root) / "var/state/host/host.token"
+        token_file = app_paths(Path(args.install_root)).state / 'host/host.token'
         enrolled_for_url = token_file.is_file() and existing_link is not None and existing_link[0] == args.link_url
         if not enrolled_for_url and not args.link_enrollment_code and not getattr(args, "_defer_link_enrollment", False):
             raise ValueError("--link-enrollment-code is required when enrolling a new CoRAgent Host")
@@ -955,7 +966,7 @@ def validate_options(args: argparse.Namespace) -> None:
 
 
 def _validate_workspace_root(value: object, install_root: Path) -> Path:
-    requested = Path(value).expanduser() if isinstance(value, str) and value else install_root / "workspaces"
+    requested = Path(value).expanduser() if isinstance(value, str) and value else app_paths(install_root).workspace_root
     if not requested.is_absolute():
         raise ValueError("--workspace-root must be absolute")
     if requested.is_symlink():
@@ -971,7 +982,7 @@ def _validate_workspace_root(value: object, install_root: Path) -> Path:
         or resolved in install.parents
     ):
         raise ValueError("--workspace-root must be a dedicated directory")
-    for protected in (install / "etc", install / "var", install / "runtimes", install / "releases"):
+    for protected in (app_paths(install).config, app_paths(install).state, install / "runtimes", install / "releases"):
         if resolved == protected or protected in resolved.parents:
             raise ValueError("--workspace-root cannot be inside installation control or runtime state")
     if resolved.exists() and not resolved.is_dir():
@@ -1016,6 +1027,8 @@ def configure_service_runtime(args: argparse.Namespace) -> dict[str, str | None]
         "scope": scope,
         "runtime_dir": runtime_dir,
     }
+    if args.service_user:
+        document['user'] = args.service_user
     from research_agent.foundation.layout import paths
     destination = paths(root).update_config(service=document)
     return {"status": "configured", "path": str(destination), "scope": scope, "runtime_dir": runtime_dir}
@@ -1023,7 +1036,7 @@ def configure_service_runtime(args: argparse.Namespace) -> dict[str, str | None]
 
 def configure_remote_host(args: argparse.Namespace) -> dict[str, object]:
     """Persist the optional SSH terminal profile without storing credentials."""
-    destination = Path(args.install_root).resolve() / REMOTE_HOST_CONFIG_RELATIVE
+    destination = app_paths(args.install_root).remote_config
     if args.remote_host is None:
         if destination.exists() or destination.is_symlink():
             destination.unlink()
@@ -1044,7 +1057,7 @@ def configure_remote_host(args: argparse.Namespace) -> dict[str, object]:
 
 
 def _existing_link_configuration(root: Path) -> tuple[str, str] | None:
-    manifest = root / "var/state/host/link.json"
+    manifest = app_paths(root).state / 'host/link.json'
     if not manifest.is_file() or manifest.is_symlink():
         return None
     try:
@@ -1083,7 +1096,7 @@ def _link_host_enrolled_for_url(args: argparse.Namespace) -> bool:
         return False
     root = Path(args.install_root)
     existing = _existing_link_configuration(root)
-    token_file = root / "var/state/host/host.token"
+    token_file = app_paths(root).state / 'host/host.token'
     return token_file.is_file() and existing is not None and existing[0] == args.link_url.rstrip("/")
 
 
@@ -1180,7 +1193,7 @@ def configure_notification_config(args: argparse.Namespace) -> dict[str, str]:
     """Write installation-owned notification configuration without exposing secrets."""
 
     root = Path(args.install_root).expanduser().resolve()
-    config_path = root / "etc/email.toml"
+    config_path = app_paths(root).email_config
     if getattr(args, "_clear_email", False):
         if config_path.is_symlink():
             raise ValueError(f"notification file cannot be a symbolic link: {config_path}")
@@ -1220,7 +1233,7 @@ def configure_notification_config(args: argparse.Namespace) -> dict[str, str]:
     if args.email_password_env is not None:
         lines.append(f"password_env = {_toml_string(args.email_password_env)}")
         credential = args.email_password_env
-        env_path = root / "etc/secrets" / "service.env"
+        env_path = app_paths(root).generated / 'secrets' / "service.env"
         value = os.environ.get(args.email_password_env)
         if value:
             escaped = value.replace("\\", "\\\\").replace('"', '\\"')
@@ -1236,7 +1249,7 @@ def configure_notification_config(args: argparse.Namespace) -> dict[str, str]:
         "binding": "smtp",
         "preset": args.email_preset,
         "credential": credential,
-        "environment_file": str(root / "etc/secrets" / "service.env") if args.email_password_env else None,
+        "environment_file": str(app_paths(root).generated / 'secrets' / "service.env") if args.email_password_env else None,
         "path": str(config_path),
     }
 
@@ -1377,7 +1390,7 @@ def verify_job_bindings(args, installed, backend_configs):
 
 
 def _write_job_readiness(destination: Path, result: dict) -> None:
-    record = destination.parent.parent / "var/state/installation/job-readiness.json"
+    record = destination.parent.parent / "installation/job-readiness.json"
     _write_private_config_bytes((json.dumps(result, indent=2) + "\n").encode(), record)
 
 
@@ -1525,11 +1538,11 @@ def configure_backend_configs(args: argparse.Namespace) -> dict[str, dict[str, s
     if job_config:
         result["job"] = _copy_private_config(
             job_config,
-            root / "etc/job.toml",
+            app_paths(root).job_config,
             kind="job",
         )
     else:
-        destination = root / "etc/job.toml"
+        destination = app_paths(root).job_config
         result["job"] = {"status": "preserved" if destination.is_file() else "not_configured", "path": str(destination)}
         if destination.is_file():
             raw = destination.read_bytes()
@@ -1538,7 +1551,7 @@ def configure_backend_configs(args: argparse.Namespace) -> dict[str, dict[str, s
             _write_job_readiness(destination, result["job"])
 
     resolver_config = getattr(args, "name_resolver_config", None)
-    resolver_destination = root / "etc/name-resolver.toml"
+    resolver_destination = app_paths(root).resolver_config
     if resolver_config:
         result["name_resolver"] = _copy_private_config(
             resolver_config,
@@ -1594,14 +1607,14 @@ def run_logged_install(
     show_progress: bool = True,
 ) -> dict[str, object]:
     install_root.mkdir(mode=0o700, parents=True, exist_ok=True)
-    pi_root = install_root / "var"
-    log_root = pi_root / "log"
-    for directory in (pi_root, log_root):
+    layout = app_paths(install_root)
+    log_root = layout.log
+    for directory in (layout.state, log_root):
         if directory.exists() or directory.is_symlink():
             if directory.is_symlink() or not directory.is_dir():
                 raise RuntimeError(f"installer log path must be a physical directory: {directory}")
         else:
-            directory.mkdir(mode=0o700)
+            directory.mkdir(mode=0o700, parents=True)
         directory.chmod(0o700)
     descriptor, temporary_name = tempfile.mkstemp(prefix=".install-", suffix=".log", dir=log_root)
     os.chmod(temporary_name, 0o600)
@@ -1688,8 +1701,8 @@ def _install_log_path(install_root: Path, *, now: datetime | None = None) -> Pat
     """Return the owner-only, date-addressable installer log path."""
 
     root = install_root.expanduser().resolve()
-    log_root = root / "var/log"
-    _ensure_private_directory(root / "etc")
+    log_root = app_paths(root).log
+    _ensure_private_directory(app_paths(root).generated)
     _ensure_private_directory(log_root)
     current = now or datetime.now()
     return log_root / f"install.{current.strftime('%Y.%m.%d')}.log"
@@ -1789,7 +1802,7 @@ def collect_deferred_link_enrollment(args: argparse.Namespace) -> None:
 def snapshot_active_release(root: Path) -> dict[str, object] | None:
     package_home = root
     current = package_home / "current"
-    state = root / "var/state/installation/install-state.json"
+    state = app_paths(root).install_state
     if not current.is_symlink() or not state.is_file():
         return None
     launchers = {
@@ -1831,33 +1844,20 @@ def _snapshot_file(path: Path) -> dict[str, object]:
 def snapshot_install_configuration(root: Path, args: argparse.Namespace) -> dict[str, object]:
     """Capture installer-owned configuration before any install side effect."""
 
-    relative_paths = [
-        "coragent",
-        "current",
-        "coragent-web",
-        "uninstall.sh",
-        "etc/installation.json",
-        "etc/remote-host.json",
-        "var/state/host/server-id",
-        "var/state/host/link.json",
-        "var/state/host/host.token",
-        "etc/web/auth.token",
-        "etc/pi/models.json",
-        "etc/pi/auth.json",
-        "etc/email.toml",
-        "etc/secrets/service.env",
-        "etc/secrets/smtp-password",
-        "etc/job.toml",
-        "etc/name-resolver.toml",
-        "var/state/installation/source-provenance.json",
-        "var/state/installation/job-environments.json",
-        "var/state/installation/job-readiness.json",
-    ]
-    paths = {str(root / relative): _snapshot_file(root / relative) for relative in relative_paths}
+    layout = app_paths(root)
+    snapshot_paths = [root / name for name in ("coragent", "current", "coragent-web", "uninstall.sh")]
+    snapshot_paths += [layout.locator, layout.marker, layout.config_file, layout.credentials,
+        layout.remote_config, layout.host_state / 'server-id', layout.host_state / 'link.json',
+        layout.host_state / 'host.token', layout.generated / 'web/auth.token',
+        layout.pi_config / 'models.json', layout.pi_config / 'auth.json', layout.email_config, layout.generated / 'secrets/service.env',
+        layout.generated / 'secrets/smtp-password', layout.job_config, layout.resolver_config]
+    snapshot_paths += [layout.state / 'installation' / name for name in
+        ('source-provenance.json', 'job-environments.json', 'job-readiness.json')]
+    paths = {str(path): _snapshot_file(path) for path in snapshot_paths}
     external_password = getattr(args, "email_password_file", None)
     if isinstance(external_password, str):
         password_path = Path(external_password).expanduser()
-        if password_path.is_absolute() and password_path != root / "etc/secrets/smtp-password":
+        if password_path.is_absolute() and password_path != app_paths(root).generated / 'secrets/smtp-password':
             paths[str(password_path)] = _snapshot_file(password_path)
 
     services: dict[str, object] = {}
@@ -1894,7 +1894,7 @@ def snapshot_install_configuration(root: Path, args: argparse.Namespace) -> dict
         "service_instances": instances,
         "package_selection": {
             "current": _snapshot_file(package_home / "current"),
-            "state": _snapshot_file(root / "var/state/installation/install-state.json"),
+            "state": _snapshot_file(app_paths(root).install_state),
         },
         "release_ids": release_ids,
         "workspace_root": {
@@ -1990,7 +1990,7 @@ def restore_install_configuration(root: Path, snapshot: dict[str, object], *, ac
         for name in ("current", "state"):
             selection = package_selection.get(name)
             if isinstance(selection, dict):
-                _restore_file((root / "var/state/installation/install-state.json" if name == "state" else package_home / name), selection)
+                _restore_file((app_paths(root).install_state if name == "state" else package_home / name), selection)
 
     workspace = snapshot.get("workspace_root")
     if isinstance(workspace, dict) and workspace.get("existed") is False:
@@ -2068,7 +2068,7 @@ def restore_active_release(root: Path, snapshot: dict[str, object] | None) -> No
                 handle.write(state)
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(temporary, root / "var/state/installation/install-state.json")
+            os.replace(temporary, app_paths(root).install_state)
         finally:
             if descriptor != -1:
                 os.close(descriptor)
@@ -2175,18 +2175,10 @@ def active_suite_root(root: Path) -> Path:
 
 
 def prepare_runtime_dirs(root: Path) -> None:
-    for relative in (
-        "var/cache",
-        "var/state/installation/python",
-        "runtimes",
-        "etc/pi",
-        "var/state/web",
-        "etc/web",
-        "var/cache/app-server-runtime",
-        "var/state/host",
-        "etc/secrets",
-    ):
-        directory = root / relative
+    layout = app_paths(root).initialize()
+    for directory in (layout.cache, layout.runtime_home, layout.root / 'runtimes', layout.pi_config,
+                      layout.state / 'web', layout.generated / 'web', layout.cache / 'app-server-runtime',
+                      layout.host_state, layout.generated / 'secrets'):
         if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
             raise RuntimeError(f"runtime path must be a physical directory: {directory}")
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -2205,13 +2197,16 @@ def provision_pi_agent_configuration(args: argparse.Namespace) -> dict[str, obje
     )
     account = pwd.getpwnam(service_user)
     configured_source = getattr(args, "agent_config_dir", None)
-    source_dir = Path(configured_source).expanduser() if configured_source else Path(account.pw_dir) / ".pi/agent"
+    if not configured_source:
+        return {"status": "configured" if app_paths(root).configuration.read(required=False).get("models") else "not_configured",
+                "directory": str(app_paths(root).pi_config), "source": str(app_paths(root).config_file), "files": {}}
+    source_dir = Path(configured_source).expanduser()
     if source_dir.is_symlink() or not source_dir.is_dir():
         raise RuntimeError(
             f"Pi agent configuration directory must be a physical directory in physical directories: {source_dir}"
         )
     source_dir = source_dir.resolve()
-    destination_dir = root / "etc/pi"
+    destination_dir = app_paths(root).pi_config
     _ensure_private_directory(destination_dir)
     files: dict[str, str] = {}
 
@@ -2342,7 +2337,7 @@ def _install_new_private_config_bytes(raw: bytes, destination: Path) -> bool:
 
 
 def ensure_host_identity(root: Path) -> Path:
-    state = root / "var/state/host"
+    state = app_paths(root).state / 'host'
     state.mkdir(mode=0o700, parents=True, exist_ok=True)
     state.chmod(0o700)
     identity = state / "server-id"
@@ -2376,7 +2371,7 @@ def configure_phone_connection(args: argparse.Namespace) -> dict[str, object]:
     """Enroll the installation Host and write its private CoRAgent Link files."""
 
     root = Path(args.install_root).resolve()
-    state = root / "var/state/host"
+    state = app_paths(root).state / 'host'
     state.mkdir(mode=0o700, parents=True, exist_ok=True)
     state.chmod(0o700)
     manifest = state / "link.json"
@@ -2482,9 +2477,10 @@ ExecStart={command}
 Environment={_systemd_quote('PATH=' + search_path)}
 Environment={_systemd_quote('HOME=' + str(service_home))}
 Environment={_systemd_quote('XDG_RUNTIME_DIR=' + runtime_dir)}
-Environment={_systemd_quote('PI_CODING_AGENT_DIR=' + str(root / 'etc/pi'))}
+Environment={_systemd_quote('PI_CODING_AGENT_DIR=' + str(app_paths(root).pi_config))}
 Environment=CORAGENT_SYSTEMD_HOST=1
 Environment={_systemd_quote("CORAGENT_INSTALL_ROOT=" + str(root))}
+Environment={_systemd_quote("CORAGENT_CONFIG=" + str(app_paths(root).config_file))}
 Environment={_systemd_quote('CORAGENT_WORKSPACE_ROOT=' + str(workspace_root))}
 Environment={_systemd_quote('CORAGENT_APP_SERVER_RUNTIME_DIR=' + ('/run/coragent' if args.service_scope == 'system' else str(Path(runtime_dir) / 'coragent')))}
 {f'User={_systemd_value(service_user)}' if args.service_scope == 'system' else ''}
@@ -2499,11 +2495,12 @@ PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=read-only
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-ReadWritePaths={_systemd_quote(root / 'var/cache')}
-ReadWritePaths={_systemd_quote(root / 'var/state')}
-ReadWritePaths={_systemd_quote(root / 'var/log')}
+ReadWritePaths={_systemd_quote(app_paths(root).cache)}
+ReadWritePaths={_systemd_quote(app_paths(root).state)}
+ReadWritePaths={_systemd_quote(app_paths(root).log)}
 ReadWritePaths={_systemd_quote(Path('/run/coragent') if args.service_scope == 'system' else Path(runtime_dir) / 'coragent')}
-ReadWritePaths={_systemd_quote(root / 'etc/pi')}
+ReadWritePaths={_systemd_quote(app_paths(root).pi_config)}
+ReadWritePaths={_systemd_quote(app_paths(root).config)}
 ReadWritePaths={_systemd_quote(Path(runtime_dir) / 'coragent')}
 ReadWritePaths={_systemd_quote(workspace_root)}
 
@@ -2523,9 +2520,9 @@ def web_unit(args: argparse.Namespace) -> str:
         root / "current/agent/apps/agent-cli/research_web_bridge.py",
         "serve",
         "--state-dir",
-        root / "var/state/web",
+        app_paths(root).state / 'web',
         "--auth-token-file",
-            Path(args.web_auth_token_file).expanduser() if args.web_auth_token_file else root / "etc/web/auth.token",
+            Path(args.web_auth_token_file).expanduser() if args.web_auth_token_file else app_paths(root).generated / 'web/auth.token',
         "--host",
         args.web_host,
     ]
@@ -2541,6 +2538,7 @@ After=network-online.target
 Type=simple
 WorkingDirectory={working_directory}
 Environment={_systemd_quote("CORAGENT_INSTALL_ROOT=" + str(root))}
+Environment={_systemd_quote("CORAGENT_CONFIG=" + str(app_paths(root).config_file))}
 ExecStart={command}
 {f'User={_systemd_value(args.service_user)}' if args.service_scope == 'system' else ''}
 {f'Group={_systemd_value(args.service_group)}' if getattr(args, 'service_group', None) and args.service_scope == 'system' else ''}
@@ -2553,8 +2551,8 @@ PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=read-only
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-ReadWritePaths={_systemd_quote(root / 'var/state/web')}
-ReadWritePaths={_systemd_quote(root / 'etc/web')}
+ReadWritePaths={_systemd_quote(app_paths(root).state / 'web')}
+ReadWritePaths={_systemd_quote(app_paths(root).generated / 'web')}
 ReadOnlyPaths={_systemd_quote(workspace_root)}
 ReadWritePaths={_systemd_quote(workspace_root / '.coragent-catalog')}
 
@@ -2565,7 +2563,7 @@ WantedBy={wanted_by}
 
 def _notification_environment_directive(args: argparse.Namespace) -> str:
     root = Path(args.install_root)
-    config = root / "etc/email.toml"
+    config = app_paths(root).email_config
     if not config.is_file():
         return ""
     try:
@@ -2574,7 +2572,7 @@ def _notification_environment_directive(args: argparse.Namespace) -> str:
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError, AttributeError):
         return ""
     if isinstance(email, dict) and isinstance(email.get("password_env"), str):
-        return f"EnvironmentFile=-{_systemd_value(root / 'etc/secrets/service.env')}"
+        return f"EnvironmentFile=-{_systemd_value(app_paths(root).generated / 'secrets/service.env')}"
     return ""
 
 
@@ -2757,7 +2755,7 @@ def verify_running_services(args, installed, *, timeout_seconds=30):
                     host = "127.0.0.1" if host == "0.0.0.0" else "::1"
                 if ":" in host:
                     host = f"[{host}]"
-                token_path = Path(args.web_auth_token_file).expanduser() if args.web_auth_token_file else root / "etc/web/auth.token"
+                token_path = Path(args.web_auth_token_file).expanduser() if args.web_auth_token_file else app_paths(root).generated / 'web/auth.token'
                 token = token_path.read_text().strip()
                 request = urllib.request.Request(f"http://{host}:{args.web_port}/api/workspaces",
                                                  headers={"Authorization": "Bearer " + token})
@@ -2782,13 +2780,14 @@ def align_service_ownership(args: argparse.Namespace) -> None:
     # service unable to traverse or execute the selected package.
     if root.is_symlink() or not root.is_dir():
         raise ValueError(f"installation root must be a physical directory: {root}")
-    for current, directories, files in os.walk(root, followlinks=False):
-        current_path = Path(current)
-        os.chown(current_path, account.pw_uid, account.pw_gid)
-        for name in [*directories, *files]:
-            child = current_path / name
-            if not child.is_symlink():
-                os.chown(child, account.pw_uid, account.pw_gid)
+    for owned_root in (root, app_paths(root).config, app_paths(root).state):
+        for current, directories, files in os.walk(owned_root, followlinks=False):
+            current_path = Path(current)
+            os.chown(current_path, account.pw_uid, account.pw_gid)
+            for name in [*directories, *files]:
+                child = current_path / name
+                if not child.is_symlink():
+                    os.chown(child, account.pw_uid, account.pw_gid)
     workspace_root = Path(args.workspace_root)
     if workspace_root.is_symlink() or not workspace_root.is_dir():
         raise ValueError(f"workspace root must be a physical directory: {workspace_root}")
@@ -2873,7 +2872,7 @@ def build_component_summary(
     )
     probe = runtime.get("runtime_probe") if isinstance(runtime.get("runtime_probe"), dict) else {}
     service_by_name = {item["name"]: item for item in services}
-    server_id_path = root / "var/state/host/server-id"
+    server_id_path = app_paths(root).state / 'host/server-id'
     try:
         server_id = server_id_path.read_text(encoding="ascii").strip() if server_id_path.is_file() else None
     except (OSError, UnicodeDecodeError):
@@ -2905,14 +2904,14 @@ def build_component_summary(
         },
         "phone": phone_connection or {
             "status": "disabled",
-            "manifest": str(root / "var/state/host/link.json"),
+            "manifest": str(app_paths(root).state / 'host/link.json'),
             "relay_url": args.link_url,
             "protocol": "coragent-link.v1",
             "tool_access": "same_as_terminal",
         },
         "models": model_configuration or {
             "status": "not_configured",
-            "directory": str(root / "etc/pi"),
+            "directory": str(app_paths(root).pi_config),
             "files": {},
         },
         "web": (
@@ -2920,7 +2919,7 @@ def build_component_summary(
                 "status": "configured" if args.service_scope == "none" else _service_readiness(service_by_name.get("coragent-web.service"), probed=args.start_services),
                 "launcher": str(root / "coragent-web"),
                 "url": f"http://{args.web_host}:{args.web_port}",
-                "state_directory": str(root / "var/state/web"),
+                "state_directory": str(app_paths(root).state / 'web'),
                 "workspace_root": str(workspace_root),
                 "credential": credentials.get("web_http"),
                 "service": service_by_name.get("coragent-web.service"),
@@ -2929,12 +2928,12 @@ def build_component_summary(
             else None
         ),
         "job": backend_configs.get("job") if backend_configs else {
-            "status": "preserved" if (root / "etc/job.toml").is_file() else "not_configured",
-            "path": str(root / "etc/job.toml"),
+            "status": "preserved" if (app_paths(root).job_config).is_file() else "not_configured",
+            "path": str(app_paths(root).job_config),
         },
         "name_resolver": backend_configs.get("name_resolver") if backend_configs else {
-            "status": "preserved" if (root / "etc/name-resolver.toml").is_file() else "not_configured",
-            "path": str(root / "etc/name-resolver.toml"),
+            "status": "preserved" if (app_paths(root).resolver_config).is_file() else "not_configured",
+            "path": str(app_paths(root).resolver_config),
             "enabled_backends": "",
             "automatic_lookup": "unavailable",
         },
@@ -2979,7 +2978,7 @@ def show_installed_summary(
         model_status = str(models.get("status", "not_configured"))
         field(
             "Pi model configuration",
-            f"{model_status} - {models.get('directory', root / 'etc/pi')}",
+            f"{model_status} - {models.get('directory', app_paths(root).pi_config)}",
             tone="success" if model_status in {"imported", "preserved"} else "warning",
         )
 
@@ -3133,7 +3132,7 @@ def show_dry_run(args: argparse.Namespace) -> None:
     _validate_job_config(scientific['settings'])
     validate_email_options(args)
     plan = {key: getattr(args, key) for key in (
-        "install_root", "config_dir", "workspace_root", "source_root", "coragent_repo",
+        "install_root", "config", "config_dir", "workspace_root", "source_root", "coragent_repo",
         "coragent_ref", "coragent_commit", "job_config", "agent_config_dir",
         "with_web", "with_link_relay", "service_scope", "phone_access",
     )}
@@ -3194,6 +3193,11 @@ def main(argv: list[str] | None = None) -> int:
         activate_source_package(ROOT)
         from research_agent.foundation.installation_maintenance import InstallationMaintenance
         maintenance = InstallationMaintenance(installation_root).acquire(defer=True)
+        try:
+            from ._configuration import prepare, publish as publish_configuration
+        except ImportError:
+            from _configuration import prepare, publish as publish_configuration
+        prepare(args)
         installed = run_install(args)
         package = Path(installed['package_root']) / 'agent'
         args._prepared_job_plan = _job_install.prepare(_job_install.plan(args, package), args, package,
@@ -3207,6 +3211,7 @@ def main(argv: list[str] | None = None) -> int:
         stop_installation_services(args)
         from research_agent.bootstrap.session_guard import guard_installation_upgrade
         writer_guard.enter_context(guard_installation_upgrade(installation_root))
+        app_paths(installation_root).materialize()
         backend_configs = _job_install.publish(args._prepared_job_plan)
         try:
             from .install_package import activate_prepared_package
@@ -3247,6 +3252,7 @@ def main(argv: list[str] | None = None) -> int:
             activity.update("Verifying declared execution environments")
             verify_job_bindings(args, installed, backend_configs)
             _write_job_readiness(Path(backend_configs['job']['path']), backend_configs['job'])
+            publish_configuration(args)
             activity.update("Configuring services")
             services = configure_services(args, start=False)
             activity.update("Verifying the installed release")

@@ -6,29 +6,37 @@ import { formatError, formatTerminalFailure } from "../../../apps/agent/terminal
 test("missing installation model configuration explains Pi's opaque startup failure", () => {
   const message = formatTerminalFailure(new Error("Internal server error"), {
     installRoot: "/home/test/coragent",
+    configFile: "/home/test/.config/coragent/config.toml",
+    credentialsFile: "/home/test/.config/coragent/credentials.json",
     fileExists: () => false,
   });
 
   assert.match(message, /^Internal server error\n/);
-  assert.match(message, /Missing Pi configuration/);
-  assert.match(message, /\/home\/test\/coragent\/etc\/pi\/models\.json/);
-  assert.match(message, /\/home\/test\/coragent\/etc\/pi\/auth\.json/);
+  assert.match(message, /Missing CoRAgent configuration/);
+  assert.match(message, /\/home\/test\/\.config\/coragent\/config\.toml/);
+  assert.match(message, /\/home\/test\/\.config\/coragent\/credentials\.json/);
   assert.match(message, /restart the CoRAgent Host/);
 });
 
 test("terminal failures include a diagnostic location when Pi configuration exists", () => {
   const message = formatTerminalFailure(new Error("Internal server error"), {
     installRoot: "/home/test/coragent",
+    configFile: "/home/test/.config/coragent/config.toml",
+    credentialsFile: "/home/test/.config/coragent/credentials.json",
     fileExists: () => true,
   });
   assert.match(message, /^Internal server error\nDiagnosis:/);
   assert.match(message, /worker-diagnostics\.log/);
   assert.match(formatTerminalFailure(new Error("Internal server error"), {
     installRoot: "/home/test/coragent",
-    fileExists: (path) => path.endsWith("models.json"),
-  }), /Missing Pi configuration: \/home\/test\/coragent\/etc\/pi\/auth\.json/);
+    configFile: "/home/test/.config/coragent/config.toml",
+    credentialsFile: "/home/test/.config/coragent/credentials.json",
+    fileExists: (path) => path.endsWith("config.toml"),
+  }), /Missing CoRAgent configuration: \/home\/test\/\.config\/coragent\/credentials\.json/);
   assert.equal(formatTerminalFailure(new Error("connection failed"), {
     installRoot: "/home/test/coragent",
+    configFile: "/home/test/.config/coragent/config.toml",
+    credentialsFile: "/home/test/.config/coragent/credentials.json",
     fileExists: () => false,
   }), "connection failed");
 });
@@ -36,7 +44,9 @@ test("terminal failures include a diagnostic location when Pi configuration exis
 test("worker diagnostics identify the Pi Durable details context mismatch", () => {
   const message = formatTerminalFailure(new Error("Internal server error"), {
     installRoot: "/home/test/coragent",
-    diagnosticFile: "/home/test/coragent/var/log/worker-diagnostics.log",
+    configFile: "/home/test/.config/coragent/config.toml",
+    credentialsFile: "/home/test/.config/coragent/credentials.json",
+    diagnosticFile: "/home/test/.local/state/coragent/logs/worker-diagnostics.log",
     fileExists: () => true,
     readFile: () => "TypeError: Cannot read properties of undefined (reading 'abortSignal')\n",
   });
@@ -48,7 +58,9 @@ test("worker diagnostics identify the Pi Durable details context mismatch", () =
 test("worker diagnostics identify stale durable session locks", () => {
   const message = formatTerminalFailure(new Error("Internal server error"), {
     installRoot: "/home/test/coragent",
-    diagnosticFile: "/home/test/coragent/var/log/worker-diagnostics.log",
+    configFile: "/home/test/.config/coragent/config.toml",
+    credentialsFile: "/home/test/.config/coragent/credentials.json",
+    diagnosticFile: "/home/test/.local/state/coragent/logs/worker-diagnostics.log",
     fileExists: () => true,
     readFile: () => "Error: Unable to update lock within the stale threshold\n",
   });
@@ -60,14 +72,16 @@ test("worker diagnostics identify stale durable session locks", () => {
 test("worker diagnostics are surfaced for opaque Pi startup failures", () => {
   const message = formatTerminalFailure(new Error("Internal server error"), {
     installRoot: "/home/test/coragent",
-    diagnosticFile: "/home/test/coragent/var/log/worker-diagnostics.log",
+    configFile: "/home/test/.config/coragent/config.toml",
+    credentialsFile: "/home/test/.config/coragent/credentials.json",
+    diagnosticFile: "/home/test/.local/state/coragent/logs/worker-diagnostics.log",
     fileExists: () => true,
     readFile: () => "Error: provider auth failed\n    at worker (worker.ts:42)\n",
   });
 
   assert.match(message, /Pi Worker diagnostics/);
   assert.match(message, /provider auth failed/);
-  assert.doesNotMatch(message, /Missing Pi configuration/);
+  assert.doesNotMatch(message, /Missing CoRAgent configuration/);
 });
 
 test("nested service failures retain their actionable cause", () => {
@@ -79,10 +93,12 @@ test("nested service failures retain their actionable cause", () => {
   assert.equal(formatError(failure), "Failed to rebind services: Internal server error: cleanup failed: transport closed");
   const message = formatTerminalFailure(failure, {
     installRoot: "/home/test/coragent",
+    configFile: "/home/test/.config/coragent/config.toml",
+    credentialsFile: "/home/test/.config/coragent/credentials.json",
     fileExists: () => false,
   });
   assert.match(message, /^Failed to rebind services: Internal server error: cleanup failed: transport closed\n/);
-  assert.match(message, /Possible cause: Missing Pi configuration/);
+  assert.match(message, /Possible cause: Missing CoRAgent configuration/);
 });
 
 test("stale Pi bindings explain Host restart recovery", () => {

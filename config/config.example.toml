@@ -1,0 +1,37 @@
+# Copy to ~/.config/coragent/config.toml. Credentials live beside it in credentials.json.
+schema_version = 1
+
+[paths]
+software_root = "/home/iaw/soft/coragent"
+state_root = "/home/iaw/.local/state/coragent"
+workspace_root = "/home/iaw/DATA/coragent/workspaces"
+
+[service]
+scope = "user"
+
+[web]
+enabled = true
+host = "127.0.0.1"
+port = 8766
+
+[models.providers]
+# Provider definitions use the Pi models format. For a secret field, use
+# apiKey = "credential:provider_key" and store the value in credentials.json.
+
+[execution]
+default_target = "local"
+
+[execution.targets.local]
+type = "local"
+driver = "systemd"
+
+[notifications.email]
+enabled = false
+# provider = "smtp"
+# preset = "custom"
+# host = "smtp.example.com"
+# port = 465
+# security = "ssl"
+# username = "research@example.com"
+# recipient = "research@example.com"
+# password = "credential:smtp_password"

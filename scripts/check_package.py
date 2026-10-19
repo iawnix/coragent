@@ -62,7 +62,7 @@ FORBIDDEN_PARTS = {
     "node_modules",
     "tests",
 }
-FORBIDDEN_BASENAMES = {".env", "auth.json", "auth.toml", "config.toml", "models.json"}
+FORBIDDEN_BASENAMES = {".env", "auth.json", "auth.toml", "config.toml", "credentials.json", "models.json"}
 FORBIDDEN_RUNTIME_FILES = {
     "scripts/_source_capture.py",
     "scripts/build_package.py",

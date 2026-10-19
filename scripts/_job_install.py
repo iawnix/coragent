@@ -5,6 +5,11 @@ receipts record ownership and never supply implicit runtime configuration.
 """
 from __future__ import annotations
 
+try:
+    from .app_layout import paths as app_paths
+except ImportError:
+    from app_layout import paths as app_paths
+
 import base64
 import copy
 import hashlib
@@ -21,8 +26,8 @@ import tempfile
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
-RECORD = 'var/state/installation/job-environments.json'
-STORES = 'var/state/installation/job-environment-stores.json'
+RECORD = 'installation/job-environments.json'
+STORES = 'installation/job-environment-stores.json'
 
 
 def contract(root=ROOT):
@@ -136,28 +141,31 @@ def read_input(path, inputs, *, required=False):
 
 
 def plan(args, package=ROOT):
-    root = Path(args.install_root or Path.home() / '.local/share/coragent').expanduser().resolve()
+    root = Path(args.install_root or Path.home() / 'soft/coragent').expanduser().resolve()
     inputs = {}
-    installed_job = read_input(root / 'etc/job.toml', inputs)
+    layout = app_paths(root)
+    read_input(layout.config_file, inputs)
+    document = layout.configuration.read(required=False)
+    installed_job = (toml_bytes({'execution': layout.configuration.resolve_credentials(document['execution'])})
+                     if 'execution' in document else None)
     raw = read_input(args.job_config, inputs, required=True) if args.job_config else installed_job
-    settings = tomllib.loads(raw.decode()) if raw is not None else {'default_environment': 'local',
-        'environments': {'local': {'kind': 'local', 'backends': {}}}}
+    settings = tomllib.loads(raw.decode()) if raw is not None else {'execution': {
+        'default_target': 'local', 'targets': {'local': {'type': 'local', 'driver': 'systemd', 'bindings': {}}}}}
     if "execution" in settings:
         settings = contract().validate_job_config(settings)
     settings = copy.deepcopy(settings)
-    previous_raw = read_input(root / RECORD, inputs)
+    previous_raw = read_input(app_paths(root).state / RECORD, inputs)
     previous = json.loads(previous_raw) if previous_raw else {'environments': []}
     if previous_raw and (not isinstance(previous, dict) or previous.get('schema_version') != 'coragent-job-install/1'
                         or not isinstance(previous.get('environments'), list)):
-        raise ValueError('invalid managed environment record: ' + str(root / RECORD))
+        raise ValueError('invalid managed environment record: ' + str(app_paths(root).state / RECORD))
     for row in previous['environments']:
         if not isinstance(row, dict) or not {'target', 'kind', 'profile', 'backends', 'binding', 'managed', 'store'} <= row.keys():
-            raise ValueError('incomplete managed environment record: ' + str(root / RECORD))
+            raise ValueError('incomplete managed environment record: ' + str(app_paths(root).state / RECORD))
         contract().validate_python(row['binding'])
     available = profiles(package)
     selections = list(getattr(args, 'job_profile', None) or [])
-    if raw is None and not getattr(args, 'without_default_job_environment', False):
-        selections.extend('local:' + key for key, value in available.items() if value.get('default'))
+    # Scientific environments are provisioned only by an explicit maintenance request.
     # A managed selection persists across upgrades, provided its bindings have
     # not been edited by the operator since the last publication.
     for row in previous['environments']:
@@ -171,7 +179,7 @@ def plan(args, package=ROOT):
     if (roots.keys() | condas.keys()) - settings['environments'].keys():
         raise ValueError('software root or Conda target is not configured')
     identity = digest(os.fsencode(root))[:16]
-    default_store = str(Path.home() / 'soft/coragent/job-envs' / identity)
+    default_store = str(Path.home() / 'soft/compute-envs')
     rows, selected_targets = [], set(getattr(args, 'verify_job_target', None) or [])
     for selection in dict.fromkeys(selections):
         target_name, separator, identifier = selection.partition(':')
@@ -223,8 +231,8 @@ def plan(args, package=ROOT):
     selected_targets.update(name for name, target in settings['environments'].items() if target['kind'] == 'local')
     if selected_targets - settings['environments'].keys():
         raise ValueError('verification target is not configured')
-    resolver_path = root / 'etc/name-resolver.toml'
-    existing_resolver = read_input(resolver_path, inputs)
+    resolver_path = app_paths(root).resolver_config
+    existing_resolver = toml_bytes(document['name_resolver']) if 'name_resolver' in document else None
     resolver = (read_input(args.name_resolver_config, inputs, required=True) if args.name_resolver_config else existing_resolver)
     if resolver is None:
         resolver = (package / 'config/name-resolver.example.toml').read_bytes()
@@ -316,12 +324,12 @@ def invoke_target(target, request, package, *, timeout=3600, log_path=None):
 
 def prepare(value, args, package, python):
     root = Path(value['install_root'])
-    stage_root = root / 'var/cache/job-install'
+    stage_root = app_paths(root).cache / 'job-install'
     stage_root.mkdir(parents=True, exist_ok=True, mode=0o700)
     stage = Path(tempfile.mkdtemp(prefix='candidate-', dir=stage_root)).resolve()
     # Keep ownership even when acceptance or release activation later fails.
     # Old stores remain discoverable after selecting a different store on retry.
-    registry = root / STORES
+    registry = app_paths(root).state / STORES
     if registry.is_symlink():
         raise ValueError('managed store registry cannot be a symlink')
     stores = json.loads(registry.read_text()) if registry.is_file() else []
@@ -377,37 +385,37 @@ def prepare(value, args, package, python):
 def publish(value):
     assert_inputs_unchanged(value)
     root = Path(value['install_root'])
-    write_private(root / 'etc/name-resolver.toml', value['resolver'].encode())
-    write_private(root / 'etc/job.toml', toml_bytes(contract().configuration_document(value['settings'])))
+    write_private(app_paths(root).resolver_config, value['resolver'].encode())
+    write_private(app_paths(root).job_config, toml_bytes(contract().configuration_document(value['settings'])))
     record = {key: value[key] for key in ('schema_version', 'environments', 'readiness', 'configuration_source')}
-    write_private(root / RECORD, (json.dumps(record, indent=2) + '\n').encode())
+    write_private(app_paths(root).state / RECORD, (json.dumps(record, indent=2) + '\n').encode())
     current_digest = digest(toml_bytes(contract().configuration_document(value['settings'])))
-    previous_digest = value['inputs'].get(str(root / 'etc/job.toml'))
-    return {'job': {'status': 'configured', 'path': str(root / 'etc/job.toml'), 'readiness': value['readiness'],
+    previous_digest = value['inputs'].get(str(app_paths(root).job_config))
+    return {'job': {'status': 'configured', 'path': str(app_paths(root).job_config), 'readiness': value['readiness'],
                     'sha256': current_digest, 'previous_sha256': previous_digest,
                     'configuration_changed': previous_digest is not None and previous_digest != current_digest},
-            'name_resolver': {'status': 'configured', 'path': str(root / 'etc/name-resolver.toml')}}
+            'name_resolver': {'status': 'configured', 'path': str(app_paths(root).resolver_config)}}
 
 
 def verify_publication(value, python):
     root = Path(value['install_root'])
-    if (root / 'etc/job.toml').read_bytes() != toml_bytes(contract().configuration_document(value['settings'])):
+    if (app_paths(root).job_config).read_bytes() != toml_bytes(contract().configuration_document(value['settings'])):
         raise RuntimeError('published Job configuration changed')
-    if (root / 'etc/name-resolver.toml').read_text() != value['resolver']:
+    if (app_paths(root).resolver_config).read_text() != value['resolver']:
         raise RuntimeError('published resolver configuration changed')
     stage, package = Path(value['stage']), Path(value['package_root'])
     targets = [name for name in value['targets'] if value['settings']['environments'][name]['kind'] == 'local']
     report = stage / 'published-readiness.json'
-    command = [python, '-B', str(package / 'scripts/_job_acceptance.py'), '--config', str(root / 'etc/job.toml'),
+    command = [python, '-B', str(package / 'scripts/_job_acceptance.py'), '--config', str(app_paths(root).job_config),
                '--package-root', str(package), '--directory', str(stage / 'published-jobs'), '--report', str(report),
                '--targets', json.dumps(targets), '--bindings-only']
     result = subprocess.run(command, text=True, capture_output=True, env=acceptance_environment(package, python))
     write_private(stage / 'published-acceptance.log', (result.stdout + '\n' + result.stderr).encode())
     if result.returncode:
         raise RuntimeError('published Job binding verification failed; local report: ' + str(report))
-    record_path = root / RECORD
+    record_path = app_paths(root).state / RECORD
     record = json.loads(record_path.read_text())
-    record['published_configuration_sha256'] = digest((root / 'etc/job.toml').read_bytes())
+    record['published_configuration_sha256'] = digest((app_paths(root).job_config).read_bytes())
     record['publication'] = json.loads(report.read_text())
     write_private(record_path, (json.dumps(record, indent=2) + '\n').encode())
 
@@ -425,15 +433,15 @@ def acceptance_environment(package, python):
 def cleanup_stores(root, workspace, guards):
     """Select unreferenced local stores owned by this installation for purge."""
     import fcntl
-    record = root / RECORD
-    registry = root / STORES
+    record = app_paths(root).state / RECORD
+    registry = app_paths(root).state / STORES
     if record.is_symlink() or registry.is_symlink():
         raise ValueError('managed environment records cannot be symlinks')
     rows = json.loads(record.read_text()).get('environments', []) if record.is_file() else []
     rows.extend({**row, 'managed': True} for row in (json.loads(registry.read_text()) if registry.is_file() else []))
     stores = {row['store'] for row in rows if row.get('managed') and row.get('store')}
     active = False
-    for directory in (workspace, root / 'var/cache/job-install'):
+    for directory in (workspace, app_paths(root).cache / 'job-install'):
         for path in directory.rglob('operations/executions/*.json') if directory.is_dir() else []:
             try:
                 active |= json.loads(path.read_text()).get('state') not in {'succeeded', 'failed', 'cancelled', 'timed_out', 'collected'}

@@ -1,10 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 
 /** Add an actionable diagnosis for Pi's opaque worker-startup failure. */
 export function formatTerminalFailure(error, {
   installRoot,
   diagnosticFile,
+  configFile = process.env.CORAGENT_CONFIG || resolve(process.env.HOME || ".", ".config/coragent/config.toml"),
+  credentialsFile = process.env.CORAGENT_CREDENTIALS_FILE || resolve(dirname(configFile), "credentials.json"),
   fileExists = existsSync,
   readFile = readFileSync,
 } = {}) {
@@ -16,16 +18,15 @@ export function formatTerminalFailure(error, {
   if (diagnostic) {
     return `${message}\n${diagnoseWorkerFailure(diagnostic)}\nPi Worker diagnostics (${diagnosticFile}):\n${diagnostic}`;
   }
-  const agentDir = resolve(installRoot, "etc/pi");
-  const modelsPath = resolve(agentDir, "models.json");
-  const authPath = resolve(agentDir, "auth.json");
+  const modelsPath = configFile;
+  const authPath = credentialsFile;
   const missing = [modelsPath, authPath].filter((path) => !fileExists(path));
   if (missing.length === 0) {
-    const location = diagnosticFile || `${installRoot}/var/log/worker-diagnostics.log`;
+    const location = diagnosticFile || "worker-diagnostics.log in the configured local state logs directory";
     return `${message}\nDiagnosis: the Pi Worker failed without returning details; inspect ${location} and restart the CoRAgent Host.`;
   }
   return (
-    `${message}\nPossible cause: Missing Pi configuration: ${missing.join(", ")}. `
+    `${message}\nPossible cause: Missing CoRAgent configuration: ${missing.join(", ")}. `
     + `Add custom providers to ${modelsPath} and credentials to ${authPath}, or configure provider `
     + "environment credentials, then restart the CoRAgent Host and retry."
   );

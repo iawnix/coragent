@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from research_agent.foundation.layout import paths as app_paths
+
 from research_agent.foundation.layout import paths
 from research_agent.foundation.protocol import HOST_PROTOCOL, WORKSPACE_ID_PATTERN
 
@@ -68,11 +70,8 @@ SMTP_PRESETS = {
 SMTP_SECURITY = {"ssl", "starttls"}
 WORKSPACE_ROOT_SCHEMA = "coragent-workspace-root/1"
 SERVICE_CONFIG_SCHEMA = "coragent-service/1"
-SERVICE_CONFIG_RELATIVE = Path("etc/installation.json")
 REMOTE_HOST_CONFIG_SCHEMA = "coragent-remote-host/1"
-REMOTE_HOST_CONFIG_RELATIVE = Path("etc/remote-host.json")
 REMOTE_ENVIRONMENT_ENV = "CORAGENT_REMOTE_ENVIRONMENT"
-PI_AGENT_SETTINGS_RELATIVE = Path("etc/pi/settings.json")
 CORAGENT_THEME_RELATIVE = Path("apps/agent/terminal/themes/coragent.json")
 CORAGENT_THEME_NAME = "coragent"
 EMAIL_ADDRESS = re.compile(r"^[^@\s]+@[^@\s]+$")
@@ -319,6 +318,7 @@ def resolve_installation(package_root: str | Path, install_root: str | Path) -> 
     expected_agent = Path(package_root).expanduser().resolve()
     layout = paths(root)
     layout.read_config()
+    layout.materialize()
     if (root / ".pi").exists() or (root / ".agents").exists():
         raise CoRAgentHostError("old installation layout is unsupported; install a fresh release")
     package_home = root
@@ -355,15 +355,15 @@ def resolve_installation(package_root: str | Path, install_root: str | Path) -> 
         root=root,
         package_root=expected_agent,
         workspaces_root=_configured_workspace_root(root),
-        notification_config_default=root / "etc/email.toml",
+        notification_config_default=app_paths(root).email_config,
         runtime_home=runtime_home,
         runtime_manifest=runtime_home / "env.json",
         env_root=layout.env_root,
-        process_cache_root=root / "var/cache",
-        job_config_default=root / "etc/job.toml",
+        process_cache_root=app_paths(root).cache,
+        job_config_default=app_paths(root).job_config,
         service_scope=service_scope,
         host_runtime_dir=host_runtime_dir,
-        remote_host_config=root / REMOTE_HOST_CONFIG_RELATIVE,
+        remote_host_config=paths(root).remote_config,
     )
 
 
@@ -371,9 +371,9 @@ def _configured_service(root: Path) -> tuple[str, Path | None]:
     path = paths(root).marker
     value = paths(root).read_config().get("service")
     if value is None: return "user", None
-    if not isinstance(value, dict) or set(value) != {"schema_version", "scope", "runtime_dir"}:
+    if not isinstance(value, dict) or set(value) - {"schema_version", "scope", "runtime_dir", "user"}:
         raise CoRAgentHostError(f"service configuration is invalid: {path}")
-    if value.get("schema_version") != SERVICE_CONFIG_SCHEMA:
+    if value.get("schema_version", SERVICE_CONFIG_SCHEMA) != SERVICE_CONFIG_SCHEMA:
         raise CoRAgentHostError(f"service configuration is invalid: {path}")
     scope = value.get("scope")
     runtime_value = value.get("runtime_dir")
@@ -446,7 +446,7 @@ def resolve_remote_terminal_request(installation: Installation, request: LaunchR
 
 
 def _configured_workspace_root(root: Path) -> Path:
-    value = paths(root).read_config().get("workspace_root", str(root / "workspaces"))
+    value = str(paths(root).workspace_root)
     requested = Path(value).expanduser()
     if not requested.is_absolute() or requested.is_symlink():
         raise CoRAgentHostError(f"configured workspace root must be an absolute physical path: {requested}")
@@ -460,7 +460,7 @@ def _configured_workspace_root(root: Path) -> Path:
         or resolved in root.parents
     ):
         raise CoRAgentHostError(f"configured workspace root must be a dedicated directory: {resolved}")
-    for protected in (root / "etc", root / "var", root / "runtimes", root / "releases"):
+    for protected in (app_paths(root).generated, paths(root).state, root / "runtimes", root / "releases"):
         if resolved == protected or protected in resolved.parents:
             raise CoRAgentHostError(f"configured workspace root overlaps installation state: {resolved}")
     return resolved
@@ -634,7 +634,7 @@ def _configure_workspace_pi_settings(path: Path) -> None:
 
 def _restore_native_pi_settings(installation: Installation) -> None:
     """Remove appearance settings written by older CoRAgent launchers."""
-    path = installation.root / PI_AGENT_SETTINGS_RELATIVE
+    path = paths(installation.root).pi_config / 'settings.json'
     if path.is_symlink():
         raise CoRAgentHostError(f"Pi agent settings cannot be a symbolic link: {path}")
     if not path.exists():
@@ -800,6 +800,10 @@ def configure_notifications(installation: Installation) -> None:
         email = notifications["email"]
         if not isinstance(email, dict):
             raise ValueError("notifications.email must be a table")
+        if email.get("enabled") is False:
+            os.environ.pop("CORAGENT_NOTIFICATION_CONFIG", None)
+            os.environ["CORAGENT_NOTIFICATION_DISPLAY_TARGET"] = "disabled"
+            return
         email = _normalize_notification_provider(email)
         enabled = email["enabled"]
         recipient = email["recipient"]
@@ -893,8 +897,10 @@ def _require_config_file(value: str, label: str) -> Path:
 def configure_process_environment(installation: Installation, workspace: Path, workspace_name: str) -> None:
     os.environ[PACKAGE_ROOT_OVERRIDE] = str(installation.package_root)
     os.environ["CORAGENT_INSTALL_ROOT"] = str(installation.root)
+    os.environ["CORAGENT_CONFIG"] = str(paths(installation.root).config_file)
+    os.environ["CORAGENT_CREDENTIALS_FILE"] = str(paths(installation.root).credentials)
     os.environ["CORAGENT_WORKSPACE_ROOT"] = str(workspace)
-    os.environ["PI_CODING_AGENT_DIR"] = str(installation.root / "etc/pi")
+    os.environ["PI_CODING_AGENT_DIR"] = str(app_paths(installation.root).pi_config)
     # Keep the Native Pi client on the package's standard presentation path.
     os.environ.pop("CORAGENT_CUSTOM_UI", None)
     _restore_native_pi_settings(installation)
@@ -924,6 +930,8 @@ def configure_host_process_environment(installation: Installation) -> None:
     """Configure the installation-wide environment used by the Host process."""
     os.environ[PACKAGE_ROOT_OVERRIDE] = str(installation.package_root)
     os.environ["CORAGENT_INSTALL_ROOT"] = str(installation.root)
+    os.environ["CORAGENT_CONFIG"] = str(paths(installation.root).config_file)
+    os.environ["CORAGENT_CREDENTIALS_FILE"] = str(paths(installation.root).credentials)
     # The Host's Pi App Server and every SessionWorker must resolve the pinned
     # Pi SDK from the installation-owned checkout.  Client launches set this
     # in their terminal path; the systemd Host has no terminal bootstrap, so
@@ -932,8 +940,8 @@ def configure_host_process_environment(installation: Installation) -> None:
     os.environ["CORAGENT_HOST_STATE_ROOT"] = str(paths(installation.root).host_state)
     os.environ["CORAGENT_SESSION_ROOT"] = str(paths(installation.root).sessions)
     os.environ["CORAGENT_WORKSPACE_ROOT"] = str(installation.workspaces_root)
-    os.environ["PI_CODING_AGENT_DIR"] = str(installation.root / "etc/pi")
-    diagnostic_path = installation.root / "var/log/worker-diagnostics.log"
+    os.environ["PI_CODING_AGENT_DIR"] = str(app_paths(installation.root).pi_config)
+    diagnostic_path = app_paths(installation.root).log / 'worker-diagnostics.log'
     if diagnostic_path.is_symlink() or (diagnostic_path.exists() and not diagnostic_path.is_file()):
         raise CoRAgentHostError(f"Pi Worker diagnostics path is not a regular file: {diagnostic_path}")
     diagnostic_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -1225,7 +1233,7 @@ def build_host_client_command(
         str(installation.package_root / "apps/agent/terminal/main.mjs"),
         "--workspace-id", str(request.workspace_name),
         "--workspace-root", str(workspace_path or (installation.workspaces_root / str(request.workspace_name))),
-        "--state-root", str(installation.root / "var/state/host"),
+        "--state-root", str(app_paths(installation.root).state / 'host'),
         "--install-root", str(installation.root),
         "--package-root", str(installation.package_root),
     ]
@@ -1329,7 +1337,7 @@ def launch_harness_client(installation: Installation, request: LaunchRequest, wo
     os.environ["CORAGENT_PI_RUNTIME_ROOT"] = str(resolve_pi_source(installation))
     os.environ["CORAGENT_HOST_STATE_ROOT"] = str(paths(installation.root).host_state)
     os.environ["CORAGENT_SESSION_ROOT"] = str(paths(installation.root).sessions)
-    os.environ["PI_SERVER_DIR"] = str(installation.root / "var/state/host/pi-server")
+    os.environ["PI_SERVER_DIR"] = str(app_paths(installation.root).state / 'host/pi-server')
     os.environ["PI_EXPERIMENTAL"] = "1"
     os.environ["CORAGENT_PACKAGE_ROOT"] = str(installation.package_root)
     os.environ["PI_SESSION_WORKER_ENTRY"] = str(installation.package_root / "apps/agent/pi/worker.mjs")
@@ -1377,12 +1385,12 @@ def _app_server_entry(installation: Installation) -> Path:
 
 
 def _prepare_host_state(installation: Installation) -> tuple[Path, Path]:
-    state_root = installation.root / "var/state/host"
+    state_root = app_paths(installation.root).state / 'host'
     host_workspace = state_root / "workspace"
     # The native Host uses its private workspace as a real Pi workspace.  Keep
     # its local `.pi` directory present before acquiring the Root Agent lock;
     # otherwise a fresh installation fails before the App Server can start.
-    installation_pi = installation.root / "var/state"
+    installation_pi = app_paths(installation.root).state
     # The installation's .pi directory is part of the immutable package
     # surface under the systemd Host sandbox.  Installation already creates
     # it with owner-only permissions, so only validate it here; attempting
@@ -1557,7 +1565,7 @@ def prepare_remote_terminal_cwd(installation: Installation, workspace_name: str)
     """Create an isolated local cwd for an SSH terminal's presentation process."""
     if not WORKSPACE_ID_PATTERN.fullmatch(workspace_name):
         raise CoRAgentHostError(f"invalid workspace name: {workspace_name}", exit_code=2)
-    root = installation.root / "var/cache/remote-terminal" / workspace_name
+    root = app_paths(installation.root).cache / 'remote-terminal' / workspace_name
     if root.is_symlink():
         raise CoRAgentHostError(f"remote terminal cwd cannot be a symbolic link: {root}")
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -1605,6 +1613,8 @@ def launch(argv: list[str], *, package_root: str | Path, install_root: str | Pat
     if request.remote_host is not None and (request.host or request.gateway):
         raise CoRAgentHostError("SSH terminal options are only valid for the default workspace client", exit_code=2)
     os.environ["CORAGENT_INSTALL_ROOT"] = str(installation.root)
+    os.environ["CORAGENT_CONFIG"] = str(paths(installation.root).config_file)
+    os.environ["CORAGENT_CREDENTIALS_FILE"] = str(paths(installation.root).credentials)
     try:
         require_guarded_installation(installation.root)
     except SessionGuardError as exc:

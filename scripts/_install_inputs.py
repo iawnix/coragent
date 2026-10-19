@@ -1,6 +1,11 @@
 """Private configuration directory inputs for the shared installer."""
 from __future__ import annotations
 
+try:
+    from .app_layout import paths as app_paths
+except ImportError:
+    from app_layout import paths as app_paths
+
 import argparse
 import os
 import shutil
@@ -94,7 +99,8 @@ def environment_defaults(parser: argparse.ArgumentParser, argv=None) -> None:
     }
     defaults = {}
     for action in parser._actions:
-        if action.dest in {"help", "source_root", "coragent_commit", "yes", "non_interactive", "dry_run", "json", "allow_dirty"}:
+        if action.dest in {"help", "source_root", "coragent_commit", "yes", "non_interactive", "dry_run", "json", "allow_dirty",
+                           "job_config", "agent_config_dir", "config_dir", "name_resolver_config"}:
             continue
         name = aliases.get(action.dest, "CORAGENT_" + action.dest.upper())
         value = os.environ.get(name)
@@ -120,7 +126,7 @@ def apply_config_directory(args: argparse.Namespace) -> None:
         return
     config = Path(args.config_dir).expanduser()
     if config.is_symlink() or not config.is_dir():
-        raise ValueError("--config-dir must be a physical configuration directory")
+        raise ValueError("--import-config must be a physical configuration directory")
     config = config.resolve()
     args.config_dir = str(config)
     for filename, attribute in (("job.toml", "job_config"), ("name-resolver.toml", "name_resolver_config")):
@@ -159,6 +165,6 @@ def provision_config_credentials(args: argparse.Namespace) -> None:
     """Copy configured SMTP credentials only inside the confirmed install step."""
     source = getattr(args, "_email_password_source", None)
     if source and args.email_password_file == source:
-        target = Path(args.install_root) / "etc/secrets/smtp-password"
+        target = app_paths(Path(args.install_root)).generated / 'secrets/smtp-password'
         _copy_private(Path(source), target)
         args.email_password_file = str(target)

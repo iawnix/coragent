@@ -29,3 +29,6 @@ npm-debug.log*
 *.tmp
 .pi/remote.toml
 AGENTS.md
+
+/config/config.toml
+/config/credentials.json

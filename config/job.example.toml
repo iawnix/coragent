@@ -1,9 +1,7 @@
-# Job execution bindings; edit these example target paths before installation.
-# For automatic provisioning, start with target/solver settings and select
-# --job-profile TARGET:PROFILE in install.sh; omit backend Python bindings.
-# The explicit bindings below instead demonstrate existing managed environments.
-# Copy to the installation-owned etc/job.toml and edit the backend bindings
-# available in each compute environment. The kind selects the execution platform.
+# Explicit component-import example for --job-config; new installations should
+# use [execution] in config.toml (see job.execution.example.toml).
+# Prepare scientific environments independently with install_job_environment.py,
+# then replace the example paths with their existing bindings.
 
 default_environment = "local"
 
@@ -18,8 +16,8 @@ lock_ref = "/opt/coragent/locks/wrapper.lock"
 
 # These Python-only methods use the selected target's RDKit/NumPy environment.
 [environments.local.backends.structure]
-# The installer binds its etc/name-resolver.toml here when no explicit resolver
-# environment is supplied. Remote targets need their own target-local path.
+# The installer binds its generated name-resolver.toml when no explicit resolver
+# configuration is supplied. Remote targets need their own target-local path.
 [environments.local.backends.structure.python]
 manager = "conda"
 conda_executable = "/opt/conda/bin/conda"

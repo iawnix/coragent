@@ -3,6 +3,11 @@
 
 from __future__ import annotations
 
+try:
+    from .app_layout import paths as app_paths
+except ImportError:
+    from app_layout import paths as app_paths
+
 import argparse
 import hashlib
 import json
@@ -309,7 +314,7 @@ def _install_captured_package(
             force=force_runtime,
         )
         archived_notification_state = []
-        ensure_private_directory(install_root / "workspaces")
+        ensure_private_directory(layout.workspace_root)
         installed_manifest = read_json_object(target / INSTALLED_MANIFEST, "installed CoRAgent Package manifest")
         state = {
             "schema_version": SUITE_INSTALL_SCHEMA_VERSION,
@@ -387,25 +392,21 @@ def ensure_name_resolver_config(install_root: Path, release_root: Path) -> None:
     same deterministic resolver default here. Existing operator configuration
     is preserved and remains subject to the runtime configuration boundary.
     """
-    destination = install_root / "etc/name-resolver.toml"
-    if destination.is_symlink():
-        raise SuiteReleaseError(f"existing name-resolver configuration must be a regular file: {destination}")
-    if destination.exists():
-        if not destination.is_file():
-            raise SuiteReleaseError(f"existing name-resolver configuration must be a regular file: {destination}")
+    layout = app_paths(install_root)
+    destination = layout.resolver_config
+    if destination.is_symlink() or (destination.exists() and not destination.is_file()):
+        raise SuiteReleaseError(f'existing name-resolver configuration must be a regular file: {destination}')
+    if destination.is_file():
         return
-    source = release_root / "agent" / "config" / "name-resolver.example.toml"
-    if source.is_symlink() or not source.is_file():
-        raise SuiteReleaseError(f"package installer is missing the bundled name-resolver configuration: {source}")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = destination.parent / f".{destination.name}.{os.getpid()}.tmp"
-    try:
-        shutil.copyfile(source, temporary)
-        os.chmod(temporary, 0o600)
-        os.replace(temporary, destination)
-    finally:
-        if temporary.exists() or temporary.is_symlink():
-            temporary.unlink()
+    if 'name_resolver' not in layout.configuration.read():
+        import tomllib
+        source = release_root / 'agent/config/name-resolver.example.toml'
+        layout.configuration.update(name_resolver=tomllib.loads(source.read_text()))
+    # Activation may have a validated job candidate that has not yet been
+    # committed to the main config. Refresh only the resolver here.
+    from research_agent.foundation.configuration import atomic_write, toml_text
+    resolver = layout.configuration.read()['name_resolver']
+    atomic_write(layout.resolver_config, toml_text(layout.configuration.resolve_credentials(resolver)))
 
 
 def _activate_release(

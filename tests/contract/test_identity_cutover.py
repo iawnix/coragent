@@ -1,4 +1,6 @@
 """A branding cutover must reject old state without adopting or rewriting it."""
+
+from research_agent.foundation.layout import paths as app_paths
 import json
 from pathlib import Path
 
@@ -13,7 +15,7 @@ from scripts.uninstall_link_relay import unit_belongs_to_root
 
 def test_old_installation_is_rejected_without_rewriting_ownership(tmp_path):
     root = tmp_path / "installation"
-    marker = root / "etc/installation.json"
+    marker = app_paths(root).marker
     marker.parent.mkdir(parents=True)
     before = json.dumps({"schema_version": "research-agent-installation/2", "install_root": str(root)})
     marker.write_text(before)

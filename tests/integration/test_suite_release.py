@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from research_agent.foundation.layout import paths as app_paths
+
 import copy
 import json
 import stat
@@ -98,10 +100,11 @@ def test_core_package_build_is_deterministic_and_installs_app_server_payload(tmp
     assert not (install_root / ".pi/session-host").exists()
     assert (package_root / "agent/apps/agent/main.mjs").is_file()
     assert not (package_root / "phone").exists()
-    resolver_config = install_root / "etc/name-resolver.toml"
+    resolver_config = app_paths(install_root).resolver_config
     assert resolver_config.is_file()
     assert stat.S_IMODE(resolver_config.stat().st_mode) == 0o600
-    assert "default_resolver = \"auto\"" in resolver_config.read_text(encoding="utf-8")
+    import tomllib
+    assert tomllib.loads(resolver_config.read_text())["default_resolver"] == "auto"
 
 
 def test_package_install_does_not_mutate_existing_research_workspace(tmp_path: Path) -> None:
@@ -138,15 +141,15 @@ def test_preparing_a_release_does_not_publish_runtime_config_or_current(tmp_path
         manifests.append(Path(built['manifest']))
     original = install_package(manifests[0], None, root, allow_dirty=True)
     current = (root/'current').readlink()
-    runtime = (root/'var/state/installation/python/env.json').read_bytes()
-    resolver = (root/'etc/name-resolver.toml').read_bytes()
+    runtime = (app_paths(root).state / 'installation/python/env.json').read_bytes()
+    resolver = (app_paths(root).resolver_config).read_bytes()
     guard = acquire_directory_guard(root, root)
     try:
         candidate = install_package(manifests[1], None, root, allow_dirty=True, activate=False)
         assert candidate['prepared']
         assert (root/'current').readlink() == current
-        assert (root/'var/state/installation/python/env.json').read_bytes() == runtime
-        assert (root/'etc/name-resolver.toml').read_bytes() == resolver
+        assert (app_paths(root).state / 'installation/python/env.json').read_bytes() == runtime
+        assert (app_paths(root).resolver_config).read_bytes() == resolver
     finally:
         os.close(guard)
     monkeypatch.setattr(_bootstrap, 'load_runtime_environment', lambda _:SimpleNamespace(_manifest_matches_spec=lambda *_:True))

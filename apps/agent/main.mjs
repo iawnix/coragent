@@ -20,7 +20,9 @@ for (let index = 0; index < args.length; index++) {
 const installRoot = process.env.CORAGENT_INSTALL_ROOT;
 if (!installRoot || !options.directory || !options["server-id"]) throw new Error("Host requires an installation, directory and server identity.");
 const stateRoot = resolve(options["state-root"] || process.env.CORAGENT_HOST_STATE_ROOT);
-const workspaceRoot = resolve(process.env.CORAGENT_WORKSPACE_ROOT || options.workspace || join(installRoot, "workspaces"));
+const configuredWorkspaceRoot = process.env.CORAGENT_WORKSPACE_ROOT || options.workspace;
+if (!configuredWorkspaceRoot) throw new Error("Host requires the configured workspace root");
+const workspaceRoot = resolve(configuredWorkspaceRoot);
 const socketPath = join(resolve(options.directory), `${options["server-id"]}.sock`);
 // The CoRAgent Host owns <directory>/<server-id>.sock. Pi's experimental server
 // uses the same server-id-derived socket name, so keep its coordinator and

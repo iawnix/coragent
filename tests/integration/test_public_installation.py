@@ -1,4 +1,6 @@
-"""Complete public installation, real managed Jobs, reuse and owned-store purge."""
+"""Public installation uses independently prepared environments and preserves them."""
+
+from research_agent.foundation.layout import paths as app_paths
 import base64
 import json
 import os
@@ -6,21 +8,23 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tomllib
 
 from scripts.build_package import build_package
 from scripts import _job_install as jobs
+from tests.unit.conftest import execution_platform_fixture
 from research_agent.foundation.layout import paths
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_public_package_install_accepts_jobs_reuses_environment_and_uninstalls(tmp_path):
+def test_public_package_install_accepts_jobs_and_preserves_external_environment(tmp_path):
     built = build_package(output_dir=tmp_path/'package', agent_manifest_path=None, allow_dirty=True, include_web=False)
     root = tmp_path/'installation'
     paths(root).initialize()
     acceptance = tmp_path/'acceptance'
     acceptance.mkdir()
-    cache = root/'var/cache/job-install'
+    cache = app_paths(root).cache / 'job-install'
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.symlink_to(acceptance, target_is_directory=True)
     pin = json.loads((ROOT/'config/pi-source.json').read_text())
@@ -28,7 +32,12 @@ def test_public_package_install_accepts_jobs_reuses_environment_and_uninstalls(t
     pi_root.mkdir(parents=True)
     subprocess.run(['cp','--reflink=auto','-a',os.environ['CORAGENT_TEST_PI_RUNTIME_ROOT']+'/.',str(pi_root)],check=True)
     config = tmp_path/'job.toml'
-    config.write_text('default_environment="local"\n[environments.local]\nkind="local"\nsupervisor="process"\n')
+    settings = tomllib.loads(Path(os.environ['CORAGENT_JOB_CONFIG']).read_text())
+    local = settings['environments']['local']
+    local['backends'] = {'structure': local['backends']['structure']}
+    config.write_bytes(jobs.toml_bytes({'default_environment':'local', 'environments':{'local':local}}))
+    prefix = Path(local['backends']['structure']['python']['prefix'])
+    stamp = (prefix/'bin/python').stat().st_ino
     conda = os.environ.get('CORAGENT_TEST_CONDA') or shutil.which('conda')
     assert conda, 'Prepare with CORAGENT_TEST_CONDA set'
     environment = dict(os.environ, CONDA_OFFLINE='true')
@@ -38,17 +47,15 @@ def test_public_package_install_accepts_jobs_reuses_environment_and_uninstalls(t
     agent_config.mkdir()
     command = [sys.executable,'-S','-B',str(ROOT/'scripts/installer.py'),'install','--source','package',
                '--package-manifest',built['manifest'],'--install-root',str(root),'--conda-root',str(Path(conda).parent.parent),
-               '--job-profile','local:structure','--job-software-root','local='+str(tmp_path/'scientific'),
                '--job-offline','--service-scope','none','--without-web',
                '--agent-config-dir',str(agent_config),
                '--phone-access','disabled','--non-interactive','--yes','--allow-dirty','--json']
     subprocess.run([*command,'--job-config',str(config)],env=environment,check=True)
-    record = json.loads((root/jobs.RECORD).read_text())
+    record = json.loads((paths(root).state/jobs.RECORD).read_text())
     assert record['readiness']['targets']['local']['status'] == 'execution_verified'
     assert len(record['readiness']['targets']['local']['jobs']) == 2
     assert record['publication']['targets']['local']['status'] == 'execution_verified'
-    prefix = Path(record['environments'][0]['binding']['prefix'])
-    stamp = (prefix/'bin/python').stat().st_ino
+    assert record['environments'] == []
     runtime = json.loads((paths(root).runtime_home/'env.json').read_text())
     python = runtime['python_executable']
     clean = jobs.acceptance_environment(root/'current/agent', python)
@@ -56,12 +63,14 @@ def test_public_package_install_accepts_jobs_reuses_environment_and_uninstalls(t
                     'assert pathlib.Path(research_agent.__file__).is_relative_to(sys.prefix)'],env=clean,check=True)
     subprocess.run(command,env=environment,check=True)
     assert (prefix/'bin/python').stat().st_ino == stamp
-    repeated = json.loads((root/jobs.RECORD).read_text())
-    assert repeated['environments'][0]['binding'] == record['environments'][0]['binding']
-    subprocess.run([python,str(root/'current/agent/scripts/uninstall.py'),'--install-root',str(root),
+    repeated = json.loads((paths(root).state/jobs.RECORD).read_text())
+    assert repeated['environments'] == []
+    assert not (root/'etc').exists()
+    assert not (root/'var').exists()
+    subprocess.run([str(root/'uninstall.sh'),'--config',str(paths(root).config_file),
                     '--service-scope','none','--purge-all','--non-interactive','--yes','--json'],env=environment,check=True)
     assert not root.exists()
-    assert not (tmp_path/'scientific').exists()
+    assert (prefix/'bin/python').stat().st_ino == stamp
 
 
 def test_remote_provisioning_transports_and_executes_real_helper_offline(tmp_path, monkeypatch):

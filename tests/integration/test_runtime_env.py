@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from research_agent.foundation.layout import paths as app_paths
 from research_agent.foundation.layout import paths as layout_paths
 
 import json
@@ -161,7 +163,7 @@ def test_installed_current_entrypoint_seeds_installation_owned_runtime_paths(tmp
         environ=environment,
     )
 
-    runtime_home = installation / "var/state/installation/python"
+    runtime_home = app_paths(installation).state / 'installation/python'
     assert resolved == installation
     assert environment == {
         "CORAGENT_RUNTIME_HOME": str(runtime_home),
@@ -200,7 +202,7 @@ def test_unified_suite_entrypoint_seeds_installation_owned_runtime_paths(
         environ=environment,
     )
 
-    runtime_home = installation / "var/state/installation/python"
+    runtime_home = app_paths(installation).state / 'installation/python'
     assert resolved == installation
     assert environment == {
         "CORAGENT_RUNTIME_HOME": str(runtime_home),
@@ -251,7 +253,7 @@ def test_suite_web_launcher_seeds_installation_owned_runtime_paths(
         environ=environment,
     )
 
-    runtime_home = installation / "var/state/installation/python"
+    runtime_home = app_paths(installation).state / 'installation/python'
     assert resolved == installation
     assert environment == {
         "CORAGENT_RUNTIME_HOME": str(runtime_home),
@@ -301,7 +303,7 @@ def test_authoritative_installation_seed_replaces_stale_runtime_paths(tmp_path: 
 
     seed_installation_runtime(tmp_path, environ=environment, authoritative=True)
 
-    runtime_home = tmp_path / "var/state/installation/python"
+    runtime_home = app_paths(tmp_path).state / 'installation/python'
     assert environment == {
         "CORAGENT_RUNTIME_HOME": str(runtime_home),
         "CORAGENT_RUNTIME_MANIFEST": str(runtime_home / "env.json"),
@@ -318,9 +320,9 @@ def test_workspace_root_owns_runtime_home_and_env_store(tmp_path: Path, monkeypa
     package.mkdir(parents=True)
     _write_runtime_specs(package)
 
-    assert default_runtime_home(package, workspace) == workspace / "var/state/installation/python"
+    assert default_runtime_home(package, workspace) == app_paths(workspace).state / 'installation/python'
     assert default_env_store(package, workspace) == layout_paths(workspace).env_root
-    assert runtime_manifest_path(package, workspace_root=workspace) == workspace / "var/state/installation/python" / "env.json"
+    assert runtime_manifest_path(package, workspace_root=workspace) == app_paths(workspace).state / 'installation/python' / "env.json"
 
 
 def test_configured_python_reads_runtime_manifest(tmp_path: Path) -> None:
@@ -626,7 +628,7 @@ def test_install_env_dry_run_reports_hashed_prefix(tmp_path: Path, monkeypatch: 
     assert payload["dry_run"] is True
     assert payload["env_prefix"].startswith(str(tmp_path / "envs" / "base"))
     assert payload["kernel_env_prefix"].startswith(str(tmp_path / "envs" / "kernels"))
-    assert payload["manifest_path"].endswith("/var/state/installation/python/env.json")
+    assert payload["manifest_path"].endswith("/state/coragent/installation/python/env.json")
     assert payload["environment_lock"] == str(ROOT / "environment.lock.txt")
     assert payload["python_executable"].endswith("/bin/python")
     assert payload["python_distribution"] == "coragent"
@@ -655,8 +657,8 @@ def test_install_env_dry_run_accepworkspace_runtime_home(tmp_path: Path) -> None
     )
     payload = json.loads(completed.stdout)
 
-    assert payload["runtime_home"] == str(workspace / "var/state/installation/python")
-    assert payload["manifest_path"] == str(workspace / "var/state/installation/python" / "env.json")
+    assert payload["runtime_home"] == str(app_paths(workspace).state / 'installation/python')
+    assert payload["manifest_path"] == str(app_paths(workspace).state / 'installation/python' / "env.json")
     assert payload["env_prefix"].startswith(str(layout_paths(workspace).env_root / "base"))
     assert payload["kernel_env_prefix"].startswith(str(layout_paths(workspace).env_root / "kernels"))
 
@@ -927,7 +929,7 @@ def test_ts_runtime_resolve_reports_external_manifest_path(tmp_path: Path) -> No
     payload = json.loads(completed.stdout)
 
     assert payload["configured"] is False
-    assert payload["manifest_path"] == str(workspace / "var/state/installation/python" / "env.json")
+    assert payload["manifest_path"] == str(app_paths(workspace).state / 'installation/python' / "env.json")
     assert payload["env_prefix"].startswith(str(layout_paths(workspace).env_root / "base"))
     assert payload["kernel_env_prefix"].startswith(str(layout_paths(workspace).env_root / "kernels"))
 

@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from research_agent.foundation.layout import paths as app_paths
 from research_agent.foundation.layout import paths as layout_paths
 
 import json
@@ -56,12 +58,12 @@ def _installation(tmp_path: Path) -> launcher.Installation:
         root=root,
         package_root=package,
         workspaces_root=root / "workspaces",
-        job_config_default=root / "etc/job.toml",
-        notification_config_default=root / "etc/email.toml",
-        runtime_home=root / "var/state/installation/python",
-        runtime_manifest=root / "var/state/installation/python/env.json",
+        job_config_default=app_paths(root).job_config,
+        notification_config_default=app_paths(root).email_config,
+        runtime_home=app_paths(root).state / 'installation/python',
+        runtime_manifest=app_paths(root).state / 'installation/python/env.json',
         env_root=root / ".agents/envs/coragent",
-        process_cache_root=root / "var/cache",
+        process_cache_root=app_paths(root).cache,
     )
 
 
@@ -69,7 +71,7 @@ def test_native_pi_settings_leave_unmanaged_values_unchanged(
     tmp_path: Path,
 ) -> None:
     installation = _installation(tmp_path)
-    settings = installation.root / launcher.PI_AGENT_SETTINGS_RELATIVE
+    settings = app_paths(installation.root).pi_config / 'settings.json'
     settings.parent.mkdir(parents=True)
     settings.write_text(
         json.dumps({"defaultProvider": "CPA", "defaultModel": "gpt-5.6-sol"}) + "\n",
@@ -88,7 +90,7 @@ def test_native_pi_settings_remove_launcher_managed_theme(
     tmp_path: Path,
 ) -> None:
     installation = _installation(tmp_path)
-    settings = installation.root / launcher.PI_AGENT_SETTINGS_RELATIVE
+    settings = app_paths(installation.root).pi_config / 'settings.json'
     settings.parent.mkdir(parents=True)
     settings.write_text(
         json.dumps(
@@ -110,7 +112,7 @@ def test_native_pi_settings_preserve_custom_theme_and_remove_old_release_theme(
     tmp_path: Path,
 ) -> None:
     installation = _installation(tmp_path)
-    settings = installation.root / launcher.PI_AGENT_SETTINGS_RELATIVE
+    settings = app_paths(installation.root).pi_config / 'settings.json'
     settings.parent.mkdir(parents=True)
     theme_path = installation.root / "./releases/old/agent/apps/agent/terminal/themes/coragent.json"
     settings.write_text(
@@ -128,7 +130,7 @@ def test_native_pi_settings_preserve_custom_theme_and_remove_old_release_theme(
 
 def test_native_pi_settings_reject_invalid_json_and_symlinks(tmp_path: Path) -> None:
     installation = _installation(tmp_path)
-    settings = installation.root / launcher.PI_AGENT_SETTINGS_RELATIVE
+    settings = app_paths(installation.root).pi_config / 'settings.json'
     settings.parent.mkdir(parents=True)
     settings.write_text("not json\n", encoding="utf-8")
 
@@ -150,7 +152,7 @@ def test_native_pi_settings_do_not_require_the_release_theme(tmp_path: Path) -> 
 
     launcher._restore_native_pi_settings(installation)
 
-    assert not (installation.root / launcher.PI_AGENT_SETTINGS_RELATIVE).exists()
+    assert not (app_paths(installation.root).pi_config / 'settings.json').exists()
 
 
 def test_research_agent_launcher_disables_retired_custom_renderer(
@@ -260,7 +262,7 @@ def test_host_command_owns_installation_state_and_workspace_root(
 
     command = launcher.build_host_server_command(installation, request)
 
-    state_root = installation.root / "var/state/host"
+    state_root = app_paths(installation.root).state / 'host'
     assert command == [
         "/usr/bin/node",
         str(installation.package_root / "apps/agent/main.mjs"),
@@ -346,7 +348,7 @@ def test_remote_terminal_requires_proxy_paths() -> None:
 
 def test_remote_terminal_uses_owner_only_installation_profile(tmp_path: Path) -> None:
     installation = _installation(tmp_path)
-    profile = installation.root / launcher.REMOTE_HOST_CONFIG_RELATIVE
+    profile = app_paths(installation.root).remote_config
     profile.parent.mkdir(parents=True)
     profile.write_text(json.dumps({
         "schema_version": launcher.REMOTE_HOST_CONFIG_SCHEMA,
@@ -431,7 +433,7 @@ def test_host_environment_publishes_owner_only_worker_diagnostics(tmp_path: Path
     (installation.package_root / "config").mkdir(parents=True)
     (installation.package_root / "config/pi-source.json").write_text(json.dumps(pin) + "\n", encoding="utf-8")
     (installation.root / "runtimes/pi" / commit).mkdir(parents=True)
-    diagnostic = installation.root / "var/log/worker-diagnostics.log"
+    diagnostic = app_paths(installation.root).log / 'worker-diagnostics.log'
     diagnostic.parent.mkdir(parents=True, exist_ok=True)
     diagnostic.write_text("stale worker error\n", encoding="utf-8")
     original_environment = dict(os.environ)
@@ -452,8 +454,8 @@ def test_host_environment_publishes_owner_only_worker_diagnostics(tmp_path: Path
 
 def test_host_state_rejects_an_insecure_installation_pi_directory(tmp_path: Path) -> None:
     installation = _installation(tmp_path)
-    installation.root.joinpath("var/state").mkdir(mode=0o700, parents=True)
-    installation.root.joinpath("var/state").chmod(0o755)
+    app_paths(installation.root).state.mkdir(mode=0o700, parents=True)
+    app_paths(installation.root).state.chmod(0o755)
 
     with pytest.raises(launcher.CoRAgentHostError, match="must be owner-only"):
         launcher._prepare_host_state(installation)
@@ -647,7 +649,7 @@ def test_default_terminal_connects_to_host_and_continues_latest_workspace_sessio
         "--socket-path", str(endpoint),
         "--workspace-id", "reaction-a",
         "--workspace-root", str(installation.workspaces_root / "reaction-a"),
-        "--state-root", str(installation.root / "var/state/host"),
+        "--state-root", str(app_paths(installation.root).state / 'host'),
         "--install-root", str(installation.root),
         "--package-root", str(installation.package_root),
         "--continue",
