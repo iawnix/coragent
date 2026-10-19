@@ -5,6 +5,8 @@ import re
 from pathlib import Path
 from urllib.parse import unquote
 
+from tools.markdown_links import markdown_links
+
 
 ROOT = Path(__file__).resolve().parents[2]
 README = ROOT / "README.md"
@@ -37,7 +39,7 @@ PUBLIC_DOCS = (
 
 def test_readmes_link_to_setup_usage_and_developer_guides() -> None:
     for path in (README, README_ZH):
-        targets = set(re.findall(r"\[[^\]]+\]\(([^)]+)\)", path.read_text(encoding="utf-8")))
+        targets = set(markdown_links(path.read_text(encoding="utf-8")))
         for target in (
             "README.md",
             "README.zh-CN.md",
@@ -95,14 +97,13 @@ def test_public_document_set_covers_install_architecture_and_maintenance() -> No
 
 
 def test_public_markdown_relative_links_resolve_inside_the_package() -> None:
-    link_pattern = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
     focused_files = [
         path
         for root in FOCUSED_SKILLS.values()
         for path in (root / "SKILL.md", root / "SKILL.zh-CN.md", *sorted((root / "references").glob("*.md")))
     ]
     for path in {*PUBLIC_DOCS, *sorted((ROOT / "docs").rglob("*.md")), SKILL, SKILL_ROOT / "SKILL.zh-CN.md", *sorted(REFERENCES.glob("*.md")), *focused_files}:
-        for raw_target in link_pattern.findall(path.read_text(encoding="utf-8")):
+        for raw_target in markdown_links(path.read_text(encoding="utf-8")):
             target = raw_target.strip().strip("<>")
             if target.startswith("#") or re.match(r"^[a-z][a-z0-9+.-]*:", target, re.IGNORECASE):
                 continue

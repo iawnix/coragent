@@ -10,11 +10,15 @@ import unicodedata
 from pathlib import Path
 from urllib.parse import unquote
 
+if __package__:
+    from .markdown_links import markdown_links
+else:
+    from markdown_links import markdown_links
+
 
 ROOT = Path(__file__).resolve().parents[1]
 FRONTMATTER = re.compile(r"\A---\n(?P<body>.*?)\n---\n", re.DOTALL)
 FIELD = re.compile(r"(?m)^(name|description):\s*(.+?)\s*$")
-LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 FORBIDDEN_PUBLIC_NAMES = ("research_" + "continuation", "ts_" + "environment", "ts_" + "reply", "ts_" + "seed", "ts_" + "compare", "ts_" + "analyze", "ts_" + "dispatch", "ts_" + "import", "ts_" + "notify", "ts_" + "render", "ts_" + "report")
 
 
@@ -57,7 +61,7 @@ def _heading_slugs(text: str) -> set[str]:
 
 def _check_links(path: Path, text: str) -> list[str]:
     errors: list[str] = []
-    for raw in LINK.findall(text):
+    for raw in markdown_links(text):
         target = raw.strip().strip("<>")
         if re.match(r"^[a-z][a-z0-9+.-]*:", target, re.IGNORECASE):
             continue
@@ -85,7 +89,7 @@ def _reachable_references(entry: Path, skill_root: Path) -> set[Path]:
         if path in visited:
             continue
         visited.add(path)
-        for raw in LINK.findall(path.read_text(encoding="utf-8")):
+        for raw in markdown_links(path.read_text(encoding="utf-8")):
             target = raw.strip().strip("<>")
             if re.match(r"^[a-z][a-z0-9+.-]*:", target, re.IGNORECASE):
                 continue
