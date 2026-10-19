@@ -39,7 +39,7 @@ can coexist with a direct process/systemd target and carry distinct cluster name
 
 For submission from another host, change `transport` to `ssh` and set `ssh_host`
 and optionally `ssh_config`. `handler` and `work_root` are paths on that host.
-SSH targets use rsync to stage and collect files. Local targets copy between the
+By default, SSH targets use rsync to stage and collect files. Local targets copy between the
 controller Job directory and `work_root`; this directory must be visible at the
 same path on compute nodes. The generic runtime does not provision shared mounts.
 Local process/systemd targets use their built-in drivers. Batch schedulers use
@@ -50,6 +50,52 @@ calculation environment. Prefer existing protected service/connection
 configuration for credentials. The target configuration digest is saved with the
 Job; changing its endpoint or handler prevents old Jobs from being silently routed
 to the replacement target. Restore the original target to reconcile them.
+
+## Shared workspace execution
+
+File handling is independent of command transport and scheduler. `file_mode`
+defaults to `"staged"`, preserving the copying behavior above. If the controller,
+submission host and compute nodes share the workspace filesystem, configure:
+
+```toml
+[execution.targets.compute]
+driver = "external"
+transport = "local"
+file_mode = "shared"
+work_root = "/home/iaw/DATA/coragent/workspaces"
+handler = ["/usr/bin/python3", "/absolute/coragent/skills/tri-operations/scripts/queue.py"]
+```
+
+Merge this target into `config.toml`; retain the required connection environment
+and scientific bindings. PBS, Torque, Slurm and custom handlers use the same
+option. `transport="ssh"` is also supported when that submission host shares
+the workspace. In shared mode `work_root` is an allowed workspace parent, not a
+second execution store. Each Job runs directly in its workspace's
+`runs/jobs/<job-id>/` directory (or its requested subdirectory).
+
+Mount aliases such as `~/DATA` are resolved on the controller; the resulting
+absolute Job path must be valid on every participating node. Different mount
+paths are not translated. Before submission, a temporary file round-trip checks
+that the command host sees the same writable storage. The wrapper checks its
+per-Job marker on the allocated compute node before starting the calculation.
+Success requires the compute node's start and exit evidence to be visible to
+the controller as well as scheduler success. Missing evidence remains unknown.
+There is no automatic fallback to staging when these checks fail.
+
+The ordinary Job API still snapshots declared inputs into the Job directory;
+shared execution skips the second transfer to an execution store. Direct
+`JobSpec` callers must place inputs and stdin in that directory first. Collection
+checks required files, sizes and hashes in place and rejects control-file outputs
+and symlink escapes. It neither copies results onto themselves nor deletes the
+workspace. Existing backend `scratch_root` and `{scratch}` settings can keep
+temporary calculation data on node-local storage; preserve results in the Job
+directory. This option does not add automatic scratch deletion.
+
+Receipts retain the file mode and execution directory. Keep the original target
+configuration and shared directory available for status, cancellation, recovery
+and collection. Installation acceptance uses its own temporary workspace under
+the shared root, deletes it after successful checks, and retains failed or
+unresolved runs for diagnosis and recovery.
 
 ## Handler protocol
 

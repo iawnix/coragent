@@ -17,6 +17,7 @@ from .platform import ExecutionPlatform
 from .config_contract import execution_timeout
 from .process_environment import job_process_environment
 from .transport import LocalTransport, SSHTransport
+from .shared import SharedDirectory
 
 
 def _now() -> str:
@@ -34,6 +35,10 @@ class StagedJobPlatform(ExecutionPlatform):
         self.transport = LocalTransport(config) if config["transport"] == "local" else SSHTransport(config)
         self.host = config.get("ssh_host")
         self.remote_root = config["work_root"].rstrip("/")
+        self.file_mode = config.get('file_mode', 'staged')
+        if self.file_mode not in ('staged', 'shared'):
+            raise ValueError('external file_mode must be staged or shared')
+        self.shared = SharedDirectory(self.remote_root, self.run_command) if self.file_mode == 'shared' else None
         self.allowed_queues = tuple(config.get("allowed_queues", ()))
 
     def run_command(self, script: str, *, check: bool = True):
@@ -46,11 +51,15 @@ class StagedJobPlatform(ExecutionPlatform):
         job_id = spec.job_id
         if not isinstance(job_id, str) or not re.fullmatch(r"job_[1-9][0-9]*", job_id):
             raise ValueError("remote job id has an invalid format")
+        if self.shared:
+            return str(self.shared.directory(spec.cwd, job=True))
         scope = hashlib.sha256(str(spec.cwd.resolve()).encode()).hexdigest()[:24]
         return f"{self.remote_root}/{job_id}-{scope}"
 
     def stage_inputs(self, spec: JobSpec) -> dict[str, Any]:
         remote_dir = self._remote_dir(spec)
+        if self.shared:
+            return {'remote_dir': remote_dir, 'shared_token': self.shared.prepare(spec)}
         self.run_command(f"umask 077; mkdir -p {shlex.quote(remote_dir)}/logs {shlex.quote(remote_dir)}/.coragent")
         self.transport.copy(spec.cwd, remote_dir)
         for path in spec.inputs:
@@ -103,6 +112,9 @@ class StagedJobPlatform(ExecutionPlatform):
         if status.state in {JobState.RUNNING, JobState.UNKNOWN, JobState.QUEUED, JobState.HELD, JobState.SUBMITTED}:
             raise RuntimeError(f"job {receipt.job_id} is not complete: {status.state}")
         root = Path(receipt.cwd)
+        if self.shared:
+            self.shared.check_receipt(receipt, success=status.state == JobState.SUCCEEDED)
+            root = root.resolve()
         remote_dir = str(receipt.metadata["remote_dir"])
         spec_path = root / "spec.json"
         declared = json.loads(spec_path.read_text(encoding="utf-8")).get("outputs", []) if spec_path.is_file() else []
@@ -113,7 +125,10 @@ class StagedJobPlatform(ExecutionPlatform):
                          "scheduler.json"):
             if not (root / relative).resolve().is_relative_to(root.resolve()):
                 raise ValueError("log destination escapes job cwd")
-            self._pull_path(remote_dir + "/" + relative, root / relative)
+            if self.shared:
+                self.shared.check_path(root, root / relative)
+            else:
+                self._pull_path(remote_dir + "/" + relative, root / relative)
         for output in declared:
             relative = output.get("path") if isinstance(output, dict) else None
             if not isinstance(relative, str):
@@ -125,8 +140,11 @@ class StagedJobPlatform(ExecutionPlatform):
                 raise ValueError("output path overlaps Job control files or escapes job cwd")
             if not (root / output_path).resolve().is_relative_to(root.resolve()):
                 raise ValueError("output destination escapes job cwd")
-            self._pull_path(remote_dir + "/" + output_path.as_posix(), root / output_path,
-                            recursive=bool(output.get("recursive", False)))
+            if self.shared:
+                self.shared.check_path(root, root / output_path, recursive=bool(output.get('recursive', False)))
+            else:
+                self._pull_path(remote_dir + "/" + output_path.as_posix(), root / output_path,
+                                recursive=bool(output.get("recursive", False)))
         outputs, validation = collect_outputs(root, declared)
         return {
             "job_id": receipt.job_id, "status": status.__dict__, "outputs": outputs, "output_validation": validation,

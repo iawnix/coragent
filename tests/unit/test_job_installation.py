@@ -149,8 +149,9 @@ def test_ssh_payload_contains_only_selected_target_resources(tmp_path, monkeypat
     assert jobs.invoke_target(target, request, ROOT)['status'] == 'environment_verified'
 
 
-@pytest.mark.parametrize('scheduler', ['pbs', 'torque'])
-def test_remote_acceptance_uses_scheduler_collects_results_and_removes_test_jobs(cluster, tmp_path, monkeypatch, scheduler):
+@pytest.mark.parametrize('scheduler', ['pbs', 'torque', 'slurm'])
+@pytest.mark.parametrize('file_mode', ['staged', 'shared'])
+def test_remote_acceptance_uses_scheduler_collects_results_and_removes_test_jobs(cluster, tmp_path, monkeypatch, scheduler, file_mode):
     from scripts._job_acceptance import accept
     from research_agent.jobs import environment
     platform, calls, remote_root = cluster
@@ -159,7 +160,7 @@ def test_remote_acceptance_uses_scheduler_collects_results_and_removes_test_jobs
     resolver.write_text('default_resolver="auto"\n')
     structure = {**local['backends']['structure'],
                  'environment': {'CORAGENT_NAME_RESOLVER_CONFIG': str(resolver)}}
-    target = {**platform.config, 'handler': [*platform.handler[:-1], scheduler],
+    target = {**platform.config, 'file_mode': file_mode, 'handler': [*platform.handler[:-1], scheduler],
               'submission':{'queue':'batch','resources':{'cpus':1,'walltime':'00:00:20'}},
               'bindings':{'structure':structure}}
     config = tmp_path/'remote-job.toml'
@@ -172,8 +173,9 @@ def test_remote_acceptance_uses_scheduler_collects_results_and_removes_test_jobs
     result = accept(config, ROOT, tmp_path/'acceptance', ['cluster'], 20)
     assert result['targets']['cluster']['status'] == 'execution_verified', result
     assert len(result['targets']['cluster']['jobs']) == 2
-    assert any(command[0] == 'rsync' for command, _ in calls)
+    assert any(command[0] == 'rsync' for command, _ in calls) == (file_mode == 'staged')
     assert not list(remote_root.glob('job_*'))
+    assert not list(remote_root.glob('.coragent-acceptance-*'))
 
 
 def test_acceptance_waits_for_cancellation_and_reports_pending_jobs(tmp_path, monkeypatch):

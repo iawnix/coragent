@@ -52,3 +52,9 @@ python3 "$TRI_JOB_HANDLER" <<'JSON'
 {"schema_version":"coragent-external-job/1","action":"probe"}
 JSON
 ```
+
+Use `file_mode="shared"` and set `work_root` to the shared workspace parent to run
+directly in each workspace Job directory. Both local and SSH submission support
+this mode. The default `file_mode="staged"` retains input/output transfers.
+Storage probes and compute-node guards belong to the generic runtime; the TRI
+protocol and helper do not change.

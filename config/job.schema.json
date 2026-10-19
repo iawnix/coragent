@@ -816,6 +816,13 @@
                         "minLength": 1,
                         "pattern": "^/(?!$)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\n\\r\\u0000]+$"
                       },
+                      "file_mode": {
+                        "enum": [
+                          "staged",
+                          "shared"
+                        ],
+                        "default": "staged"
+                      },
                       "handler": {
                         "type": "array",
                         "minItems": 1,

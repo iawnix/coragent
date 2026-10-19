@@ -46,3 +46,7 @@ python3 "$TRI_JOB_HANDLER" <<'JSON'
 {"schema_version":"coragent-external-job/1","action":"probe"}
 JSON
 ```
+
+设置 `file_mode="shared"`，并将 `work_root` 指向共享工作区父目录，即可直接在
+工作区任务目录执行；本机和 SSH 提交均支持。默认 `file_mode="staged"` 保留输入
+传输与输出回收。共享检查由通用执行层负责，TRI 协议和处理器无需改变。

@@ -254,16 +254,18 @@ def test_handler_runs_over_ssh_with_same_lifecycle(queue, tmp_path, monkeypatch)
 
 
 @pytest.mark.parametrize("lose_response", [False, True])
-def test_application_jobs_reconcile_and_collect_external_tasks(queue, tmp_path, monkeypatch, lose_response):
+@pytest.mark.parametrize("file_mode", ["staged", "shared"])
+def test_application_jobs_reconcile_and_collect_external_tasks(queue, tmp_path, monkeypatch, lose_response, file_mode):
     from research_agent.application.execution import dispatch, _RUNTIMES
     from tests.unit.test_job_recovery import workspace
     from scripts._job_install import toml_bytes
 
     config, state = queue
+    config = {**config, "file_mode": file_mode}
     path = tmp_path / "external.toml"
     path.write_bytes(toml_bytes({"execution": {"default_target": "compute", "targets": {"compute": config}}}))
     monkeypatch.setenv("CORAGENT_JOB_CONFIG", str(path))
-    root = tmp_path / "research"
+    root = (Path(config["work_root"]) if file_mode == "shared" else tmp_path) / "research"
     workspace(root)
     if lose_response:
         (state / "lose-submit-response").touch()

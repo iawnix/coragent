@@ -11,7 +11,11 @@ driver = "external"
 transport = "ssh" # use local when CoRAgent runs on the submission host
 cluster_name = "cluster"
 ssh_host = "login.cluster.example" # omit for local transport
+file_mode = "staged" # default: copy inputs and collect outputs
 work_root = "/shared/coragent/jobs"
+# For direct shared execution, set file_mode = "shared" and work_root to
+# the shared workspace parent, e.g. /home/iaw/DATA/coragent/workspaces.
+# Controller, submission host and compute nodes must see the same physical paths.
 handler = ["/usr/bin/python3", "/opt/coragent/skills/batch-schedulers/scripts/queue.py", "pbs"]
 connect_timeout_seconds = 15
 command_timeout_seconds = 180

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 import shlex
 import subprocess
@@ -56,13 +57,15 @@ class ExternalJobPlatform(StagedJobPlatform):
         missing = [str(path) for path in spec.inputs if not path.exists()]
         try:
             result = self.run_command(f"test -d {shlex.quote(self.remote_root)} && test -w {shlex.quote(self.remote_root)}", check=False)
+            if self.shared:
+                self.shared.probe(spec.cwd)
             observation = self._invoke({"schema_version": PROTOCOL, "action": "probe"})
             available = result.returncode == 0 and observation.get("available") is True
             error = None if available else observation.get("error", "execution root or handler unavailable")
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
             available, error = False, str(exc)
         return {"platform": self.name, "available": available, "transport": self.transport.name,
-                "work_root": self.remote_root, "cwd_exists": spec.cwd.is_dir(),
+                "work_root": self.remote_root, "file_mode": self.file_mode, "cwd_exists": spec.cwd.is_dir(),
                 "inputs_present": not missing, "missing_inputs": missing, "error": error}
 
     @staticmethod
@@ -84,12 +87,17 @@ class ExternalJobPlatform(StagedJobPlatform):
         directory = self._remote_dir(spec)
         wrapper, scratch, timeout = self._wrapper(spec, directory,
             inherit_environment=("CUDA_VISIBLE_DEVICES", "NVIDIA_VISIBLE_DEVICES"))
+        # In shared mode prepare only private execution controls; the ordinary
+        # Job API has already placed immutable inputs in this directory.
+        storage = self.stage_inputs(spec) if self.shared else {}
+        if self.shared:
+            wrapper = '#!/bin/sh\n' + self.shared.guard(directory, storage['shared_token']) + wrapper.removeprefix('#!/bin/sh\n')
         identity = hashlib.sha256(json.dumps([self.name, spec.workspace_id, str(spec.cwd.resolve()), spec.job_id]).encode()).hexdigest()
         request = {"schema_version": PROTOCOL, "action": "submit", "job_id": spec.job_id,
                    "request_id": "coragent-" + identity, "cwd": directory,
                    "script": directory + "/.coragent/run.sh", "resources": spec.metadata.get("resources", {}),
                    "queue": spec.metadata.get("queue"), "timeout_seconds": timeout}
-        metadata = {**spec.metadata, "remote_dir": directory, "scratch_path": scratch,
+        metadata = {**spec.metadata, **storage, "file_mode": self.file_mode, "remote_dir": directory, "scratch_path": scratch,
                     "execution_timeout_seconds": timeout, "external_request": request,
                     "transport": self.transport.name, "driver": "external", "target_name": self.name,
                     "scope": getattr(self, "scope", "local"), "cluster_name": getattr(self, "cluster_name", None),
@@ -97,15 +105,21 @@ class ExternalJobPlatform(StagedJobPlatform):
         self._write(spec.cwd / "spec.json", {"command": list(spec.command), "cwd": str(spec.cwd),
                     "outputs": [output.__dict__ for output in spec.outputs], "metadata": metadata,
                     "workspace_id": spec.workspace_id, "remote_dir": directory})
-        self.stage_inputs(spec)
+        if not self.shared:
+            self.stage_inputs(spec)
         with tempfile.NamedTemporaryFile("w", dir=spec.cwd, delete=False) as stream:
             path = Path(stream.name)
             stream.write(wrapper)
         try:
-            self.transport.copy(path, request["script"])
+            if self.shared:
+                os.replace(path, request['script'])
+                os.chmod(request['script'], 0o700)
+            else:
+                self.transport.copy(path, request["script"])
         finally:
             path.unlink(missing_ok=True)
-        self.run_command("chmod 700 " + shlex.quote(request["script"]))
+        if not self.shared:
+            self.run_command("chmod 700 " + shlex.quote(request["script"]))
         value = self._invoke(request)
         return self._receipt(spec.job_id, spec.cwd, self._identity(value), metadata, spec.command, spec.workspace_id)
 
@@ -116,6 +130,8 @@ class ExternalJobPlatform(StagedJobPlatform):
         return receipt
 
     def _check_target(self, metadata):
+        if metadata.get('file_mode', 'staged') != self.file_mode:
+            raise ValueError('external file_mode changed; restore the original target to reconcile')
         recorded = metadata.get("target_config_digest")
         if recorded != getattr(self, "target_config_digest", None):
             raise ValueError("external target configuration changed; restore the original target to reconcile")
@@ -145,6 +161,8 @@ class ExternalJobPlatform(StagedJobPlatform):
             if path.exists():
                 saved = json.loads(path.read_text())
                 if saved.get("job_id") == receipt.job_id and JobState(saved["state"]) in TERMINAL:
+                    if self.shared and JobState(saved['state']) == JobState.SUCCEEDED:
+                        self.shared.check_receipt(receipt, success=True)
                     return JobStatus(**{**saved, "state": JobState(saved["state"])})
             value = self._invoke(self._request(receipt, "status"))
             if self._identity(value) != receipt.metadata["scheduler_id"]:
@@ -163,6 +181,8 @@ class ExternalJobPlatform(StagedJobPlatform):
                 raise ValueError("external terminal state lacks execution_finished confirmation")
             if state == JobState.SUCCEEDED and code != 0:
                 raise ValueError("external success requires exit code zero")
+            if self.shared and state == JobState.SUCCEEDED:
+                self.shared.check_receipt(receipt, success=True)
             status = JobStatus(receipt.job_id, state, self.name, exit_code=code,
                                started_at=value.get("started_at"), finished_at=value.get("finished_at"),
                                error=value.get("error"), diagnostics=value.get("diagnostics", {}))

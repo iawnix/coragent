@@ -89,9 +89,9 @@ each compute node. Keep caches and scratch node-local. An online TRI node does
 not imply that every scientific backend is available. See
 [EXTERNAL_JOBS.md](EXTERNAL_JOBS.md) for the current submission interface.
 
-Job records remain under each workspace's `runs/jobs/<job-id>/`. This configuration
-change does not alter the external staging/collection protocol. Direct execution
-in a shared workspace is a separate follow-up change.
+Job records remain under each workspace's `runs/jobs/<job-id>/`. External targets
+can use `file_mode="shared"` to execute there directly; staging remains the default.
+See [external Jobs](EXTERNAL_JOBS.md) for storage checks and configuration.
 
 ## Uninstall
 

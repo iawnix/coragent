@@ -54,3 +54,9 @@ Old Python scheduler plugin drivers and remote process drivers have been removed
 Replace their configurations with external targets; migrate active work after
 collecting it through the old installation. Existing old receipts are not converted.
 The generic protocol is documented in [external Jobs](../../../docs/EXTERNAL_JOBS.md).
+
+For direct workspace execution, add `file_mode="shared"` and set `work_root` to
+the shared workspace parent. Controller, submission host and compute nodes must
+see the same resolved Job path. This applies to all three schedulers and both
+local and SSH transports; `staged` remains the default. See the shared-storage
+checks in [external Jobs](../../../docs/EXTERNAL_JOBS.md).

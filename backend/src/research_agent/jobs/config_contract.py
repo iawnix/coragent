@@ -76,7 +76,7 @@ def _validate_execution_config(value):
             raise ValueError("external transport must be local or ssh")
         scope = target.get("type", "remote" if transport == "ssh" else "local") if external else target.get("type")
         if external:
-            _keys(target, {"type", "driver", "transport", "work_root", "handler", "handler_environment",
+            _keys(target, {"type", "driver", "transport", "file_mode", "work_root", "handler", "handler_environment",
                            "cluster_name", "ssh_host", "ssh_config", "submission", "bindings", "python",
                            "allowed_queues", *TIMEOUT_LIMITS}, f"execution.targets.{name}")
             if "transport" not in target:
@@ -99,6 +99,8 @@ def _validate_execution_config(value):
             target.update(type=scope, transport=transport)
             root = target.get("work_root")
             _absolute(root, f"execution.targets.{name}.work_root")
+            if target.get('file_mode', 'staged') not in ('staged', 'shared'):
+                raise ValueError('external file_mode must be staged or shared')
             handler = target.get("handler")
             if not isinstance(handler, list) or not handler or any(not isinstance(arg, str) or not arg or "\0" in arg for arg in handler):
                 raise ValueError("external target requires a handler argv")
@@ -387,6 +389,7 @@ def job_config_schema():
     external_target = record({
         'type': {'enum': ['local', 'remote']}, 'driver': {'const': 'external'},
         'transport': {'enum': ['local', 'ssh']}, 'work_root': absolute,
+        'file_mode': {'enum': ['staged', 'shared'], 'default': 'staged'},
         'handler': {'type': 'array', 'minItems': 1, 'items': text()},
         'handler_environment': backend['properties']['environment'],
         'cluster_name': text('^' + NAME_PATTERN + '$'),

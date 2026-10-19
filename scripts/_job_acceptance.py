@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 import time
 import shlex
+import shutil
+import tempfile
 
 try:
     from ._job_install import profiles, resource, write_private
@@ -55,7 +57,8 @@ def run_job(root, request, timeout):
                 time.sleep(.2)
             if not terminal:
                 raise RuntimeError('acceptance_cancellation_pending:' + receipt['job_id'])
-        if terminal and receipt.get('metadata', {}).get('remote_dir'):
+        if (terminal and receipt.get('metadata', {}).get('remote_dir')
+                and receipt['metadata'].get('file_mode', 'staged') != 'shared'):
             if not collected_outputs:
                 execute('job.collect', root, {'job_id': receipt['job_id']})
             from research_agent.jobs import platforms_from_config
@@ -83,13 +86,22 @@ def accept(config, package, directory, targets, timeout, *, bindings_only=False)
             report['targets'][name] = {'status': 'not_verified'}
             continue
         row = report['targets'][name] = {'status': 'configuration_validated', 'jobs': []}
+        shared_workspace = None
+        accepted = False
         try:
             selected = {'default_environment': name, 'environments': {name: target},
                         **({'execution': settings['execution']} if 'execution' in settings else {})}
             row['environments'] = check_environments(selected)[name]
             row['status'] = 'environment_verified'
-            root = directory / name
-            root.mkdir(mode=0o700)
+            if target.get('file_mode', 'staged') == 'shared':
+                # Acceptance must exercise the same filesystem as real Jobs.
+                # Own only this freshly-created directory, never work_root.
+                shared_workspace = Path(tempfile.mkdtemp(prefix='.coragent-acceptance-',
+                                                        dir=Path(target['work_root']).resolve()))
+                root = shared_workspace
+            else:
+                root = directory / name
+                root.mkdir(mode=0o700)
             initialize_workspace(root, 'installation_' + name, 'research')
             admit_research_workspace(root)
             tested = set()
@@ -126,9 +138,17 @@ def accept(config, package, directory, targets, timeout, *, bindings_only=False)
             row['tested_backends'] = sorted(tested)
             row['untested_backends'] = sorted(target.get('backends', {}).keys() - tested)
             row['status'] = 'execution_verified' if tested else 'environment_verified'
+            accepted = True
         except (OSError, RuntimeError, ValueError) as error:
             row['status'] = 'failed'
             row['error'] = str(error)
+        finally:
+            if shared_workspace is not None:
+                if accepted:
+                    shutil.rmtree(shared_workspace)
+                else:
+                    # Keep evidence and any unresolved execution for recovery.
+                    row['retained_workspace'] = str(shared_workspace)
     return report
 
 

@@ -93,7 +93,8 @@ fed1/fed2 共享软件时，在有写权限的节点安装一次，两个节点�
 资源申请与具体节点选择使用现有外部 Job 接口，见 [EXTERNAL_JOBS.zh-CN.md](EXTERNAL_JOBS.zh-CN.md)。
 
 研究 Job 的归档目录仍位于工作区 `runs/jobs/<job-id>/`。
-本次配置改造不改变外部执行层现有的暂存/回收协议；共享目录直接执行属于后续独立改造。
+外部目标可设置 `file_mode="shared"` 直接在该目录执行；默认仍为暂存传输。
+共享检查和配置方式见 [外部任务](EXTERNAL_JOBS.zh-CN.md)。
 
 ## 卸载
 

@@ -47,3 +47,8 @@ PBS 模式读取 OpenPBS/PBS Pro 的 `qstat -x -f -F json`，包括保留的历�
 旧 Python 调度器插件驱动及远程 process 驱动已移除。将配置改为外部目标；
 已有任务先在旧安装中收集完成，再迁移。旧回执不做转换。
 通用协议见[外部任务接入](../../../docs/EXTERNAL_JOBS.zh-CN.md)。
+
+如需在工作区内直接执行，设置 `file_mode="shared"`，将 `work_root` 指向共享
+工作区父目录。控制端、提交端和计算节点必须访问同一解析后的任务路径。三个
+调度器及本机、SSH 提交均支持此模式，默认仍为 `staged`。共享检查见
+[外部任务说明](../../../docs/EXTERNAL_JOBS.zh-CN.md)。
