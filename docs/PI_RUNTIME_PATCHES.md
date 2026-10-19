@@ -5,12 +5,18 @@ in `config/pi-source.json`. The experimental transport protocol remains version 
 Terminal presentation uses Pi's experimental client, separately from ordinary
 `InteractiveMode`.
 
-`scripts/prepare_pi_source.py` preflights the ordered patches in
-`config/pi-patches/`, skips completely applied groups, and rejects partial or
-incompatible groups before applying pending changes. Verification checks that
+The [Pi 1.3.0 migration audit](PI_1_3_MIGRATION.zh-CN.md) records upstream
+coverage and migration work for all fourteen patches and the installer model
+type workaround. Pi 1.2.0 removed the experimental server/client stack; 1.3.0
+requires replacing that integration before changing the active pin.
+
+`scripts/prepare_pi_source.py` checks and applies the patches in
+`config/pi-patches/` in order, skips completely applied groups, and rejects a
+partial or incompatible group before applying that group. Later patches can
+depend on earlier ones. Verification checks that
 Git can reverse every patch; comments or version strings alone are insufficient.
-A mismatched upstream commit is rejected. Keep the patch groups independent so
-all pending patches can be checked before changing files.
+A mismatched upstream commit is rejected. Verify the complete ordered stack in
+a separate checkout before installing it.
 
 | Patch | Purpose | Validation |
 |---|---|---|
@@ -24,6 +30,16 @@ all pending patches can be checked before changing files.
 | 008-request-admission | Fail-closed generation hooks and one bounded compaction attempt | Request admission failure, context budget and compaction outcome tests |
 | 009-input-identity | Native clients supply stable request IDs; AgentController preserves them and specific admission errors | Real native-controller and common input-admission tests |
 | 010-context-lifecycle | Atomic passive context preparation, pinned summary supplements and an operating input budget | Native context persistence, compaction, recovery and budget tests |
+| 011-markdown-presentation | Register Markdown transformers in the experimental chat view | Native Markdown rendering and retained transcript text |
+| 012-skill-presentation | Keep attached user/tool detail inside the expandable Skill card | Collapsed/expanded Skill card and ordinary InteractiveMode rendering |
+| 013-monitor-presentation | Present recorded Monitor wake messages as compact event cards | Native Monitor transcript rendering and reconnect replay |
+| 014-runtime-presentation | Render task continuations as compact runtime status messages | Native continuation rendering, legacy messages and transcript replay |
+
+There is also a source modification outside the patch directory:
+`hydrate_model_data()` in `scripts/prepare_pi_source.py` adds an `as any` cast to
+the OpenCode Go model list. Include it in every upgrade audit. Pi 1.3.0 adds
+the Google API type and implementation missing from 1.1.0's provider; the
+migration should remove the cast and validate the hydrated catalog build.
 
 Application integration lives outside these patches. The worker publishes the
 `coragent.client-queries` service, bound to its workspace, session, kernel bridge, and
