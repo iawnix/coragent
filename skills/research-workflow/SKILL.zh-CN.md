@@ -11,8 +11,8 @@ description: 通过原生研究闭环协调任务、研究 Node、科学 Job、�
 
 ## 启动与恢复
 
-1. 读取当前任务和 `research-review/1` 上下文。
-2. 用真实用户 submission ID 和具体交付标准通过 `task_begin`/`task_read` 注册或恢复任务。
+1. 检查 `runtime_control` 和 `research-review/1` 上下文；通过 `task_read` 恢复已有任务的要求和状态。
+2. 仅在没有未结束任务且开始新委托时使用 `task_begin`，传入真实用户 submission ID、覆盖每项交付物的目标与标准、`initial_plan` 和 `next_action`。后续请求沿用当前任务，新增用户要求通过 `task_update action=refine` 更新。读取任务不会恢复暂停或阻塞的工作：暂停需要用户明确恢复，阻塞解除后需引用新用户指令执行 `refine`。
 3. 用 `research_create` 创建或选择 Node，再用 `task_update action=set_research` 绑定 entry/focus Node。
 4. 读取相关领域 Skill，选择下一项能区分假设的操作。
 

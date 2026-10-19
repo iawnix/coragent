@@ -44,6 +44,6 @@ Correct a published conclusion with a new Result and `supersedes`. Select it as 
 
 ## Retain progress and finish the assignment
 
-Plans and notes explain decisions. New Results, fixed materials and actual Job milestones provide recoverable progress. Editing a plan, making more Nodes or citing the same evidence in a different combination does not replenish progress allowance. For derivation or planning assignments, retain the useful derivation or plan itself as a Result/material.
+Plans and notes explain decisions. New Results, fixed materials and actual Job milestones provide recoverable progress. Editing a plan, making more Nodes or citing the same evidence in a different combination does not establish new substantive progress. The no-progress count is an advisory replanning signal, not a fixed stopping threshold; continue within the user's compute, cost, time and retry limits. For derivation or planning assignments, retain the useful derivation or plan itself as a Result/material.
 
 Finish against the user's delivery criteria, with the relevant immutable evidence and limitations. A negative or inconclusive conclusion may satisfy the actual assignment; it does not authorize weakening a requested claim. Closed Nodes and successful processes are not completion evidence by themselves. Stop repeated uninformative attempts within the stated limits, and distinguish a local failed method from a task-wide blocker.

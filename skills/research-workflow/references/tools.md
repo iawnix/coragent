@@ -50,11 +50,14 @@ Task tools use actual user submission IDs represented as decimal strings, distin
 
 | action | Required fields and meaning |
 | --- | --- |
-| refine | source_submission_ids from actual user requests; optionally replace objective or criteria. |
-| progress | evidence_refs; cite adopted Results/Artifacts or Jobs owned by this task. Notes alone do not reset the no-progress allowance. Collection receipt IDs are not accepted here. |
+| refine | source_submission_ids from actual user requests; optionally replace objective, criteria or next_action. Scope changes or recovery from a blocker require a new user instruction; refine does not resume a paused task. |
+| progress | evidence_refs; cite adopted Results/Artifacts or Jobs owned by this task; optionally update next_action. Notes alone are not substantive progress. Collection receipt IDs are not accepted here. |
 | wait | wait with job_ids owned by this task and mode all/any. Unknown outcomes wake the task for reconciliation. |
-| block | reason explaining the blocker. |
+| block | block_kind, reason explaining the unmet prerequisite and why no independent authorized work remains, and resume_when. execution_failure, budget_exhausted, scientific_dead_end and resource_unavailable also require evidence_refs citing verified Results/Artifacts or Jobs owned by this task. missing_user_input is only for indispensable input unavailable from existing sources; optional preferences and unfinished analysis do not qualify. |
 | propose_completion | completion entries covering every criterion_id, each supported by a fixed Result or Artifact. Then deliver the final answer; this call alone does not finish delivery. |
 | set_research | research containing complete entry_node_ids and focus_node_ids arrays; replaces both, and [] clears a list. |
+| apply_user_control | control=pause/resume/cancel and source_submission_ids from actual current user input in runtime_control. cancel also requires jobs=keep/cancel according to user intent; inspect returned task state and cancellation receipts before acknowledging a stop. |
+
+The no-progress count is an advisory signal to reconsider the approach, not a fixed stopping threshold or a resource budget. Continue within the user's limits; register a blocker only when its concrete prerequisites and evidence meet the contract above.
 
 For intentional identical recalculation, prepare with a new work_id and submit repeat with the matching predecessor_job_id, reason and budget. Reusing an existing request identity reuses its Job; duplicate_execution normally means inspect/collect the returned Job. Validator Jobs require the registered validator_id/version and Artifacts in the count/order declared by their input roles; collected_output roles require the producer's current collected evidence. job_probe checks platform infrastructure, not scientific software. job_reconcile recovers the existing execution state without resubmission. After job_cancel, inspect the returned state; unknown is not confirmation that execution stopped.

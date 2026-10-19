@@ -50,11 +50,14 @@ research_update 用 node_id 与 note 解释变化；有可引用产出时，rese
 
 | action | 必填字段与含义 |
 | --- | --- |
-| refine | source_submission_ids 必须来自实际用户请求；可替换 objective 或 criteria。 |
-| progress | evidence_refs；引用实际采用的 Result/Artifact 或当前任务的 Job。笔记本身不重置无进展计数，此处不接受收集回执 ID。 |
+| refine | source_submission_ids 必须来自实际用户请求；可替换 objective、criteria 或 next_action。修改范围或解除阻塞需要新用户指令；refine 不恢复暂停任务。 |
+| progress | evidence_refs；引用实际采用的 Result/Artifact 或当前任务的 Job；可更新 next_action。笔记本身不算实质进展，此处不接受收集回执 ID。 |
 | wait | wait 中填写当前任务的 job_ids 和 all/any 模式。未知执行结果会唤醒任务以协调状态。 |
-| block | reason 说明阻塞原因。 |
+| block | block_kind、reason 和 resume_when；reason 说明缺失条件及为何没有其它可独立推进的已授权工作。execution_failure、budget_exhausted、scientific_dead_end 和 resource_unavailable 还必须通过 evidence_refs 引用已验证的 Result/Artifact 或当前任务的 Job。missing_user_input 仅用于不可或缺且无法从现有来源获取的输入；可选偏好和未完成分析不符合条件。 |
 | propose_completion | completion 覆盖全部 criterion_id，每项至少有固定 Result 或 Artifact 支持；之后仍需交付最终答复。 |
 | set_research | research 包含完整 entry_node_ids、focus_node_ids 数组；两者整体替换，[] 表示清空。 |
+| apply_user_control | control=pause/resume/cancel，以及 runtime_control 中当前真实用户输入的 source_submission_ids。cancel 还需按用户意图设置 jobs=keep/cancel；确认返回的任务状态和取消回执后再确认停止。 |
+
+无进展计数用于提示重新评估方法，不是固定停止阈值或资源预算。遵守用户限制继续推进；只有满足上述具体条件和证据要求时才登记阻塞。
 
 有意重复完全相同的计算时，用新的 work_id 准备请求，并提交包含匹配 predecessor_job_id、reason、budget 的 repeat。复用请求身份会复用 Job；duplicate_execution 通常应转为查询或收集返回的 Job。验证器 Job 必须使用已登记的 validator_id/version，并按输入角色规定的数量、顺序传 Artifact；collected_output 角色要求生产 Job 当前已收集的证据。job_probe 检查平台基础设施，不验证科学软件；job_reconcile 恢复已有执行状态，不重新提交；job_cancel 后检查返回状态，unknown 不等于已经停止。

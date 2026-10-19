@@ -11,8 +11,8 @@ Use this Skill to run a sustained research assignment. It connects user requirem
 
 ## Start and resume
 
-1. Read the current task and `research-review/1` context.
-2. Register or resume the assignment with `task_begin`/`task_read`, using actual user submission IDs and concrete delivery criteria.
+1. Check `runtime_control` and the `research-review/1` context; use `task_read` to recover an existing task's requirements and state.
+2. Use `task_begin` only for a new assignment when no nonterminal task exists, with actual user submission IDs, an objective and criteria covering every deliverable, `initial_plan`, and `next_action`. Follow-ups continue the current task; update new user requirements through `task_update action=refine`. Reading a task does not resume paused or blocked work: pause requires explicit user resume, and a resolved blocker requires `refine` with a new user instruction.
 3. Create or select Nodes with `research_create`, then bind entry/focus Nodes with `task_update action=set_research`.
 4. Read the relevant domain Skill and choose the next discriminating operation.
 
