@@ -44,6 +44,8 @@ For SMTP, set `notifications.email.password = "credential:smtp_password"`, or us
 an explicit external `password_file`/`password_env`. External credential files are
 not removed during uninstall. Pi updates its credential section under the canonical
 file lock while preserving other sections; startup never copies stale auth back.
+In a model's `thinkingLevelMap`, use `false` for an unsupported thinking level;
+generated Pi configuration restores its native `null` value.
 
 ## Install and update
 

@@ -13,6 +13,23 @@ SECTIONS = {'schema_version', 'paths', 'service', 'models', 'execution', 'notifi
             'name_resolver', 'web', 'remote_host', 'phone', 'runtime'}
 
 
+def _thinking_levels(value, *, encode):
+    """TOML false represents Pi's null (unsupported) thinking level."""
+    if isinstance(value, list):
+        return [_thinking_levels(item, encode=encode) for item in value]
+    if not isinstance(value, dict):
+        return value
+    result = {}
+    for key, item in value.items():
+        if key == 'thinkingLevelMap' and isinstance(item, dict):
+            result[key] = {level: (False if mapped is None else mapped) if encode
+                           else (None if mapped is False else mapped)
+                           for level, mapped in item.items()}
+        else:
+            result[key] = _thinking_levels(item, encode=encode)
+    return result
+
+
 def atomic_write(path: Path, content: str | bytes):
     if path.is_symlink():
         raise ValueError(f'configuration cannot be a symbolic link: {path}')
@@ -79,9 +96,13 @@ class Configuration:
             if not isinstance(path, str) or not Path(path).expanduser().is_absolute():
                 raise ValueError(f'paths.{name} must be absolute')
         validate_settings(value)
+        if 'models' in value:
+            value['models'] = _thinking_levels(value['models'], encode=False)
         return value
 
     def write(self, value):
+        if 'models' in value:
+            value = {**value, 'models': _thinking_levels(value['models'], encode=True)}
         atomic_write(self.path, toml_text(value))
 
     def update(self, **sections):

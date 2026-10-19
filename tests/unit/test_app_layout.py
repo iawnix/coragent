@@ -114,6 +114,23 @@ def test_toml_encoder_handles_model_arrays_and_quoted_provider_names():
     assert tomllib.loads(toml_text(value)) == value
 
 
+def test_unsupported_model_thinking_levels_survive_configuration_and_projection(layout):
+    import copy
+    import tomllib
+    models = {'providers': {'test': {'models': [{
+        'id': 'test', 'reasoning': True,
+        'thinkingLevelMap': {'off': None, 'minimal': None, 'high': 'high'},
+        'compat': {'supportsDeveloperRole': False}}]}}}
+    original = copy.deepcopy(models)
+    layout.configuration.update(models=models)
+    stored = tomllib.loads(layout.config_file.read_text())
+    assert stored['models']['providers']['test']['models'][0]['thinkingLevelMap']['off'] is False
+    assert layout.configuration.read()['models'] == original
+    assert models == original
+    layout.initialize().materialize()
+    assert json.loads((layout.pi_config / 'models.json').read_text()) == original
+
+
 def test_install_preview_uses_one_config_without_writing_runtime_files(layout, capsys):
     from scripts.install_wizard import parse_args, show_dry_run
     layout.configuration.update(execution={'default_target': 'local', 'targets': {

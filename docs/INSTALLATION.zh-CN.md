@@ -56,6 +56,7 @@ password = "credential:smtp_password"
 
 也可引用外部 `password_file` 或 `password_env`。外部凭据不会因为卸载而被删除。
 模型认证直接在同一份凭据文件内加锁更新，启动时不复制旧认证覆盖刷新结果。
+模型的 `thinkingLevelMap` 中用 `false` 表示不支持的思考档位；生成 Pi 配置时会转换为其原生 `null`。
 
 ## 安装、检查与更新
 
