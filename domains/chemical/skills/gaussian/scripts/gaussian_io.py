@@ -36,6 +36,7 @@ ROUTE_KEYWORDS_WITH_KNOWN_LINE_WRAPS = (
 
 # Validators stage this module together with the same shared XYZ reader.
 from xyz import PERIODIC_TABLE, read_xyz_frames, select_frame
+from gaussian_input import serialize_structures
 
 
 def read_xyz(path: Path, frame: str = "only") -> tuple[int, str, list[Coord]]:
@@ -73,22 +74,14 @@ def write_gjf(
         f"%nprocshared={nproc}",
         f"%mem={mem}",
         normalize_route(route),
-        "",
-        title,
-        "",
-        f"{charge} {multiplicity}",
     ]
-    for element, x, y, z in coords:
-        lines.append(f"{element:<3s} {x:16.8f} {y:16.8f} {z:16.8f}")
-    lines.append("")
+    body = serialize_structures([{'title': title, 'charge': charge, 'multiplicity': multiplicity, 'atoms': coords}])
+    text = '\n'.join(lines) + '\n\n' + body
     for section in extra_sections:
-        section_lines = section.rstrip().splitlines()
-        if section_lines:
-            lines.extend(section_lines)
-            lines.append("")
-    lines.append("")
+        if section.strip():
+            text += section.rstrip() + '\n\n'
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines), encoding="utf-8")
+    path.write_text(text, encoding="utf-8")
 
 
 def read_extra_sections(paths: list[Path]) -> list[str]:
@@ -399,9 +392,11 @@ def _parse_convergence_number(token: str) -> float | str:
         return token
 
 
-def parse_convergence(lines: list[str]) -> tuple[dict[str, dict[str, str | float]], str | None]:
+def parse_optimization(lines: list[str]):
+    """Read the final optimization attempt, retaining the solver's completion rule."""
     convergence_rows: dict[str, dict[str, str | float]] = {}
     stationary_convergence_rows: dict[str, dict[str, str | float]] | None = None
+    completion_rule = None
     labels = (
         "Maximum Force",
         "RMS     Force",
@@ -413,6 +408,7 @@ def parse_convergence(lines: list[str]) -> tuple[dict[str, dict[str, str | float
         if stripped.startswith(("Step number", "Maximum Force")):
             convergence_rows = {}
             stationary_convergence_rows = None
+            completion_rule = None
         if stripped.startswith(labels):
             parts = stripped.split()
             if len(parts) >= 5:
@@ -422,13 +418,46 @@ def parse_convergence(lines: list[str]) -> tuple[dict[str, dict[str, str | float
                     "threshold": _parse_convergence_number(parts[3]),
                     "converged": parts[4],
                 }
+        elif stripped == "Optimization completed on the basis of negligible forces.":
+            completion_rule = 'gaussian_negligible_forces'
         elif "Stationary point found" in stripped and convergence_rows:
             stationary_convergence_rows = {key: dict(value) for key, value in convergence_rows.items()}
+        elif stripped.startswith('Optimization stopped'):
+            stationary_convergence_rows = None
+            completion_rule = None
     if stationary_convergence_rows is not None:
-        return stationary_convergence_rows, "stationary_point"
+        return stationary_convergence_rows, "stationary_point", completion_rule
     if convergence_rows:
-        return convergence_rows, "last_section_rows"
-    return {}, None
+        return convergence_rows, "last_section_rows", None
+    return {}, None, None
+
+
+def parse_convergence(lines: list[str]) -> tuple[dict[str, dict[str, str | float]], str | None]:
+    rows, source, _ = parse_optimization(lines)
+    return rows, source
+
+
+def convergence_row_satisfied(row):
+    return (str(row['converged']).upper() == 'YES'
+            and all(type(row[key]) in (int, float) and math.isfinite(row[key])
+                    for key in ('value', 'threshold'))
+            and 0 <= row['value'] <= row['threshold'] and row['threshold'] > 0)
+
+
+def optimization_completion(convergence, source, completion_rule):
+    """Return strict table satisfaction and the accepted solver completion reason."""
+    complete_convergence = set(convergence) == {
+        "Maximum Force", "RMS Force", "Maximum Displacement", "RMS Displacement",
+    }
+    final_convergence_satisfied = complete_convergence and all(map(convergence_row_satisfied, convergence.values()))
+    valid_table = complete_convergence and all(
+        all(type(row[key]) in (int, float) and math.isfinite(row[key]) for key in ('value', 'threshold'))
+        and row['value'] >= 0 and row['threshold'] > 0 for row in convergence.values())
+    negligible_forces = (completion_rule == 'gaussian_negligible_forces' and valid_table
+                         and all(convergence_row_satisfied(convergence[key]) for key in ('Maximum Force', 'RMS Force')))
+    completion_reason = (completion_rule if negligible_forces else 'all_criteria'
+                         if final_convergence_satisfied else None) if source == "stationary_point" else None
+    return final_convergence_satisfied, completion_reason
 
 
 def orientation_blocks(lines: list[str], marker: str) -> list[list[Coord]]:
@@ -806,16 +835,13 @@ def parse_log(
     imaginary = [freq for freq in section_frequencies if freq < 0.0]
     raw_imaginary = [freq for freq in raw_section_frequencies if freq < 0.0]
     atoms = final_geometry(section_lines)
-    convergence, convergence_source = parse_convergence(section_lines)
+    convergence, convergence_source, completion_rule = parse_optimization(section_lines)
     normal_termination = "Normal termination of Gaussian" in section_text
     error_termination = "Error termination" in section_text
     stationary_point_found = convergence_source == "stationary_point"
     final_convergence_evidence_present = bool(convergence)
-    final_convergence_satisfied = set(convergence) == {
-        "Maximum Force", "RMS Force", "Maximum Displacement", "RMS Displacement",
-    } and all(
-        str(row["converged"]).upper() == "YES" for row in convergence.values()
-    )
+    final_convergence_satisfied, completion_reason = optimization_completion(convergence, convergence_source, completion_rule)
+    optimization_completed = bool(normal_termination and not error_termination and completion_reason)
     summary: dict[str, object] = {
         "log": str(log_path),
         "section_count": section["section_count"],
@@ -829,6 +855,8 @@ def parse_log(
         "normal_termination": normal_termination,
         "error_termination": error_termination,
         "stationary_point_found": stationary_point_found,
+        "optimization_completed": optimization_completed,
+        "optimization_completion_reason": completion_reason,
         "frequency_count": len(section_frequencies),
         "imaginary_frequency_count": len(imaginary),
         "imaginary_frequencies_cm-1": imaginary,

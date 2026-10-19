@@ -100,7 +100,9 @@ def saddle(spec, sides, path):
     summary=parsed['summary']
     convergence=summary['force_convergence']
     complete_convergence=set(convergence)=={'Maximum Force','RMS Force','Maximum Displacement','RMS Displacement'}
-    checks['stationary_point']=record(summary['stationary_point_found'] and summary['final_convergence_satisfied'] and complete_convergence,missing=not complete_convergence)
+    checks['stationary_point']=record(summary['optimization_completed'],
+                                     {'completion_reason':summary['optimization_completion_reason'], 'criteria':convergence},
+                                     missing=not complete_convergence)
     negative=[f for f in parsed['frequencies'] if f<0]
     checks['frequency_table_complete']=record(len(parsed['frequencies'])==3*atoms.GetNumAtoms()-6 and np.isfinite(parsed['frequencies']).all(),{'expected':3*atoms.GetNumAtoms()-6,'actual':len(parsed['frequencies'])})
     checks['one_imaginary_frequency']=record(len(negative)==1,{'frequencies_cm-1':parsed['frequencies']},missing=not parsed['frequencies'])

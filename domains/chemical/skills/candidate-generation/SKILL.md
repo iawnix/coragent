@@ -38,6 +38,8 @@ Keep multiple site, face, conformer, and mechanism hypotheses until validation o
 - `chemical.gradient-xtb@1`, `chemical.gradient-gaussian@1`: gradient/path calculators.
 - `chemical.neb-xtb@2`, `chemical.neb-gaussian@2`: ASE NEB v2 searches.
 
+Both QST preparers use the shared Cartesian serializer in `skills/_shared/gaussian_input.py`. It reads generated blocks back and checks their state, ordered elements and coordinates against the mapped request before producing the input. Supply the explicit atom mapping to the preparer; coordinate serialization preserves that ordering.
+
 Read [candidate-generation criteria](references/candidate_generation.md), [path operations](references/path_search.md), [QST preparation](references/path_preparation.md), and [NEB executor details](references/ase_neb_executor.md). Use [reactive geometry](../reactive-geometry/SKILL.md) for pose construction and [validation](../validation/SKILL.md) for saddle/IRC evidence.
 
 ## Further references

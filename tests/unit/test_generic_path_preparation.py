@@ -77,6 +77,26 @@ def test_unimolecular_ring_opening_generates_reproducible_generic_qst2(tmp_path)
     assert 'da_geometry.py' not in result['implementation_sha256']
 
 
+@pytest.mark.parametrize('bonded', [True, False])
+def test_qst_preparer_retains_graph_aware_hydrogen_contact_diagnosis(tmp_path, bonded):
+    from rdkit import Chem
+    from gaussian_path_inputs import write_qst2
+    mol = Chem.MolFromSmiles('[H:1][H:2]' if bonded else '[H:1].[H:2]')
+    xyz = [[0., 0., 0.], [.758, 0., 0.]]
+    settings = {'charge': 0, 'multiplicity': 1, 'method': 'HF', 'basis': 'STO-3G', 'threads': 1, 'memory_mb': 256}
+    folder = tmp_path / 'candidate'; folder.mkdir()
+    if bonded:
+        files = write_qst2(folder, settings, mol, mol, xyz, xyz, [1, 2], 'fixture')
+        assert 'geometry_preflight.json' in files
+        assert (folder / 'ts.gjf').is_file()
+    else:
+        with pytest.raises(ValueError, match='nonreaction_short_contact'):
+            write_qst2(folder, settings, mol, mol, xyz, xyz, [1, 2], 'fixture')
+        assert not (folder / 'ts.gjf').exists()
+    report = json.loads((folder / 'geometry_preflight.json').read_text())
+    assert report['reactant']['verdict'] == ('safe' if bonded else 'unsafe')
+
+
 def test_supplied_multifragment_coordinates_preserve_mapping_and_produce_irc(tmp_path):
     assert not hasattr(helper, 'prepare_irc')
     assert hasattr(irc_helper, 'prepare_irc')

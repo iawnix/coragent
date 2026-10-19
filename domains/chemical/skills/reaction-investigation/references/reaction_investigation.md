@@ -20,7 +20,7 @@ per-turn checklist is required. Read current assessments before repeating old wo
 
 | Unresolved question | Operation and usable output | Decision after inspection |
 | --- | --- | --- |
-| What structures were requested? | [material-preparation](../../material-preparation/SKILL.md): original identity, graph/state, explicit-H order, mapped materials and source geometries | Repair an incorrect graph or atom correspondence before calculating; reuse sound optimized fragments rather than retyping coordinates |
+| What structures were requested? | [material-preparation](../../material-preparation/SKILL.md): original identity, graph/state, explicit-H order, mapped materials and source geometries | Establish graph identities and full atom correspondence before seed generation or optimization; carry them through calculations and reuse suitable existing geometries |
 | What elementary step is being tested? | reaction-investigation: proposed bond changes, conformers/sites/states, alternatives and falsifiers | If endpoints span multiple steps, investigate intermediates; a failed input is not a falsifier of the reaction |
 | How can the reacting atoms approach? | [reactive-geometry](../../reactive-geometry/SKILL.md): source-preserving poses, contact/protected-bond checks and rejected alternatives | Inspect actual local geometry, then select a constrained refinement or path search; revise the pose if it clashes |
 | Where is a saddle candidate? | [candidate-generation](../../candidate-generation/SKILL.md): QST/TS optimization, scan or NEB outputs, selected frame and constraints | Refine a plausible peak as a saddle; classify a failed calculation and change the diagnosed cause |

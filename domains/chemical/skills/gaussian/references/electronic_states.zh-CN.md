@@ -21,7 +21,8 @@ tda 用 TDA。root 属于局部方法/几何；开壳层 TD、单重参考到三
 配合 NoSymm 和 tight SCF，限定气相。核对 Gaussian 16 版本、route、电荷/参考
 多重度、终止、各 SCF/选中态区块、完整 root 列表、Input orientation 与原轴力表。
 力取负号并由 Eh/bohr 转为 Eh/Å 的 Cartesian dE/dR；SP 坐标容差 2e-6 Å。
-opt 要求四项力/位移数值判据通过，不只检查“已收敛”字样。拒绝覆盖已有输出目录。
+opt 使用共享 Gaussian 完成判定：四项数值判据通过，或程序明确按可忽略力准则完成且力判据通过。
+结果保留完整四项原始记录和完成依据。每次尝试使用新的输出目录。
 
 激发态能量来自绑定于目标选中态标记的 Total Energy, E(TD-HF/TD-DFT) 或
 E(CIS/TDA)，并核对其与参考 SCF+选中激发能相符，容差 1e-4 eV。

@@ -18,7 +18,7 @@ def validate(summary, task, method, basis):
         raise ValueError('Gaussian output route does not match requested method/basis')
     if not summary['normal_termination'] or summary['error_termination']:
         raise ValueError('Gaussian did not terminate normally')
-    if task == 'opt' and not (summary['stationary_point_found'] and summary['final_convergence_satisfied']):
+    if task == 'opt' and not summary['optimization_completed']:
         raise ValueError('Gaussian optimization lacks converged stationary point evidence')
     return require_supported_energy(summary)
 
@@ -48,9 +48,14 @@ def main():
             write_gjf(step/'input.gjf','Skill calculation',read_xyz(geometry),route,a.charge,a.multiplicity,a.threads,f'{a.memory_mb}MB','wavefunction.chk',[])
             with (step/'input.gjf').open('rb') as source, (step/'gaussian.out').open('wb') as log:
                 run=subprocess.run([executable],cwd=step,stdin=source,stdout=log,stderr=subprocess.STDOUT)
-            if run.returncode: raise RuntimeError(f'Gaussian {task} exited {run.returncode}')
             parsed=parse_log(step/'gaussian.out',expected_route=route)
             write_json(step/'parsed.json',parsed)
+            result['last_attempt'] = {'task': task, 'program_returncode': run.returncode,
+                                      'summary': parsed['summary'], 'geometry': None}
+            if parsed['atoms']:
+                write_xyz(step/'last_geometry.xyz', parsed['atoms'], 'Last Gaussian geometry; see parsed.json for completion')
+                result['last_attempt']['geometry'] = f'{task}/last_geometry.xyz'
+            if run.returncode: raise RuntimeError(f'Gaussian {task} exited {run.returncode}')
             energy=validate(parsed['summary'],task,a.method,a.basis)
             if task=='opt':
                 if [x[0] for x in parsed['atoms']] != [x[0] for x in atoms]:

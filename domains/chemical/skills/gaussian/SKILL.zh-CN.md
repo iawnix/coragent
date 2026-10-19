@@ -21,6 +21,8 @@ Gaussian 用于优化、单点、QST/TS、频率、IRC、松弛扫描、电子�
 
 `opt` 做几何优化，`sp` 做固定几何单点，`opt-sp` 两者都做。结果记录能量、收敛、优化几何、方法/基组、电子态、原生日志和解析摘要。
 
+结合 `summary.optimization_completed` 与 `optimization_completion_reason` 读取优化状态。解析器识别 Gaussian 明确给出的可忽略力完成准则，同时保留原始四项收敛记录和更严格的 `final_convergence_satisfied` 标记。失败后从 `result.json.last_attempt` 和 `last_geometry.xyz` 检查最后结构、选择重启方案；随后按研究需要进行频率、模式和 IRC 检查。
+
 ## 显式输入
 
 ```bash

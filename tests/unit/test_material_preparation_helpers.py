@@ -24,6 +24,36 @@ def test_reproducible_seed_from_supplied_structure(tmp_path, smiles, formula, at
         helper.seeds(smiles, 0, 2, tmp_path/'bad')
 
 
+def test_atom_maps_are_prepared_before_embedding_and_survive_explicit_hydrogen_parsing(tmp_path):
+    # All atom identities are declared before any coordinates exist.
+    source = '[H:31][C:8]([H:32])([H:33])[O:4][H:34]'
+    before, _, _ = helper.graph_material(source)
+    assert before.GetNumConformers() == 0
+    expected = [a.GetAtomMapNum() for a in before.GetAtoms()]
+    result = helper.seeds(source, 0, 1, tmp_path / 'seed')
+    seed = result['seeds'][0]
+    assert result['source_smiles'] == source
+    assert [a['atom_map'] for a in seed['atoms']] == expected
+    assert [a['xyz_index'] for a in seed['atoms']] == list(range(len(expected)))
+    xyz_elements = [row.split()[0] for row in Path(seed['xyz']).read_text().splitlines()[2:] if row.strip()]
+    assert xyz_elements == [a['element'] for a in seed['atoms']]
+    assert all(a['origin'] == 'smiles_atom' for a in seed['atoms'])
+    assert {a['atom_map'] for a in seed['atoms'] if a['element'] == 'H'} == {31, 32, 33, 34}
+    for atom in seed['atoms']:
+        if atom['element'] == 'H':
+            parent = seed['atoms'][atom['parent_atom_index']]
+            assert parent['atom_map'] == (4 if atom['atom_map'] == 34 else 8)
+
+
+def test_implicit_hydrogens_have_recorded_parentage_without_invented_reaction_maps(tmp_path):
+    result = helper.seeds('[CH3:8][OH:4]', 0, 1, tmp_path / 'seed')
+    atoms = result['seeds'][0]['atoms']
+    hydrogens = [a for a in atoms if a['element'] == 'H']
+    assert len(hydrogens) == 4
+    assert all(a['atom_map'] is None and a['origin'] == 'added_hydrogen' for a in hydrogens)
+    assert sorted(atoms[a['parent_atom_index']]['atom_map'] for a in hydrogens) == [4, 8, 8, 8]
+
+
 def test_stereo_is_explicitly_enumerated_without_selecting_one_identity(tmp_path):
     with pytest.raises(ValueError, match='unspecified stereochemistry'):
         helper.seeds('CC(O)F', 0, 1, tmp_path/'blocked')

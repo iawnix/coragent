@@ -7,7 +7,8 @@ from pathlib import Path, PurePosixPath
 
 from gaussian_io import parse_log, parse_irc_log, write_irc_parse_artifacts, write_xyz, require_supported_energy
 from science import digest, write_json, new_result, finish
-from geometry_safety import assess_gaussian_input, parse_gaussian_coordinate_blocks, require_safe
+from geometry_safety import assess_gaussian_input, require_safe
+from gaussian_input import inspect_qst_structures
 
 
 def local_reference(value):
@@ -15,39 +16,6 @@ def local_reference(value):
     if path.is_absolute() or '..' in path.parts or not path.parts or '\\' in value:
         raise ValueError('Gaussian file references must be relative staged paths')
     return str(path)
-
-
-def inspect_qst_structures(body, route):
-    """Check the supported Cartesian QST grammar before starting Gaussian.
-
-    A charge header somewhere in the input is insufficient: every structure has
-    its own title and state, and an omitted header must not hide coordinates
-    from geometry screening. Advanced Gaussian dialects need a separate adapter.
-    """
-    kinds = re.findall(r'\bqst([23])\b', route, re.I)
-    if not kinds:
-        return
-    if len(kinds) != 1:
-        raise ValueError('declare exactly one QST2 or QST3 operation per Gaussian link')
-    count = int(kinds[0])
-    parts = [part.strip() for part in re.split(r'\n[ \t]*\n', body) if part.strip()]
-    if len(parts) != 2 * count:
-        raise ValueError(f'QST{count} requires {count} complete title and charge/multiplicity + Cartesian coordinate sections; extra sections require a dedicated adapter')
-    elements = None
-    for index in range(count):
-        title, geometry = parts[2 * index:2 * index + 2]
-        if re.match(r'^\s*-?\d+\s+\d+\s*$', title.splitlines()[0]):
-            raise ValueError(f'QST structure {index + 1} needs a title before its charge/multiplicity')
-        lines = geometry.splitlines()
-        if not re.fullmatch(r'\s*-?\d+\s+\d+\s*', lines[0]):
-            raise ValueError(f'QST structure {index + 1} is missing its charge/multiplicity header')
-        blocks = parse_gaussian_coordinate_blocks(geometry)
-        if len(blocks) != 1 or len(blocks[0]) != len(lines) - 1:
-            raise ValueError(f'QST structure {index + 1} requires complete plain Cartesian coordinates; unsupported records need a dedicated adapter')
-        current = [row[0] for row in blocks[0]]
-        if elements is not None and current != elements:
-            raise ValueError('QST structures must have identical atom counts and element order; supply an explicit atom mapping before serialization')
-        elements = current
 
 
 def inspect_input(path, method, basis, charge, multiplicity, threads, memory_mb):
@@ -129,6 +97,10 @@ def run_input(args):
         write_json(out/'parsed.json', parsed)
         result['parsing']['status'] = 'completed'
         summary = parsed['summary']; result['normal_termination'] = summary['normal_termination'] and not summary['error_termination']
+        result['last_attempt'] = {'summary': summary, 'geometry': None}
+        if parsed['atoms']:
+            write_xyz(out/'last_geometry.xyz', parsed['atoms'], 'Last Gaussian geometry; see parsed.json for completion')
+            result['last_attempt']['geometry'] = 'last_geometry.xyz'
         if process.returncode or not result['normal_termination']:
             result['execution_status'] = 'failed'
             stage = 'execution'
@@ -140,7 +112,7 @@ def run_input(args):
         if parsed['atoms']: write_xyz(out/'geometry.xyz', parsed['atoms'], 'Gaussian final geometry')
         energy = require_supported_energy(summary)
         result['steps'].append({'task': args.validation, 'energy_hartree': energy, 'summary': summary})
-        if args.validation in {'opt', 'saddle'} and not (summary['stationary_point_found'] and summary['final_convergence_satisfied']):
+        if args.validation in {'opt', 'saddle'} and not summary['optimization_completed']:
             raise ValueError('missing converged stationary point evidence')
         if args.validation in {'frequency', 'minimum', 'saddle'}:
             if not summary['frequency_count']: raise ValueError('missing final frequency evidence')

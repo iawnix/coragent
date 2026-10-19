@@ -44,6 +44,27 @@ def test_qst_requires_complete_structure_sections(tmp_path):
         helper.inspect_input(path, 'M062X', '6-31G**', 0, 1, 12, 4000)
 
 
+@pytest.mark.parametrize('count', [2, 3])
+def test_qst_serialization_roundtrip_preserves_mapped_coordinates_and_state(tmp_path, count):
+    from gaussian_input import serialize_structures, verify_structures
+    structures = [{'title': f'frame {i}', 'charge': 0, 'multiplicity': 1,
+                   'atoms': [('C', 0., float(i), 0.), ('C', 1.6 + i, 0., 0.)]} for i in range(count)]
+    body = serialize_structures(structures)
+    path = tmp_path / 'qst.gjf'
+    path.write_text(f'%nprocshared=12\n%mem=4000MB\n#p M062X/6-31G** Opt=QST{count}\n\n' + body)
+    assert len(helper.inspect_input(path, 'M062X', '6-31G**', 0, 1, 12, 4000)['geometry_safety']['blocks']) == count
+    # Same-element permutations are invisible to an element-order check.
+    changed = body.replace('C 0 0 0\nC 1.6 0 0', 'C 1.6 0 0\nC 0 0 0', 1)
+    with pytest.raises(ValueError, match='coordinates differ'):
+        verify_structures(changed, structures)
+
+
+def test_serializer_rejects_coordinates_that_would_be_silently_truncated():
+    from gaussian_input import serialize_structures
+    with pytest.raises(ValueError, match='three finite'):
+        serialize_structures([{'title': 'bad', 'charge': 0, 'multiplicity': 1, 'atoms': [('H', 0, 0, 0, 4)]}])
+
+
 def test_explicit_gaussian_input_requires_terminal_blank_line(tmp_path):
     path = gjf(tmp_path/'input.gjf')
     path.write_text(path.read_text().rstrip('\n') + '\n')

@@ -91,6 +91,17 @@ def test_optimization_checks_numeric_convergence_and_repeated_state_evidence():
     with pytest.raises(ValueError,match='numeric'):parse_electronic(text,m,s,'opt')
 
 
+@pytest.mark.parametrize('theory', ['ground', 'td', 'tda'])
+def test_electronic_optimization_uses_gaussian_negligible_force_completion(theory):
+    m = electronic_material(molecule()) if theory == 'ground' else excited_material(theory)
+    s = config(theory)
+    text = log_text(m, s, 'opt').replace('0.0001 0.0018 YES', '0.002 0.0018 NO').replace(
+        ' Stationary point found', ' Optimization completed on the basis of negligible forces.\n Stationary point found')
+    result = parse_electronic(text, m, s, 'opt')
+    assert result['optimization_completion_reason'] == 'gaussian_negligible_forces'
+    assert result['optimization_convergence']['Maximum Displacement']['converged'] == 'NO'
+
+
 def tracking_input(flip=False):
     first=[{'root':1,'energy_hartree':-75.,'multiplicity':1,'transition_density':[[1,0],[0,0]]},
            {'root':2,'energy_hartree':-74.,'multiplicity':1,'transition_density':[[0,0],[0,1]]}]

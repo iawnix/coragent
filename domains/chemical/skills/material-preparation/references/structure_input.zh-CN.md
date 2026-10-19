@@ -20,3 +20,17 @@ inspect 和 seed 包含 `chemical-identity/1` 对象，保存规范异构 SMILES
 收集 `results/comparison.json`，其中记录 match、mismatch 或 indeterminate、
 对照结构及检查范围。XYZ 的键级由几何推断。用 `check_refs` 引用检查材料，
 用 `subjects` 区分目标和计算结构；利用差异指导研究，检查不限制记录结论或继续工作。
+
+## 生成初始结构时保留原子身份
+
+反应研究先完成[映射准备](reaction_mapping.zh-CN.md)，再嵌入三维坐标。
+`chemical.seed@1` 保留输入的显式氢 map 标签，记录原文 `source_smiles`。
+每个 seed 包含 `atom_index_base: 0` 及按 XYZ 行序排列的 `atoms` 表，其中记录
+`xyz_index`、`element`、`atom_map`、`isotope`、`origin` 和 `parent_atom_index`
+（单键连接的 H 的母原子行号）。表、XYZ 和 SHA256 一起保存。行号对应这一份 seed，
+与规范 SMILES 的遍历顺序分开记录。
+
+准备反应时采用包含全部显式氢标签的映射 SMILES。输入使用隐式氢时，seed 会补齐坐标，
+以 `origin: "added_hydrogen"`、`atom_map: null` 记录这些 H 及其母原子行号。
+先在图上分配共用的反应标签，再分别生成片段，使它们沿用同一编号空间。
+后续构象和优化结果继承原子表；行序改变时记录明确的排列。

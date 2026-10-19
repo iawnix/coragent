@@ -28,6 +28,37 @@ def test_nonreaction_short_contact_is_hard_failure():
     assert any(row['kind'] == 'nonreaction_short_contact' for row in result['hard_failures'])
 
 
+def test_hydrogen_contacts_use_connectivity_without_rejecting_h2_or_reaction_pairs():
+    xyz = [[0, 0, 0], [.758, 0, 0]]
+    assert assess(['H', 'H'], xyz, bonded_pairs=[])['verdict'] == 'unsafe'
+    assert assess(['H', 'H'], xyz, fragment_groups=[[0], [1]])['verdict'] == 'unsafe'
+    assert assess(['H', 'H'], xyz, bonded_pairs=[(0, 1)])['verdict'] == 'safe'
+    assert assess(['H', 'H'], xyz, bonded_pairs=[], reaction_pairs=[(0, 1)])['verdict'] == 'safe'
+    unknown = assess(['H', 'H'], xyz)
+    assert unknown['verdict'] == 'safe'
+    assert any(w['kind'] == 'hydrogen_contact_needs_connectivity' for w in unknown['warnings'])
+    assert assess(['H', 'H'], [[0, 0, 0], [.58, 0, 0]])['verdict'] == 'unsafe'
+    assert assess(['H', 'H'], [[0, 0, 0], [.1, 0, 0]], reaction_pairs=[(0, 1)])['verdict'] == 'unsafe'
+
+
+def test_nonreaction_bond_changes_are_reported_with_reference_distances():
+    reference = [[0, 0, 0], [1.1, 0, 0]]
+    xyz = [[0, 0, 0], [1.6, 0, 0]]
+    result = assess(['C', 'H'], xyz, bonded_pairs=[(0, 1)], reference_coordinates=reference)
+    assert result['verdict'] == 'safe'
+    assert result['checks']['bond_lengths'] == 'warning'
+    pair = next(w for w in result['warnings'] if w['kind'] == 'nonreaction_bond_length_change')['pairs'][0]
+    assert pair['delta_angstrom'] == pytest.approx(.5)
+    reacting = assess(['C', 'H'], xyz, bonded_pairs=[(0, 1)], reaction_pairs=[(0, 1)], reference_coordinates=reference)
+    assert reacting['checks']['bond_lengths'] == 'pass'
+
+
+@pytest.mark.parametrize('pairs', [[(0, 2)], [(0, 0)], [(False, 1)], [[0]]])
+def test_invalid_pair_metadata_is_not_silently_ignored(pairs):
+    with pytest.raises(ValueError, match='pair'):
+        assess(['H', 'H'], [[0, 0, 0], [1, 0, 0]], reaction_pairs=pairs)
+
+
 def test_gaussian_blocks_are_assessed_independently():
     text = '''%chk=test.chk
 %nprocshared=1

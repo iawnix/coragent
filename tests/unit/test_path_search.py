@@ -287,12 +287,29 @@ def test_native_gradient_rejects_inconsistent_primary_data(tmp_path,fault):
     with pytest.raises(ValueError):gradient_file(text,m,xyz,energy)
 
 
-def test_gaussian_scan_uses_native_constraints_and_checks_actual_coordinates(tmp_path):
+@pytest.mark.parametrize('completion', ['all_criteria', 'negligible_forces'])
+def test_gaussian_scan_uses_native_constraints_and_checks_actual_coordinates(tmp_path, completion):
     native=fake_gaussian(tmp_path/'g16')
+    if completion == 'negligible_forces':
+        native.write_text(native.read_text().replace('0.00001 0.0018 YES', '0.002 0.0018 NO').replace(
+            ' Stationary point found.', ' Optimization completed on the basis of negligible forces.\\n Stationary point found.'))
     result=scan(scan_input(backend='gaussian'),tmp_path/'scan','gaussian',lambda m,s:GaussianOptimizer(m,s,str(native)))
     assert result['status']=='completed'
     assert result['points'][-1]['actual']==[2.]
     assert 'B 1 2 2 F' in (tmp_path/'scan/points/0002/input.gjf').read_text()
+
+
+def test_failed_gaussian_scan_preserves_parsed_last_geometry(tmp_path):
+    native = fake_gaussian(tmp_path / 'g16')
+    native.write_text(native.read_text().replace('Stationary point found.', 'Optimization stopped.').replace(
+        'Normal termination of Gaussian', 'Error termination via Lnk1e') + '\nsys.exit(1)\n')
+    result = scan(scan_input(backend='gaussian'), tmp_path / 'scan', 'gaussian',
+                  lambda m, s: GaussianOptimizer(m, s, str(native)))
+    assert result['status'] == 'failed'
+    assert 'candidate' not in result
+    folder = tmp_path / 'scan/points/0000'
+    assert (folder / 'last_geometry.xyz').is_file()
+    assert not json.loads((folder / 'parsed.json').read_text())['summary']['optimization_completed']
 
 
 @pytest.mark.parametrize('operation',['qst-prepare','scan-xtb','scan-gaussian','neb-xtb','gradient-xtb'])

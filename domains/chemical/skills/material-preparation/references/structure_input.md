@@ -27,3 +27,19 @@ Collect `results/comparison.json`, which reports match, mismatch or indeterminat
 the compared structures and the scope of the checks. XYZ bond orders are inferred.
 Record the findings with `check_refs` and distinguish target/calculated `subjects`.
 Use differences to guide the research; checks do not gate publication or further work.
+
+## Atom identity through seed generation
+
+For reaction studies, follow [mapping preparation](reaction_mapping.md) before
+embedding. `chemical.seed@1` preserves supplied explicit-H map labels and records
+the exact `source_smiles`. Each seed includes `atom_index_base: 0` and an `atoms`
+table in XYZ row order, with `xyz_index`, `element`, `atom_map`, `isotope`, `origin`,
+and `parent_atom_index` (for singly bonded H). Save this table with the XYZ and its
+SHA256. Row indexes refer to that seed, not to canonical SMILES traversal order.
+
+Use fully mapped explicit-H SMILES when preparing a reaction. If the input uses
+implicit H, seed adds their coordinates and records their parent rows with
+`origin: "added_hydrogen"` and `atom_map: null`. Assign shared reaction labels on
+the graphs before seeding so independently prepared fragments retain one common
+label space. Subsequent conformer and optimization outputs inherit the table;
+record explicit row permutations whenever order changes.

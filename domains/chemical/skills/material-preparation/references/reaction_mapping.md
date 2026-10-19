@@ -1,37 +1,74 @@
-# Explicit reaction mapping / 显式反应映射
+# Prepare atom mapping before geometry
 
-Prepare the mapping through the `chemical.reaction@1` executor and pass
-the returned request to `job_start`; do not invoke `scripts/prepare.py` directly
-from native `bash`. Each explicit atom must have a unique positive map label on
-each side. The helper checks element/charge conservation,
-map coverage and element correspondence, and reports formed/broken/order-changed bonds.
-For isotope or proton-transfer studies use explicit isotopes and H atoms, and
-inspect that correspondence rather than treating implicit H as mapped evidence.
+[中文](reaction_mapping.zh-CN.md)
 
-映射由 Agent 选择并保留，helper 核验对应关系与键变化，不证明机理或路径连通性。
-用 artifact_register 保存 JSON 后，引用返回的 Artifact ID 记录有依据的 research note。
-将映射、XYZ 原子顺序、构象/立体化学和 IRC 端点身份分别核对。
+Prepare correspondence on molecular graphs before generating 3D seeds, searching
+conformers, or optimizing species. Carry the selected identities through candidate
+construction, calculations, and IRC analysis.
+
+## Working procedure
+
+1. Preserve the original SMILES and import each complete reaction side with
+   `chemical.material@1`. Include participating protons, counterions, and other
+   species needed for the proposed step's composition. Inspect formula, charge,
+   isotopes, stereo, and explicit-H rows. SMILES import needs no coordinates.
+2. Establish persistent reactant labels across all fragments, including every H.
+   Retain supplied maps and allocate unused positive integers to remaining atoms.
+   Expand H into graph atoms before writing mapped SMILES: `[CH3:8]` labels only
+   carbon; `[H:31][C:8]([H:32])([H:33])…` also labels its three H atoms. Save the
+   correspondence from source material IDs to these labels.
+3. For a proposed product graph, use `chemical.map-candidates@1 --mode reaction`
+   on the two materials. Fix known pairs with `--fixed-pairs` using local atom IDs.
+   Review candidate `pairs`, `left_to_right`, and bond changes against the proposed
+   chemistry. The search ranks by bond-order edits; combine that score with the
+   elementary-step hypothesis. See [structure analysis](structure_analysis.md)
+   for execution examples and search coverage fields.
+4. Transfer each reactant label to its selected product partner. Save the complete
+   pair table, selected candidate, and mapped SMILES for both sides. For a hypothesis
+   with no H transfer, H follows its mapped parent atom. For H/proton transfer,
+   identify the moving H and its old and new attachment explicitly. Keep relevant
+   symmetry-equivalent alternatives and record search coverage.
+5. Use `chemical.reaction@1` to **check the supplied mapping** and declared changes.
+   Prepare its request through the generic executor, submit with `job_start`, and
+   collect results for map coverage, element/charge balance, and bond changes.
+   Resolve discrepancies in the selected hypothesis before preparing its geometry.
+6. Generate each connected species with `chemical.seed@1` from fully mapped SMILES.
+   Save its `atoms` table alongside the XYZ: it binds zero-based coordinate rows to
+   map labels, elements, isotopes, and H parents. Conformer search, assembly, and
+   optimization inherit that table. When software changes row order, record and
+   apply the permutation to coordinates and associated tensors. Arrange path
+   endpoints in the same map-label order; equal element sequences are insufficient.
+
+If products are still under investigation, complete steps 1–2 first and generate
+reactant geometry using those identities. Map each later intermediate/product
+hypothesis onto the same identities when its graph is proposed. Geometric comparison
+can refine equivalent assignments while preserving the original mapping and branch
+history.
 
 ## Declaring a transformation
 
-Use `--transformation <file.json>` with `kind: "explicit"` to declare the complete
-`bond_changes` list: each entry has mapped `atoms`, `before` and `after` bond orders
-(0 means no bond). Optional `hydrogen_changes` entries declare per-atom counts with
-`atom`, `before` and `after`. This compares the supplied hypothesis with the mapped
-graphs; it does not generate a mechanism. A new reaction name does not require a
-new transformation kind or registered validator. With no declaration, mapping and
-balance can still be checked while the intended transformation remains unassessed.
+Use `--transformation <file.json>` with `kind: "explicit"` and the complete
+`bond_changes` list. Each entry has mapped `atoms`, `before` and `after` bond orders
+(0 means no bond). Optional `hydrogen_changes` entries use `atom`, `before` and
+`after` for per-atom H counts. Explicit mapped H bond changes describe individual
+transfers; counts describe their net effect. This declaration works for any
+reaction class.
 
-## Optional named topology check
+Register the mapping, transformation, and checked results as Artifacts in the
+step record. Use these labels for reactive pairs, constraints, mode interpretation,
+and both IRC endpoint comparisons.
 
-The following fields belong to the existing specialized topology check; they are
-not required for other reaction hypotheses.
+## Diels–Alder example
 
-For declared Diels–Alder transformations, `declared_transformation.product_graph_matches`
-compares the product constitution generated by the declared bond changes with the
-supplied product after removing atom-map labels and stereochemistry. Charge and
-isotopes remain part of that comparison. `null` means the declared reactant bond
-pattern could not be applied. A graph match does not change a failing exact atom-map
-verdict: symmetry-equivalent labeling is not evidence of a different regioisomer,
-and identical product graphs do not establish the claimed atom trajectory or
-hydrogen correspondence. Check those reported fields separately.
+For a concerted Diels–Alder hypothesis, retain each H on its mapped carbon and
+specify two forming C–C bonds and three changing π-bond orders. Generate conformers
+from that correspondence. A diene's s-cis/s-trans adjustment changes geometry while
+retaining its graph and labels.
+
+The specialized `kind: "diels_alder"` check also reports
+`declared_transformation.product_graph_matches`: it compares the constitution
+generated by declared changes with the supplied product, retaining charge and
+isotopes while ignoring labels and stereo. `null` means the declared reactant
+bond pattern could not be applied. Read it together with the exact mapping verdict:
+the graph comparison distinguishes a constitutional mismatch from a labeling issue;
+the selected atom pairs describe the trajectory hypothesis being tested.

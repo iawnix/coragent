@@ -1,15 +1,25 @@
-# Molecular preparation / 分子准备
+# Molecular preparation
 
-Use the material-preparation Skill's executable scripts/prepare.py through bash.
-resolve handles names; inspect checks SMILES; seed writes reproducible explicit-H
-XYZ with declared charge/multiplicity. reaction checks an explicit mapped
-reactants>>products expression for atom coverage, composition, charge and bond changes.
+[中文](molecular_preparation.zh-CN.md)
 
-Agent selects the mapping and research scope. Explicitly enumerate unspecified
-stereoisomers when they are alternatives under study. Separately explore diene
-conformers and intermolecular approach geometries; an isomer seed does not sample
-the conformational landscape. Keep atom order and map correspondence with every XYZ.
+Use `material-preparation` to prepare graphs and correspondence before generating
+reaction geometries. Follow its [mapping procedure](../../material-preparation/references/reaction_mapping.md).
 
-使用 material-preparation 的实际 CLI，保留来源、原子编号与映射。名称解析、初始几何、
-反应对应关系是不同证据；不要把图变化或嵌入结果当成机理证明。
-旧 reaction.parse/structure.* provider 接口已移除，不再尝试发现这些工作流。
+1. Resolve names with `chemical.resolve@1`, import SMILES with `chemical.material@1`,
+   and inspect graph, formula, charge, and stereo with `chemical.inspect@1`.
+2. Establish persistent labels for all reactant atoms, including explicit H, across
+   all fragments. For each proposed step, select graph correspondences using
+   `chemical.map-candidates@1` and check the supplied mapped reaction and declared
+   changes with `chemical.reaction@1`. If products are unknown, retain reactant
+   identities and map later hypotheses onto them.
+3. Generate each species with `chemical.seed@1` from selected mapped SMILES. Keep its
+   per-row atom table with the XYZ through conformer search, optimization, and
+   assembly. Preserve supplied coordinates together with their graph correspondence.
+4. Explore unspecified stereoisomers, conformers, and approach poses as distinct
+   choices. A diene's s-cis/s-trans adjustment retains its graph and atom labels.
+   Assemble path endpoints in a common mapped order and record row permutations.
+
+Prepare these registered operations through the generic executor, submit with
+`job_start`, and collect Artifacts into the step record. Pass the selected mapping
+and reactive pairs to geometry construction, then use the same labels for mode
+interpretation and IRC endpoint comparison.

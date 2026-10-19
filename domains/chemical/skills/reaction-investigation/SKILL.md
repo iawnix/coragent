@@ -18,7 +18,7 @@ For every elementary step, keep a current record containing species identity, at
 ## Closed loop
 
 1. **Define**: state reactants/products, plausible intermediates, bond changes, stereochemical outcome, and competing mechanisms. Write predictions and observations that would distinguish them.
-2. **Prepare**: use `material-preparation` to resolve names/SMILES, preserve supplied coordinates, generate missing seeds, and map reaction atoms.
+2. **Prepare**: use `material-preparation` to resolve names/SMILES and establish atom identities and reaction mapping on graphs before generating seeds or optimizing species. Preserve supplied coordinates and carry the mapping through subsequent calculations.
 3. **Assess**: use `structure-assessment` and `geometry-preflight` to inspect graph, fragments, state, contacts, and reaction-center geometry.
 4. **Construct**: use `reactive-geometry` for approach poses and `candidate-generation` for QST, scans, direct TS, or NEB. Keep multiple hypotheses when site/face/conformer evidence is unresolved.
 5. **Run and validate**: choose a backend with `method-selection`, execute Gaussian/xTB/CF22D, then use `validation` for mode and IRC evidence.

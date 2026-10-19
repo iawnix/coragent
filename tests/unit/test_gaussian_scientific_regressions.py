@@ -24,6 +24,65 @@ CONVERGED = ''' Maximum Force 0.00001 0.00045 YES
  Stationary point found.
 '''
 
+NEGLIGIBLE = CONVERGED.replace('0.00001 0.00180 YES', '0.00200 0.00180 NO').replace(
+    ' Stationary point found.', ' Optimization completed on the basis of negligible forces.\n Stationary point found.')
+
+
+def test_negligible_force_completion_retains_failed_displacement_row(tmp_path):
+    summary = parse(tmp_path, NEGLIGIBLE + ' Normal termination of Gaussian\n')['summary']
+    assert summary['optimization_completed']
+    assert summary['optimization_completion_reason'] == 'gaussian_negligible_forces'
+    assert not summary['final_convergence_satisfied']
+    assert summary['force_convergence']['Maximum Displacement']['converged'] == 'NO'
+
+
+@pytest.mark.parametrize('case', ['truncated', 'error', 'later_step', 'later_rows', 'missing_marker', 'bad_force', 'stopped'])
+def test_negligible_force_completion_does_not_mask_failed_or_missing_evidence(tmp_path, case):
+    text = NEGLIGIBLE
+    if case == 'error': text += ' Error termination via Lnk1e\n'
+    if case == 'later_step': text += ' Step number 2 out of a maximum of 20\n'
+    if case == 'later_rows': text += CONVERGED.replace(' Stationary point found.\n', '')
+    if case == 'missing_marker': text = text.replace(' Optimization completed on the basis of negligible forces.\n', '')
+    if case == 'bad_force': text = text.replace('0.00001 0.00045 YES', '0.1 0.00045 YES')
+    if case == 'stopped': text += ' Optimization stopped.\n'
+    if case != 'truncated': text += ' Normal termination of Gaussian\n'
+    assert not parse(tmp_path, text)['summary']['optimization_completed']
+
+
+@pytest.mark.parametrize('mode', ['xyz', 'explicit'])
+@pytest.mark.parametrize('status', ['negligible', 'limit', 'nonzero'])
+def test_runners_preserve_last_geometry_and_use_solver_completion(tmp_path, mode, status):
+    from tests.unit.test_gaussian_explicit_input import gjf
+    route = '#p M062X/6-31G** Opt=Tight SCF=Tight Int=UltraFine'
+    orientation = (' Standard orientation:\n ----\n Center Atomic Atomic Coordinates (Angstroms)\n'
+                   ' Number Number Type X Y Z\n ----\n 1 8 0 0.0 0.0 0.0\n'
+                   ' 2 1 0 0.0 0.0 1.0\n 3 1 0 0.0 1.0 0.0\n ----\n')
+    text = route + '\n ----\n' + orientation + ' SCF Done: E(RM062X) = -76.0 A.U.\n'
+    text += (NEGLIGIBLE + ' Normal termination of Gaussian\n' if status == 'negligible' else
+             ' Maximum Force 0.1 0.00045 NO\n Optimization stopped.\n Error termination via Lnk1e\n')
+    log = tmp_path / 'fixture.out'; log.write_text(text)
+    program = tmp_path / 'fixture-gaussian'
+    program.write_text('#!/bin/sh\ncat >/dev/null\ncat ' + shlex.quote(str(log)) +
+                       ('\nexit 1\n' if status == 'nonzero' else '\n'))
+    program.chmod(0o755)
+    if mode == 'explicit':
+        source = gjf(tmp_path / 'input.gjf', 'Opt=Tight SCF=Tight Int=UltraFine')
+        inputs = ['--input-gjf', str(source), '--validation', 'opt']
+    else:
+        source = tmp_path / 'input.xyz'; source.write_text('3\nfixture\nO 0 0 0\nH 0 0 1\nH 0 1 0\n')
+        inputs = ['--xyz', str(source), '--task', 'opt']
+    out = tmp_path / 'out'
+    completed = subprocess.run([sys.executable, str(SKILLS / 'gaussian/scripts/run.py'), *inputs,
+        '--executable', str(program), '--output-dir', str(out), '--threads', '12', '--memory-mb', '4000'],
+        capture_output=True, text=True, timeout=30)
+    assert completed.returncode == (0 if status == 'negligible' else 1), completed.stderr
+    result = json.loads((out / 'result.json').read_text())
+    assert (out / result['last_attempt']['geometry']).read_text().startswith('3\n')
+    assert result['last_attempt']['summary']['optimization_completed'] == (status == 'negligible')
+    assert result['checks_passed'] == (status == 'negligible')
+    assert result['scientific_validation'] == 'not_assessed'
+    if status != 'negligible': assert not (out / 'geometry.xyz').exists()
+
 
 def parse(tmp_path, text):
     path = tmp_path / 'gaussian.out'

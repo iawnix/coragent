@@ -14,7 +14,10 @@ stationary markers, frequencies, geometry and Cartesian normal-mode vectors
 from the final harmonic table. Its `section_index` argument is zero based. Select the relevant section
 and compare the output route, charge, multiplicity, method and basis with the input.
 Later incomplete optimization or harmonic sections do not inherit earlier passing
-evidence. Convergence requires all four rows from the final optimization table.
+evidence. Read `optimization_completed` and `optimization_completion_reason` alongside
+the four rows of the final optimization table. Gaussian may accept a stationary point
+on the basis of negligible forces even when a displacement row says NO; the parser
+preserves that row and records `gaussian_negligible_forces` as the completion reason.
 
 For a classical first-order saddle, require optimization convergence and one
 imaginary mode that represents the proposed elementary step. Numerical noise,

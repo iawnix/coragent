@@ -10,6 +10,7 @@ from ensemble_material import canonical, checked, derive_material, xyz_text
 from material import object_fields
 from xyz import validate_electronic_state
 from geometry_safety import assess, require_safe
+from gaussian_input import serialize_structures, inspect_qst_structures
 
 BOHR_ANGSTROM = .529177210903
 
@@ -31,12 +32,12 @@ def material(value):
     if value.get('electronic_state', {}).get('kind') != 'ground': raise ValueError('this profile requires explicit ground state')
     if any(a.get('isotope') is not None for a in m['atoms']): raise ValueError('explicit isotope masses need a separate solver input')
     validate_electronic_state([[a['element']] for a in m['atoms']], value.get('charge'), value.get('multiplicity'))
-    bonded = [(b.GetBeginAtomIdx(), b.GetEndAtomIdx()) for b in m['mol'].GetBonds()] if m['mol'] is not None else ()
+    bonded = [(b.GetBeginAtomIdx(), b.GetEndAtomIdx()) for b in m['mol'].GetBonds()] if m['mol'] is not None else None
     geometry(m['coordinates'], elements=[a['element'] for a in m['atoms']], bonded_pairs=bonded)
     return m
 
 
-def geometry(xyz, *, elements=None, bonded_pairs=(), reaction_pairs=(), profile='general'):
+def geometry(xyz, *, elements=None, bonded_pairs=None, reaction_pairs=(), profile='general'):
     xyz = numeric_array(xyz, (len(xyz), 3), 'geometry')
     # When a low-level caller has no material metadata, retain the historical
     # role of this helper (finite/non-coincident coordinates only).  All
@@ -101,7 +102,11 @@ def gaussian_header(s, route):
 
 
 def gaussian_geometry(m, xyz, title):
-    return f'{title}\n\n{m["value"]["charge"]} {m["value"]["multiplicity"]}\n' + '\n'.join(xyz_text(m['atoms'], xyz).splitlines()[2:]) + '\n\n'
+    if len(xyz) != len(m['atoms']):
+        raise ValueError('coordinate count differs from material')
+    return serialize_structures([{'title': title, 'charge': m['value']['charge'],
+                                 'multiplicity': m['value']['multiplicity'],
+                                 'atoms': [(a['element'], *row) for a, row in zip(m['atoms'], xyz)]}])
 
 
 def qst(spec):
@@ -115,8 +120,10 @@ def qst(spec):
         geometries.append(('guess', xyz)); correspondence['guess_to_reactant_order'] = order
     elif 'guess_mapping' in spec: raise ValueError('guess mapping without a guess')
     kind = 'QST3' if len(geometries) == 3 else 'QST2'
-    text = gaussian_header(s, f'Opt=({kind},CalcFC,MaxCycles={s.get("max_cycles", 200)}) Freq')
-    text += ''.join(gaussian_geometry(r, xyz, name) for name, xyz in geometries)
+    route = f'Opt=({kind},CalcFC,MaxCycles={s.get("max_cycles", 200)}) Freq'
+    body = ''.join(gaussian_geometry(r, xyz, name) for name, xyz in geometries)
+    inspect_qst_structures(body, route)
+    text = gaussian_header(s, route) + body
     return text, {'schema_version': 'chemical-qst-preparation/1', 'kind': kind, 'source_sha256': canonical(spec),
                   'atom_ids': r['ids'], 'correspondence': correspondence, 'settings': s,
                   'endpoint_status': 'supplied_geometries_not_certified_minima',

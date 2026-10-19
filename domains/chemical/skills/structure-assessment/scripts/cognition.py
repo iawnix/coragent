@@ -209,7 +209,7 @@ def cognize(material_value, context_value, *, material_sha256=None):
         safety = {'verdict': 'not_assessed', 'reason': 'coordinates_not_supplied'}
         geometry = {'status': 'not_assessed', 'safety': safety}
     else:
-        bond_pairs = [tuple(i for i in pair) for pair in graph_edges]
+        bond_pairs = [tuple(i for i in pair) for pair in graph_edges] if material['value'].get('graph') is not None else None
         reaction_pairs = [tuple(ids.index(atom) for atom in row['atoms']) for row in context['changes']]
         safety = assess(elements, coordinates, bonded_pairs=bond_pairs, reaction_pairs=reaction_pairs,
                         profile='ts_candidate' if context['role'] == 'ts_candidate' else 'general')

@@ -262,6 +262,7 @@ def generate(spec):
                                           {"directions": direction_values, "distances": distance_values, "twists": twist_values}, sampling, rng)
             safety = assess([atom["element"] for atom in source["atoms"]], xyz,
                             bonded_pairs=list(edges), reaction_pairs=reaction_pairs,
+                            fragment_groups=[list(group) for group in fragments], reference_coordinates=coords,
                             profile="reaction_seed", clash_scale=sampling["clash_scale"])
             report = {"safety": safety, "transforms": transforms,
                       "pair_distances": [float(np.linalg.norm(xyz[a] - xyz[b])) for a, b in reaction_pairs]}

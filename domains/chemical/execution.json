@@ -55,7 +55,7 @@
         ]
       },
       "resources": {
-        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/path_validation.py": "sha256:679a95216bcc3bcb35546e4801452130925c71633be501717c09c1fcb179d5e9",
         "skills/_shared/reaction_checks.py": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
@@ -120,7 +120,7 @@
         ]
       },
       "resources": {
-        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/path_validation.py": "sha256:679a95216bcc3bcb35546e4801452130925c71633be501717c09c1fcb179d5e9",
         "skills/_shared/reaction_checks.py": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
@@ -183,15 +183,16 @@
         ]
       },
       "resources": {
-        "skills/_shared/geometry_safety.py": "sha256:bf2ec65219f07e80806926e1ca3dfaf1e034ffeec78f7ea89fa8e8dfc655eb29",
-        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
+        "skills/_shared/path_validation.py": "sha256:679a95216bcc3bcb35546e4801452130925c71633be501717c09c1fcb179d5e9",
         "skills/_shared/reaction_checks.py": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/gaussian/scripts/cli.py": "sha256:b020439cd06a75962e9d75752b65b621264b7897d71ccea2167c49d5e0476bbc",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
-        "skills/gaussian/scripts/input_job.py": "sha256:49359f0cb3f4c775f848845667fcf6bec32fa0bd23e49fb81027137ae88e2d59",
-        "skills/gaussian/scripts/run.py": "sha256:290a692bbaddceaf3c97f920bbc82605c77bc33b40995b9275970faa3017c0bb"
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "skills/gaussian/scripts/input_job.py": "sha256:5e37689963af8590bff52571a5f35cd532596132b68b1631e40e5df7865eb11c",
+        "skills/gaussian/scripts/run.py": "sha256:a2bb3cd3e543628b9b156de92a9c1e20bc905563d5c8341b065e986d05757ebe"
       },
       "module_paths": [
         "skills/_shared"
@@ -260,15 +261,16 @@
         ]
       },
       "resources": {
-        "skills/_shared/geometry_safety.py": "sha256:bf2ec65219f07e80806926e1ca3dfaf1e034ffeec78f7ea89fa8e8dfc655eb29",
-        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
+        "skills/_shared/path_validation.py": "sha256:679a95216bcc3bcb35546e4801452130925c71633be501717c09c1fcb179d5e9",
         "skills/_shared/reaction_checks.py": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/gaussian/scripts/cli.py": "sha256:b020439cd06a75962e9d75752b65b621264b7897d71ccea2167c49d5e0476bbc",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
-        "skills/gaussian/scripts/input_job.py": "sha256:49359f0cb3f4c775f848845667fcf6bec32fa0bd23e49fb81027137ae88e2d59",
-        "skills/gaussian/scripts/run.py": "sha256:290a692bbaddceaf3c97f920bbc82605c77bc33b40995b9275970faa3017c0bb"
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "skills/gaussian/scripts/input_job.py": "sha256:5e37689963af8590bff52571a5f35cd532596132b68b1631e40e5df7865eb11c",
+        "skills/gaussian/scripts/run.py": "sha256:a2bb3cd3e543628b9b156de92a9c1e20bc905563d5c8341b065e986d05757ebe"
       },
       "module_paths": [
         "skills/_shared"
@@ -310,7 +312,7 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/path_validation.py": "sha256:679a95216bcc3bcb35546e4801452130925c71633be501717c09c1fcb179d5e9",
         "skills/_shared/reaction_checks.py": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
@@ -326,7 +328,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -378,7 +380,7 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/path_validation.py": "sha256:679a95216bcc3bcb35546e4801452130925c71633be501717c09c1fcb179d5e9",
         "skills/_shared/reaction_checks.py": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
@@ -394,7 +396,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -442,7 +444,7 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/path_validation.py": "sha256:679a95216bcc3bcb35546e4801452130925c71633be501717c09c1fcb179d5e9",
         "skills/_shared/reaction_checks.py": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
@@ -458,7 +460,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -514,7 +516,7 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/path_validation.py": "sha256:679a95216bcc3bcb35546e4801452130925c71633be501717c09c1fcb179d5e9",
         "skills/_shared/reaction_checks.py": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
@@ -530,7 +532,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -578,7 +580,7 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/path_validation.py": "sha256:679a95216bcc3bcb35546e4801452130925c71633be501717c09c1fcb179d5e9",
         "skills/_shared/reaction_checks.py": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
@@ -594,7 +596,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -652,18 +654,19 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/geometry_safety.py": "sha256:bf2ec65219f07e80806926e1ca3dfaf1e034ffeec78f7ea89fa8e8dfc655eb29",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/backends/gaussian_path.py": "sha256:fc778cf5f15df65e3e32fef953bb512f0017abfdb8486044bf7fd8aa22f62bc9",
-        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:dc41abb380af930c3bb2101d8de3df9dc2751378321bf78d69e377e3f0eae997",
+        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:d12a19ca072b2b3085b6ee1bc5b07dacfd57d11e0567b030d5027bb4efe8fe93",
         "skills/candidate-generation/scripts/backends/path_xtb.py": "sha256:4e5d6dc3257891483dc64bb675f3a13ab33a55746203f750b1376fba02604fb3",
         "skills/candidate-generation/scripts/da/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
         "skills/candidate-generation/scripts/neb/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
         "skills/candidate-generation/scripts/neb/ase_neb.py": "sha256:ec1b20d26cbd8d5adf586256e54ef1cdb990d70b9d0a3b2663786f873bd6433b",
         "skills/candidate-generation/scripts/neb/ase_search.py": "sha256:4d4770cff5326a703c74dadc68187f255bb7dfd2a09140b98d64f15feca87b28",
         "skills/candidate-generation/scripts/path/cli.py": "sha256:06411b2e86c8aa2f7452680cb2b89cfa8a2a9086994ca7548e749a8cafba9456",
-        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:affc5cb17f17d773f1f1ce8774c2e030972163445f2a60bbd5fd5028560950cf",
-        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:03885183ed85b11a052e7c539f985c87a83a9fec0e4b2c54627338bc04b59a78",
+        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:a187b008c97851638988893c1db6e931dc80e095fa59bcfee270a38ccd2bbbbd",
+        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:795be80f437795f6f868faf4adc163f60f048a932e71e75c023732ce10c8c1f3",
         "skills/candidate-generation/scripts/path/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
@@ -685,7 +688,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/reactive-geometry/scripts/geometry_contract.py": "sha256:ddd5a55b40c928315245c4d8d49a9d40665ffaecbcfe3fa7ea8403bf4582a11d",
         "skills/reactive-geometry/scripts/geometry_ops.py": "sha256:1440804e727e17675e01baab5427958e4bad0c62a47fe2f16770ef9ef2a53cb0",
@@ -752,7 +755,7 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/geometry_safety.py": "sha256:bf2ec65219f07e80806926e1ca3dfaf1e034ffeec78f7ea89fa8e8dfc655eb29",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/crest/scripts/ensemble_material.py": "sha256:2a52c033bb0ca2f6f531444808098206f2d2f48d74670f5fc8f1c2c93138302a",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
@@ -767,7 +770,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/reactive-geometry/scripts/reactive_sites.py": "sha256:30438a7c5ea437641170c5b5a828d1da698315dab2192c32d54f1c7df5dae380",
         "skills/reactive-geometry/scripts/reactive_sites_cli.py": "sha256:a8ea97dd78c3ab2e648ba1f00ac7e18737e8ee7d533076fa68aae2ff440a96dc"
@@ -827,18 +830,19 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/geometry_safety.py": "sha256:bf2ec65219f07e80806926e1ca3dfaf1e034ffeec78f7ea89fa8e8dfc655eb29",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/backends/gaussian_path.py": "sha256:fc778cf5f15df65e3e32fef953bb512f0017abfdb8486044bf7fd8aa22f62bc9",
-        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:dc41abb380af930c3bb2101d8de3df9dc2751378321bf78d69e377e3f0eae997",
+        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:d12a19ca072b2b3085b6ee1bc5b07dacfd57d11e0567b030d5027bb4efe8fe93",
         "skills/candidate-generation/scripts/backends/path_xtb.py": "sha256:4e5d6dc3257891483dc64bb675f3a13ab33a55746203f750b1376fba02604fb3",
         "skills/candidate-generation/scripts/da/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
         "skills/candidate-generation/scripts/neb/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
         "skills/candidate-generation/scripts/neb/ase_neb.py": "sha256:ec1b20d26cbd8d5adf586256e54ef1cdb990d70b9d0a3b2663786f873bd6433b",
         "skills/candidate-generation/scripts/neb/ase_search.py": "sha256:4d4770cff5326a703c74dadc68187f255bb7dfd2a09140b98d64f15feca87b28",
         "skills/candidate-generation/scripts/path/cli.py": "sha256:06411b2e86c8aa2f7452680cb2b89cfa8a2a9086994ca7548e749a8cafba9456",
-        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:affc5cb17f17d773f1f1ce8774c2e030972163445f2a60bbd5fd5028560950cf",
-        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:03885183ed85b11a052e7c539f985c87a83a9fec0e4b2c54627338bc04b59a78",
+        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:a187b008c97851638988893c1db6e931dc80e095fa59bcfee270a38ccd2bbbbd",
+        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:795be80f437795f6f868faf4adc163f60f048a932e71e75c023732ce10c8c1f3",
         "skills/candidate-generation/scripts/path/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
@@ -860,10 +864,10 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/reactive-geometry/scripts/pose_cli.py": "sha256:8c95da6067fa9111b6fbbd42ee5c153bf86eba73e82c20314c67f745b9263d5b",
-        "skills/reactive-geometry/scripts/reactive_pose.py": "sha256:27ca5fd13e4f1eb770c5a123725e3a850484a837258faa9e980186e51357da49"
+        "skills/reactive-geometry/scripts/reactive_pose.py": "sha256:4a9fea01048d4bdbf96eed917ac1348056b394878243f36f87a2295590d45afa"
       },
       "module_paths": [
         "skills/_shared",
@@ -924,20 +928,22 @@
         ]
       },
       "resources": {
-        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
+        "skills/_shared/path_validation.py": "sha256:679a95216bcc3bcb35546e4801452130925c71633be501717c09c1fcb179d5e9",
         "skills/_shared/reaction_checks.py": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/backends/gaussian_path.py": "sha256:fc778cf5f15df65e3e32fef953bb512f0017abfdb8486044bf7fd8aa22f62bc9",
-        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:dc41abb380af930c3bb2101d8de3df9dc2751378321bf78d69e377e3f0eae997",
+        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:d12a19ca072b2b3085b6ee1bc5b07dacfd57d11e0567b030d5027bb4efe8fe93",
         "skills/candidate-generation/scripts/backends/path_xtb.py": "sha256:4e5d6dc3257891483dc64bb675f3a13ab33a55746203f750b1376fba02604fb3",
         "skills/candidate-generation/scripts/da/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
         "skills/candidate-generation/scripts/neb/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
         "skills/candidate-generation/scripts/neb/ase_neb.py": "sha256:ec1b20d26cbd8d5adf586256e54ef1cdb990d70b9d0a3b2663786f873bd6433b",
         "skills/candidate-generation/scripts/neb/ase_search.py": "sha256:4d4770cff5326a703c74dadc68187f255bb7dfd2a09140b98d64f15feca87b28",
         "skills/candidate-generation/scripts/path/cli.py": "sha256:06411b2e86c8aa2f7452680cb2b89cfa8a2a9086994ca7548e749a8cafba9456",
-        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:affc5cb17f17d773f1f1ce8774c2e030972163445f2a60bbd5fd5028560950cf",
-        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:03885183ed85b11a052e7c539f985c87a83a9fec0e4b2c54627338bc04b59a78",
+        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:a187b008c97851638988893c1db6e931dc80e095fa59bcfee270a38ccd2bbbbd",
+        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:795be80f437795f6f868faf4adc163f60f048a932e71e75c023732ce10c8c1f3",
         "skills/candidate-generation/scripts/path/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
@@ -1039,7 +1045,7 @@
         ]
       },
       "resources": {
-        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/path_validation.py": "sha256:679a95216bcc3bcb35546e4801452130925c71633be501717c09c1fcb179d5e9",
         "skills/_shared/reaction_checks.py": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
@@ -1109,7 +1115,7 @@
         ]
       },
       "resources": {
-        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/path_validation.py": "sha256:679a95216bcc3bcb35546e4801452130925c71633be501717c09c1fcb179d5e9",
         "skills/_shared/reaction_checks.py": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
@@ -1165,7 +1171,7 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/path_validation.py": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a",
+        "skills/_shared/path_validation.py": "sha256:679a95216bcc3bcb35546e4801452130925c71633be501717c09c1fcb179d5e9",
         "skills/_shared/reaction_checks.py": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de",
         "skills/_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
@@ -1181,7 +1187,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -1262,7 +1268,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -1331,7 +1337,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -1400,7 +1406,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -1469,7 +1475,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -1525,8 +1531,10 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "skills/material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -1539,12 +1547,12 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/validation/scripts/check_cli.py": "sha256:7a802b5f104e9a6db3075483613e067a1b4e7bee747c6bb206da436254097605",
-        "skills/validation/scripts/check_common.py": "sha256:43b2c52a590a09710465e0075066ac02a6b5b06b61d8a075c51f9cbcb674135e",
+        "skills/validation/scripts/check_common.py": "sha256:731ad2905f50457208fae4ddc4c5cf1e5e947b9c0fc0dea49a693e6b6d9f05c3",
         "skills/validation/scripts/evidence_check.py": "sha256:262a8a34a8599c8cffe1603d956c92ae4a1f632400e61def6d0d8d8c56a38f60",
-        "skills/validation/scripts/gaussian_evidence.py": "sha256:5dfbbf9b80929f6665eee86d0ccc63301f1cf0e18fafbab76ff5d047888405b4",
+        "skills/validation/scripts/gaussian_evidence.py": "sha256:a303265e1b9c8b57aad1cbaf577a760636a009cb9d1821c907adbe42958d8e7b",
         "skills/validation/scripts/irc_check.py": "sha256:7bedcb0bf969fd2aba5b6da81b507b997fefe66746354033f8d5a7977b856209",
         "skills/validation/scripts/mode_check.py": "sha256:6cf321a29e995651a28ad5c5fdc3acac7f10d995d9a4faf236abf751390eddaf"
       },
@@ -1604,8 +1612,10 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "skills/material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -1618,12 +1628,12 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/validation/scripts/check_cli.py": "sha256:7a802b5f104e9a6db3075483613e067a1b4e7bee747c6bb206da436254097605",
-        "skills/validation/scripts/check_common.py": "sha256:43b2c52a590a09710465e0075066ac02a6b5b06b61d8a075c51f9cbcb674135e",
+        "skills/validation/scripts/check_common.py": "sha256:731ad2905f50457208fae4ddc4c5cf1e5e947b9c0fc0dea49a693e6b6d9f05c3",
         "skills/validation/scripts/evidence_check.py": "sha256:262a8a34a8599c8cffe1603d956c92ae4a1f632400e61def6d0d8d8c56a38f60",
-        "skills/validation/scripts/gaussian_evidence.py": "sha256:5dfbbf9b80929f6665eee86d0ccc63301f1cf0e18fafbab76ff5d047888405b4",
+        "skills/validation/scripts/gaussian_evidence.py": "sha256:a303265e1b9c8b57aad1cbaf577a760636a009cb9d1821c907adbe42958d8e7b",
         "skills/validation/scripts/irc_check.py": "sha256:7bedcb0bf969fd2aba5b6da81b507b997fefe66746354033f8d5a7977b856209",
         "skills/validation/scripts/mode_check.py": "sha256:6cf321a29e995651a28ad5c5fdc3acac7f10d995d9a4faf236abf751390eddaf"
       },
@@ -1692,8 +1702,10 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "skills/material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -1706,12 +1718,12 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/validation/scripts/check_cli.py": "sha256:7a802b5f104e9a6db3075483613e067a1b4e7bee747c6bb206da436254097605",
-        "skills/validation/scripts/check_common.py": "sha256:43b2c52a590a09710465e0075066ac02a6b5b06b61d8a075c51f9cbcb674135e",
+        "skills/validation/scripts/check_common.py": "sha256:731ad2905f50457208fae4ddc4c5cf1e5e947b9c0fc0dea49a693e6b6d9f05c3",
         "skills/validation/scripts/evidence_check.py": "sha256:262a8a34a8599c8cffe1603d956c92ae4a1f632400e61def6d0d8d8c56a38f60",
-        "skills/validation/scripts/gaussian_evidence.py": "sha256:5dfbbf9b80929f6665eee86d0ccc63301f1cf0e18fafbab76ff5d047888405b4",
+        "skills/validation/scripts/gaussian_evidence.py": "sha256:a303265e1b9c8b57aad1cbaf577a760636a009cb9d1821c907adbe42958d8e7b",
         "skills/validation/scripts/irc_check.py": "sha256:7bedcb0bf969fd2aba5b6da81b507b997fefe66746354033f8d5a7977b856209",
         "skills/validation/scripts/mode_check.py": "sha256:6cf321a29e995651a28ad5c5fdc3acac7f10d995d9a4faf236abf751390eddaf"
       },
@@ -1768,8 +1780,10 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "skills/material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -1782,12 +1796,12 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/validation/scripts/check_cli.py": "sha256:7a802b5f104e9a6db3075483613e067a1b4e7bee747c6bb206da436254097605",
-        "skills/validation/scripts/check_common.py": "sha256:43b2c52a590a09710465e0075066ac02a6b5b06b61d8a075c51f9cbcb674135e",
+        "skills/validation/scripts/check_common.py": "sha256:731ad2905f50457208fae4ddc4c5cf1e5e947b9c0fc0dea49a693e6b6d9f05c3",
         "skills/validation/scripts/evidence_check.py": "sha256:262a8a34a8599c8cffe1603d956c92ae4a1f632400e61def6d0d8d8c56a38f60",
-        "skills/validation/scripts/gaussian_evidence.py": "sha256:5dfbbf9b80929f6665eee86d0ccc63301f1cf0e18fafbab76ff5d047888405b4",
+        "skills/validation/scripts/gaussian_evidence.py": "sha256:a303265e1b9c8b57aad1cbaf577a760636a009cb9d1821c907adbe42958d8e7b",
         "skills/validation/scripts/irc_check.py": "sha256:7bedcb0bf969fd2aba5b6da81b507b997fefe66746354033f8d5a7977b856209",
         "skills/validation/scripts/mode_check.py": "sha256:6cf321a29e995651a28ad5c5fdc3acac7f10d995d9a4faf236abf751390eddaf"
       },
@@ -1875,7 +1889,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -1959,7 +1973,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -2043,7 +2057,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -2175,18 +2189,19 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/geometry_safety.py": "sha256:bf2ec65219f07e80806926e1ca3dfaf1e034ffeec78f7ea89fa8e8dfc655eb29",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/backends/gaussian_path.py": "sha256:fc778cf5f15df65e3e32fef953bb512f0017abfdb8486044bf7fd8aa22f62bc9",
-        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:dc41abb380af930c3bb2101d8de3df9dc2751378321bf78d69e377e3f0eae997",
+        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:d12a19ca072b2b3085b6ee1bc5b07dacfd57d11e0567b030d5027bb4efe8fe93",
         "skills/candidate-generation/scripts/backends/path_xtb.py": "sha256:4e5d6dc3257891483dc64bb675f3a13ab33a55746203f750b1376fba02604fb3",
         "skills/candidate-generation/scripts/da/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
         "skills/candidate-generation/scripts/neb/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
         "skills/candidate-generation/scripts/neb/ase_neb.py": "sha256:ec1b20d26cbd8d5adf586256e54ef1cdb990d70b9d0a3b2663786f873bd6433b",
         "skills/candidate-generation/scripts/neb/ase_search.py": "sha256:4d4770cff5326a703c74dadc68187f255bb7dfd2a09140b98d64f15feca87b28",
         "skills/candidate-generation/scripts/path/cli.py": "sha256:06411b2e86c8aa2f7452680cb2b89cfa8a2a9086994ca7548e749a8cafba9456",
-        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:affc5cb17f17d773f1f1ce8774c2e030972163445f2a60bbd5fd5028560950cf",
-        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:03885183ed85b11a052e7c539f985c87a83a9fec0e4b2c54627338bc04b59a78",
+        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:a187b008c97851638988893c1db6e931dc80e095fa59bcfee270a38ccd2bbbbd",
+        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:795be80f437795f6f868faf4adc163f60f048a932e71e75c023732ce10c8c1f3",
         "skills/candidate-generation/scripts/path/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
@@ -2201,7 +2216,7 @@
         "skills/crest/scripts/ensemble_cli.py": "sha256:b2593f171f107e9ca83b849219a967c44659ae3c09299ccc3593f2fdbedc87f0",
         "skills/crest/scripts/ensemble_material.py": "sha256:2a52c033bb0ca2f6f531444808098206f2d2f48d74670f5fc8f1c2c93138302a",
         "skills/crest/scripts/ensemble_select.py": "sha256:6d891716c8e85e8eb4b0274739e55028883801ef0c38d1d5a7fb56d07785f752",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "skills/material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -2214,7 +2229,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/xtb/scripts/parser.py": "sha256:5922d0093eddf05b166d11be7b17220dc2da30e5d78a36ce887bfd67c34fc677"
       },
@@ -2282,18 +2297,19 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/geometry_safety.py": "sha256:bf2ec65219f07e80806926e1ca3dfaf1e034ffeec78f7ea89fa8e8dfc655eb29",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/backends/gaussian_path.py": "sha256:fc778cf5f15df65e3e32fef953bb512f0017abfdb8486044bf7fd8aa22f62bc9",
-        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:dc41abb380af930c3bb2101d8de3df9dc2751378321bf78d69e377e3f0eae997",
+        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:d12a19ca072b2b3085b6ee1bc5b07dacfd57d11e0567b030d5027bb4efe8fe93",
         "skills/candidate-generation/scripts/backends/path_xtb.py": "sha256:4e5d6dc3257891483dc64bb675f3a13ab33a55746203f750b1376fba02604fb3",
         "skills/candidate-generation/scripts/da/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
         "skills/candidate-generation/scripts/neb/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
         "skills/candidate-generation/scripts/neb/ase_neb.py": "sha256:ec1b20d26cbd8d5adf586256e54ef1cdb990d70b9d0a3b2663786f873bd6433b",
         "skills/candidate-generation/scripts/neb/ase_search.py": "sha256:4d4770cff5326a703c74dadc68187f255bb7dfd2a09140b98d64f15feca87b28",
         "skills/candidate-generation/scripts/path/cli.py": "sha256:06411b2e86c8aa2f7452680cb2b89cfa8a2a9086994ca7548e749a8cafba9456",
-        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:affc5cb17f17d773f1f1ce8774c2e030972163445f2a60bbd5fd5028560950cf",
-        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:03885183ed85b11a052e7c539f985c87a83a9fec0e4b2c54627338bc04b59a78",
+        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:a187b008c97851638988893c1db6e931dc80e095fa59bcfee270a38ccd2bbbbd",
+        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:795be80f437795f6f868faf4adc163f60f048a932e71e75c023732ce10c8c1f3",
         "skills/candidate-generation/scripts/path/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
@@ -2308,7 +2324,7 @@
         "skills/crest/scripts/ensemble_cli.py": "sha256:b2593f171f107e9ca83b849219a967c44659ae3c09299ccc3593f2fdbedc87f0",
         "skills/crest/scripts/ensemble_material.py": "sha256:2a52c033bb0ca2f6f531444808098206f2d2f48d74670f5fc8f1c2c93138302a",
         "skills/crest/scripts/ensemble_select.py": "sha256:6d891716c8e85e8eb4b0274739e55028883801ef0c38d1d5a7fb56d07785f752",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "skills/material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -2321,7 +2337,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/xtb/scripts/parser.py": "sha256:5922d0093eddf05b166d11be7b17220dc2da30e5d78a36ce887bfd67c34fc677"
       },
@@ -2389,18 +2405,19 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/geometry_safety.py": "sha256:bf2ec65219f07e80806926e1ca3dfaf1e034ffeec78f7ea89fa8e8dfc655eb29",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/backends/gaussian_path.py": "sha256:fc778cf5f15df65e3e32fef953bb512f0017abfdb8486044bf7fd8aa22f62bc9",
-        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:dc41abb380af930c3bb2101d8de3df9dc2751378321bf78d69e377e3f0eae997",
+        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:d12a19ca072b2b3085b6ee1bc5b07dacfd57d11e0567b030d5027bb4efe8fe93",
         "skills/candidate-generation/scripts/backends/path_xtb.py": "sha256:4e5d6dc3257891483dc64bb675f3a13ab33a55746203f750b1376fba02604fb3",
         "skills/candidate-generation/scripts/da/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
         "skills/candidate-generation/scripts/neb/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
         "skills/candidate-generation/scripts/neb/ase_neb.py": "sha256:ec1b20d26cbd8d5adf586256e54ef1cdb990d70b9d0a3b2663786f873bd6433b",
         "skills/candidate-generation/scripts/neb/ase_search.py": "sha256:4d4770cff5326a703c74dadc68187f255bb7dfd2a09140b98d64f15feca87b28",
         "skills/candidate-generation/scripts/path/cli.py": "sha256:06411b2e86c8aa2f7452680cb2b89cfa8a2a9086994ca7548e749a8cafba9456",
-        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:affc5cb17f17d773f1f1ce8774c2e030972163445f2a60bbd5fd5028560950cf",
-        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:03885183ed85b11a052e7c539f985c87a83a9fec0e4b2c54627338bc04b59a78",
+        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:a187b008c97851638988893c1db6e931dc80e095fa59bcfee270a38ccd2bbbbd",
+        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:795be80f437795f6f868faf4adc163f60f048a932e71e75c023732ce10c8c1f3",
         "skills/candidate-generation/scripts/path/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
@@ -2415,7 +2432,7 @@
         "skills/crest/scripts/ensemble_cli.py": "sha256:b2593f171f107e9ca83b849219a967c44659ae3c09299ccc3593f2fdbedc87f0",
         "skills/crest/scripts/ensemble_material.py": "sha256:2a52c033bb0ca2f6f531444808098206f2d2f48d74670f5fc8f1c2c93138302a",
         "skills/crest/scripts/ensemble_select.py": "sha256:6d891716c8e85e8eb4b0274739e55028883801ef0c38d1d5a7fb56d07785f752",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "skills/material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -2428,7 +2445,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/xtb/scripts/parser.py": "sha256:5922d0093eddf05b166d11be7b17220dc2da30e5d78a36ce887bfd67c34fc677"
       },
@@ -2496,18 +2513,19 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/geometry_safety.py": "sha256:bf2ec65219f07e80806926e1ca3dfaf1e034ffeec78f7ea89fa8e8dfc655eb29",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/backends/gaussian_path.py": "sha256:fc778cf5f15df65e3e32fef953bb512f0017abfdb8486044bf7fd8aa22f62bc9",
-        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:dc41abb380af930c3bb2101d8de3df9dc2751378321bf78d69e377e3f0eae997",
+        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:d12a19ca072b2b3085b6ee1bc5b07dacfd57d11e0567b030d5027bb4efe8fe93",
         "skills/candidate-generation/scripts/backends/path_xtb.py": "sha256:4e5d6dc3257891483dc64bb675f3a13ab33a55746203f750b1376fba02604fb3",
         "skills/candidate-generation/scripts/da/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
         "skills/candidate-generation/scripts/neb/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
         "skills/candidate-generation/scripts/neb/ase_neb.py": "sha256:ec1b20d26cbd8d5adf586256e54ef1cdb990d70b9d0a3b2663786f873bd6433b",
         "skills/candidate-generation/scripts/neb/ase_search.py": "sha256:4d4770cff5326a703c74dadc68187f255bb7dfd2a09140b98d64f15feca87b28",
         "skills/candidate-generation/scripts/path/cli.py": "sha256:06411b2e86c8aa2f7452680cb2b89cfa8a2a9086994ca7548e749a8cafba9456",
-        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:affc5cb17f17d773f1f1ce8774c2e030972163445f2a60bbd5fd5028560950cf",
-        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:03885183ed85b11a052e7c539f985c87a83a9fec0e4b2c54627338bc04b59a78",
+        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:a187b008c97851638988893c1db6e931dc80e095fa59bcfee270a38ccd2bbbbd",
+        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:795be80f437795f6f868faf4adc163f60f048a932e71e75c023732ce10c8c1f3",
         "skills/candidate-generation/scripts/path/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
@@ -2522,7 +2540,7 @@
         "skills/crest/scripts/ensemble_cli.py": "sha256:b2593f171f107e9ca83b849219a967c44659ae3c09299ccc3593f2fdbedc87f0",
         "skills/crest/scripts/ensemble_material.py": "sha256:2a52c033bb0ca2f6f531444808098206f2d2f48d74670f5fc8f1c2c93138302a",
         "skills/crest/scripts/ensemble_select.py": "sha256:6d891716c8e85e8eb4b0274739e55028883801ef0c38d1d5a7fb56d07785f752",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "skills/material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -2535,7 +2553,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/xtb/scripts/parser.py": "sha256:5922d0093eddf05b166d11be7b17220dc2da30e5d78a36ce887bfd67c34fc677"
       },
@@ -2621,7 +2639,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -2700,7 +2718,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -2779,7 +2797,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -2858,7 +2876,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -2937,7 +2955,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -3016,7 +3034,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -3095,7 +3113,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -3167,12 +3185,12 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/reaction-investigation/scripts/pathway.py": "sha256:51bda670bfa2a8f3ce02df30e6e9dd50841b90f55f31384803e1bdf52245997f",
         "skills/reaction-investigation/scripts/pathway_cli.py": "sha256:2c25affc3ba06c5dc2decf3ff2128054d0ef0a198c65e6842eefa9153eea1460",
         "skills/reaction-investigation/scripts/pathway_job.py": "sha256:39c00b9b9d273efa41abdbe2efd85dd0ec8d199527ebb50cf738bec62dd0dca7",
-        "skills/validation/scripts/check_common.py": "sha256:43b2c52a590a09710465e0075066ac02a6b5b06b61d8a075c51f9cbcb674135e",
+        "skills/validation/scripts/check_common.py": "sha256:731ad2905f50457208fae4ddc4c5cf1e5e947b9c0fc0dea49a693e6b6d9f05c3",
         "skills/validation/scripts/irc_check.py": "sha256:7bedcb0bf969fd2aba5b6da81b507b997fefe66746354033f8d5a7977b856209",
         "skills/validation/scripts/mode_check.py": "sha256:6cf321a29e995651a28ad5c5fdc3acac7f10d995d9a4faf236abf751390eddaf"
       },
@@ -3235,17 +3253,19 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/backends/gaussian_path.py": "sha256:fc778cf5f15df65e3e32fef953bb512f0017abfdb8486044bf7fd8aa22f62bc9",
-        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:dc41abb380af930c3bb2101d8de3df9dc2751378321bf78d69e377e3f0eae997",
+        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:d12a19ca072b2b3085b6ee1bc5b07dacfd57d11e0567b030d5027bb4efe8fe93",
         "skills/candidate-generation/scripts/backends/path_xtb.py": "sha256:4e5d6dc3257891483dc64bb675f3a13ab33a55746203f750b1376fba02604fb3",
         "skills/candidate-generation/scripts/da/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
         "skills/candidate-generation/scripts/neb/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
         "skills/candidate-generation/scripts/neb/ase_neb.py": "sha256:ec1b20d26cbd8d5adf586256e54ef1cdb990d70b9d0a3b2663786f873bd6433b",
         "skills/candidate-generation/scripts/neb/ase_search.py": "sha256:4d4770cff5326a703c74dadc68187f255bb7dfd2a09140b98d64f15feca87b28",
         "skills/candidate-generation/scripts/path/cli.py": "sha256:06411b2e86c8aa2f7452680cb2b89cfa8a2a9086994ca7548e749a8cafba9456",
-        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:affc5cb17f17d773f1f1ce8774c2e030972163445f2a60bbd5fd5028560950cf",
-        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:03885183ed85b11a052e7c539f985c87a83a9fec0e4b2c54627338bc04b59a78",
+        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:a187b008c97851638988893c1db6e931dc80e095fa59bcfee270a38ccd2bbbbd",
+        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:795be80f437795f6f868faf4adc163f60f048a932e71e75c023732ce10c8c1f3",
         "skills/candidate-generation/scripts/path/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
@@ -3264,8 +3284,8 @@
         "skills/gaussian/scripts/electronic.py": "sha256:6525de6234bf9e630920098eb4d27e79a0529a984fabd447c2b101e8019f17a1",
         "skills/gaussian/scripts/electronic_cli.py": "sha256:9fac0a6b0ffae98c6fbe679d7a3f48c1d77c3f929113bda99e55a9d0060b8dbc",
         "skills/gaussian/scripts/electronic_contract.py": "sha256:430ffaecb6ef12a128df446c5a66b272aeac111056dba8d79e9df3bede244121",
-        "skills/gaussian/scripts/electronic_parse.py": "sha256:e5716b7e6581245f8855d40b293076c5dd8de548b3af938db9d1e57411427075",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/electronic_parse.py": "sha256:592d033be20122f716b2d350f9230ac158a05b0b22f0e04129e99ce91491c260",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
         "skills/gaussian/scripts/state_tracking.py": "sha256:d22ad0867715f2d0b8da4679eb276010932c7aeb44319e38d339f85b8e14d3cc",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
@@ -3279,7 +3299,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -3343,17 +3363,19 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/backends/gaussian_path.py": "sha256:fc778cf5f15df65e3e32fef953bb512f0017abfdb8486044bf7fd8aa22f62bc9",
-        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:dc41abb380af930c3bb2101d8de3df9dc2751378321bf78d69e377e3f0eae997",
+        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:d12a19ca072b2b3085b6ee1bc5b07dacfd57d11e0567b030d5027bb4efe8fe93",
         "skills/candidate-generation/scripts/backends/path_xtb.py": "sha256:4e5d6dc3257891483dc64bb675f3a13ab33a55746203f750b1376fba02604fb3",
         "skills/candidate-generation/scripts/da/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
         "skills/candidate-generation/scripts/neb/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
         "skills/candidate-generation/scripts/neb/ase_neb.py": "sha256:ec1b20d26cbd8d5adf586256e54ef1cdb990d70b9d0a3b2663786f873bd6433b",
         "skills/candidate-generation/scripts/neb/ase_search.py": "sha256:4d4770cff5326a703c74dadc68187f255bb7dfd2a09140b98d64f15feca87b28",
         "skills/candidate-generation/scripts/path/cli.py": "sha256:06411b2e86c8aa2f7452680cb2b89cfa8a2a9086994ca7548e749a8cafba9456",
-        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:affc5cb17f17d773f1f1ce8774c2e030972163445f2a60bbd5fd5028560950cf",
-        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:03885183ed85b11a052e7c539f985c87a83a9fec0e4b2c54627338bc04b59a78",
+        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:a187b008c97851638988893c1db6e931dc80e095fa59bcfee270a38ccd2bbbbd",
+        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:795be80f437795f6f868faf4adc163f60f048a932e71e75c023732ce10c8c1f3",
         "skills/candidate-generation/scripts/path/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
@@ -3372,8 +3394,8 @@
         "skills/gaussian/scripts/electronic.py": "sha256:6525de6234bf9e630920098eb4d27e79a0529a984fabd447c2b101e8019f17a1",
         "skills/gaussian/scripts/electronic_cli.py": "sha256:9fac0a6b0ffae98c6fbe679d7a3f48c1d77c3f929113bda99e55a9d0060b8dbc",
         "skills/gaussian/scripts/electronic_contract.py": "sha256:430ffaecb6ef12a128df446c5a66b272aeac111056dba8d79e9df3bede244121",
-        "skills/gaussian/scripts/electronic_parse.py": "sha256:e5716b7e6581245f8855d40b293076c5dd8de548b3af938db9d1e57411427075",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/electronic_parse.py": "sha256:592d033be20122f716b2d350f9230ac158a05b0b22f0e04129e99ce91491c260",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
         "skills/gaussian/scripts/state_tracking.py": "sha256:d22ad0867715f2d0b8da4679eb276010932c7aeb44319e38d339f85b8e14d3cc",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
@@ -3387,7 +3409,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b"
       },
       "module_paths": [
@@ -3453,17 +3475,19 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/backends/gaussian_path.py": "sha256:fc778cf5f15df65e3e32fef953bb512f0017abfdb8486044bf7fd8aa22f62bc9",
-        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:dc41abb380af930c3bb2101d8de3df9dc2751378321bf78d69e377e3f0eae997",
+        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:d12a19ca072b2b3085b6ee1bc5b07dacfd57d11e0567b030d5027bb4efe8fe93",
         "skills/candidate-generation/scripts/backends/path_xtb.py": "sha256:4e5d6dc3257891483dc64bb675f3a13ab33a55746203f750b1376fba02604fb3",
         "skills/candidate-generation/scripts/da/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
         "skills/candidate-generation/scripts/neb/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
         "skills/candidate-generation/scripts/neb/ase_neb.py": "sha256:ec1b20d26cbd8d5adf586256e54ef1cdb990d70b9d0a3b2663786f873bd6433b",
         "skills/candidate-generation/scripts/neb/ase_search.py": "sha256:4d4770cff5326a703c74dadc68187f255bb7dfd2a09140b98d64f15feca87b28",
         "skills/candidate-generation/scripts/path/cli.py": "sha256:06411b2e86c8aa2f7452680cb2b89cfa8a2a9086994ca7548e749a8cafba9456",
-        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:affc5cb17f17d773f1f1ce8774c2e030972163445f2a60bbd5fd5028560950cf",
-        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:03885183ed85b11a052e7c539f985c87a83a9fec0e4b2c54627338bc04b59a78",
+        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:a187b008c97851638988893c1db6e931dc80e095fa59bcfee270a38ccd2bbbbd",
+        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:795be80f437795f6f868faf4adc163f60f048a932e71e75c023732ce10c8c1f3",
         "skills/candidate-generation/scripts/path/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
@@ -3482,8 +3506,8 @@
         "skills/gaussian/scripts/electronic.py": "sha256:6525de6234bf9e630920098eb4d27e79a0529a984fabd447c2b101e8019f17a1",
         "skills/gaussian/scripts/electronic_cli.py": "sha256:9fac0a6b0ffae98c6fbe679d7a3f48c1d77c3f929113bda99e55a9d0060b8dbc",
         "skills/gaussian/scripts/electronic_contract.py": "sha256:430ffaecb6ef12a128df446c5a66b272aeac111056dba8d79e9df3bede244121",
-        "skills/gaussian/scripts/electronic_parse.py": "sha256:e5716b7e6581245f8855d40b293076c5dd8de548b3af938db9d1e57411427075",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/electronic_parse.py": "sha256:592d033be20122f716b2d350f9230ac158a05b0b22f0e04129e99ce91491c260",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
         "skills/gaussian/scripts/state_tracking.py": "sha256:d22ad0867715f2d0b8da4679eb276010932c7aeb44319e38d339f85b8e14d3cc",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
@@ -3497,7 +3521,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/surface-crossing/scripts/crossing.py": "sha256:8aefe995c86a0f181b8b51343fd6bc29e8e64b875d68004d0a90d9b276dcb9d4",
         "skills/surface-crossing/scripts/crossing_check.py": "sha256:78a08bec48529ead1db27651f2bb71bc4e5a43819bfe191073da4ca5e53b7450",
@@ -3566,17 +3590,19 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/backends/gaussian_path.py": "sha256:fc778cf5f15df65e3e32fef953bb512f0017abfdb8486044bf7fd8aa22f62bc9",
-        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:dc41abb380af930c3bb2101d8de3df9dc2751378321bf78d69e377e3f0eae997",
+        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:d12a19ca072b2b3085b6ee1bc5b07dacfd57d11e0567b030d5027bb4efe8fe93",
         "skills/candidate-generation/scripts/backends/path_xtb.py": "sha256:4e5d6dc3257891483dc64bb675f3a13ab33a55746203f750b1376fba02604fb3",
         "skills/candidate-generation/scripts/da/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
         "skills/candidate-generation/scripts/neb/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
         "skills/candidate-generation/scripts/neb/ase_neb.py": "sha256:ec1b20d26cbd8d5adf586256e54ef1cdb990d70b9d0a3b2663786f873bd6433b",
         "skills/candidate-generation/scripts/neb/ase_search.py": "sha256:4d4770cff5326a703c74dadc68187f255bb7dfd2a09140b98d64f15feca87b28",
         "skills/candidate-generation/scripts/path/cli.py": "sha256:06411b2e86c8aa2f7452680cb2b89cfa8a2a9086994ca7548e749a8cafba9456",
-        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:affc5cb17f17d773f1f1ce8774c2e030972163445f2a60bbd5fd5028560950cf",
-        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:03885183ed85b11a052e7c539f985c87a83a9fec0e4b2c54627338bc04b59a78",
+        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:a187b008c97851638988893c1db6e931dc80e095fa59bcfee270a38ccd2bbbbd",
+        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:795be80f437795f6f868faf4adc163f60f048a932e71e75c023732ce10c8c1f3",
         "skills/candidate-generation/scripts/path/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
@@ -3595,8 +3621,8 @@
         "skills/gaussian/scripts/electronic.py": "sha256:6525de6234bf9e630920098eb4d27e79a0529a984fabd447c2b101e8019f17a1",
         "skills/gaussian/scripts/electronic_cli.py": "sha256:9fac0a6b0ffae98c6fbe679d7a3f48c1d77c3f929113bda99e55a9d0060b8dbc",
         "skills/gaussian/scripts/electronic_contract.py": "sha256:430ffaecb6ef12a128df446c5a66b272aeac111056dba8d79e9df3bede244121",
-        "skills/gaussian/scripts/electronic_parse.py": "sha256:e5716b7e6581245f8855d40b293076c5dd8de548b3af938db9d1e57411427075",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/electronic_parse.py": "sha256:592d033be20122f716b2d350f9230ac158a05b0b22f0e04129e99ce91491c260",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
         "skills/gaussian/scripts/state_tracking.py": "sha256:d22ad0867715f2d0b8da4679eb276010932c7aeb44319e38d339f85b8e14d3cc",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
@@ -3610,7 +3636,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/surface-crossing/scripts/crossing.py": "sha256:8aefe995c86a0f181b8b51343fd6bc29e8e64b875d68004d0a90d9b276dcb9d4",
         "skills/surface-crossing/scripts/crossing_check.py": "sha256:78a08bec48529ead1db27651f2bb71bc4e5a43819bfe191073da4ca5e53b7450",
@@ -3681,18 +3707,19 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/geometry_safety.py": "sha256:bf2ec65219f07e80806926e1ca3dfaf1e034ffeec78f7ea89fa8e8dfc655eb29",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/backends/gaussian_path.py": "sha256:fc778cf5f15df65e3e32fef953bb512f0017abfdb8486044bf7fd8aa22f62bc9",
-        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:dc41abb380af930c3bb2101d8de3df9dc2751378321bf78d69e377e3f0eae997",
+        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:d12a19ca072b2b3085b6ee1bc5b07dacfd57d11e0567b030d5027bb4efe8fe93",
         "skills/candidate-generation/scripts/backends/path_xtb.py": "sha256:4e5d6dc3257891483dc64bb675f3a13ab33a55746203f750b1376fba02604fb3",
         "skills/candidate-generation/scripts/da/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
         "skills/candidate-generation/scripts/neb/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
         "skills/candidate-generation/scripts/neb/ase_neb.py": "sha256:ec1b20d26cbd8d5adf586256e54ef1cdb990d70b9d0a3b2663786f873bd6433b",
         "skills/candidate-generation/scripts/neb/ase_search.py": "sha256:4d4770cff5326a703c74dadc68187f255bb7dfd2a09140b98d64f15feca87b28",
         "skills/candidate-generation/scripts/path/cli.py": "sha256:06411b2e86c8aa2f7452680cb2b89cfa8a2a9086994ca7548e749a8cafba9456",
-        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:affc5cb17f17d773f1f1ce8774c2e030972163445f2a60bbd5fd5028560950cf",
-        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:03885183ed85b11a052e7c539f985c87a83a9fec0e4b2c54627338bc04b59a78",
+        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:a187b008c97851638988893c1db6e931dc80e095fa59bcfee270a38ccd2bbbbd",
+        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:795be80f437795f6f868faf4adc163f60f048a932e71e75c023732ce10c8c1f3",
         "skills/candidate-generation/scripts/path/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
@@ -3717,8 +3744,8 @@
         "skills/gaussian/scripts/electronic.py": "sha256:6525de6234bf9e630920098eb4d27e79a0529a984fabd447c2b101e8019f17a1",
         "skills/gaussian/scripts/electronic_cli.py": "sha256:9fac0a6b0ffae98c6fbe679d7a3f48c1d77c3f929113bda99e55a9d0060b8dbc",
         "skills/gaussian/scripts/electronic_contract.py": "sha256:430ffaecb6ef12a128df446c5a66b272aeac111056dba8d79e9df3bede244121",
-        "skills/gaussian/scripts/electronic_parse.py": "sha256:e5716b7e6581245f8855d40b293076c5dd8de548b3af938db9d1e57411427075",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/electronic_parse.py": "sha256:592d033be20122f716b2d350f9230ac158a05b0b22f0e04129e99ce91491c260",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
         "skills/gaussian/scripts/state_tracking.py": "sha256:d22ad0867715f2d0b8da4679eb276010932c7aeb44319e38d339f85b8e14d3cc",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
@@ -3732,7 +3759,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/xtb/scripts/parser.py": "sha256:5922d0093eddf05b166d11be7b17220dc2da30e5d78a36ce887bfd67c34fc677"
       },
@@ -3805,18 +3832,19 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/geometry_safety.py": "sha256:bf2ec65219f07e80806926e1ca3dfaf1e034ffeec78f7ea89fa8e8dfc655eb29",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/backends/gaussian_path.py": "sha256:fc778cf5f15df65e3e32fef953bb512f0017abfdb8486044bf7fd8aa22f62bc9",
-        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:dc41abb380af930c3bb2101d8de3df9dc2751378321bf78d69e377e3f0eae997",
+        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:d12a19ca072b2b3085b6ee1bc5b07dacfd57d11e0567b030d5027bb4efe8fe93",
         "skills/candidate-generation/scripts/backends/path_xtb.py": "sha256:4e5d6dc3257891483dc64bb675f3a13ab33a55746203f750b1376fba02604fb3",
         "skills/candidate-generation/scripts/da/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
         "skills/candidate-generation/scripts/neb/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
         "skills/candidate-generation/scripts/neb/ase_neb.py": "sha256:ec1b20d26cbd8d5adf586256e54ef1cdb990d70b9d0a3b2663786f873bd6433b",
         "skills/candidate-generation/scripts/neb/ase_search.py": "sha256:4d4770cff5326a703c74dadc68187f255bb7dfd2a09140b98d64f15feca87b28",
         "skills/candidate-generation/scripts/path/cli.py": "sha256:06411b2e86c8aa2f7452680cb2b89cfa8a2a9086994ca7548e749a8cafba9456",
-        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:affc5cb17f17d773f1f1ce8774c2e030972163445f2a60bbd5fd5028560950cf",
-        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:03885183ed85b11a052e7c539f985c87a83a9fec0e4b2c54627338bc04b59a78",
+        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:a187b008c97851638988893c1db6e931dc80e095fa59bcfee270a38ccd2bbbbd",
+        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:795be80f437795f6f868faf4adc163f60f048a932e71e75c023732ce10c8c1f3",
         "skills/candidate-generation/scripts/path/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
@@ -3841,8 +3869,8 @@
         "skills/gaussian/scripts/electronic.py": "sha256:6525de6234bf9e630920098eb4d27e79a0529a984fabd447c2b101e8019f17a1",
         "skills/gaussian/scripts/electronic_cli.py": "sha256:9fac0a6b0ffae98c6fbe679d7a3f48c1d77c3f929113bda99e55a9d0060b8dbc",
         "skills/gaussian/scripts/electronic_contract.py": "sha256:430ffaecb6ef12a128df446c5a66b272aeac111056dba8d79e9df3bede244121",
-        "skills/gaussian/scripts/electronic_parse.py": "sha256:e5716b7e6581245f8855d40b293076c5dd8de548b3af938db9d1e57411427075",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/electronic_parse.py": "sha256:592d033be20122f716b2d350f9230ac158a05b0b22f0e04129e99ce91491c260",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
         "skills/gaussian/scripts/state_tracking.py": "sha256:d22ad0867715f2d0b8da4679eb276010932c7aeb44319e38d339f85b8e14d3cc",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
@@ -3856,7 +3884,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/xtb/scripts/parser.py": "sha256:5922d0093eddf05b166d11be7b17220dc2da30e5d78a36ce887bfd67c34fc677"
       },
@@ -3929,18 +3957,19 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/geometry_safety.py": "sha256:bf2ec65219f07e80806926e1ca3dfaf1e034ffeec78f7ea89fa8e8dfc655eb29",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/backends/gaussian_path.py": "sha256:fc778cf5f15df65e3e32fef953bb512f0017abfdb8486044bf7fd8aa22f62bc9",
-        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:dc41abb380af930c3bb2101d8de3df9dc2751378321bf78d69e377e3f0eae997",
+        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:d12a19ca072b2b3085b6ee1bc5b07dacfd57d11e0567b030d5027bb4efe8fe93",
         "skills/candidate-generation/scripts/backends/path_xtb.py": "sha256:4e5d6dc3257891483dc64bb675f3a13ab33a55746203f750b1376fba02604fb3",
         "skills/candidate-generation/scripts/da/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
         "skills/candidate-generation/scripts/neb/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
         "skills/candidate-generation/scripts/neb/ase_neb.py": "sha256:ec1b20d26cbd8d5adf586256e54ef1cdb990d70b9d0a3b2663786f873bd6433b",
         "skills/candidate-generation/scripts/neb/ase_search.py": "sha256:4d4770cff5326a703c74dadc68187f255bb7dfd2a09140b98d64f15feca87b28",
         "skills/candidate-generation/scripts/path/cli.py": "sha256:06411b2e86c8aa2f7452680cb2b89cfa8a2a9086994ca7548e749a8cafba9456",
-        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:affc5cb17f17d773f1f1ce8774c2e030972163445f2a60bbd5fd5028560950cf",
-        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:03885183ed85b11a052e7c539f985c87a83a9fec0e4b2c54627338bc04b59a78",
+        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:a187b008c97851638988893c1db6e931dc80e095fa59bcfee270a38ccd2bbbbd",
+        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:795be80f437795f6f868faf4adc163f60f048a932e71e75c023732ce10c8c1f3",
         "skills/candidate-generation/scripts/path/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
@@ -3965,8 +3994,8 @@
         "skills/gaussian/scripts/electronic.py": "sha256:6525de6234bf9e630920098eb4d27e79a0529a984fabd447c2b101e8019f17a1",
         "skills/gaussian/scripts/electronic_cli.py": "sha256:9fac0a6b0ffae98c6fbe679d7a3f48c1d77c3f929113bda99e55a9d0060b8dbc",
         "skills/gaussian/scripts/electronic_contract.py": "sha256:430ffaecb6ef12a128df446c5a66b272aeac111056dba8d79e9df3bede244121",
-        "skills/gaussian/scripts/electronic_parse.py": "sha256:e5716b7e6581245f8855d40b293076c5dd8de548b3af938db9d1e57411427075",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/electronic_parse.py": "sha256:592d033be20122f716b2d350f9230ac158a05b0b22f0e04129e99ce91491c260",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
         "skills/gaussian/scripts/state_tracking.py": "sha256:d22ad0867715f2d0b8da4679eb276010932c7aeb44319e38d339f85b8e14d3cc",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
@@ -3980,7 +4009,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/xtb/scripts/parser.py": "sha256:5922d0093eddf05b166d11be7b17220dc2da30e5d78a36ce887bfd67c34fc677"
       },
@@ -4039,18 +4068,19 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/geometry_safety.py": "sha256:bf2ec65219f07e80806926e1ca3dfaf1e034ffeec78f7ea89fa8e8dfc655eb29",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/backends/gaussian_path.py": "sha256:fc778cf5f15df65e3e32fef953bb512f0017abfdb8486044bf7fd8aa22f62bc9",
-        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:dc41abb380af930c3bb2101d8de3df9dc2751378321bf78d69e377e3f0eae997",
+        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:d12a19ca072b2b3085b6ee1bc5b07dacfd57d11e0567b030d5027bb4efe8fe93",
         "skills/candidate-generation/scripts/backends/path_xtb.py": "sha256:4e5d6dc3257891483dc64bb675f3a13ab33a55746203f750b1376fba02604fb3",
         "skills/candidate-generation/scripts/da/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
         "skills/candidate-generation/scripts/neb/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
         "skills/candidate-generation/scripts/neb/ase_neb.py": "sha256:ec1b20d26cbd8d5adf586256e54ef1cdb990d70b9d0a3b2663786f873bd6433b",
         "skills/candidate-generation/scripts/neb/ase_search.py": "sha256:4d4770cff5326a703c74dadc68187f255bb7dfd2a09140b98d64f15feca87b28",
         "skills/candidate-generation/scripts/path/cli.py": "sha256:06411b2e86c8aa2f7452680cb2b89cfa8a2a9086994ca7548e749a8cafba9456",
-        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:affc5cb17f17d773f1f1ce8774c2e030972163445f2a60bbd5fd5028560950cf",
-        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:03885183ed85b11a052e7c539f985c87a83a9fec0e4b2c54627338bc04b59a78",
+        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:a187b008c97851638988893c1db6e931dc80e095fa59bcfee270a38ccd2bbbbd",
+        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:795be80f437795f6f868faf4adc163f60f048a932e71e75c023732ce10c8c1f3",
         "skills/candidate-generation/scripts/path/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
@@ -4065,7 +4095,7 @@
         "skills/crest/scripts/ensemble_cli.py": "sha256:b2593f171f107e9ca83b849219a967c44659ae3c09299ccc3593f2fdbedc87f0",
         "skills/crest/scripts/ensemble_material.py": "sha256:2a52c033bb0ca2f6f531444808098206f2d2f48d74670f5fc8f1c2c93138302a",
         "skills/crest/scripts/ensemble_select.py": "sha256:6d891716c8e85e8eb4b0274739e55028883801ef0c38d1d5a7fb56d07785f752",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "skills/material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -4078,7 +4108,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/xtb/scripts/parser.py": "sha256:5922d0093eddf05b166d11be7b17220dc2da30e5d78a36ce887bfd67c34fc677"
       },
@@ -4147,18 +4177,19 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/geometry_safety.py": "sha256:bf2ec65219f07e80806926e1ca3dfaf1e034ffeec78f7ea89fa8e8dfc655eb29",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/backends/gaussian_path.py": "sha256:fc778cf5f15df65e3e32fef953bb512f0017abfdb8486044bf7fd8aa22f62bc9",
-        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:dc41abb380af930c3bb2101d8de3df9dc2751378321bf78d69e377e3f0eae997",
+        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:d12a19ca072b2b3085b6ee1bc5b07dacfd57d11e0567b030d5027bb4efe8fe93",
         "skills/candidate-generation/scripts/backends/path_xtb.py": "sha256:4e5d6dc3257891483dc64bb675f3a13ab33a55746203f750b1376fba02604fb3",
         "skills/candidate-generation/scripts/da/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
         "skills/candidate-generation/scripts/neb/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
         "skills/candidate-generation/scripts/neb/ase_neb.py": "sha256:ec1b20d26cbd8d5adf586256e54ef1cdb990d70b9d0a3b2663786f873bd6433b",
         "skills/candidate-generation/scripts/neb/ase_search.py": "sha256:4d4770cff5326a703c74dadc68187f255bb7dfd2a09140b98d64f15feca87b28",
         "skills/candidate-generation/scripts/path/cli.py": "sha256:06411b2e86c8aa2f7452680cb2b89cfa8a2a9086994ca7548e749a8cafba9456",
-        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:affc5cb17f17d773f1f1ce8774c2e030972163445f2a60bbd5fd5028560950cf",
-        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:03885183ed85b11a052e7c539f985c87a83a9fec0e4b2c54627338bc04b59a78",
+        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:a187b008c97851638988893c1db6e931dc80e095fa59bcfee270a38ccd2bbbbd",
+        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:795be80f437795f6f868faf4adc163f60f048a932e71e75c023732ce10c8c1f3",
         "skills/candidate-generation/scripts/path/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
@@ -4180,7 +4211,7 @@
         "skills/energetics/scripts/kinetic_network.py": "sha256:c2926f3b31cf0197f206cf73cdf8df4d0f038af4adfcc1aa5b027eb0ea881c93",
         "skills/energetics/scripts/kinetics.py": "sha256:4b5493f612c8ae27a72d5d770d48d42c9379c30bbdf7ed85b7a81429d8b24ea3",
         "skills/energetics/scripts/thermochemistry.py": "sha256:ae3f849988f9baa1803ef35120274c5ddccfec239967e8f87fdd4a5684dd6550",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "skills/material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -4193,7 +4224,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/report/scripts/research_cli.py": "sha256:37af37d3af1447ba2ef8e96528aae067698bd78f3c47f48e6f9f6272a743aed3",
         "skills/report/scripts/research_job.py": "sha256:38e894e66517cb13630192b7b769ecb27939350368c8a7785c9632107ab1d8ab",
@@ -4266,18 +4297,19 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/geometry_safety.py": "sha256:bf2ec65219f07e80806926e1ca3dfaf1e034ffeec78f7ea89fa8e8dfc655eb29",
+        "skills/_shared/gaussian_input.py": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/candidate-generation/scripts/backends/gaussian_path.py": "sha256:fc778cf5f15df65e3e32fef953bb512f0017abfdb8486044bf7fd8aa22f62bc9",
-        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:dc41abb380af930c3bb2101d8de3df9dc2751378321bf78d69e377e3f0eae997",
+        "skills/candidate-generation/scripts/backends/path_gaussian.py": "sha256:d12a19ca072b2b3085b6ee1bc5b07dacfd57d11e0567b030d5027bb4efe8fe93",
         "skills/candidate-generation/scripts/backends/path_xtb.py": "sha256:4e5d6dc3257891483dc64bb675f3a13ab33a55746203f750b1376fba02604fb3",
         "skills/candidate-generation/scripts/da/da_geometry.py": "sha256:931f3958ea9a35ca742d15edd8c0213a95e7fe8860bf3d4c68423d9b78da01b5",
         "skills/candidate-generation/scripts/neb/ase_cli.py": "sha256:ac528523cf231fc8922ad3a63ca50d5df951a4dac9b18af69a16a2fa264e6a23",
         "skills/candidate-generation/scripts/neb/ase_neb.py": "sha256:ec1b20d26cbd8d5adf586256e54ef1cdb990d70b9d0a3b2663786f873bd6433b",
         "skills/candidate-generation/scripts/neb/ase_search.py": "sha256:4d4770cff5326a703c74dadc68187f255bb7dfd2a09140b98d64f15feca87b28",
         "skills/candidate-generation/scripts/path/cli.py": "sha256:06411b2e86c8aa2f7452680cb2b89cfa8a2a9086994ca7548e749a8cafba9456",
-        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:affc5cb17f17d773f1f1ce8774c2e030972163445f2a60bbd5fd5028560950cf",
-        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:03885183ed85b11a052e7c539f985c87a83a9fec0e4b2c54627338bc04b59a78",
+        "skills/candidate-generation/scripts/path/gaussian_path_inputs.py": "sha256:a187b008c97851638988893c1db6e931dc80e095fa59bcfee270a38ccd2bbbbd",
+        "skills/candidate-generation/scripts/path/path_contract.py": "sha256:795be80f437795f6f868faf4adc163f60f048a932e71e75c023732ce10c8c1f3",
         "skills/candidate-generation/scripts/path/path_geometry.py": "sha256:66159cad0a39a3a177cf11fc5e2cadc7729e00d43e925bc46a9455a3218773a0",
         "skills/candidate-generation/scripts/path/path_process.py": "sha256:48b5086da08fbfbd18ef4ce342eda586a44e037bc311f2ec0c70d8fd26f4deb6",
         "skills/candidate-generation/scripts/path/path_specification.py": "sha256:0935d747e72f10b45c1e2e8e1e3f2c94a47cc21878963324d5d6b7e4187e6c14",
@@ -4299,7 +4331,7 @@
         "skills/energetics/scripts/kinetic_network.py": "sha256:c2926f3b31cf0197f206cf73cdf8df4d0f038af4adfcc1aa5b027eb0ea881c93",
         "skills/energetics/scripts/kinetics.py": "sha256:4b5493f612c8ae27a72d5d770d48d42c9379c30bbdf7ed85b7a81429d8b24ea3",
         "skills/energetics/scripts/thermochemistry.py": "sha256:ae3f849988f9baa1803ef35120274c5ddccfec239967e8f87fdd4a5684dd6550",
-        "skills/gaussian/scripts/gaussian_io.py": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735",
+        "skills/gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "skills/material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -4312,7 +4344,7 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/report/scripts/research_cli.py": "sha256:37af37d3af1447ba2ef8e96528aae067698bd78f3c47f48e6f9f6272a743aed3",
         "skills/report/scripts/research_job.py": "sha256:38e894e66517cb13630192b7b769ecb27939350368c8a7785c9632107ab1d8ab",
@@ -4365,9 +4397,9 @@
         "python": ">=3.11"
       },
       "resources": {
-        "skills/_shared/geometry_safety.py": "sha256:bf2ec65219f07e80806926e1ca3dfaf1e034ffeec78f7ea89fa8e8dfc655eb29",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/geometry-preflight/scripts/cli.py": "sha256:1937b48ce6d063a6dfcc02f243c5ad631c9676d1ae35ba9ea2e848bc64573d80",
-        "skills/geometry-preflight/scripts/run.py": "sha256:e99f270052796cee21157c4a843cfcc64b3cd54ac63219aa78214db3ef806671"
+        "skills/geometry-preflight/scripts/run.py": "sha256:c7eadd7cf0a30b469fc7414d0fd06a84a71ba32760c4acc2961dc04f7117bfba"
       },
       "module_paths": [
         "skills/_shared",
@@ -4416,7 +4448,7 @@
       },
       "resources": {
         "skills/_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
-        "skills/_shared/geometry_safety.py": "sha256:bf2ec65219f07e80806926e1ca3dfaf1e034ffeec78f7ea89fa8e8dfc655eb29",
+        "skills/_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "skills/_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "skills/material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "skills/material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
@@ -4430,10 +4462,10 @@
         "skills/material-preparation/scripts/reaction/cli.py": "sha256:efa9e4206a62346839a80af069fb5535a56ad1076d57e1020de23fe8e12c132a",
         "skills/material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
         "skills/material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
-        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:abd68c96df7e61a38c2b5deb0e4bea789abb71f117ed32fd52eb79fc3b8cc0a9",
+        "skills/material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "skills/material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
         "skills/structure-assessment/scripts/cli.py": "sha256:2c20f6eee0c7efa972c230c2938a31ca2e887e7121ca352d16cbc41d9424d7cc",
-        "skills/structure-assessment/scripts/cognition.py": "sha256:7ad4f3bf92656461cc13c0fa1a9ad2044b6af88a7a2c2396cfd0d5aab1947d22",
+        "skills/structure-assessment/scripts/cognition.py": "sha256:51903429b2a0a2802c2fcabdaac890ecfb859a18fe9432cc2eab58d0729203ac",
         "skills/structure-assessment/scripts/run.py": "sha256:0abbcf57d9f13189a9130818cb4fc7b8efff349381a2e2de8314f9a0a9b3532a"
       },
       "module_paths": [
@@ -4476,17 +4508,25 @@
         ]
       },
       "resources": {
-        "reaction_checks.py": {
-          "path": "skills/_shared/reaction_checks.py",
-          "sha256": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de"
-        },
-        "path_validation.py": {
-          "path": "skills/_shared/path_validation.py",
-          "sha256": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a"
+        "gaussian_input.py": {
+          "path": "skills/_shared/gaussian_input.py",
+          "sha256": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8"
         },
         "gaussian_io.py": {
           "path": "skills/gaussian/scripts/gaussian_io.py",
-          "sha256": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735"
+          "sha256": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112"
+        },
+        "geometry_safety.py": {
+          "path": "skills/_shared/geometry_safety.py",
+          "sha256": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22"
+        },
+        "path_validation.py": {
+          "path": "skills/_shared/path_validation.py",
+          "sha256": "sha256:679a95216bcc3bcb35546e4801452130925c71633be501717c09c1fcb179d5e9"
+        },
+        "reaction_checks.py": {
+          "path": "skills/_shared/reaction_checks.py",
+          "sha256": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de"
         },
         "xyz.py": {
           "path": "skills/_shared/xyz.py",
@@ -4529,17 +4569,25 @@
         ]
       },
       "resources": {
-        "reaction_checks.py": {
-          "path": "skills/_shared/reaction_checks.py",
-          "sha256": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de"
-        },
-        "path_validation.py": {
-          "path": "skills/_shared/path_validation.py",
-          "sha256": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a"
+        "gaussian_input.py": {
+          "path": "skills/_shared/gaussian_input.py",
+          "sha256": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8"
         },
         "gaussian_io.py": {
           "path": "skills/gaussian/scripts/gaussian_io.py",
-          "sha256": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735"
+          "sha256": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112"
+        },
+        "geometry_safety.py": {
+          "path": "skills/_shared/geometry_safety.py",
+          "sha256": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22"
+        },
+        "path_validation.py": {
+          "path": "skills/_shared/path_validation.py",
+          "sha256": "sha256:679a95216bcc3bcb35546e4801452130925c71633be501717c09c1fcb179d5e9"
+        },
+        "reaction_checks.py": {
+          "path": "skills/_shared/reaction_checks.py",
+          "sha256": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de"
         },
         "xyz.py": {
           "path": "skills/_shared/xyz.py",
@@ -4592,17 +4640,25 @@
         ]
       },
       "resources": {
-        "reaction_checks.py": {
-          "path": "skills/_shared/reaction_checks.py",
-          "sha256": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de"
-        },
-        "path_validation.py": {
-          "path": "skills/_shared/path_validation.py",
-          "sha256": "sha256:84079ca0ca160527371a5ace3cce4fd3fd78913ba4f036b67d60d311b317065a"
+        "gaussian_input.py": {
+          "path": "skills/_shared/gaussian_input.py",
+          "sha256": "sha256:2a662e6a7770036127ce5ea72bff0147af002396f06fe7e8ca7e2985f04801a8"
         },
         "gaussian_io.py": {
           "path": "skills/gaussian/scripts/gaussian_io.py",
-          "sha256": "sha256:960b8f874b91b9b2696708331840f7de06e8d5200e03b68db58069ef24532735"
+          "sha256": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112"
+        },
+        "geometry_safety.py": {
+          "path": "skills/_shared/geometry_safety.py",
+          "sha256": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22"
+        },
+        "path_validation.py": {
+          "path": "skills/_shared/path_validation.py",
+          "sha256": "sha256:679a95216bcc3bcb35546e4801452130925c71633be501717c09c1fcb179d5e9"
+        },
+        "reaction_checks.py": {
+          "path": "skills/_shared/reaction_checks.py",
+          "sha256": "sha256:27ac5042baf6e1df4267fe05d239f25e39f19b4007448450349deb6fa8fd43de"
         },
         "xyz.py": {
           "path": "skills/_shared/xyz.py",

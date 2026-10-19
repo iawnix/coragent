@@ -14,8 +14,10 @@ def run(args):
     if value.get('schema_version') != 'chemical-geometry-safety-input/1':
         raise ValueError('chemical-geometry-safety-input/1 required')
     result = assess(value.get('elements'), value.get('coordinates'),
-                    bonded_pairs=value.get('bonded_pairs', []),
+                    bonded_pairs=value.get('bonded_pairs'),
                     reaction_pairs=value.get('reaction_pairs', []),
+                    fragment_groups=value.get('fragment_groups'),
+                    reference_coordinates=value.get('reference_coordinates'),
                     profile=value.get('profile', 'general'),
                     clash_scale=value.get('clash_scale'))
     result.update(schema_version='chemical-geometry-safety/1')

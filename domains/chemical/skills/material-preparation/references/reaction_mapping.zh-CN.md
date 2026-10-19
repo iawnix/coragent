@@ -1,30 +1,54 @@
-# Explicit reaction mapping / 显式反应映射
+# 在几何生成之前准备原子映射
 
-通过 `chemical.reaction@1` executor 准备映射，并将返回的 request 交给
-`job_start`；不要在原生 `bash` 中直接调用 `scripts/prepare.py`。每个显式原子在两侧都必须有唯一
-正整数 map 标签。The helper checks element/charge conservation,
-map coverage and element correspondence, and reports formed/broken/order-changed bonds.
-For isotope or proton-transfer studies use explicit isotopes and H atoms, and
-inspect that correspondence rather than treating implicit H as mapped evidence.
+[English](reaction_mapping.md)
 
-映射由 Agent 选择并保留，helper 核验对应关系与键变化，不证明机理或路径连通性。
-用 artifact_register 保存 JSON 后，引用返回的 Artifact ID 记录有依据的研究记录。
-将映射、XYZ 原子顺序、构象/立体化学和 IRC 端点身份分别核对。
+在分子连接图上先准备对应关系，再生成三维初始结构、搜索构象和优化物种。
+后续候选构建、计算和 IRC 分析持续沿用选定的原子身份。
+
+## 操作步骤
+
+1. 保存原始 SMILES，用 `chemical.material@1` 导入完整反应两侧。按基元步骤补齐
+   参与的质子、抗衡离子等物种，检查分子式、电荷、同位素、立体化学和显式氢原子表。
+   SMILES 导入在没有坐标时就能提供这些图和原子表。
+2. 为全部反应物片段建立包含每个 H 的持久标签。保留已有 map 标签，给其余原子分配
+   尚未使用的正整数；不同片段共用这一编号空间。先把 H 展开为图中的显式原子，再
+   写出映射 SMILES：`[CH3:8]` 只标记碳，`[H:31][C:8]([H:32])([H:33])…`
+   同时标记三个氢。保存来源 material 原子 ID 到这些标签的对应表。
+3. 对已提出的产物图，用 `chemical.map-candidates@1 --mode reaction` 比较两侧材料，
+   以局部原子 ID 通过 `--fixed-pairs` 固定已知对应。结合基元步骤假设审查候选的
+   `pairs`、`left_to_right` 和键变化。搜索按键级改变量排序，选择时同时结合化学假设。
+   调用示例和搜索覆盖字段见[结构分析](structure_analysis.zh-CN.md)。
+4. 将每个反应物标签传给选定的产物对应原子，保存完整原子对表、选中候选和两侧
+   映射 SMILES。没有氢转移的假设中，H 跟随对应的原有母原子；有质子或氢转移时，
+   显式指定移动的 H 及转移前后的连接。保留有意义的对称等价分支，记录搜索覆盖情况。
+5. 用 `chemical.reaction@1` **核验已经提供的映射**及声明的变化。通过 generic executor
+   准备请求，用 `job_start` 提交，收集映射覆盖、元素/电荷守恒和键变化结果。
+   先解决当前假设中的不一致，再准备这一分支的几何。
+6. 将每个连通物种的完整映射 SMILES 交给 `chemical.seed@1`。把其 `atoms` 表与 XYZ
+   一起保存，记录每个从零开始的坐标行号对应的 map 标签、元素、同位素及氢的母原子。
+   构象搜索、片段组装和优化继承这张表。软件改变行序时保存明确的排列，同步调整坐标
+   和相关张量。路径两端按相同 map 标签顺序排列；相同元素序列不足以确定对应关系。
+
+产物尚在探索时，先完成步骤 1–2，再用这些身份生成反应物几何。提出中间体或产物图时，
+将各假设映射到相同身份上。后续几何比较可细化等价原子的选择，同时保留原始映射和分支历史。
 
 ## 声明变换
 
-通过 `--transformation <file.json>` 传入 `kind: "explicit"`，用完整的 `bond_changes`
-列表声明预期变化：每项含映射原子对 `atoms`、键级 `before` 和 `after`，0 表示无键。
-可选 `hydrogen_changes` 用 `atom`、`before` 和 `after` 声明逐原子氢计数变化。
-这只是核对输入假设与映射图，不生成机理。新反应名称不要求新增 transformation kind
-或注册验证器。省略变换声明时仍可核验映射与守恒，目标变换则保持未评估。
+用 `--transformation <file.json>` 提供 `kind: "explicit"` 和完整的 `bond_changes`。
+每项包含映射原子对 `atoms`、键级 `before` 和 `after`，0 表示无键。可选
+`hydrogen_changes` 用 `atom`、`before` 和 `after` 声明逐原子氢计数变化。
+显式映射 H 的成断键描述具体哪个氢在转移，计数描述其净效果。这套声明适用于任意反应类别。
 
-## 可选的命名拓扑检查
+将映射、变换声明及核验结果登记为 Artifact，在基元步骤记录中引用。反应原子对、约束、
+振动模式解释和双向 IRC 端点比较都使用这套标签。
 
-以下字段属于已有的专用拓扑检查，其他反应假设不要求使用它们。
+## Diels–Alder 示例
 
-对于声明的 Diels–Alder 变换，`declared_transformation.product_graph_matches` 将声明键变化
-生成的产物与输入产物比较，忽略 atom-map 标签及立体化学，但保留电荷和同位素。`null` 表示
-反应物键型不满足声明，无法进行该比较。图相同不会将失败的精确映射判定改为通过：对称等价
-标签不证明得到不同区域异构体；同一个产物图也不证明所声明的原子轨迹或逐原子氢对应正确。
-分别检查这些结果，不把映射差异直接解释为错误产物。
+协同 Diels–Alder 假设中，每个 H 保留在对应的原有碳上，声明两个新生 C–C 键和三个
+发生变化的 π 键键级，再基于这套对应生成构象。二烯 s-cis/s-trans 调整改变几何，
+保留分子图和原子标签。
+
+专用 `kind: "diels_alder"` 检查还输出 `declared_transformation.product_graph_matches`：
+比较声明变化生成的产物组成图与输入产物，保留电荷、同位素，忽略标签和立体化学。
+`null` 表示声明的反应物键型无法应用。结合精确映射判定阅读：图比较帮助区分组成图
+不一致和标签问题，选定的原子对则描述本次研究要检验的轨迹假设。

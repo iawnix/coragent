@@ -34,6 +34,8 @@ description: 根据映射端点、反应坐标和结构证据构建并搜索过�
 
 `chemical.path-candidates@1`：映射 QST/路径输入；`chemical.qst-prepare@1`：QST2/QST3；`chemical.scan-xtb@1`、`chemical.scan-gaussian@1`：受限松弛扫描；`chemical.gradient-xtb@1`、`chemical.gradient-gaussian@1`：梯度/路径计算；`chemical.neb-xtb@2`、`chemical.neb-gaussian@2`：ASE NEB v2。
 
+两个 QST 准备入口共用 `skills/_shared/gaussian_input.py` 的笛卡尔序列化器。生成后自动回读并核对电子态、元素顺序和坐标；向准备器提供显式原子映射，生成过程保留这一顺序。
+
 方法判据见 [candidate_generation.zh-CN.md](references/candidate_generation.zh-CN.md)，路径操作见 [path_search.zh-CN.md](references/path_search.zh-CN.md)，QST 和 NEB 细节见对应 reference。姿态构建使用 [reactive-geometry](../reactive-geometry/SKILL.zh-CN.md)，鞍点/IRC 证据使用 [validation](../validation/SKILL.zh-CN.md)。
 
 ## Further references

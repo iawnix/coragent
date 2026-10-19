@@ -73,6 +73,10 @@ and `unit`. Supported names are max_gradient/rms_gradient (hartree/bohr) and
 max_displacement/rms_displacement (bohr). Passing requires converged=true,
 both gradient criteria and every supplied criterion numerically satisfied. A
 reported convergence flag alone is insufficient. Preserve the solver thresholds.
+For Gaussian's explicit negligible-force completion, its adapter adds
+`optimization.completion_reason=gaussian_negligible_forces`. This rule requires
+all four criteria to be present and both gradient criteria to pass; displacement
+rows retain their actual values and individual satisfaction flags.
 
 `--kind minimum|saddle` defaults to saddle. Coordinates determine vibrational
 degrees of freedom: 3N−6 nonlinear, 3N−5 linear, zero for an atom. The centered

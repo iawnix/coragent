@@ -17,7 +17,7 @@
 
 | 未解决问题 | 负责操作及可交接产物 | 检查后的决策 |
 | --- | --- | --- |
-| 用户要求哪些结构？ | [material-preparation](../../material-preparation/SKILL.zh-CN.md)：原始身份、分子图/电子态、显式氢顺序、映射材料及来源几何 | 先修复错误分子图或原子对应；复用可靠优化片段，避免手填坐标 |
+| 用户要求哪些结构？ | [material-preparation](../../material-preparation/SKILL.zh-CN.md)：原始身份、分子图/电子态、显式氢顺序、映射材料及来源几何 | 生成初始结构或优化前先建立图上的身份及完整原子对应；计算持续沿用，并复用适用的已有几何 |
 | 测试哪个基元步骤？ | reaction-investigation：键变化、构象/位点/电子态、替代假设与可证伪观察 | 端点跨多步时研究中间体；输入错误不否定反应假设 |
 | 反应原子如何接近？ | [reactive-geometry](../../reactive-geometry/SKILL.zh-CN.md)：保留来源的姿态、接触/保护键检查及被拒方案 | 检查真实局部几何后选择约束精修或路径搜索；碰撞则修正姿态 |
 | 鞍点候选在哪里？ | [candidate-generation](../../candidate-generation/SKILL.zh-CN.md)：QST/TS 优化、扫描或 NEB 输出、选中帧及约束 | 对合理高点做鞍点精修；计算失败先分类，再修改已诊断原因 |

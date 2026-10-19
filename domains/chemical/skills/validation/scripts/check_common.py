@@ -130,7 +130,14 @@ def stationary(material, evidence, *, kind='saddle', negative_threshold=20., nea
             raise ValueError('convergence values require nonnegative numbers with declared atomic units')
         evaluated.append({**row, 'satisfied': value <= threshold})
     enough = {'max_gradient', 'rms_gradient'} <= seen
-    checks['optimization'] = check(False if converged is False or any(not v['satisfied'] for v in evaluated)
+    reason = optimization.get('completion_reason')
+    # Gaussian's explicit negligible-force completion uses the force criteria;
+    # keep displacement rows in the evidence even when they exceed their limits.
+    negligible = reason == 'gaussian_negligible_forces'
+    if negligible:
+        enough = seen == {'max_gradient', 'rms_gradient', 'max_displacement', 'rms_displacement'}
+    required = [v for v in evaluated if not negligible or v['name'].endswith('gradient')]
+    checks['optimization'] = check(False if converged is False or any(not v['satisfied'] for v in required)
                                    else True if converged is True and enough else None, evaluated)
     category, dof = geometry_class(xyz)
     frequencies = evidence.get('frequencies_cm-1')

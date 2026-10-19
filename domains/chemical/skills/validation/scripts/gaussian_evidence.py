@@ -73,7 +73,8 @@ def gaussian_evidence(material, path, *, kind='stationary', section_index=None, 
                 and [row['frequency_cm-1'] for row in mode_rows] == parsed['frequencies'])
     return {**common, 'schema_version': 'chemical-stationary-evidence/1',
             'coordinates': [list(a[1:]) for a in atoms] if atoms else None,
-            'optimization': {'converged': summary['stationary_point_found'] and summary['final_convergence_satisfied'] if complete else None,
+            'optimization': {'converged': summary['optimization_completed'] if complete else None,
+                             'completion_reason': summary['optimization_completion_reason'],
                              'criteria': criteria},
             'frequencies_cm-1': parsed['frequencies'] or None, 'mode_representation': 'cartesian',
             'normal_modes': [row['displacements'] for row in mode_rows] if matching and mode_rows else None}

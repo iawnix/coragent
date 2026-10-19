@@ -27,6 +27,8 @@ The path-specific gradient and NEB adapters live in `candidate-generation`; Gaus
 
 Use `opt` for geometry, `sp` for a fixed geometry, and `opt-sp` for both. The wrapper records energies, convergence, optimized geometry, method/basis, state, raw log, and parser summary.
 
+Read `summary.optimization_completed` with `optimization_completion_reason` for optimization status. The parser accepts Gaussian's explicit negligible-force completion while preserving the original four convergence rows and the stricter `final_convergence_satisfied` flag. After a failed attempt, use `result.json.last_attempt` and `last_geometry.xyz` to inspect the last structure and choose a restart; frequency, mode and IRC checks provide the subsequent evidence.
+
 ## Explicit input
 
 Stage a complete input and relative checkpoint/dependency names inside the Job:

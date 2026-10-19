@@ -278,6 +278,19 @@ def test_gaussian_adapter_produces_bound_reusable_evidence(tmp_path):
     assert stationary(m, unknown)['scientific_verdict'] == 'not_assessed'
 
 
+def test_gaussian_negligible_forces_survive_adapter_and_stationary_check(tmp_path):
+    text = gaussian_log().replace('0.00001 0.0018 YES', '0.002 0.0018 NO').replace(
+        ' Stationary point found.', ' Optimization completed on the basis of negligible forces.\n Stationary point found.')
+    m = material(); log = tmp_path / 'calculation.log'; log.write_text(text)
+    e = gaussian_evidence(m, log, constraints='none')
+    assert e['optimization']['completion_reason'] == 'gaussian_negligible_forces'
+    checked = stationary(m, e)
+    assert checked['verdict'] == 'pass'
+    assert any(not row['satisfied'] for row in checked['checks']['optimization']['details'])
+    e['optimization'].pop('completion_reason')
+    assert stationary(m, e)['checks']['optimization']['verdict'] == 'fail'
+
+
 @pytest.mark.parametrize('change', ['constraint', 'excited', 'late_incomplete', 'missing_vector'])
 def test_gaussian_adapter_does_not_promote_unsupported_or_incomplete_logs(tmp_path, change):
     m = material(); text = gaussian_log()

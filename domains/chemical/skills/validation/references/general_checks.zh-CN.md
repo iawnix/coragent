@@ -62,6 +62,9 @@ single_surface。这些是记录的假设，不能用来将未知设置改成默
 rms_gradient（hartree/bohr）与 max_displacement / rms_displacement（bohr）。通过需要
 converged=true、两项梯度判据齐全且每项给定值都数值满足阈值。只有收敛标记不够；保存
 求解器实际阈值，不用人为放宽的数值替换。
+Gaussian 明确按可忽略力准则完成时，适配器增加
+`optimization.completion_reason=gaussian_negligible_forces`。这一规则要求四项记录齐全、
+两项梯度判据通过；位移项保留实际数值及其各自是否满足阈值的标记。
 
 `--kind minimum|saddle` 默认 saddle。按几何分类要求 3N−6（非线性）、3N−5（线性）
 或 0（单原子）振动自由度。中心化坐标 SVD 的第二/第一奇异值比小于 1e-7 为线性，

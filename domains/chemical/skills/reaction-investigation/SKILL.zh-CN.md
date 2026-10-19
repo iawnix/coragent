@@ -18,7 +18,7 @@ description: 从物种和机理假设开始，经过候选搜索、验证、能�
 ## 闭环步骤
 
 1. **定义**：写明反应物/产物、可能中间体、键变化、立体化学结果和竞争机理，并列出可区分它们的预测。
-2. **准备**：用 `material-preparation` 解析名称/SMILES，保留给定坐标，生成缺失种子并建立反应原子映射。
+2. **准备**：用 `material-preparation` 解析名称/SMILES，在生成初始结构或优化物种之前，先从分子图建立原子身份和反应映射。保留给定坐标，后续计算持续沿用这套映射。
 3. **评估**：用 `structure-assessment` 和 `geometry-preflight` 检查图、片段、电子态、接触和反应中心几何。
 4. **构建**：用 `reactive-geometry` 生成接近姿态，用 `candidate-generation` 选择 QST、扫描、直接 TS 或 NEB。位点/进攻面/构象未区分时保留多个假设。
 5. **运行与验证**：用 `method-selection` 选择后端，运行 Gaussian/xTB/CF22D，再用 `validation` 获取模式和 IRC 证据。

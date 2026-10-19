@@ -17,12 +17,11 @@ for _part in ('materials', 'reaction', 'geometry', 'diagnostics', 'tensor', '_sh
     sys.path.insert(0, str(_SCRIPTS / _part if _part != '_shared' else _skills / _part))
 
 from chemical_identity import identity, compare
+from material import graph_material
 
 
 def inspect(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        raise ValueError('invalid SMILES')
+    mol, _, _ = graph_material(smiles)
     stereo = [str(x.type) + ':' + str(x.centeredOn) for x in Chem.FindPotentialStereo(mol)
               if x.specified == Chem.StereoSpecified.Unspecified]
     return mol, {'smiles': Chem.MolToSmiles(mol), 'formula': rdMolDescriptors.CalcMolFormula(mol),
@@ -60,9 +59,17 @@ def seeds(smiles, charge, multiplicity, output, enumerate_stereo=False):
             raise ValueError('3D embedding failed')
         xyz = Chem.MolToXYZBlock(structure)
         path = output / f'seed-{index + 1}.xyz'; path.write_text(xyz)
+        atoms = [{'xyz_index': atom.GetIdx(), 'element': atom.GetSymbol(),
+                  'atom_map': atom.GetAtomMapNum() or None, 'isotope': atom.GetIsotope() or None,
+                  'origin': 'smiles_atom' if atom.GetIdx() < isomer.GetNumAtoms() else 'added_hydrogen',
+                  'parent_atom_index': atom.GetNeighbors()[0].GetIdx()
+                  if atom.GetAtomicNum() == 1 and atom.GetDegree() == 1 else None}
+                 for atom in structure.GetAtoms()]
         generated.append({'smiles': Chem.MolToSmiles(isomer), 'xyz': str(path.resolve()),
-                          'sha256': hashlib.sha256(xyz.encode()).hexdigest(), 'identity': identity(isomer)})
+                          'sha256': hashlib.sha256(xyz.encode()).hexdigest(), 'identity': identity(isomer),
+                          'atom_index_base': 0, 'atoms': atoms})
     return {'schema_version': 'chemical-seeds/1', **metadata, 'multiplicity': multiplicity,
+            'source_smiles': smiles,
             'embedding': {'method': 'ETKDGv3', 'random_seed': 61453},
             'seeds': generated, 'geometry_status': 'initial_seed',
             'limitations': ['Embedding is not optimization; conformers and intermolecular approaches require separate exploration.']}

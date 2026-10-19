@@ -69,19 +69,22 @@ def _radii(elements):
     return np.asarray(values, dtype=float), unknown
 
 
-def _pair_set(pairs):
+def _pair_set(pairs, atom_count):
     result = set()
     for pair in pairs or ():
         if not isinstance(pair, (list, tuple)) or len(pair) != 2:
-            continue
+            raise ValueError('atom pairs must contain two zero-based indexes')
         a, b = pair
-        if isinstance(a, (int, np.integer)) and isinstance(b, (int, np.integer)) and a != b:
-            result.add(tuple(sorted((int(a), int(b)))))
+        if (isinstance(a, (bool, np.bool_)) or isinstance(b, (bool, np.bool_))
+                or not isinstance(a, (int, np.integer)) or not isinstance(b, (int, np.integer))
+                or not 0 <= a < atom_count or not 0 <= b < atom_count or a == b):
+            raise ValueError('atom pair indexes must be distinct and within the geometry')
+        result.add(tuple(sorted((int(a), int(b)))))
     return result
 
 
-def assess(elements, coordinates, *, bonded_pairs=(), reaction_pairs=(), profile='general',
-           clash_scale=None, max_coordinate=1e4):
+def assess(elements, coordinates, *, bonded_pairs=None, reaction_pairs=(), profile='general',
+           clash_scale=None, max_coordinate=1e4, fragment_groups=None, reference_coordinates=None):
     """Return a machine-readable safety assessment for one geometry.
 
     ``bonded_pairs`` and ``reaction_pairs`` use zero-based atom indexes.  The
@@ -99,6 +102,7 @@ def assess(elements, coordinates, *, bonded_pairs=(), reaction_pairs=(), profile
         'catastrophic_overlap': 'not_assessed',
         'nonreaction_contacts': 'not_assessed',
         'reaction_center': 'not_assessed',
+        'bond_lengths': 'not_assessed',
     }
     array = np.asarray(coordinates, dtype=float) if coordinates is not None else np.empty((0, 3))
     if array.ndim != 2 or array.shape != (len(elements), 3):
@@ -117,8 +121,25 @@ def assess(elements, coordinates, *, bonded_pairs=(), reaction_pairs=(), profile
     if hard or len(elements) < 2:
         return _result('unsafe' if hard else 'safe', checks, hard, warnings, array, None)
 
-    bonded = _pair_set(bonded_pairs)
-    reaction = _pair_set(reaction_pairs)
+    bonded = _pair_set(bonded_pairs, len(elements))
+    reaction = _pair_set(reaction_pairs, len(elements))
+    owners = {}
+    if fragment_groups is not None:
+        for group_index, group in enumerate(fragment_groups):
+            for atom in group:
+                if type(atom) is not int or not 0 <= atom < len(elements) or atom in owners:
+                    raise ValueError('fragment groups must partition the atom indexes')
+                owners[atom] = group_index
+        if len(owners) != len(elements):
+            raise ValueError('fragment groups must partition the atom indexes')
+    reference = None
+    if reference_coordinates is not None:
+        reference = np.asarray(reference_coordinates, dtype=float)
+        if reference.shape != array.shape or not np.isfinite(reference).all():
+            raise ValueError('reference coordinates must be finite and match the atom order/shape')
+    if bonded_pairs is None:
+        warnings.append({'kind': 'bond_connectivity_not_supplied',
+                         'detail': 'Supply bonded_pairs to distinguish bonded and nonbonded close contacts.'})
     if clash_scale is None:
         clash_scale = {'general': .75, 'reaction_seed': .72, 'ts_candidate': .70,
                        'path_image': .72}.get(profile, .75)
@@ -127,26 +148,45 @@ def assess(elements, coordinates, *, bonded_pairs=(), reaction_pairs=(), profile
     distances = np.linalg.norm(array[:, None, :] - array[None, :, :], axis=2)
     short_contacts = []
     collapse_pairs = []
+    bond_outliers = []
     for i in range(len(elements)):
         for j in range(i):
             pair = (j, i)
             distance = float(distances[i, j])
             radius_sum = float(radii[i] + radii[j])
+            hydrogen_pair = _symbol(elements[i]) == _symbol(elements[j]) == 'H'
+            known_nonbonded = bonded_pairs is not None or (owners and owners[i] != owners[j])
+            contact_limit = 1.20 if known_nonbonded else .70
             # A reaction pair may be elongated or unformed, but no chemistry
             # makes two nuclei occupying the same point a valid TS guess.
             if distance < max(.35, .50 * radius_sum):
                 collapse_pairs.append({'atoms': [j, i], 'distance_angstrom': distance,
                                        'reaction_pair': pair in reaction})
-            elif pair not in bonded and pair not in reaction and elements[i] == 'H' and elements[j] == 'H' and distance < .70:
-                # Hydrogen pairs have no ordinary covalent contact in the
-                # supported Cartesian material contract.  The radius-scaled
-                # screen alone is too permissive for the 0.54 Å artifact that
-                # otherwise reached a Gaussian optimization.
+            elif pair not in bonded and pair not in reaction and hydrogen_pair and distance < contact_limit:
                 short_contacts.append({'atoms': [j, i], 'distance_angstrom': distance,
-                                         'radius_sum_angstrom': radius_sum, 'kind': 'short_hydrogen_contact'})
+                                       'threshold_angstrom': contact_limit,
+                                       'context': 'declared_nonbonded' if known_nonbonded else 'connectivity_unknown',
+                                       'radius_sum_angstrom': radius_sum, 'kind': 'short_hydrogen_contact'})
             elif pair not in bonded and pair not in reaction and distance < clash_scale * radius_sum:
                 short_contacts.append({'atoms': [j, i], 'distance_angstrom': distance,
                                          'radius_sum_angstrom': radius_sum})
+            elif hydrogen_pair and pair not in bonded and pair not in reaction and distance < 1.20:
+                warnings.append({'kind': 'hydrogen_contact_needs_connectivity', 'atoms': [j, i],
+                                 'distance_angstrom': distance})
+            if pair in bonded and pair not in reaction:
+                observed = {'atoms': [j, i], 'distance_angstrom': distance}
+                if reference is not None:
+                    before = float(np.linalg.norm(reference[i] - reference[j]))
+                    observed.update(reference_distance_angstrom=before, delta_angstrom=distance-before)
+                    unusual = abs(distance-before) > max(.20, .20 * before)
+                else:
+                    unusual = distance < .65 * radius_sum or distance > 1.6 * radius_sum
+                if unusual:
+                    bond_outliers.append(observed)
+    if bonded_pairs is not None:
+        checks['bond_lengths'] = 'warning' if bond_outliers else 'pass'
+    if bond_outliers:
+        warnings.append({'kind': 'nonreaction_bond_length_change', 'pairs': bond_outliers})
     if collapse_pairs:
         hard.append({'kind': 'catastrophic_overlap', 'pairs': collapse_pairs})
         checks['catastrophic_overlap'] = 'fail'

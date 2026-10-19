@@ -5,7 +5,7 @@ import re
 import numpy as np
 from analysis_material import numeric_array
 from electronic_contract import BOHR_ANGSTROM, EV_HARTREE, route
-from gaussian_io import (electronic_energy_evidence, orientation_blocks, parse_convergence,
+from gaussian_io import (electronic_energy_evidence, orientation_blocks, parse_optimization, optimization_completion,
     route_expectation, select_job_section, split_job_sections)
 from xyz import PERIODIC_TABLE
 
@@ -112,13 +112,11 @@ def parse_electronic(text,m,s,task):
             'spin_squared':spin,'spin_source':spin_source})
     if task=='sp' and (len(cycles)!=1 or not np.allclose(cycles[0]['coordinates'],m['coordinates'],rtol=0,atol=2e-6)):
         raise ValueError('single-point geometry/cycle binding differs')
-    convergence,kind=parse_convergence(lines)
-    if task=='opt':
-        if kind!='stationary_point' or set(convergence)!={'Maximum Force','RMS Force','Maximum Displacement','RMS Displacement'}:
-            raise ValueError('complete converged geometry optimization evidence required')
-        for row in convergence.values():
-            if type(row['value']) not in (int,float) or type(row['threshold']) not in (int,float) or row['converged']!='YES' or abs(row['value'])>row['threshold']:
-                raise ValueError('optimization numeric criterion failed')
+    convergence, kind, rule = parse_optimization(lines)
+    _, completion_reason = optimization_completion(convergence, kind, rule)
+    if task == 'opt' and completion_reason is None:
+        raise ValueError('optimization completion or numeric criteria not satisfied')
     return {'gaussian_revision':version[1],'cycles':cycles,'final':cycles[-1],'optimization_convergence':convergence if task=='opt' else None,
+        'optimization_completion_reason':completion_reason if task=='opt' else None,
         'state_continuity':{'status':'not_assessed','reason':'Printed orbital labels/root indices do not establish inter-geometry wavefunction or transition-density overlap'},
         'scope':'Target-state energy/analytic gradient and spin diagnostics; no stable-wavefunction, minimum-frequency, root-continuity or global-state proof'}

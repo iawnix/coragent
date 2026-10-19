@@ -27,8 +27,10 @@ Gaussian 16 revision readback, route, charge/reference multiplicity, termination
 each SCF/selected-state block, complete requested root lists, input-orientation
 geometry and original-axis force tables. Forces are negated and converted from
 Eh/bohr to Cartesian dE/dR in Eh/Å. SP coordinates agree within printed precision
-(2e-6 Å). Opt requires all four numerical force/displacement criteria, not merely
-a convergence word. New output directories protect historical evidence.
+(2e-6 Å). Opt uses the shared Gaussian completion parser: four passing criteria
+or explicit negligible-force completion with passing force criteria. The raw
+four-row table and completion reason remain in the result. Use a new output
+directory for each attempt.
 
 Excited energy is parsed from `Total Energy, E(TD-HF/TD-DFT)` or
 `Total Energy, E(CIS/TDA)` **bound to the requested selected-state marker**.
