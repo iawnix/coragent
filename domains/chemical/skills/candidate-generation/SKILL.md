@@ -12,7 +12,7 @@ Use this Skill to turn a reaction hypothesis into one or more geometries that a 
 ## Choose a construction method
 
 - **QST2**: use when mapped reactant and product geometries are available and the step is a single, smooth rearrangement. Keep atom order and charge/spin aligned.
-- **QST3**: use when the endpoints are reliable but the reaction-center structure needs a chemically informed middle guess. Supply an explicit mapped TS-like geometry; do not let an arbitrary interpolation choose the mechanism.
+- **QST3**: use when the endpoints are reliable but the reaction-center structure needs a chemically informed middle guess. Supply an explicit mapped TS-like geometry so the intended reaction-center structure controls the middle guess.
 - **Reactive pose + restrained scan**: use for separate fragments, association, substitution, cycloaddition, proton transfer, or unclear approach direction. Generate several faces/distances, then relax a forming/breaking coordinate with `chemical.scan-xtb@1` or `chemical.scan-gaussian@1`.
 - **Relaxed 1D/2D scan**: use when one or two bond distances, angles, or dihedrals control the event and endpoints are not enough to locate the ridge. Select high-energy or curvature-changing frames as TS seeds.
 - **NEB**: use when both endpoint minima are known and the path has several coupled coordinates. Start with compatible mapped endpoints; use `chemical.neb-xtb@2` or `chemical.neb-gaussian@2`, then refine the highest path region with a TS optimizer.

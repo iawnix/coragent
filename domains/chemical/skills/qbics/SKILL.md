@@ -7,7 +7,7 @@ description: Plan and execute a QBICS crossing-point study through a declared in
 
 [Chinese version](SKILL.zh-CN.md)
 
-Use QBICS when the study concerns a same-spin crossing or related crossing-point optimization supported by an installed QBICS program. This Skill supplies the scientific setup and generic Job handoff because the repository does not register a dedicated QBICS runner.
+Use QBICS when the study concerns a same-spin crossing or related crossing-point optimization supported by an installed QBICS program. This Skill supplies the scientific setup and generic Job handoff; the repository routes QBICS through an explicit installation and generic Job.
 
 ## Recommended workflow
 

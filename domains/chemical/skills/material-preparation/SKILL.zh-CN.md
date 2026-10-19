@@ -14,7 +14,7 @@ description: 从名称、SMILES 或坐标准备分子材料和明确反应定义
 1. 将用户原文或坐标作为来源记录保存。
 2. 名称用 `chemical.resolve@1` 按配置的解析器处理；SMILES/XYZ 直接用 `chemical.material@1`。保留片段、电荷、多重度、显式氢顺序、立体化学和来源元数据。
 3. 名称解析失败时写出带理由的候选 SMILES，用 `chemical.resolve-candidates@1` 检查价态、电荷、立体化学和分子式，再选择研究分支。
-4. 图和价态检查用 `chemical.inspect@1`；缺少 3D 几何时用 `chemical.seed@1`。已有坐标应保留并检查，不要无理由替换成新嵌入。
+4. 图和价态检查用 `chemical.inspect@1`；缺少 3D 几何时用 `chemical.seed@1`。已有坐标应保留并检查；只有缺少几何时才使用新的 3D 嵌入。
 5. 反应使用 `chemical.reaction@1`，提供反应物/产物映射和 `--transformation`；多个对应关系时用 `chemical.map-candidates@1`。
 6. 用 `chemical.compare@1` 比较计算结构与目标；用 `chemical.conformer-compare@1` 做考虑对称性的几何比较，用 `chemical.reorder-tensors@1` 处理梯度、Hessian 和模式的原子顺序。
 7. 用 `chemical.local-diagnostics@1` 获取反应中心距离、接触和局部对齐证据，再将完整 material 与映射交给 `reaction-investigation`。

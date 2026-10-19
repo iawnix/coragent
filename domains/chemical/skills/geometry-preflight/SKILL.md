@@ -19,6 +19,6 @@ Use the shared checker `skills/_shared/geometry_safety.py` through `chemical.geo
 --input <xyz-or-gjf> --output <report.json>
 ```
 
-The result gives hard failures, warnings, reaction-pair exemptions, profile, and a `safe`/`unsafe`/`not_assessed` verdict. A safe result authorizes solver input preparation; it does not replace optimization, mode, IRC, or structure assessment.
+The result gives hard failures, warnings, reaction-pair exemptions, profile, and a `safe`/`unsafe`/`not_assessed` verdict. A `safe` result authorizes solver input preparation, while optimization, mode, IRC, and structure assessment provide the scientific interpretation.
 
 Read [geometry safety](references/geometry_safety.md) for schema, thresholds, and Gaussian block handling. After `reactive-geometry` edits, run this check again and carry the report digest into the candidate Job.

@@ -30,7 +30,7 @@ Use `chemical.pathway-check@1` for an independent audit of an explicit multistep
 
 ## Decision habits
 
-Separate species identity, elementary-step connectivity, saddle evidence, energetics, kinetics, and robustness so one weak result does not erase the others. Preserve failed searches when they reveal a wrong pose, endpoint, electronic state, or reaction hypothesis. A mechanism becomes a conclusion through convergent evidence across these records, not through a single successful Job.
+Separate species identity, elementary-step connectivity, saddle evidence, energetics, kinetics, and robustness so each result contributes its own evidence. Preserve failed searches when they reveal a wrong pose, endpoint, electronic state, or reaction hypothesis. Convergent evidence across these records supports the mechanism conclusion.
 
 Read [pathway model](references/pathway_model.md), [molecular preparation](references/molecular_preparation.md), [pathway execution](references/pathway_execution.md), and [mechanism reflection](references/mechanism_reflection.md) when the study contains several steps or competing explanations.
 

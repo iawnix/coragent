@@ -33,4 +33,4 @@ A review projection is a navigation aid: its `state_digest` and `review_digest` 
 4. Record what changed after execution.
 5. Publish a Result or revise the plan, preserving competing branches and unresolved questions.
 
-Do not infer chemical identity or scientific validity from a receipt alone; domain Skills interpret structures and calculations. The memory layer stores those interpretations and their sources.
+When publishing a Result, use `observation` for findings, `conclusion` for interpretation, and `evidence_refs` for source records. When resuming work, follow those references to review the evidence behind the conclusion.

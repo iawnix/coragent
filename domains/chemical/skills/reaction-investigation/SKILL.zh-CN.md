@@ -30,7 +30,7 @@ description: 从物种和机理假设开始，经过候选搜索、验证、能�
 
 ## 决策习惯
 
-把物种身份、基元步骤连通性、鞍点证据、能量学、动力学和稳健性分开记录。失败搜索若揭示姿态、端点、电子态或机理错误，应保留并用于改变下一步。机理结论来自多条记录的收敛证据，而不是单个成功 Job。
+把物种身份、基元步骤连通性、鞍点证据、能量学、动力学和稳健性分开记录。失败搜索若揭示姿态、端点、电子态或机理错误，应保留并用于改变下一步。机理结论由这些记录的收敛证据共同支持。
 
 多步或竞争解释研究可阅读[路径模型](references/pathway_model.zh-CN.md)、[分子准备](references/molecular_preparation.zh-CN.md)、[路径执行](references/pathway_execution.zh-CN.md)和[机理反思](references/mechanism_reflection.zh-CN.md)。
 
