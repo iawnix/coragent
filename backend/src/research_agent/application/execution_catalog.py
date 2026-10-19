@@ -61,7 +61,7 @@ def _executor(root, entry):
     for relative, expected in resources.items():
         _destination(relative, destinations)
         _verify(root, relative, expected)
-    for key in ('entry', 'cli'):
+    for key in ('entry', 'cli', 'resource_contract'):
         if key in entry and entry[key] not in resources:
             raise ValueError('executor_entry_resource_required')
     if entry['runtime'] == 'python' and 'entry' not in entry:

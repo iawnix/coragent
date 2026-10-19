@@ -260,7 +260,13 @@ def test_electronic_and_crossing_jobs(tmp_path,monkeypatch,operation):
     elif operation=='neb-gaussian':s={'schema_version':'chemical-neb-input/2','reactant':h2(.8,center=True),'product':h2(1.2,center=True),
         'mapping':[['atom_1','atom_1'],['atom_2','atom_2']],'settings':config(),'image_count':3,'max_steps':0}
     else:s=mecp_input();s['material']=h2(2.);s['hessian_step_angstrom']=None
-    path=root/'input.json';path.write_text(json.dumps(s));request=prepare(config_path,'local','chemical.'+operation,'2' if operation=='neb-gaussian' else '1',{'input':path})
+    submission = None
+    if operation == 'electronic-gaussian':
+        # A JSON calculation can specify resources once on the Job. The pinned
+        # source stays unchanged; the runner resolves omitted settings at runtime.
+        s['settings'].pop('threads'); s['settings'].pop('memory_mb')
+        submission = {'resources': {'cpus': 12, 'memory_mb': 16384}}
+    path=root/'input.json';path.write_text(json.dumps(s));request=prepare(config_path,'local','chemical.'+operation,'2' if operation=='neb-gaussian' else '1',{'input':path}, submission=submission)
     node=execute('research.create',root,{'goal':'Bound electronic/crossing fixture'})['node'];receipt=execute('job.start',root,{**request,'node_id':node['id']})
     try:
         for _ in range(600):
@@ -269,6 +275,11 @@ def test_electronic_and_crossing_jobs(tmp_path,monkeypatch,operation):
             time.sleep(.01)
         assert status['state']=='succeeded'
         assert execute('job.collect',root,{'job_id':receipt['job_id']})['output_validation']['complete']
+        if operation == 'electronic-gaussian':
+            result = json.loads((Path(receipt['cwd']) / 'results/result.json').read_text())
+            assert result['settings']['threads'] == 12
+            assert result['settings']['memory_mb'] == 14745
+            assert json.loads(path.read_text()) == s
     finally:execute('job.cancel',root,{'job_id':receipt['job_id']})
 
 

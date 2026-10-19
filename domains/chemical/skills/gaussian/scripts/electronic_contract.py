@@ -6,6 +6,7 @@ from analysis_material import validate_material, numeric_array
 from energy_common import canonical, fields, integer, label, number
 from xyz import validate_electronic_state
 from gaussian_input import coordinate_text
+from job_resources import runtime_settings
 
 BOHR_ANGSTROM=.529177210903
 EV_HARTREE=27.211386245988
@@ -21,6 +22,7 @@ def electronic_material(value):
 
 
 def settings(value):
+    value = runtime_settings(value)
     fields(value,('theory','functional','basis','root','nstates','threads','memory_mb','timeout_seconds','max_cycles','spin_tolerance'),'electronic settings')
     if value.get('theory') not in ('ground','td','tda'): raise ValueError('theory must be ground, td or tda')
     if value.get('functional') not in FUNCTIONALS: raise ValueError('functional outside verified analytic-gradient route scope')

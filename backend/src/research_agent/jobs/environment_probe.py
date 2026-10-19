@@ -134,6 +134,9 @@ def inspect_python(binding, requirements, command=(), *, require_receipt=True):
 
 def main():
     request = json.loads(sys.argv[1])
+    # Conda activation can overwrite thread variables. Apply the pinned values
+    # inside the target interpreter before importing libraries or launching it.
+    os.environ.update(request.get('resource_environment', {}))
     expected = json.loads(sys.argv[2]) if len(sys.argv) > 2 else None
     try:
         observed = inspect_python(request["python"], request["requirements"], request.get("command", []),

@@ -61,3 +61,5 @@ research_update 用 node_id 与 note 解释变化；有可引用产出时，rese
 无进展计数用于提示重新评估方法，不是固定停止阈值或资源预算。遵守用户限制继续推进；只有满足上述具体条件和证据要求时才登记阻塞。
 
 有意重复完全相同的计算时，用新的 work_id 准备请求，并提交包含匹配 predecessor_job_id、reason、budget 的 repeat。复用请求身份会复用 Job；duplicate_execution 通常应转为查询或收集返回的 Job。验证器 Job 必须使用已登记的 validator_id/version，并按输入角色规定的数量、顺序传 Artifact；collected_output 角色要求生产 Job 当前已收集的证据。job_probe 检查平台基础设施，不验证科学软件；job_reconcile 恢复已有执行状态，不重新提交；job_cancel 后检查返回状态，unknown 不等于已经停止。
+
+每次计算在准备阶段通过 `--` 之前的 `--cpus`、`--job-memory-mb` 指定资源。配置值是默认值，不是上限。调整申请需重新准备，不要修改已固定请求，也不要因默认值较小而判定必须管理员扩容。容量、可用性和排队由 TRI 处理。见[逐作业资源](../../../docs/EXTERNAL_JOBS.zh-CN.md#逐作业资源)。

@@ -39,8 +39,10 @@ def validate_requirements(value, runtime):
 
 
 def _python_request(selected, requirements):
+    from .process_environment import resource_environment
     command = selected["binding"].get("command", [])
     return {"python": selected["python"], "requirements": requirements,
+            "resource_environment": resource_environment(selected['submission']['resources']),
             "command": [command] if isinstance(command, str) else command}
 
 
@@ -166,6 +168,9 @@ def guarded_command(selected, argv, snapshot, *, module_paths=None):
     """Build the command deterministically so Runtime can reject forged metadata."""
     observation = snapshot["observation"]
     script = "set -eu\n" + _activation(selected, observation["files"].get("activation"))
+    from .process_environment import resource_environment
+    script += ''.join('export ' + key + '=' + shlex.quote(value) + '\n'
+                      for key, value in resource_environment(selected['submission']['resources']).items())
     inputs = []
     if selected["runtime"] == "python":
         import hashlib

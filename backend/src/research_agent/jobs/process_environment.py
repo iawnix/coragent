@@ -6,6 +6,21 @@ import os
 from pathlib import PurePosixPath
 import re
 
+THREAD_VARIABLES = ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS')
+
+
+def resource_environment(resources):
+    """Allocation-derived defaults, also reasserted after software activation."""
+    cpus = resources.get('cpus')
+    return {**({name: str(cpus) for name in (*THREAD_VARIABLES, 'CORAGENT_JOB_CPUS')} if cpus else {}),
+            **({'CORAGENT_JOB_MEMORY_MB': str(resources['memory_mb'])} if resources.get('memory_mb') else {})}
+
+
+def validate_resource_environment(resources, variables):
+    for name, expected in resource_environment(resources).items():
+        if name in variables and variables[name] != expected:
+            raise ValueError('job_resource_conflict: ' + name + ' differs from the job allocation; update the binding environment')
+
 
 def minimum_environment(home=None):
     return {"PATH": os.defpath, "LANG": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1",
@@ -24,8 +39,8 @@ def job_process_environment(root, metadata, variables, *, home=None):
     scratch = str(PurePosixPath(scratch_root) / ('job-' + hashlib.sha256(str(root).encode()).hexdigest()[:32])
                   if scratch_root else PurePosixPath(root) / '.scratch')
     env = {**minimum_environment(home), 'TMPDIR': scratch}
-    cpus = metadata.get('resources', {}).get('cpus')
-    if cpus:
-        env.update({name: str(cpus) for name in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS')})
+    resources = metadata.get('resources', {})
+    validate_resource_environment(resources, variables)
+    env.update(resource_environment(resources))
     env.update({key: value.replace('{scratch}', scratch) for key, value in variables.items()})
     return env, scratch

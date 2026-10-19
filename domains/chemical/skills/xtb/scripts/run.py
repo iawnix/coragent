@@ -1,5 +1,6 @@
 """Run and validate GFN2-xTB opt/SP using the restored xTB parser."""
 import argparse
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -33,6 +34,8 @@ def main():
             step = out / task; step.mkdir()
             shutil.copyfile(geometry, step / 'input.xyz')
             command = [executable, 'input.xyz', '--gfn', '2', '--chrg', str(a.charge), '--uhf', str(a.multiplicity - 1)]
+            if os.environ.get('CORAGENT_JOB_CPUS'):
+                command += ['--parallel', os.environ['CORAGENT_JOB_CPUS']]
             command += ['--opt', a.opt_level] if task == 'opt' else ['--sp']
             write_json(step / 'command.json', command)
             with (step/'xtb.out').open('w') as log:

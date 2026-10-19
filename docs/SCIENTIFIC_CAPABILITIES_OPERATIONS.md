@@ -103,3 +103,26 @@ during initialization. Report the exact observation and selected target; an
 unconfigured binding or absent recipe does not prove the software is absent
 from every environment. Changed binding or executable evidence requires preparing
 a new request before dispatch, not running an old prepared command.
+
+## Resource contracts for extension authors
+
+Preparation accepts `submission={"resources": {"cpus": 12, "memory_mb": 16384}}`
+for registered executors, Python scripts and validators. See [per-job resource rules](EXTERNAL_JOBS.md#per-job-resources).
+
+An executor may declare `resource_contract` as a path in its hashed `resources` closure.
+It is a pure standard-library-only Python module, loaded without scientific dependencies,
+with three functions: `defaults(descriptor)` returns last-resort resource values;
+`requirements(descriptor, arguments, inputs)` returns explicit input requirements;
+`prepare(descriptor, arguments, inputs, resources)` returns `(normalized_arguments, report)`.
+Arguments are forwarded arguments only; inputs map roles to absolute source paths.
+Normalization must be deterministic and idempotent. Raise an actionable `ValueError` for
+conflicts, never rewrite user input files, and do not probe capacity or execute programs.
+Submission repeats the contract against the pinned inputs, final allocation and arguments.
+Executors without this contract and arbitrary scripts report internal resource use as unverified.
+
+`configuration_sha256` pins configured defaults/software; `execution_binding.submission`
+contains the effective Job allocation, recomputed from `submission_request`. They need not
+equal configuration defaults. Final allocations also participate in execution fingerprints.
+`CORAGENT_JOB_CPUS` and `CORAGENT_JOB_MEMORY_MB` expose the resolved allocation at runtime;
+thread defaults are reasserted after activation so activation scripts cannot restore a stale
+fixed thread count. These variables describe requested limits, not measured use or node capacity.

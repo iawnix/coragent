@@ -11,6 +11,7 @@ from material import object_fields
 from xyz import validate_electronic_state
 from geometry_safety import assess, require_safe
 from gaussian_input import serialize_structures, inspect_qst_structures
+from job_resources import runtime_settings
 
 BOHR_ANGSTROM = .529177210903
 
@@ -52,6 +53,7 @@ def geometry(xyz, *, elements=None, bonded_pairs=None, reaction_pairs=(), profil
 
 
 def settings(value, backend):
+    value = runtime_settings(value, memory=backend == 'gaussian')
     common = ('method', 'threads', 'timeout_seconds', 'solvent', 'solvent_model')
     allowed = (*common, 'basis', 'memory_mb', 'max_cycles') if backend == 'gaussian' else (*common, 'opt_level', 'force_constant')
     object_fields(value, allowed, 'solver settings')

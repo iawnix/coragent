@@ -15,8 +15,10 @@ def check_configuration(params):
             raise ValueError("execution_binding_required")
         return
     settings = load_job_config(os.environ["CORAGENT_JOB_CONFIG"])
-    expected = resolve_binding(settings, selected["environment"], selected["backend"], runtime=selected["runtime"])
-    if selected != expected or metadata.get("configuration_sha256") != binding_digest(expected):
+    configured = resolve_binding(settings, selected["environment"], selected["backend"], runtime=selected["runtime"])
+    expected = resolve_binding(settings, selected["environment"], selected["backend"], runtime=selected["runtime"],
+                               requested=metadata.get('submission_request'))
+    if selected != expected or metadata.get("configuration_sha256") != binding_digest(configured):
         raise ValueError("execution_binding_changed: prepare again with the current configuration")
     if params.get("platform") != selected["environment"]:
         raise ValueError("execution_binding_platform_mismatch")
@@ -25,6 +27,8 @@ def check_configuration(params):
         raise ValueError("execution_binding_override_forbidden")
     if {key: value for key, value in metadata.items() if key in SUBMISSION_FIELDS} != selected["submission"]:
         raise ValueError("execution_binding_submission_mismatch")
+    from research_agent.jobs.process_environment import validate_resource_environment
+    validate_resource_environment(selected['submission']['resources'], params.get('environment', {}))
     return settings, selected
 
 
@@ -44,12 +48,12 @@ def check_binding(params, *, probe):
     if metadata.get("executor"):
         from .executors import registered_executor, validate_prepared_entry
         identity = metadata["executor"]
-        _, descriptor = registered_executor(identity["id"], identity["version"])
+        base, descriptor = registered_executor(identity["id"], identity["version"])
         if descriptor["backend"] != selected["backend"] or descriptor["runtime"] != selected["runtime"]:
             raise ValueError("executor_binding_mismatch")
         requirements = descriptor.get("requirements", {})
         module_paths = descriptor.get('module_paths')
-        validate_prepared_entry(params, descriptor)
+        validate_prepared_entry(params, descriptor, base)
     elif metadata.get("validator"):
         from research_agent.application.execution_catalog import registered_entry
         identity = metadata["validator"]

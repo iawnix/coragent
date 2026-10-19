@@ -128,6 +128,17 @@ export interface CommandParameters {
     "request_sha256"?: string | null;
     "node_id"?: string;
     "user_task_id"?: string | null;
+    "submission"?: {
+      "resources"?: {
+        "cpus"?: number;
+        "memory_mb"?: number;
+        "gpus"?: number;
+        "walltime"?: string;
+        "select"?: string;
+      };
+      "queue"?: string;
+      "queue_wait_seconds"?: number;
+    };
   };
   "job.status": {
     "job_id"?: string;

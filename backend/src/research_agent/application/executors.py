@@ -15,7 +15,7 @@ import io
 import json
 from pathlib import Path
 
-from research_agent.jobs.config_contract import binding_digest, load_job_config, resolve_binding
+from research_agent.jobs.config_contract import binding_digest, load_job_config
 from research_agent.jobs.environment import probe_binding, guarded_command
 from research_agent.jobs.inputs import content_digest
 from research_agent.application.execution_catalog import installed_catalogs
@@ -96,7 +96,7 @@ def _validate_forwarded_arguments(template, arguments):
         raise ValueError("executor_argument_reserved: fixed arguments are owned by the execution descriptor")
 
 
-def validate_prepared_entry(params, descriptor):
+def validate_prepared_entry(params, descriptor, base):
     """An environment observation cannot authorize a different method or binary."""
     metadata = params['metadata']
     selected = metadata['execution_binding']
@@ -130,15 +130,24 @@ def validate_prepared_entry(params, descriptor):
         raise ValueError('executor_input_roles_mismatch')
     if any(output not in params.get('outputs', []) for output in descriptor['outputs']):
         raise ValueError('executor_output_contract_changed')
+    from .execution_resources import check_program
+    role_sources = {role: inputs[path]['source'] for role, path in descriptor['inputs'].items()}
+    for path in descriptor['inputs'].values():
+        if content_digest(Path(inputs[path]['source'])) != inputs[path]['sha256']:
+            raise ValueError('prepared_input_changed: re-prepare the request')
+    arguments = argv[len(before):end]
+    normalized, report = check_program(base, descriptor, arguments, role_sources, selected['submission']['resources'])
+    if normalized != arguments or metadata.get('program_resources') != report:
+        raise ValueError('execution_program_resources_mismatch: prepare again')
 
 
-def prepare(config, environment, executor, version, inputs, arguments=(), *, dependencies=(), collect=(), work_id=None, input_artifact_ids=()):
+def prepare(config, environment, executor, version, inputs, arguments=(), *, dependencies=(), collect=(), work_id=None, input_artifact_ids=(), submission=None):
     base, descriptor = registered_executor(executor, version)
     return _prepare(config, environment, base, descriptor, descriptor["resources"], inputs, arguments,
-                    dependencies=dependencies, collect=collect, work_id=work_id, input_artifact_ids=input_artifact_ids)
+                    dependencies=dependencies, collect=collect, work_id=work_id, input_artifact_ids=input_artifact_ids, submission=submission)
 
 
-def prepare_script(config, environment, backend, script, arguments=(), *, dependencies=(), collect=(), work_id=None, input_artifact_ids=()):
+def prepare_script(config, environment, backend, script, arguments=(), *, dependencies=(), collect=(), work_id=None, input_artifact_ids=(), submission=None):
     """Pin a task-specific Python script without inventing an installed method."""
     script = Path(script).expanduser().resolve()
     if not script.is_file() or script.suffix != ".py":
@@ -146,13 +155,11 @@ def prepare_script(config, environment, backend, script, arguments=(), *, depend
     descriptor = {"backend": backend, "runtime": "python", "entry": script.name,
                   "argv": ["{entry}", "{args}"], "inputs": {}, "outputs": []}
     return _prepare(config, environment, script.parent, descriptor, {script.name: "sha256:" + content_digest(script)},
-                    {}, arguments, dependencies=dependencies, collect=collect, work_id=work_id, input_artifact_ids=input_artifact_ids)
+                    {}, arguments, dependencies=dependencies, collect=collect, work_id=work_id, input_artifact_ids=input_artifact_ids, submission=submission)
 
 
-def _prepare(config, environment, base, descriptor, resources, inputs, arguments, *, dependencies, collect, work_id, input_artifact_ids):
+def _prepare(config, environment, base, descriptor, resources, inputs, arguments, *, dependencies, collect, work_id, input_artifact_ids, submission):
     settings = load_job_config(config)
-    selected = resolve_binding(settings, environment, descriptor["backend"], runtime=descriptor["runtime"])
-    binding, python, submission = selected["binding"], selected["python"], selected["submission"]
     if not isinstance(inputs, dict) or set(inputs) != set(descriptor["inputs"]):
         raise ValueError("executor_inputs_invalid: provide exactly the declared input roles")
     if not isinstance(arguments, (list, tuple)) or any(not isinstance(arg, str) or "\0" in arg for arg in arguments):
@@ -160,6 +167,15 @@ def _prepare(config, environment, base, descriptor, resources, inputs, arguments
     if (not isinstance(input_artifact_ids, (list, tuple)) or any(not isinstance(ref, str) or not ref for ref in input_artifact_ids)
             or len(set(input_artifact_ids)) != len(input_artifact_ids)):
         raise ValueError("executor_input_artifacts_invalid")
+    from .execution_resources import contract, resolve, check_program
+    inputs = {role: Path(source).expanduser().resolve() for role, source in inputs.items()}
+    module = contract(base, descriptor)
+    requirements = module.requirements(descriptor, list(arguments), inputs) if module else {}
+    selected, resource_metadata = resolve(settings, environment, descriptor['backend'], descriptor['runtime'],
+                                          submission=submission, requirements=requirements,
+                                          defaults=module.defaults(descriptor) if module else {})
+    arguments, program_resources = check_program(base, descriptor, arguments, inputs, selected['submission']['resources'])
+    binding, python, submission = selected["binding"], selected["python"], selected["submission"]
     command = binding.get("command", [])
     command = [command] if isinstance(command, str) else command
     template = descriptor["argv"]
@@ -228,8 +244,8 @@ def _prepare(config, environment, base, descriptor, resources, inputs, arguments
     module_paths = descriptor.get('module_paths')
     argv, guard_inputs = guarded_command(selected, execution_argv, environment_evidence, module_paths=module_paths)
     staged.extend(guard_inputs)
-    configuration = binding_digest(selected)
-    identity = binding_digest({"executor": descriptor, "configuration": configuration, "environment": environment_evidence,
+    identity = binding_digest({"executor": descriptor, "configuration": resource_metadata['configuration_sha256'],
+        "submission": submission, "environment": environment_evidence,
         "resources": resources, "arguments": arguments, "outputs": outputs, "input_artifact_ids": input_artifact_ids,
         "inputs": {row["destination"]: row["sha256"] for row in staged}})[7:]
     work_id = work_id or "work_" + identity[:48]
@@ -242,7 +258,7 @@ def _prepare(config, environment, base, descriptor, resources, inputs, arguments
             "metadata": {**submission,
                          **({"executor": {"id": descriptor["id"], "version": descriptor["version"]}, **({"skill": descriptor["skill"]} if "skill" in descriptor else {})}
                             if descriptor.get("id") else {"script": {"entry": descriptor["entry"], "sha256": resources[descriptor["entry"]]}}),
-                         "resources_sha256": resources, "configuration_sha256": configuration,
+                         "resources_sha256": resources, **resource_metadata, 'program_resources': program_resources,
                          "execution_binding": selected, "execution_environment": environment_evidence, "execution_argv": execution_argv,
                          **({'module_paths': module_paths} if module_paths is not None else {}),
                          'input_roles': {role: {'destination': destination,
@@ -268,6 +284,12 @@ def main():
     parser.add_argument("--dependency", action="append", default=[], help="source=relative Job destination")
     parser.add_argument("--collect", action="append", default=[], help="Required relative Job output the script actually writes; does not create a file or redirect stdout (captured in logs/stdout.log)")
     parser.add_argument("--work-id", help="New identity for an intentional recalculation")
+    parser.add_argument("--cpus", type=int, help="Total CPUs for this Job; configured values are defaults, not limits")
+    parser.add_argument("--job-memory-mb", type=int, help="Total Job memory in MiB, including program overhead")
+    parser.add_argument("--gpus", type=int, help="GPUs for this Job on an external scheduler")
+    parser.add_argument("--walltime", help="Job time limit HH:MM:SS")
+    parser.add_argument("--queue", help="Scheduler queue, subject to configured permissions")
+    parser.add_argument("--queue-wait-seconds", type=int, help="Maximum scheduler queue wait")
     parser.add_argument("--output", help="Save a Job request (not calculation results); relative paths resolve from the command cwd. Print request_file and request_sha256 for job_start")
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     args = parser.parse_args()
@@ -300,6 +322,9 @@ def main():
         inputs[role] = source
     arguments = args.arguments[1:] if args.arguments[:1] == ["--"] else args.arguments
     options = {"dependencies": args.dependency, "collect": args.collect, "work_id": args.work_id, "input_artifact_ids": args.input_artifact}
+    options['submission'] = {'resources': {key: value for key, value in {
+        'cpus': args.cpus, 'memory_mb': args.job_memory_mb, 'gpus': args.gpus, 'walltime': args.walltime}.items() if value is not None},
+        **{key: value for key, value in {'queue': args.queue, 'queue_wait_seconds': args.queue_wait_seconds}.items() if value is not None}}
     try:
         request = (prepare_script(args.config, args.environment, args.backend, args.script, arguments, **options)
                    if args.script else prepare(args.config, args.environment, args.executor, args.version, inputs, arguments, **options))

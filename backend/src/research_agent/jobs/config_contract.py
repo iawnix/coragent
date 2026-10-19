@@ -256,7 +256,7 @@ def binding_digest(value):
     return "sha256:" + hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
-def resolve_binding(config, environment, backend, *, runtime):
+def resolve_binding(config, environment, backend, *, runtime, requested=None):
     """Select only the configuration that can affect this execution."""
     if runtime not in {"python", "native"}:
         raise ValueError("execution_runtime_invalid")
@@ -269,7 +269,7 @@ def resolve_binding(config, environment, backend, *, runtime):
     python = resolve_python(config, environment, backend) if runtime == "python" else None
     return {"environment": environment, "kind": target["kind"], "backend": backend,
             "runtime": runtime, "binding": binding, "python": python,
-            "submission": resolve_submission(config, environment, backend),
+            "submission": resolve_submission(config, environment, backend, requested=requested),
             **({"supervisor": target.get("supervisor", "systemd")} if target["kind"] == "local" and target.get("driver") != "external" else {}),
             **{key: target[key] for key in ("ssh_host", "work_root") if key in target}}
 

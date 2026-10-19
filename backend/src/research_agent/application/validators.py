@@ -22,14 +22,15 @@ def prepare(root, params):
     script, script_digest = _registered_file(base, descriptor['entry'], descriptor['sha256'])
     if any(k in params for k in ('command', 'inputs', 'outputs', 'environment', 'env', 'metadata', 'cwd')):
         raise ValueError('validator_request_invalid: use validator identity, inputs, Job identity and a named platform')
-    from research_agent.jobs.config_contract import load_job_config, resolve_binding, binding_digest
+    from research_agent.jobs.config_contract import load_job_config
     from research_agent.jobs.environment import probe_binding, guarded_command
     config_path = os.environ.get('CORAGENT_JOB_CONFIG')
     if not config_path:
         raise ValueError('job_config_required')
     settings = load_job_config(config_path)
-    selected = resolve_binding(settings, params.get('platform') or settings['default_environment'],
-                               descriptor['backend'], runtime='python')
+    from .execution_resources import resolve
+    selected, resource_metadata = resolve(settings, params.get('platform') or settings['default_environment'],
+                                          descriptor['backend'], 'python', submission=params.get('submission'))
     from research_agent.artifacts import PayloadStore
     store = PayloadStore(root / 'artifacts')
     from research_agent.artifacts.registry import manifests
@@ -123,14 +124,14 @@ def prepare(root, params):
     module_paths = descriptor.get('module_paths')
     command, guard_inputs = guarded_command(selected, argv, environment, module_paths=module_paths)
     inputs.extend(guard_inputs)
-    return {**params, 'platform': selected['environment'],
+    return {**{key: value for key, value in params.items() if key != 'submission'}, 'platform': selected['environment'],
         'command': command,
         'environment': selected['binding'].get('environment', {}),
         'inputs': inputs, 'outputs': [{'path': 'validator_result.json', 'required': True, 'min_bytes': 2}],
         'metadata': {**selected['submission'], 'execution_binding': selected, 'python_binding': selected['python'],
             'execution_environment': environment, 'execution_argv': argv,
             **({'module_paths': module_paths} if module_paths is not None else {}),
-            'configuration_sha256': binding_digest(selected),
+            **resource_metadata,
             'resources_sha256': {row['destination']: row['sha256'] for row in inputs if not row['destination'].startswith('input_')},
             'validator': {'id': descriptor['id'], 'version': descriptor['version'],
             'script_sha256': descriptor['sha256'], 'input_versions': input_versions, 'input_result_versions': input_result_versions},

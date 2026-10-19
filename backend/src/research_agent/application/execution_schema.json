@@ -141,6 +141,11 @@
               "type": "string",
               "minLength": 1
             }
+          },
+          "resource_contract": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pinned standard-library-only module exposing defaults, requirements and prepare for program resource consistency."
           }
         },
         "required": [

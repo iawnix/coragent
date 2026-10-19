@@ -103,5 +103,6 @@ def test_registered_comparison_runs_as_job_and_mismatch_remains_publishable(tmp_
         'check_refs': [comparison['artifact_id']]})
     assert saved['result_saved']
     prepared['metadata']['input_roles']['target']['sha256'] = 'sha256:' + '0' * 64
+    base, descriptor = registered_executor('chemical.compare', '1')
     with pytest.raises(ValueError, match='input_roles_mismatch'):
-        validate_prepared_entry(prepared, registered_executor('chemical.compare', '1')[1])
+        validate_prepared_entry(prepared, descriptor, base)

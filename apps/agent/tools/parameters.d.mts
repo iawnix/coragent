@@ -104,6 +104,17 @@ export interface ToolParameters {
     "timeout_seconds"?: number;
     "platform"?: string;
     "root"?: string;
+    "submission"?: {
+      "resources"?: {
+        "cpus"?: number;
+        "memory_mb"?: number;
+        "gpus"?: number;
+        "walltime"?: string;
+        "select"?: string;
+      };
+      "queue"?: string;
+      "queue_wait_seconds"?: number;
+    };
   };
   jobStatus: {
     "job_id"?: string;

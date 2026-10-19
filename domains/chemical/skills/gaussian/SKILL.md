@@ -22,7 +22,7 @@ The path-specific gradient and NEB adapters live in `candidate-generation`; Gaus
 ## XYZ shortcut
 
 ```bash
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.gaussian --version 1 --input geometry=input.xyz --output prepared/gaussian.json -- --task opt-sp --method M062X --basis '6-31G**' --charge 0 --multiplicity 1 --threads 8 --memory-mb 8000
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.gaussian --version 1 --input geometry=input.xyz --cpus 12 --job-memory-mb 16384 --output prepared/gaussian.json -- --task opt-sp --method M062X --basis '6-31G**' --charge 0 --multiplicity 1
 ```
 
 Use `opt` for geometry, `sp` for a fixed geometry, and `opt-sp` for both. The wrapper records energies, convergence, optimized geometry, method/basis, state, raw log, and parser summary.
@@ -34,9 +34,11 @@ Read `summary.optimization_completed` with `optimization_completion_reason` for 
 Stage a complete input and relative checkpoint/dependency names inside the Job:
 
 ```bash
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.gaussian-input --version 1 --input input=ts.gjf --collect results/ts.chk --output prepared/ts.json -- --method M062X --basis '6-31G**' --charge 0 --multiplicity 1 --threads 12 --memory-mb 4000 --validation none
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.gaussian-input --version 1 --input input=ts.gjf --collect results/ts.chk --output prepared/ts.json -- --method M062X --basis '6-31G**' --charge 0 --multiplicity 1 --validation none
 ```
 
 Use `--validation opt|sp|frequency|minimum|saddle|irc` when the input is intended for a parser check. Keep the final blank section terminator and complete Link1 metadata. Submit prepared requests with `job_start`, then inspect `gaussian.out`, `parsed.json`, checkpoint, geometry, and validation fields.
 
 Read [L101 input guide](references/l101_input_guide.md), [electronic states](references/electronic_states.md), [relaxed scans](references/relaxed_scans.md), and [Gaussian validation](references/gaussian_validation.md) for route and parser details.
+
+Resource settings belong to the Job: preparer `--cpus 12 --job-memory-mb 16384` requests 12 CPUs and 16 GiB total. Omitted runner threads follow that allocation; Gaussian `%mem` leaves the greater of 256 MiB or 10% for overhead (14745 MiB here). Explicit GJF `%nprocshared`/`%mem` are read at preparation and are never rewritten. Without job overrides they supply requirements; with overrides, conflicting threads or insufficient total memory fail before submission. Re-prepare to change resources. Defaults are not hardware limits.

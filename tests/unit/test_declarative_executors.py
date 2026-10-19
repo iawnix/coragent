@@ -232,6 +232,11 @@ driver="process"
     assert "/cluster/validation" in request["command"]
     assert request["metadata"]["resources"] == {"cpus": 3}
     assert request["metadata"]["queue"] == "science"
+    allocated = prepare_validator(tmp_path, {**params, 'submission': {'resources': {'cpus': 12, 'memory_mb': 16384}}})
+    assert allocated['metadata']['resources'] == {'cpus': 12, 'memory_mb': 16384}
+    assert 'submission' not in allocated
+    from research_agent.application.execution_environment import check_binding
+    check_binding(allocated, probe=False)
     with pytest.raises(ValueError, match="executor_binding_missing"):
         prepare_validator(tmp_path, {**params, "platform": "local"})
 

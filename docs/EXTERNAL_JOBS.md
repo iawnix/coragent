@@ -162,3 +162,35 @@ cancellation cases, plus a controller restart and a lost submit response. Check
 declared output collection from a separate execution directory. Use an isolated
 queue or deterministic command fixtures, and keep this repository's test state
 under `local_debug/`.
+
+## Per-job resources
+
+Configured target and backend resources are fallback defaults, not capacity limits.
+Prepare executors and scripts with `--cpus 12 --job-memory-mb 16384 --walltime 02:00:00`
+before the `--` separator. Optional `--gpus`, `--queue` and `--queue-wait-seconds`
+use the same submission resolver; each target still enforces supported fields and queue permissions.
+TRI supports CPU/memory/GPU requests, not `queue` or PBS `select`.
+
+Resolution is per field: target defaults → backend defaults → explicit program input
+requirements → this Job's request. Registered program contracts validate contradictions
+before probing/submitting; an explicit request cannot silently rewrite an explicit input.
+Direct Jobs and validators accept `submission: {"resources": {"cpus": 12, "memory_mb": 16384}}`.
+Python callers use the same `submission=` argument on `prepare` and `prepare_script`.
+Do not combine direct `submission` with resource fields in metadata.
+
+Gaussian/PySCF reserve at least 256 MiB and 10% of total memory for process overhead.
+This is a default budget, not a peak-memory guarantee. Explicit Gaussian files remain
+unchanged. JSON path/electronic settings may omit threads and Gaussian memory; runners
+then use the pinned Job allocation. Current scan, NEB and crossing evaluations are serial,
+so image/surface counts do not multiply the CPU request. Unsupported parallel settings
+are rejected. xTB and CREST threads follow the same allocation.
+
+Prepared resources participate in work identity, execution fingerprints and receipts.
+Changing them requires a new preparation; `job_start` rejects overrides of request files
+or prepared references. Software, input hashes and configuration drift remain checked.
+Scripts receive thread environment defaults, but their internal parallelism is explicitly
+unverified. Memory and CPU enforcement depend on the selected runtime/scheduler.
+
+TRI owns node capacity, queueing and allocation. CoRAgent does not treat a busy node or a
+4-CPU default as a 4-CPU hardware limit. A 12-thread shared-memory job needs one eligible
+node with sufficient capacity; capacities on separate nodes are not added together.

@@ -84,3 +84,21 @@ Gaussian 与本地 NumPy 算法。态跟踪需要提供 AO 密度/重叠张量�
 表示要求的包或模块缺失；`environment_import_failed` 表示已有依赖导入初始化失败。
 报告实际观测与所选目标：未配置绑定或没有预设入口不等于所有环境都未安装软件。
 绑定或程序字节发生变化后须重新准备请求，不能继续派发旧准备命令。
+
+## 扩展资源合同
+
+已登记执行器、Python 脚本和验证器都支持 `submission={"resources": {"cpus": 12, "memory_mb": 16384}}`。
+规则见[逐作业资源](EXTERNAL_JOBS.zh-CN.md#逐作业资源)。
+
+执行声明可增加 `resource_contract`，路径必须在已哈希的 `resources` 闭包内。
+它是仅依赖标准库的纯 Python 模块，提供三个函数：`defaults(descriptor)` 返回最终兜底值；
+`requirements(descriptor, arguments, inputs)` 返回显式输入需求；
+`prepare(descriptor, arguments, inputs, resources)` 返回 `(normalized_arguments, report)`。
+arguments 仅包含转发给程序的参数，inputs 是角色到绝对源路径的映射。标准化必须确定、幂等；
+矛盾时抛出可操作的 `ValueError`，不改写用户输入、不探测容量、不执行程序。
+提交时依据已固定输入、最终资源和参数重新校验。没有该合同的执行器及任意脚本，其内部资源使用标为未验证。
+
+`configuration_sha256` 固定配置默认值和软件绑定；`execution_binding.submission` 是本次最终申请，
+根据 `submission_request` 重新计算，不要求等于配置默认值。最终资源也参与执行指纹。
+运行时 `CORAGENT_JOB_CPUS`、`CORAGENT_JOB_MEMORY_MB` 提供最终申请；软件激活后再次设置线程默认值，
+避免激活脚本恢复旧线程数。这些变量表示申请量，不是实测占用或节点容量。

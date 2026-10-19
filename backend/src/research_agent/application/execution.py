@@ -407,13 +407,20 @@ def _stage_start(root, runtime, params, job_id, preparation=None, prepared_param
         from .validators import check_current_inputs
         check_current_inputs(root, prepared_params)
     metadata = dict(prepared_params.get('metadata') or {})
+    if 'submission' in prepared_params and metadata.get('execution_binding'):
+        raise ValueError('prepared_override_forbidden: resource changes require a new preparation')
     if not metadata.get('execution_binding'):
         from research_agent.jobs.config_contract import SUBMISSION_FIELDS, load_job_config, resolve_submission
         # Registered entries carry their already resolved, verified submission.
         # Raw Jobs receive the same resolver before submission fingerprint commit.
+        requested = {key: value for key, value in metadata.items() if key in SUBMISSION_FIELDS}
+        if 'submission' in prepared_params:
+            if requested:
+                raise ValueError('job_submission_ambiguous: use submission or metadata resource fields, not both')
+            requested = prepared_params['submission']
         submission = resolve_submission(load_job_config(os.environ['CORAGENT_JOB_CONFIG']),
             _platform_name(prepared_params) or runtime.default,
-            requested={key: value for key, value in metadata.items() if key in SUBMISSION_FIELDS})
+            requested=requested)
         metadata.update(submission)
         prepared_params = {**prepared_params, 'metadata': metadata}
     if params.get('node_id') is not None:
