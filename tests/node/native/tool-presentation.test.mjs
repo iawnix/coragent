@@ -203,8 +203,8 @@ test("skill invocations keep attached failures inside one collapsible card", asy
   const { initTheme } = await fromSource("packages/coding-agent/src/modes/interactive/theme/theme.ts");
   initTheme("dark");
   const block = parseSkillBlock([
-    '<skill name="chemical-input" location="/package/domains/chemical/skills/chemical-input/SKILL.md">',
-    "# Chemical input",
+    '<skill name="material-preparation" location="/package/domains/chemical/skills/material-preparation/SKILL.md">',
+    "# Material preparation",
     "</skill>",
     "",
     "<harness>\n[error] Tool call blocked\n</harness>",
@@ -212,11 +212,11 @@ test("skill invocations keep attached failures inside one collapsible card", asy
   assert.ok(block);
   const component = new SkillInvocationMessageComponent(block);
   const collapsed = component.render(120).join("\n");
-  assert.match(collapsed, /\[skill\].*chemical-input.*▾/);
+  assert.match(collapsed, /\[skill\].*material-preparation.*▾/);
   assert.doesNotMatch(collapsed, /Tool call blocked/);
   component.setExpanded(true);
   const expanded = component.render(120).join("\n");
-  assert.match(expanded, /chemical-input.*▴/);
+  assert.match(expanded, /material-preparation.*▴/);
   assert.match(expanded, /Tool call blocked/);
   component.setExpanded(false);
   assert.doesNotMatch(component.render(120).join("\n"), /Tool call blocked/);

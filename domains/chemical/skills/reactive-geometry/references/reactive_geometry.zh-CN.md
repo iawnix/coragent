@@ -46,7 +46,7 @@
 
 `chemical-reactive-geometry/1` 包含嵌入的 `material`（2–256 原子、Å 坐标）、
 `bond_changes`、`edit_hypotheses`，以及可选 `sampling`，不要求产物。
-先通过 chemical-input/CREST 导入或组装材料；本执行器不嵌入 SMILES、不优化单体。
+先通过 material-preparation/CREST 导入或组装材料；本执行器不嵌入 SMILES、不优化单体。
 
 材料需要参考分子图。对没有当前图的 TS/路径候选，提供 `reference_material`，其原子
 ID、顺序、元素/同位素和态声明必须相同。参考图只定义受保护键和片段，不认证当前几何

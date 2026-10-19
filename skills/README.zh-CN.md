@@ -17,11 +17,11 @@ Skill 提供科学操作、方法/后端适配和研究协调方面的指导，�
 | Skill | 用途 |
 | --- | --- |
 | [candidate-generation](../domains/chemical/skills/candidate-generation/SKILL.zh-CN.md) | 根据映射端点、键变化、约束和结构证据，为过渡态与反应路径搜索生成候选几何。 |
-| [chemical-input](../domains/chemical/skills/chemical-input/SKILL.zh-CN.md) | 准备分子材料和显式反应定义，为后续科学操作保留身份、电子态与来源。 |
+| [material-preparation](../domains/chemical/skills/material-preparation/SKILL.zh-CN.md) | 准备分子材料和显式反应定义，为后续科学操作保留身份、电子态与来源。 |
 | [energetics](../domains/chemical/skills/energetics/SKILL.zh-CN.md) | 评估电子能、ZPE 与热校正、自由能和反应能、势垒、构象集合、TST 速率、竞争分支、质量作用网络及能量剖面。 |
-| [mechanism-reasoning](../domains/chemical/skills/mechanism-reasoning/SKILL.zh-CN.md) | 使用明确的物种身份、原子映射、基元步骤、替代假设与可证伪条件形成、比较并修订反应机理假设。 |
+| [reaction-investigation](../domains/chemical/skills/reaction-investigation/SKILL.zh-CN.md) | 使用明确的物种身份、原子映射、基元步骤、替代假设与可证伪条件形成、比较并修订反应机理假设。 |
 | [reactive-geometry](../domains/chemical/skills/reactive-geometry/SKILL.zh-CN.md) | 根据明确的反应中心证据构造和修订反应取向及局部候选几何。 |
-| [structure-cognition](../domains/chemical/skills/structure-cognition/SKILL.zh-CN.md) | 在不认证机理或过渡态的前提下，根据证据整理材料和反应候选的结构描述。 |
+| [structure-assessment](../domains/chemical/skills/structure-assessment/SKILL.zh-CN.md) | 在不认证机理或过渡态的前提下，根据证据整理材料和反应候选的结构描述。 |
 | [surface-crossing](../domains/chemical/skills/surface-crossing/SKILL.zh-CN.md) | 用 Gaussian 搜索不同自旋表面的局部交叉候选，并检查能隙、投影梯度和可选交叉缝曲率。 |
 | [validation](../domains/chemical/skills/validation/SKILL.zh-CN.md) | 根据鞍点、目标振动模式、结构、电子态、立体化学和双向 IRC 连通性证据验证过渡态候选。 |
 
@@ -45,7 +45,7 @@ Skill 提供科学操作、方法/后端适配和研究协调方面的指导，�
 | Skill | 用途 |
 | --- | --- |
 | [email](email/SKILL.zh-CN.md) | 提供通用 SMTP 邮件运输和持久、幂等的发送回执。 |
-| [geometry-safety](../domains/chemical/skills/geometry-safety/SKILL.zh-CN.md) | 在电子结构 Job 前执行跨任务坐标安全检查，同时允许声明的反应中心处于非平衡几何。 |
+| [geometry-preflight](../domains/chemical/skills/geometry-preflight/SKILL.zh-CN.md) | 在电子结构 Job 前执行跨任务坐标安全检查，同时允许声明的反应中心处于非平衡几何。 |
 | [method-selection](../domains/chemical/skills/method-selection/SKILL.zh-CN.md) | 协调科学方法、后端与命名计算环境，包括已指定方法时的执行准备。 |
 | [report](../domains/chemical/skills/report/SKILL.zh-CN.md) | 根据研究证据编写图文报告，包含分子结构、能量曲线、数据表、方法、结论和可追溯的来源。 |
 | [research-memory](research-memory/SKILL.zh-CN.md) | 用持久问题 Node、显式关系、执行观察与不可变 Result 恢复和推进研究。 |

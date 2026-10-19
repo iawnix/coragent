@@ -72,5 +72,5 @@ path.xyz、candidate.xyz、candidate.material.json（有完整路径时）。各
 最高内部 image 始终标为 validated_ts=false。继续鞍点优化、虚频模式归属和双向 IRC
 端点/极小点验证。多峰、中间体、IRC 同势阱可能要求重构假设、分别搜索基元步骤。
 结合[故障诊断](../../method-selection/references/search_recovery.zh-CN.md)、
-[局部结构诊断](../../chemical-input/references/local_diagnostics.zh-CN.md)和
+[局部结构诊断](../../material-preparation/references/local_diagnostics.zh-CN.md)和
 [轨迹/报告工具](../../report/references/research_tools.zh-CN.md)检查证据。

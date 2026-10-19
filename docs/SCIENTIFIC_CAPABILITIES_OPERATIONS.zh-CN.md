@@ -73,7 +73,7 @@ NEB 统一使用 ASE 版本 2 接入 Gaussian/xTB calculator，旧 NumPy 实现�
 Gaussian 与本地 NumPy 算法。态跟踪需要提供 AO 密度/重叠张量，尚未实现从 Gaussian
 检查点自动提取。经典 TS/IRC 检查不认证跨态或激发态连续性。旧 DA 验证器为显式专用
 选项，其它反应使用[通用检查](../domains/chemical/skills/validation/references/general_checks.zh-CN.md)。
-局部诊断与搜索恢复指南分别见 chemical-input/method-selection。独立轨迹与报告 Job 包含分子图、数据表和能量曲线，做法与证据要求见[报告 Skill](../domains/chemical/skills/report/SKILL.zh-CN.md)。
+局部诊断与搜索恢复指南分别见 material-preparation/method-selection。独立轨迹与报告 Job 包含分子图、数据表和能量曲线，做法与证据要求见[报告 Skill](../domains/chemical/skills/report/SKILL.zh-CN.md)。
 
 ## 验证
 

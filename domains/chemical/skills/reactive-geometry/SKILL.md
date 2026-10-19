@@ -13,7 +13,7 @@ revise an existing scan, NEB, optimization or IRC geometry for another search.
 lifecycle; it does not determine a mechanism or run a quantum solver.
 
 For reaction investigations, return accepted poses and rejected-candidate reasons to
-the [mechanism-reasoning loop](../mechanism-reasoning/references/reaction_investigation.md).
+the [reaction-investigation loop](../reaction-investigation/references/reaction_investigation.md).
 An accepted pose is a handoff to constrained refinement or candidate generation, not
 a reason to stop. Preserve the source material, fragment-internal geometry, mapping,
 bond changes and actual local contacts in that handoff.

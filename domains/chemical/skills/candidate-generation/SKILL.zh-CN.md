@@ -12,7 +12,7 @@ description: 根据映射端点、键变化、约束和已有结构证据，为�
 本 Skill 属于科学搜索操作层。Gaussian、xTB 等软件配方仍属于后端适配；此处提到它们
 只是为了说明如何通过既有 Job 接口执行搜索。
 
-反应研究遵循[机理研究闭环](../mechanism-reasoning/references/reaction_investigation.zh-CN.md)。
+反应研究遵循[机理研究闭环](../reaction-investigation/references/reaction_investigation.zh-CN.md)。
 交回选定候选及其来源、待验证事项和下一项操作；失败则交回诊断及有变化的构造/搜索行动。
 只写出输入文件的准备 Job 尚未完成搜索，还须执行并检查求解器。候选身份允许继续探索；
 并非每种搜索方法都要求整个反应物复合物先成为已验证极小点。
@@ -55,4 +55,4 @@ IRC 连通性验证；验证准备 IRC 输入时仍须保留端点和求解器�
 基态自旋 Gaussian 梯度与 NEB 另有 chemical.gradient-gaussian@1、chemical.neb-gaussian@2，
 独立电子设置与范围见[路径操作](references/path_search.zh-CN.md)。
 
-新 xTB/Gaussian 路径搜索使用 [ASE NEB v2](references/ase_neb_executor.zh-CN.md)。失败或畸变时按[搜索恢复](../method-selection/references/search_recovery.zh-CN.md)诊断，结合[局部几何](../chemical-input/references/local_diagnostics.zh-CN.md)和[轨迹](../report/references/research_tools.zh-CN.md)选择重启帧。
+新 xTB/Gaussian 路径搜索使用 [ASE NEB v2](references/ase_neb_executor.zh-CN.md)。失败或畸变时按[搜索恢复](../method-selection/references/search_recovery.zh-CN.md)诊断，结合[局部几何](../material-preparation/references/local_diagnostics.zh-CN.md)和[轨迹](../report/references/research_tools.zh-CN.md)选择重启帧。

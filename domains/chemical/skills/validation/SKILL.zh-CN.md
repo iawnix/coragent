@@ -10,7 +10,7 @@ description: 根据鞍点、目标振动模式、结构、电子态、立体化�
 使用本 Skill 判断候选结构能否作为可信的过渡态。候选生成提供候选结构；双向 IRC 连通性属于
 验证维度，用于检查候选是否连接到已声明的反应物和产物势阱。
 
-反应研究中，验证必须将决定交回[机理研究闭环](../mechanism-reasoning/references/reaction_investigation.zh-CN.md)：
+反应研究中，验证必须将决定交回[机理研究闭环](../reaction-investigation/references/reaction_investigation.zh-CN.md)：
 已验证鞍点、需要补充检查的候选，或带下一项构造/搜索操作的失败诊断。缺失判据属于未解决
 证据；只要仍能生成有依据的候选或诊断实验，就不应将其变成任务阻塞。验证闭合的是一个
 候选的证据环，不是整个反应研究。

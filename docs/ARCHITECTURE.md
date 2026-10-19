@@ -98,7 +98,7 @@ Host restart discovers sessions from Pi's existing catalog and reopens at most f
 
 ## Skills and delivery
 
-Pi loads installed Skills natively. CoRAgent verifies installed resource digests. Read the actual Skill path supplied by Pi; relative references resolve from that Skill directory. `research-memory` teaches five small operations; research-workflow coordinates Jobs and materials; domain Skills teach scientific methods. `reaction_mapping.md` belongs to `chemical-input/references/`.
+Pi loads installed Skills natively. CoRAgent verifies installed resource digests. Read the actual Skill path supplied by Pi; relative references resolve from that Skill directory. `research-memory` teaches five small operations; research-workflow coordinates Jobs and materials; domain Skills teach scientific methods. `reaction_mapping.md` belongs to `material-preparation/references/`.
 
 Process completion, file existence and Node closure do not establish a scientific result. Email uses existing user authorization and its own durable send identity. If Memory recording fails after transport acceptance, recover the record without resending. Installation, runtime and scientific claims each require their own evidence.
 

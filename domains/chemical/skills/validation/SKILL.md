@@ -13,7 +13,7 @@ connectivity is a validation dimension that tests its connection to declared
 reactant and product basins.
 
 For a reaction investigation, validation must return a decision to the
-[mechanism-reasoning loop](../mechanism-reasoning/references/reaction_investigation.md):
+[reaction-investigation loop](../reaction-investigation/references/reaction_investigation.md):
 validated saddle, candidate requiring another check, or a diagnosed failure with
 the next construction/search operation. A missing criterion is unresolved evidence;
 it is not a task blocker when a justified candidate or diagnostic next experiment

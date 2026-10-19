@@ -4,8 +4,8 @@ from pathlib import Path
 import sys
 
 _skills = Path(__file__).resolve().parents[2]
-for _part in ('chemical-input/scripts/materials', 'chemical-input/scripts/reaction',
-              'chemical-input/scripts/geometry', 'chemical-input/scripts/tensor'):
+for _part in ('material-preparation/scripts/materials', 'material-preparation/scripts/reaction',
+              'material-preparation/scripts/geometry', 'material-preparation/scripts/tensor'):
     sys.path.insert(0, str(_skills / _part))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / '_shared'))
 from analysis_material import read_json, read_material

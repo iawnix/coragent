@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 
 SKILLS=Path(__file__).resolve().parents[2]
-for part in ('_shared','chemical-input/scripts/materials','chemical-input/scripts/reaction',
+for part in ('_shared','material-preparation/scripts/materials','material-preparation/scripts/reaction',
              'crest/scripts','energetics/scripts','candidate-generation/scripts/path',
              'candidate-generation/scripts/search','candidate-generation/scripts/backends'):
     sys.path.insert(0,str(SKILLS/part))

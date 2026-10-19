@@ -23,7 +23,7 @@
 | --- | --- | --- | --- |
 | 1. SMILES、名称、XYZ 等输入 | 名称解析、SMILES 检查、种子生成；计算可读 XYZ | 统一输入材料、已有坐标保真、片段与缺失信息记录 | P1 |
 | 2. R/P、复合物、孤立分子、缺失 P、优化和非基态 | 基态/指定多重度优化；部分端点构造；CREST 方法指导 | 通用复合物采样、完整构象集合处理、缺失端点规划、电子态专用执行与解析 | P1、P2、P5、P6 |
-| 3. 机制猜测 | mechanism-reasoning 的思考与分支原则 | 可恢复的物种/步骤材料、有限假设探索与比较案例 | P5 |
+| 3. 机制猜测 | reaction-investigation 的思考与分支原则 | 可恢复的物种/步骤材料、有限假设探索与比较案例 | P5 |
 | 4. scan、QST2/3、NEB、多后端 | 显式 Gaussian；xTB 原生命令途径；CF22D TS；部分 QST2 准备 | 通用扫描汇总、NEB runner/calculator、统一候选来源 | P2 |
 | 5. 鞍点与 R/P 连通性 | 频率/优化解析、IRC、DA 专用验证器 | 反应无关的模式与端点检查、清楚的适用范围 | P0、P3 |
 | 6. 多步基元反应 | Node 可组织子问题；Skill 描述多步路径 | 化学路径组装、相邻步骤与共享中间体一致性检查 | P5 |
@@ -99,7 +99,7 @@
 - 拆开图身份、立体化学、构象几何和电子态比较。构象比较支持对齐 RMSD、关键内坐标、对称等价与片段取向；不能通过反射对齐误合并对映体。
 - 迁移 H 必须保留显式身份；XYZ 推断键级和金属配位等歧义输出未确定结论，不能强制宣告相同/不同。
 
-主要范围：chemical-input、`_shared/chemical_identity.py`、`_shared/reaction_checks.py`、candidate-generation 的原子顺序处理；版本化材料约定放在对应领域资源中。
+主要范围：material-preparation、`_shared/chemical_identity.py`、`_shared/reaction_checks.py`、candidate-generation 的原子顺序处理；版本化材料约定放在对应领域资源中。
 
 完成标准：同一输入保留原坐标；乱序结构可往返恢复；旋转平移和对称等价不造成错误差异；对映体、不同质子化状态和明确异构体不错误合并；缺失 P 不妨碍独立优化/单点任务；显式 H 转移与同位素的身份不丢失。
 
@@ -162,7 +162,7 @@
 
 工作项：
 
-- 扩展 mechanism-reasoning 的条件化决策：R-only、已给 R/P、复合物、催化/溶剂参与、自旋变化和竞争路径分别给出可检验假设及探索预算。
+- 扩展 reaction-investigation 的条件化决策：R-only、已给 R/P、复合物、催化/溶剂参与、自旋变化和竞争路径分别给出可检验假设及探索预算。
 - 机制材料区分初始假设、计算观察、支持/冲突和未探索部分；产物猜测始终保留来源，避免计算开始后丢失假设身份。
 - 多步路径材料引用每一步与共享中间体证据，核验原子/计量/态连续性和缺失步骤。发现中间体或意外出口时可扩展路径，不能把总 R/P 当成单个 QST2 任务。
 - 先实现适用范围明确的基元 TST 与共同前体竞争分支比较；记录浓度、可逆性、传输系数以及未处理的隧穿/再穿越/扩散。
@@ -170,7 +170,7 @@
 - 报告分别给出热力学排序、动力学预测、条件敏感性和覆盖范围。没有充分采样时只能声称“所比较集合中”，不声称全局最优。
 - 验收 Agent 在 Job 等待、失败、上下文恢复和方法切换后的持续推进；只在有独立研究问题时拆 Node。
 
-主要范围：mechanism-reasoning、energetics、report、research-workflow 的使用示例及原生 Agent 集成测试。Task/Memory 内核不新增化学真值裁判。
+主要范围：reaction-investigation、energetics、report、research-workflow 的使用示例及原生 Agent 集成测试。Task/Memory 内核不新增化学真值裁判。
 
 完成标准：确定性两步路径不会遗漏中间体证据；动力学与热力学排序相反的案例正确区分；不同前体不能直接套共同前体分支比；缺 P 时有有界探索和未决记录；证据不足只形成进展/阻塞说明，不能降低原交付目标后宣告成功。
 
@@ -290,7 +290,7 @@
 
 ## 10. P1 基础 / 批次 B 实施记录
 
-2026-10-11，工作区实现，尚未提交。新增 `chemical.material@1` 独立 executor，使用现有 structure 后端、Job 与 Artifact，不新增模型工具或研究阶段门槛。详细合同及调用示例见[结构材料输入](../domains/chemical/skills/chemical-input/references/material_input.zh-CN.md)。
+2026-10-11，工作区实现，尚未提交。新增 `chemical.material@1` 独立 executor，使用现有 structure 后端、Job 与 Artifact，不新增模型工具或研究阶段门槛。详细合同及调用示例见[结构材料输入](../domains/chemical/skills/material-preparation/references/material_input.zh-CN.md)。
 
 交付内容：
 
@@ -307,7 +307,7 @@
 
 ## 11. P1 / 批次 C 实施记录
 
-2026-10-11，工作区实现，尚未提交。新增三个独立 executor，复用 structure 后端的 RDKit/NumPy 与现有 Job/Artifact，不增加模型工具或固定研究阶段。详细合同与独立调用见[结构分析](../domains/chemical/skills/chemical-input/references/structure_analysis.zh-CN.md)。
+2026-10-11，工作区实现，尚未提交。新增三个独立 executor，复用 structure 后端的 RDKit/NumPy 与现有 Job/Artifact，不增加模型工具或固定研究阶段。详细合同与独立调用见[结构分析](../domains/chemical/skills/material-preparation/references/structure_analysis.zh-CN.md)。
 
 - `chemical.map-candidates@1`：接受两份结构材料中的显式图，按元素、同位素、总电荷、显式 map 和用户固定对应生成有界候选。identity 模式保持分子图及已指定立体化学；reaction 模式以键级编辑代价排序，支持显式质子转移等非 DA 输入。保存歧义、搜索预算、候选截断与来源摘要，不把最小编辑当作真实机理或轨迹。
 - `chemical.conformer-compare@1`：对图允许的对应进行全原子纯旋转/平移 RMSD 比较，可加入距离、角度、周期二面角。复合物整体对齐，不分别移动片段；不允许反射拟合。覆盖不足时，匹配可凭具体候选成立，未找到匹配则保持未确定。几何与态声明分开，显式态冲突保留，未知态和相同激发态 root 都不认证波函数身份，也不自动合并材料。
@@ -387,13 +387,13 @@
 
 ## 16. P5 多步路径与动力学 / 批次 H 实施记录
 
-2026-10-11，工作区实现，尚未提交。新增四个独立 executor，复用 structure、Job/Artifact 和 G 的能量材料。合同见[路径检查](../domains/chemical/skills/mechanism-reasoning/references/pathway_execution.zh-CN.md)与[动力学执行](../domains/chemical/skills/energetics/references/kinetics_execution.zh-CN.md)。
+2026-10-11，工作区实现，尚未提交。新增四个独立 executor，复用 structure、Job/Artifact 和 G 的能量材料。合同见[路径检查](../domains/chemical/skills/reaction-investigation/references/pathway_execution.zh-CN.md)与[动力学执行](../domains/chemical/skills/energetics/references/kinetics_execution.zh-CN.md)。
 
 - `chemical.pathway-check@1`：保存提供/假设/计算物种、可证伪假设、支持/冲突/未决观察、预算和未探索分支。支持 R-only、显式多步路线及共享中间体；按物种实例与本地原子 ID 的完整对应核对元素、同位素、电荷、计量及声明态连续性，报告缺步骤和未达到目标。可用确切端点材料重新执行 D 的模式/IRC 检查，不接受外部 pass 标签替代证据。
 - `chemical.tst@1`：根据明确 G 剖面计算一至三分子的 Eyring 速率常数，包含显式传输系数、浓度标准态前因子及可选初始通量。核对活性反应物、唯一活化复合物及不变旁观物种，拒绝仅电子能、负势垒和不相容来源；保留对数速率与原始证据引用，不自动认证基元步骤。
 - `chemical.branching@1`：只比较同一已平衡共同前体、相同模型/条件、不可逆且不互变产物的有限通道集合。稳定对数归一化计算初始分支比；给定浓度需各通道一致且为正，重复活化复合物不能通过改标签或注释重复计数。热力学排序与条件动力学排序分别报告。
 - `chemical.kinetic-network@1`：封闭恒容充分混合的质量作用网络，支持显式正逆速率、催化循环、构象互变和耗尽。速率可来自绑定物种/温度的 TST 或有来源的常数；核对反应守恒，以自适应双步长 RK4、Richardson 修正和左零空间不变量监测误差及守恒。负浓度阶段缩步重试，不截零；预算或数值失败保留部分轨迹并使 Job 失败。
-- 同步 mechanism-reasoning、energetics、report、research-workflow 的中英文说明，保留现有 Node/Task 的开放研究逻辑。机制材料不生成新的自动派发循环，不把化学步骤数等同于 Node 数。
+- 同步 reaction-investigation、energetics、report、research-workflow 的中英文说明，保留现有 Node/Task 的开放研究逻辑。机制材料不生成新的自动派发循环，不把化学步骤数等同于 Node 数。
 
 本批新增 **35 项**测试，覆盖独立 Eyring 公式、双分子标准态不变性、相反的热力学/动力学排序、可逆平衡与串联中间体的解析解、双分子/催化守恒、部分轨迹、无效输入、路径缺口、R-only、证据重算，以及四个入口的真实本地 Job 准备/执行/收集。
 
@@ -462,6 +462,6 @@ A–J 的约定模块开发及确定性验收完成，实现、测试和文档�
 
 合同和实际调用见 [ASE NEB](../domains/chemical/skills/candidate-generation/references/ase_neb_executor.zh-CN.md)、
 [搜索恢复](../domains/chemical/skills/method-selection/references/search_recovery.zh-CN.md)、
-[局部诊断](../domains/chemical/skills/chemical-input/references/local_diagnostics.zh-CN.md)、
+[局部诊断](../domains/chemical/skills/material-preparation/references/local_diagnostics.zh-CN.md)、
 [轨迹与报告](../domains/chemical/skills/report/references/research_tools.zh-CN.md)。
 验证采用真实 ASE/解析势与本地确定性原生替身；不等同于真实 Gaussian/xTB 反应基准。

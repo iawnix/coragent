@@ -40,6 +40,6 @@ Monitor 唤醒后先核对最新用户要求、已有结论与剩余预算；已
 
 执行故障由 execution_recovery 单独记录，不等于研究 blocked。无新证据轮数提示重新评估方法，不是固定停止阈值。失败后先检查已有回执，不能盲目重复已完成或结果未知的外部操作。最终回复恢复沿用完成证据，仅补充说明，不启动新计算或重复发送。执行待处理时说明故障；新指令解决问题后可用 refine，用户也可在 Monitor 显式 resume。
 
-多步化学任务使用领域的[路径证据合同](../../domains/chemical/skills/mechanism-reasoning/references/pathway_execution.zh-CN.md)，
+多步化学任务使用领域的[路径证据合同](../../domains/chemical/skills/reaction-investigation/references/pathway_execution.zh-CN.md)，
 将化学中间体/缺步骤与 Node 关系分开保存。扫描失败、NEB 候选和已验证基元步骤是不同
 结果。切换方法时保留先前回执及原始交付标准；动力学/交叉分析仍是普通独立 Job。

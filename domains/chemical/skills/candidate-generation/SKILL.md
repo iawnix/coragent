@@ -15,7 +15,7 @@ This is the scientific search-operation layer. Gaussian, xTB and other software
 recipes remain backend concerns; their presence here only describes how a search
 can be executed through the existing Job interface.
 
-Within a reaction investigation, follow the [mechanism-reasoning loop](../mechanism-reasoning/references/reaction_investigation.md).
+Within a reaction investigation, follow the [reaction-investigation loop](../reaction-investigation/references/reaction_investigation.md).
 Return a selected candidate with its source, remaining validation and next operation,
 or a diagnosed failure with a changed construction/search action. A preparation Job
 that only writes inputs has not performed the search: execute and inspect the solver.
@@ -77,4 +77,4 @@ Ground-spin Gaussian gradients and NEB are also available as `chemical.gradient-
 and `chemical.neb-gaussian@2`; their separate electronic settings and scope are in
 [path operations](references/path_search.md).
 
-Use [ASE NEB v2](references/ase_neb_executor.md) for new xTB/Gaussian band searches. Diagnose failed or distorted searches with [search recovery](../method-selection/references/search_recovery.md); inspect [local geometry](../chemical-input/references/local_diagnostics.md) and [trajectories](../report/references/research_tools.md) before choosing a restart frame.
+Use [ASE NEB v2](references/ase_neb_executor.md) for new xTB/Gaussian band searches. Diagnose failed or distorted searches with [search recovery](../method-selection/references/search_recovery.md); inspect [local geometry](../material-preparation/references/local_diagnostics.md) and [trajectories](../report/references/research_tools.md) before choosing a restart frame.

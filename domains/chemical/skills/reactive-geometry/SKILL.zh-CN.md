@@ -10,7 +10,7 @@ description: 根据反应中心局部坐标系、显式几何编辑和计算模�
 当需要按机制假设摆放分离反应物，或根据扫描、NEB、优化、IRC 结果修正下一轮初猜时使用。
 `chemical.reactive-geometry@1` 通过普通 Job 生命周期编辑已有坐标，不决定机理、不运行量化求解器。
 
-反应研究中，将接受的姿态和被拒候选原因交回[机理研究闭环](../mechanism-reasoning/references/reaction_investigation.zh-CN.md)。
+反应研究中，将接受的姿态和被拒候选原因交回[机理研究闭环](../reaction-investigation/references/reaction_investigation.zh-CN.md)。
 接受姿态只是约束精修或候选生成的交接，不能因此停止。交接时保留来源材料、片段内部几何、
 映射、成键变化和真实局部接触。
 

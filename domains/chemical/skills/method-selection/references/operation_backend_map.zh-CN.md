@@ -5,8 +5,8 @@
 
 | 科学操作 | 主要 Skill | 方法或后端 | 执行器 | 独立证据或验证器 |
 | --- | --- | --- | --- | --- |
-| 材料导入、结构检查与反应映射 | `chemical-input` | structure | `chemical.material`、`chemical.resolve`、`chemical.inspect`、`chemical.reaction`、`chemical.map-candidates` | 结构身份、映射和显式键变化检查 |
-| 构象/复合物准备 | `chemical-input` 与 `crest` | structure、CREST | `chemical.seed`、`chemical.crest`、`chemical.crest-ensemble`、`chemical.complex-sample` | 集合身份、来源几何和筛选证据 |
+| 材料导入、结构检查与反应映射 | `material-preparation` | structure | `chemical.material`、`chemical.resolve`、`chemical.inspect`、`chemical.reaction`、`chemical.map-candidates` | 结构身份、映射和显式键变化检查 |
+| 构象/复合物准备 | `material-preparation` 与 `crest` | structure、CREST | `chemical.seed`、`chemical.crest`、`chemical.crest-ensemble`、`chemical.complex-sample` | 集合身份、来源几何和筛选证据 |
 | 反应取向构造 | `reactive-geometry` | structure | `chemical.reactive-sites`、`chemical.reactive-pose`、`chemical.reactive-geometry` | 几何安全和显式反应中心观察 |
 | 过渡态/路径候选生成 | `candidate-generation` | Gaussian、xTB、ASE | `chemical.qst-prepare`、`chemical.scan-*`、`chemical.path-candidates`、`chemical.gradient-*`、`chemical.neb-*` | 候选来源记录；不作鞍点结论 |
 | 过渡态鞍点证据 | `validation` | Gaussian 证据解析器或规范化证据 | `chemical.gaussian-evidence`、`chemical.stationary-check`、`chemical.mode-check` | 驻点、模式方向、电子态和几何检查 |
@@ -20,7 +20,7 @@
 | CREST 计算后端 | `crest` | CREST 绑定 | `chemical.crest` 及集合执行器 | 集合回执和逐成员证据 |
 
 `method-selection` 负责协调这些层并选择命名环境，不替代操作 Skill，也不会把 Job 成功
-自动变成科学结论。`geometry-safety` 是跨任务的前置控制，在坐标进入电子结构计算前使用。
+自动变成科学结论。`geometry-preflight` 是跨任务的前置控制，在坐标进入电子结构计算前使用。
 
 
 

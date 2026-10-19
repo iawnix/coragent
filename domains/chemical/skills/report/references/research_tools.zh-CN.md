@@ -31,7 +31,7 @@ chemical-trajectory-input/1 要求 material（chemical-material/1，1–128 个�
   自动生成 33 帧正弦示意，amplitude_angstrom 默认 .15、正数且 <=1，表示最大逐原子
   位移。没有计算能量，不表示动力学或 IRC。
 
-可选 coordinates 遵循[局部诊断合同](../../chemical-input/references/local_diagnostics.zh-CN.md)；
+可选 coordinates 遵循[局部诊断合同](../../material-preparation/references/local_diagnostics.zh-CN.md)；
 display_bonds 最多 512 对显式 ID，不推断键。animation_frames 为 2–128、默认64，
 只采样 GIF 并记录原帧索引；JSON/XYZ/CSV 保留全部帧。fps 为 1–30、默认8。
 相机、轴和比例全程固定，不逐帧对齐。

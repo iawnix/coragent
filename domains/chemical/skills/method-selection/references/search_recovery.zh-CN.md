@@ -33,7 +33,7 @@ NEB 新初始路径应来自已收集、审查过且结构—能量配对的证�
 
 检查预期/非预期质子转移、短接触、片段塌陷、位阻接近、旁观基团参与及角度/扭转。
 使用明确原子 ID 和合适的局部对齐；全局 RMSD 可能掩盖反应中心变化，局部对齐可揭示
-旁观片段移动。[局部工具](../../chemical-input/references/local_diagnostics.zh-CN.md)
+旁观片段移动。[局部工具](../../material-preparation/references/local_diagnostics.zh-CN.md)
 只描述几何；键级、电荷、自旋密度、轨道特征需另取电子证据，共价半径阈值不证明键或机制。
 结合[轨迹工具](../../report/references/research_tools.zh-CN.md)查看完整变化。
 

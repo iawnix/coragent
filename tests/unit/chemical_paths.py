@@ -6,11 +6,11 @@ ROOT = Path(__file__).resolve().parents[2]
 SKILLS = ROOT / "domains" / "chemical" / "skills"
 _RELATIVE_PATHS = (
     "_shared",
-    "chemical-input/scripts/materials",
-    "chemical-input/scripts/reaction",
-    "chemical-input/scripts/geometry",
-    "chemical-input/scripts/diagnostics",
-    "chemical-input/scripts/tensor",
+    "material-preparation/scripts/materials",
+    "material-preparation/scripts/reaction",
+    "material-preparation/scripts/geometry",
+    "material-preparation/scripts/diagnostics",
+    "material-preparation/scripts/tensor",
     "crest/scripts",
     "gaussian/scripts",
     "energetics/scripts",
@@ -21,7 +21,7 @@ _RELATIVE_PATHS = (
     "candidate-generation/scripts/neb",
     "candidate-generation/scripts/da",
     "reactive-geometry/scripts",
-    "structure-cognition/scripts",
+    "structure-assessment/scripts",
 )
 
 

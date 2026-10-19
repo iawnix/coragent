@@ -7,7 +7,7 @@ description: 适配已声明的 CREST 构象和刚性片段集合 Job，保留�
 
 本 Skill 负责 CREST 可执行程序绑定、版本化输入暂存、集合回执解析和逐成员来源。它不选择
 反应机理、不排序研究假设、不认证极小点或过渡态，也不把集合能量解释为自由能；这些决策
-属于 `chemical-input`、`candidate-generation`、`energetics` 或 `method-selection`。
+属于 `material-preparation`、`candidate-generation`、`energetics` 或 `method-selection`。
 
 已注册的适配器：
 

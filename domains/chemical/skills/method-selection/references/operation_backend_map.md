@@ -7,8 +7,8 @@ not by itself establish the scientific conclusion listed in the last column.
 
 | Scientific operation | Primary Skill | Backend or adapter | Executor entries | Independent evidence or validator |
 | --- | --- | --- | --- | --- |
-| Material import, structure inspection and reaction mapping | `chemical-input` | structure | `chemical.material`, `chemical.resolve`, `chemical.inspect`, `chemical.reaction`, `chemical.map-candidates` | structure identity, mapping and explicit bond-change checks |
-| Conformer/complex preparation | `chemical-input` plus `crest` | structure, CREST | `chemical.seed`, `chemical.crest`, `chemical.crest-ensemble`, `chemical.complex-sample` | ensemble identity, source geometry and selection evidence |
+| Material import, structure inspection and reaction mapping | `material-preparation` | structure | `chemical.material`, `chemical.resolve`, `chemical.inspect`, `chemical.reaction`, `chemical.map-candidates` | structure identity, mapping and explicit bond-change checks |
+| Conformer/complex preparation | `material-preparation` plus `crest` | structure, CREST | `chemical.seed`, `chemical.crest`, `chemical.crest-ensemble`, `chemical.complex-sample` | ensemble identity, source geometry and selection evidence |
 | Reactive pose construction | `reactive-geometry` | structure | `chemical.reactive-sites`, `chemical.reactive-pose`, `chemical.reactive-geometry` | geometry safety and explicit reaction-center observations |
 | TS/path candidate generation | `candidate-generation` | Gaussian, xTB, ASE | `chemical.qst-prepare`, `chemical.scan-*`, `chemical.path-candidates`, `chemical.gradient-*`, `chemical.neb-*` | candidate provenance; no saddle conclusion |
 | TS saddle evidence | `validation` | Gaussian evidence parser or normalized evidence | `chemical.gaussian-evidence`, `chemical.stationary-check`, `chemical.mode-check` | stationary point, mode direction, state and geometry checks |
@@ -23,7 +23,7 @@ not by itself establish the scientific conclusion listed in the last column.
 
 `method-selection` coordinates these layers and chooses a named environment. It
 does not replace the operation Skill or turn a successful Job into a scientific
-verdict. `geometry-safety` is a cross-cutting preflight control used whenever a
+verdict. `geometry-preflight` is a cross-cutting preflight control used whenever a
 coordinate set is about to enter an electronic-structure calculation.
 
 

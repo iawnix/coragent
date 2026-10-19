@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 SKILLS=Path(__file__).resolve().parents[2]
-for part in ('_shared','chemical-input/scripts/materials','energetics/scripts',
+for part in ('_shared','material-preparation/scripts/materials','energetics/scripts',
              'candidate-generation/scripts/path','candidate-generation/scripts/search',
              'candidate-generation/scripts/backends'):
     sys.path.insert(0,str(SKILLS/part))

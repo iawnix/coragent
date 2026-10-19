@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 
 SKILLS = next(parent for parent in Path(__file__).resolve().parents if (parent / '_shared').is_dir())
-for part in ('_shared','chemical-input/scripts/materials','chemical-input/scripts/reaction',
+for part in ('_shared','material-preparation/scripts/materials','material-preparation/scripts/reaction',
              'crest/scripts','gaussian/scripts','energetics/scripts',
              'candidate-generation/scripts/path','candidate-generation/scripts/search',
              'candidate-generation/scripts/backends','candidate-generation/scripts/neb'):

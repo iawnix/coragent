@@ -8,7 +8,7 @@ description: Adapt declared CREST conformer and rigid-fragment ensemble jobs, pr
 This Skill owns the CREST executable binding, versioned input staging, ensemble
 receipt parsing and member-level provenance. It does not choose a reaction
 mechanism, rank a research hypothesis, certify a minimum or transition state, or
-interpret ensemble energies as free energies. Use `chemical-input`,
+interpret ensemble energies as free energies. Use `material-preparation`,
 `candidate-generation`, `energetics` or `method-selection` for those decisions.
 
 Registered adapters:

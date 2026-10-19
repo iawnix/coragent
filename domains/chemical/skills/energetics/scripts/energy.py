@@ -6,8 +6,8 @@ from pathlib import Path
 import sys
 
 SKILLS = Path(__file__).resolve().parents[2]
-for part in ('_shared', 'chemical-input/scripts/materials', 'chemical-input/scripts/reaction',
-             'chemical-input/scripts/geometry'):
+for part in ('_shared', 'material-preparation/scripts/materials', 'material-preparation/scripts/reaction',
+             'material-preparation/scripts/geometry'):
     sys.path.insert(0, str(SKILLS / part))
 from analysis_material import read_json
 from energy_analysis import ensemble, profile, scan_slice

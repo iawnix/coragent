@@ -8,7 +8,7 @@ import numpy as np
 from rdkit import Chem
 
 SKILLS = Path(__file__).resolve().parents[2]
-for part in ("_shared", "chemical-input/scripts/materials", "crest/scripts"):
+for part in ("_shared", "material-preparation/scripts/materials", "crest/scripts"):
     sys.path.insert(0, str(SKILLS / part))
 
 from analysis_material import read_json  # noqa: E402

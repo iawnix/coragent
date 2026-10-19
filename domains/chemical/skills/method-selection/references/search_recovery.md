@@ -41,7 +41,7 @@ Inspect desired and undesired proton transfer, short contacts, fragment collapse
 steric approach, spectator participation, and angle/torsion changes. Use explicit
 atom IDs and an appropriate local alignment; global RMSD can hide a moved reaction
 center, while a local alignment may expose displaced spectators. The
-[local diagnostics](../../chemical-input/references/local_diagnostics.md) report
+[local diagnostics](../../material-preparation/references/local_diagnostics.md) report
 geometry only. Bond orders, charges, spin density and orbital character require
 separate electronic evidence; covalent-radius thresholds are not bond or mechanism
 proof. Watch trajectories with the [report tools](../../report/references/research_tools.md).

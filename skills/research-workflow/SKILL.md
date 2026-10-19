@@ -41,7 +41,7 @@ For recovery, read `task_read` and the new `actual_user_submission_ids` from the
 Execution failures use execution_recovery, independently of research blocked. Runs without new evidence are a replanning signal, not a fixed stopping threshold. Inspect prior receipts after a failed run; never blindly repeat completed or uncertain side effects. During final-response recovery, use the saved completion evidence and deliver the explanation without new calculations or external sends. If execution needs attention, explain the failure; a new instruction resolving it can use refine, or the user can explicitly resume in Monitor.
 
 For multistep chemical tasks, use the domain
-[pathway evidence contract](../../domains/chemical/skills/mechanism-reasoning/references/pathway_execution.md)
+[pathway evidence contract](../../domains/chemical/skills/reaction-investigation/references/pathway_execution.md)
 to retain chemical intermediates and missing steps independently of Node relations.
 A failed scan, a NEB candidate and a validated elementary step are different
 results. Method changes keep prior receipts and the original delivery criterion;

@@ -47,14 +47,14 @@ override the generated covalent-radius-based distances per forming pair, and
 `twists` defaults to `[0, 120, -120]` degrees.
 
 Every result records local directions, rigid transforms, reaction-pair distances
-and the geometry-safety report. The executor never embeds SMILES, ranks
+and the geometry-preflight report. The executor never embeds SMILES, ranks
 electronic energies or claims that an accepted pose is a TS. Use `chemical.seed`
 or CREST first, inspect the pose ensemble, then run a separate constrained
 preoptimization, QST, scan or NEB.
 
 `chemical-reactive-geometry/1` contains an embedded `material` with 2–256 atoms in Å,
 `bond_changes`, `edit_hypotheses`, and optional `sampling`. Product input is not
-required. Import/assemble materials first using chemical-input/CREST; this executor
+required. Import/assemble materials first using material-preparation/CREST; this executor
 neither embeds SMILES nor optimizes monomers.
 
 The material must have a reference molecular graph. For a graphless previous TS/path

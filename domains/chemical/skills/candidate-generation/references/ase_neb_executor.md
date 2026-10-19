@@ -93,5 +93,5 @@ check the imaginary mode against intended coordinates, and establish bidirection
 IRC endpoints/minima with the validation tools. Multiple peaks, intermediates or
 same-basin IRC may require revised hypotheses and separate step searches.
 Use [failure diagnosis](../../method-selection/references/search_recovery.md),
-[local diagnostics](../../chemical-input/references/local_diagnostics.md) and
+[local diagnostics](../../material-preparation/references/local_diagnostics.md) and
 [trajectory/report tools](../../report/references/research_tools.md) to inspect evidence.

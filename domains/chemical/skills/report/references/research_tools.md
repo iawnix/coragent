@@ -37,7 +37,7 @@ with coordinates) and `kind`: irc, neb, optimization, mode or other. Supply exac
   illustration uses `amplitude_angstrom` (default .15, positive and <=1) as maximum
   per-atom displacement. No computed energies, dynamics or IRC are implied.
 
-Optional `coordinates` use the [local diagnostic contract](../../chemical-input/references/local_diagnostics.md).
+Optional `coordinates` use the [local diagnostic contract](../../material-preparation/references/local_diagnostics.md).
 `display_bonds` are explicit ID pairs (at most 512); no bonds are inferred.
 `animation_frames` (2–128, default64) bounds sampled GIF frames and records source
 indices; result JSON, XYZ and CSV retain all frames. `fps` is 1–30, default8.
