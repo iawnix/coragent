@@ -1,5 +1,6 @@
 import { defineDoc } from "@earendil-works/pi-durable";
 import { taskError } from "./controller.mjs";
+import { projectMonitorTask, projectMonitorContinuation } from "./projection.mjs";
 export { MONITOR_SERVICE_ID } from "../contracts/monitor.mjs";
 
 // References only: Pi remains authoritative for every execution status.
@@ -53,21 +54,30 @@ export function createMonitorService({ controller, harness, conversation, kernel
   }
   const handlers = {
     "monitor/overview": async (params, context) => {
-      const [task, jobs, live] = await Promise.all([controller.current(context), scopedJobs({ limit: 25 }), harness.snapshot(LiveDoc, conversation.id, context)]);
+      const [task, live] = await Promise.all([controller.current(context), harness.snapshot(LiveDoc, conversation.id, context)]);
+      const jobScope = task ? { user_task_id: task.user_task_id } : {};
       const counts = { running: 0, queued: 0, total: 0 };
-      let page = jobs;
+      const active = [], queued = new Set(["queued", "held", "submitted", "created"]);
+      let page = await scopedJobs({ ...jobScope, limit: 100 });
       do {
-        for (const job of page.items) { counts.total += 1; if (job.state === "running") counts.running += 1; if (["queued", "held", "submitted", "created"].includes(job.state)) counts.queued += 1; }
-        page = page.next_cursor ? await scopedJobs({ limit: 100, cursor: page.next_cursor }) : null;
+        for (const job of page.items) {
+          counts.total += 1;
+          if (job.state === "running") counts.running += 1;
+          if (queued.has(job.state)) counts.queued += 1;
+          if ((job.state === "running" || queued.has(job.state)) && active.length < 5) active.push({ job_id: job.job_id, state: job.state });
+        }
+        page = page.next_cursor ? await scopedJobs({ ...jobScope, limit: 100, cursor: page.next_cursor }) : null;
       } while (page);
-      jobs.counts = counts;
-      return { schema_version: "coragent-monitor/1", workspace_id: workspaceId, session_id: sessionId,
-        task, jobs, execution: { state: live?.run ? "running" : "idle", run_id: live?.run ? String(live.run.inputs[0]) : null },
-        research_review: task?.research_review ?? null,
-        task_controller: controller.health(),
-        automatic_continuation_enabled: controller.health().automatic_continuation_enabled, updated_at: new Date().toISOString() };
+      return { schema_version: "coragent-monitor/2", workspace_id: workspaceId, session_id: sessionId,
+        task: projectMonitorTask(task),
+        jobs: { scope: task ? "task" : "session", counts, active, active_omitted: counts.running + counts.queued - active.length },
+        execution: { state: live?.run ? "running" : "idle", run_id: live?.run ? String(live.run.inputs[0]) : null },
+        continuation: projectMonitorContinuation(task, controller.health()), updated_at: new Date().toISOString() };
     },
-    "monitor/tasks": (params, context) => controller.list(context, params),
+    "monitor/tasks": async (params, context) => {
+      const page = await controller.list(context, params);
+      return { items: page.items.map(task => projectMonitorTask(task, { list: true })), next_cursor: page.next_cursor };
+    },
     "monitor/task/read": async (params, context) => {
       const task = await controller.read(params, context);
       const research = await kernel.execute_command("research.read", {

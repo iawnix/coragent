@@ -31,6 +31,7 @@ const requireValue = (ok, code, message) => { if (!ok) throw taskError(code, mes
 const stamp = () => new Date().toISOString();
 const researchSchema = shared.tools.taskUpdate.properties.research;
 const reviewStatuses = new Set(["current", "pending", "stale", "running", "failed"]);
+const blockKinds = new Set(shared.tools.taskUpdate.properties.block_kind.enum);
 const reviewProjection = data => {
   requireValue(data && data.schema_version === "research-review/1", "research_review_invalid", "Research Review projection schema is unsupported");
   requireValue(reviewStatuses.has(data.review_status), "research_review_invalid", "Research Review lifecycle status is invalid");
@@ -448,6 +449,26 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       requireValue(task?.user_task_id, "task_not_found", "User task does not exist in this conversation");
       return taskRecord(task);
     },
+    /** Bind the first research Node to an otherwise unbound active task.
+     * This is a derived runtime convenience: it deliberately does not advance
+     * the user-task revision, so a task_update using the task_begin revision
+     * remains valid in the same model turn. Explicit set_research remains the
+     * authority once a task already has a research scope. */
+    async bindResearchNode(nodeId, ctx, expectedTaskId) {
+      requireValue(typeof nodeId === "string" && /^node_[1-9][0-9]*$/.test(nodeId),
+        "task_research_invalid", "Research binding requires an existing Node reference");
+      return conversation.commit(async tx => {
+        const { task } = await currentTx(tx);
+        if (!task || !["active", "waiting"].includes(task.state)) return null;
+        if (task.user_task_id !== expectedTaskId) return null;
+        if (task.research.entry_node_ids.length || task.research.focus_node_ids.length) return null;
+        if (task.audit.some(item => ["set_research", "research_bind"].includes(item.action))) return null;
+        task.research = { entry_node_ids: [nodeId], focus_node_ids: [nodeId] };
+        task.audit.push({ action: "research_bind", actor: "runtime", reason: "First Node bound as the task research focus", revision: task.revision, at: stamp() });
+        task.updated_at = stamp();
+        return { user_task_id: task.user_task_id, research: copy(task.research), auto_bound: true };
+      }, ctx);
+    },
     /** Persist only the derived Review pointer used by Monitor. Review facts
      * remain in the research store and do not advance the user-task revision. */
     async recordResearchReview(data, ctx, expectedTaskId = null) {
@@ -483,8 +504,10 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         Object.assign(task, { schema_version: "coragent-user-task/2", user_task_id: id,
           workspace_id: workspaceId, session_id: sessionId, conversation_id: conversation.id,
           title: params.title, objective: params.objective, sources, criteria: params.criteria,
+          initial_plan: params.initial_plan || "Preserve the user's deliverables, establish the research scope, and produce evidence for the first decision before choosing the next action.",
+          next_action: params.next_action || "Read the current requirements and perform the first concrete evidence-producing action.",
           state: "active", reason: null, revision: 1, control_epoch: 1, wait: null,
-          progress: null, progress_version: 0, completion: null, execution_recovery: null,
+          progress: null, progress_version: 0, completion: null, execution_recovery: null, block_details: null,
           research: { entry_node_ids: [], focus_node_ids: [] }, research_review: null, progress_identities: [],
           event_inputs: [],
           continuation: { sequence: 0, reservation: null, no_progress: 0 }, audit: [],
@@ -508,6 +531,18 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       requireValue(params.action === "set_research" || params.research === undefined, "task_research_invalid", "Research bindings use set_research");
       if (params.action === "set_research") await verifyResearch(params.research);
       const identities = params.action === "progress" ? await verifyEvidence(params.evidence_refs, ctx, { userTaskId: basis?.user_task_id }) : [];
+      if (params.action === "block") {
+        requireValue(typeof params.reason === "string" && params.reason.trim(), "task_reason_required", "A blocker needs an explanation");
+        requireValue(blockKinds.has(params.block_kind), "task_block_invalid", "A blocker needs a supported block_kind");
+        requireValue(typeof params.resume_when === "string" && params.resume_when.trim(), "task_block_invalid", "A blocker needs a concrete resume_when condition");
+        const requiresEvidence = params.block_kind !== "missing_user_input";
+        requireValue(!requiresEvidence || Array.isArray(params.evidence_refs) && params.evidence_refs.length > 0,
+          "task_block_evidence_required", "This blocker kind requires evidence_refs");
+        const blockEvidence = params.evidence_refs
+          ? await verifyEvidence(params.evidence_refs, ctx, { userTaskId: basis?.user_task_id }) : [];
+        requireValue(!requiresEvidence || blockEvidence.length > 0,
+          "task_block_evidence_required", "A blocker needs verified Result, Artifact or owned Job evidence; plans and notes alone are insufficient");
+      }
       if (params.action === "propose_completion") {
         for (const item of params.completion || []) await verifyEvidence(item.evidence_refs, ctx, { completion: true, userTaskId: basis?.user_task_id });
       }
@@ -540,16 +575,19 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           if (params.objective !== undefined) task.objective = params.objective;
           if (params.criteria !== undefined) task.criteria = params.criteria;
           task.execution_recovery = null;
+          task.block_details = null;
           task.completion = null; delete task.completion_submission_id; delete task.completion_control_epoch;
           if (task.state === "completing") task.state = "active";
           task.sources.push(...sources); task.control_epoch += 1;
+          if (params.next_action !== undefined) task.next_action = params.next_action;
         } else if (params.action === "progress") {
           if (recordProgress(task, identities)) await recordUserRecoveryProgress(tx, task);
           task.progress = { summary: params.reason ?? null, evidence_refs: params.evidence_refs, at: stamp() };
+          if (params.next_action !== undefined) task.next_action = params.next_action;
         } else if (params.action === "set_research") {
           task.research = copy(params.research);
         } else if (params.action === "wait") {
-          task.state = "waiting"; task.wait = params.wait;
+          task.state = "waiting"; task.wait = params.wait; task.block_details = null;
         } else if (params.action === "block") {
           requireValue(params.reason, "task_reason_required", "A blocker needs an explanation");
           const live = await tx.doc(LiveDoc, conversation.id);
@@ -558,6 +596,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           Object.assign(finalization, { submission_id: live.run?.inputs[0] ?? null,
             submission_ids: live.run?.inputs ?? [], control_epoch: task.control_epoch });
           task.state = "blocked"; task.reason = params.reason; task.wait = null;
+          task.block_details = { kind: params.block_kind, resume_when: params.resume_when, evidence_refs: params.evidence_refs ?? [] };
           task.execution_recovery = null; task.completion = null; delete task.completion_submission_id; delete task.completion_control_epoch;
         } else if (params.action === "propose_completion") {
           requireValue(task.criteria.length > 0 && task.criteria.every(criterion =>
@@ -626,6 +665,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           task.control_epoch += 1;
           task.state = action === "resume" ? "active" : action === "pause" ? "paused" : "cancelled";
           task.reason = action === "resume" ? null : `User requested ${action}`;
+          task.block_details = null;
           index.automatic_suppressed = action !== "resume";
           if (action !== "resume") {
             task.wait = null; task.execution_recovery = null;

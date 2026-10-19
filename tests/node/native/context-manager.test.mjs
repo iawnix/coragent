@@ -155,6 +155,36 @@ test('tool turns, progress revisions and external events do not rehydrate; scope
   assert.equal(reads,4);
 });
 
+test('latest action and blocker survive compaction without refreshing the historical review', async () => {
+  let reads = 0;
+  const manager = fixtureManager({bridge:{async execute_command(){reads++;return snapshot();}}});
+  const task = {...fullTask(),initial_plan:'Compare both routes.',next_action:'Inspect route A.'};
+  const first = await manager.prepare({entries:[]},memoApi(),context,{task});
+  const metadata = manager.prepareSummary({entries:[committed(first)],firstKept:3}).metadata;
+  const view = {entries:[{id:4,kind:'pi.compaction',data:{metadata:[metadata]}}]};
+  const revised = {...task,revision:2,next_action:'Validate route B against the original constraints.'};
+  assert.equal(await manager.prepare(view,memoApi(),context,{task:revised}),undefined);
+  const request = {messages:[{role:'user',content:'Historical summary',timestamp:0}],model:{contextWindow:1000000},maxTokens:1024};
+  const current = await manager.admit(request,'progress',{task:revised});
+  assert.equal(decode(current.messages.at(-1)).task.next_action,revised.next_action);
+  const blocked = {...revised,state:'blocked',block_details:{kind:'missing_user_input',resume_when:'Supply the boundary value.',evidence_refs:[]}};
+  const stopped = await manager.admit(request,'block',{task:blocked});
+  assert.deepEqual(decode(stopped.messages.at(-1)).task.block_details,blocked.block_details);
+  const resumed = await manager.admit(request,'resume',{task:{...revised,block_details:null}});
+  assert.equal(decode(resumed.messages.at(-1)).task.block_details,undefined);
+  assert.equal(reads,1);
+  assert.equal(decode(first.messages[0]).task.next_action,'Inspect route A.');
+  const long = '\u0001中文😀'.repeat(1000);
+  const oversized = await manager.admit(request,'large-hints',{task:{...blocked,next_action:long,
+    block_details:{kind:'scientific_dead_end',resume_when:long,evidence_refs:Array(64).fill(long)}}});
+  const projected = decode(oversized.messages.at(-1)).task;
+  assert.ok(Buffer.byteLength(JSON.stringify(projected))<4000);
+  assert.equal(projected.continuation_truncated,true);
+  assert.equal(projected.block_details.evidence_refs.length,8);
+  assert.equal(projected.block_details.evidence_omitted,56);
+  assert.match(projected.required_action,/task_read/);
+});
+
 test('hydration recovery reuses immutable memo, escapes data and grants no read receipts', async () => {
   let reads = 0;
   const manager = fixtureManager({bridge:{async execute_command(command){assert.equal(command,'research.read');reads++;return {...snapshot(),read_basis:'not-a-permission'};}}});

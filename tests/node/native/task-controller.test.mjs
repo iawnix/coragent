@@ -11,6 +11,7 @@ import { createSessionAdmission } from "../../../apps/agent/host/admission/sessi
 import { createTaskController, UserTask } from "../../../apps/agent/tasks/controller.mjs";
 import { createMonitorService } from "../../../apps/agent/tasks/service.mjs";
 import { createTaskTools } from "../../../apps/agent/tasks/tools.mjs";
+import { createResearchTools } from "../../../apps/agent/tools/research/tools.mjs";
 import { wrapToolForHarness } from "../../../apps/agent/tools/envelope.mjs";
 import { createToolExecutionContext } from "../../../apps/agent/tools/context.mjs";
 import { projectUserTask } from "../../../apps/agent/tasks/projection.mjs";
@@ -65,7 +66,9 @@ async function fixture(t, storage = new MemoryStorage(), controllerOptions = {},
     const source = await admission.submitUser({ requestId: "user-research", content: "Research this mechanism and deliver an evidence-backed report" }, context);
     await conversation.waitForIdle(context);
     const task = await controller.begin({ title: "Research mechanism", objective: "Deliver the mechanism report",
-      source_submission_ids: [String(source.id)], criteria: [{ id: "report", description: "Report supported by evidence" }] }, "begin", context);
+      source_submission_ids: [String(source.id)], criteria: [{ id: "report", description: "Report supported by evidence" }],
+      initial_plan: "Investigate the mechanism and deliver a report supported by evidence.",
+      next_action: "Inspect the available mechanism inputs." }, "begin", context);
     return task;
   };
   return { harness, conversation, admission, get controller() { return controller; }, native, faux, begin, jobStates, calls, kernel, session, artifacts,
@@ -79,6 +82,8 @@ test("idle active tasks continue beyond three evidence-free runs and explicit bl
   assert.equal(task.schema_version, "coragent-user-task/2");
   assert.deepEqual(task.research, { entry_node_ids: [], focus_node_ids: [] });
   assert.match(task.sources[0].text, /evidence-backed/);
+  assert.equal(task.initial_plan, "Investigate the mechanism and deliver a report supported by evidence.");
+  assert.equal(projectUserTask(task).next_action, "Inspect the available mechanism inputs.");
   for (let round = 0; round < 4; round++) {
     faux.setResponses([fauxAssistantMessage("Another partial summary")]);
     await Promise.all([controller.reconcile(), controller.reconcile()]);
@@ -90,6 +95,7 @@ test("idle active tasks continue beyond three evidence-free runs and explicit bl
   let blocking = await controller.current(context);
   assert.equal(blocking.state, "active");
   await controller.update({ action: "block", expected_revision: blocking.revision,
+    block_kind: "missing_user_input", resume_when: "The user supplies the required boundary data.",
     reason: "The required boundary data must be supplied before further analysis" }, "explicit-block", context);
   await controller.reconcile();
   assert.equal((await controller.current(context)).state, "blocked");
@@ -131,6 +137,77 @@ test("idle active tasks continue beyond three evidence-free runs and explicit bl
   current = await controller.current(context);
   await assert.rejects(controller.update({ action: "refine", expected_revision: current.revision,
     source_submission_ids: [String(source.id)] }, "refine-paused", context), { code: "task_paused" });
+});
+
+test("structured blockers require a concrete resume condition and evidence when applicable", async t => {
+  const { controller, begin, reopen } = await fixture(t);
+  const task = await begin();
+  const blocker = { action: "block", expected_revision: task.revision,
+    block_kind: "scientific_dead_end", resume_when: "A new independent route is identified.",
+    reason: "The tested route cannot satisfy the stated constraint." };
+  for (const block_kind of ["scientific_dead_end", "execution_failure", "resource_unavailable", "budget_exhausted"]) {
+    await assert.rejects(controller.update({ ...blocker, block_kind }, `premature-${block_kind}`, context), { code: "task_block_evidence_required" });
+    await assert.rejects(controller.update({ ...blocker, block_kind, evidence_refs: ["node_1"] }, `node-${block_kind}`, context), { code: "task_block_evidence_required" });
+  }
+  await assert.rejects(controller.update({ ...blocker, block_kind: "missing_user_input", resume_when: " " }, "blank-condition", context), { code: "task_block_invalid" });
+  await assert.rejects(controller.update({ ...blocker, block_kind: "missing_user_input", reason: " " }, "blank-reason", context), { code: "task_reason_required" });
+  await assert.rejects(controller.update({ ...blocker, evidence_refs: ["missing"] }, "missing-evidence", context), /unknown evidence/);
+  assert.equal((await controller.current(context)).state, "active");
+  const blocked = await controller.update({ ...blocker, evidence_refs: ["result_1"] }, "evidenced-block", context);
+  assert.equal(blocked.state, "blocked");
+  assert.deepEqual(blocked.block_details, { kind: "scientific_dead_end",
+    resume_when: "A new independent route is identified.", evidence_refs: ["result_1"] });
+  const progressed = await controller.update({ action: "progress", expected_revision: blocked.revision,
+    evidence_refs: ["result_2"], next_action: "Inspect another route once the blocker is resolved." }, "blocked-progress", context);
+  assert.equal(progressed.state, "blocked");
+  assert.equal(progressed.next_action, "Inspect another route once the blocker is resolved.");
+  assert.deepEqual(progressed.block_details, blocked.block_details, "progress alone must not erase the blocker");
+  await reopen();
+  const resumed = await controller.control({ user_task_id: task.user_task_id, action: "resume",
+    expected_revision: progressed.revision, request_id: "user-resume" }, context);
+  assert.equal(resumed.task.state, "active");
+  assert.equal(resumed.task.block_details, null);
+});
+
+test("the first created research Node becomes the task focus when no scope was set", async t => {
+  const { controller, begin } = await fixture(t);
+  const task = await begin();
+  assert.deepEqual(task.research, { entry_node_ids: [], focus_node_ids: [] });
+  const bound = await controller.bindResearchNode("node_1", context, task.user_task_id);
+  assert.deepEqual(bound, { user_task_id: task.user_task_id,
+    research: { entry_node_ids: ["node_1"], focus_node_ids: ["node_1"] }, auto_bound: true });
+  assert.deepEqual((await controller.current(context)).research,
+    { entry_node_ids: ["node_1"], focus_node_ids: ["node_1"] });
+  assert.equal(await controller.bindResearchNode("node_2", context, task.user_task_id), null);
+  assert.equal((await controller.current(context)).revision, task.revision, "automatic focus must not invalidate same-turn updates");
+  const explicit = await controller.update({ action: "set_research", expected_revision: task.revision,
+    research: { entry_node_ids: [], focus_node_ids: [] } }, "clear-scope", context);
+  assert.equal(await controller.bindResearchNode("node_3", context, task.user_task_id), null, "explicit scope clearing takes precedence");
+  assert.deepEqual((await controller.current(context)).research, explicit.research);
+});
+
+test("a Node creation finishing after task replacement cannot bind the new task", async t => {
+  const { controller, begin } = await fixture(t);
+  const task = await begin();
+  const entered = Promise.withResolvers(), finish = Promise.withResolvers();
+  const tools = createResearchTools({
+    commandBridge: { async execute_command() { entered.resolve(); return finish.promise; } },
+    getResearchTaskId: async ctx => (await controller.current(ctx))?.user_task_id ?? null,
+    bindResearchNode: (nodeId, ctx, taskId) => controller.bindResearchNode(nodeId, ctx, taskId),
+  });
+  const pending = tools.find(tool => tool.name === "research_create").execute({ goal: "Inspect the old task route" },
+    { callId: "race", coragent: { workspace_root: "/workspace", session_id: "session", operation_id: "create", principal: "root_agent" } }, context);
+  await entered.promise;
+  try {
+    await controller.control({ user_task_id: task.user_task_id, action: "cancel", expected_revision: task.revision,
+      request_id: "cancel-before-create", jobs: "keep" }, context);
+    await controller.begin({ title: "New study", objective: "Investigate another route", source_submission_ids: [task.sources[0].submission_id],
+      criteria: [{ id: "report", description: "Deliver the new study" }], initial_plan: "Inspect the new inputs and report.",
+      next_action: "Read the new inputs." }, "replace-before-create", context);
+  } finally { finish.resolve({ node: { id: "node_1", revision: 1 } }); }
+  const reply = await pending;
+  assert.equal(reply.details.result.task_research_binding, undefined);
+  assert.deepEqual((await controller.current(context)).research, { entry_node_ids: [], focus_node_ids: [] });
 });
 
 const nodeId = n => `node_${n + 1}`;
@@ -475,7 +552,8 @@ test("canonical task tools run through the trusted Harness envelope", async t =>
   const [begin, read] = createTaskTools(() => controller).map(tool => wrapToolForHarness(tool, { toolContext,
     invocation: api => ({ workspaceRoot: "/workspace", sessionId: "session", operationId: String(api.taskId) }) }));
   const result = await begin.execute({ title: "Work", objective: "Complete research", source_submission_ids: [String(input.id)],
-    criteria: [{ id: "report", description: "Deliver a report" }] }, { taskId: 99, callId: "begin" }, context);
+    criteria: [{ id: "report", description: "Deliver a report" }], initial_plan: "Collect evidence and deliver the report.",
+    next_action: "Read the requirements and collect the first evidence." }, { taskId: 99, callId: "begin" }, context);
   assert.equal(result.isError, undefined);
   assert.equal(result.details.envelope.ok, true);
   const readResult = await read.execute({}, { taskId: 100, callId: "read" }, context);
@@ -487,12 +565,16 @@ test("task context bounds original requirements, waits, progress and escaped tex
   const task = await begin();
   const long = "\u0001中文😀".repeat(10000);
   const projected = projectUserTask({ ...task, title: long, objective: long, reason: long,
+    initial_plan: long, next_action: long,
+    block_details: { kind: "scientific_dead_end", resume_when: long, evidence_refs: Array(1000).fill(long) },
     sources: Array.from({ length: 1000 }, (_, id) => ({ submission_id: String(id), entry_id: id, text: long })),
     criteria: Array.from({ length: 1000 }, (_, id) => ({ id: String(id), description: long })),
     wait: { mode: "all", job_ids: Array(1000).fill(long) },
     progress: { summary: long, at: "2026-10-10", evidence_refs: Array(1000).fill(long) },
   });
   assert.ok(Buffer.byteLength(JSON.stringify(projected)) < 16000);
+  assert.equal(projected.block_details.evidence_refs.length, 8);
+  assert.equal(projected.block_details.evidence_omitted, 992);
   assert.equal(projected.sources.length, 4);
   assert.equal(projected.sources_omitted, 996);
   assert.equal(projected.projection_truncated, true);
@@ -582,6 +664,7 @@ for (const producer of ["task_controller", "monitor"]) for (const control of [nu
   try {
     task = await controller.current(context);
     task = await controller.update({ action: "block", expected_revision: task.revision,
+      block_kind: "missing_user_input", resume_when: "The user supplies the missing boundary data.",
       reason: "Missing required boundary data; no independent analysis remains" }, "block", context);
     await controller.assertExecutionAllowed(record, origin, context);
     await assert.rejects(controller.assertExecutionAllowed(record, { ...origin, consumption: null }, context));

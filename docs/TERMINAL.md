@@ -139,52 +139,43 @@ Arrow keys scroll content without changing the panel height; short documents onl
 show Back. Closing restores editing and the transcript reading position. Background
 task cancellation hints are hidden while a command surface owns Esc.
 
-A permanent row immediately above the input shows the user task before the Job
-count: `Monitor ✓ · Researching · 2 jobs running`, `Waiting for compute`,
-`Preparing continuation`, `Paused`, `Needs attention`, or `Completed`. A completed
-model reply does not imply a completed user task. A disconnected or stale snapshot
-takes priority over cached progress. Unknown counts display `—`; no progress
-percentage or completion time is inferred. The row remains visible while idle and
-while command panels are open. Background refreshes preserve focus, selection,
-reading position, and the input draft.
+A permanent row immediately above the input shows a compact activity label and
+Job count, for example `Monitor … · Working · 2 jobs running`. It uses only five
+labels; operational explanations belong in `/monitor`, not in the status name.
 
-The base task states are:
-
-| Task state | Display | Meaning |
-| --- | --- | --- |
-| `active` | Researching | The user task is still in progress |
-| `waiting` | Waiting for compute | Waiting for recorded compute conditions; adds Continues when ready when automatic continuation is on |
-| `paused` | Paused | Automatic continuation is paused |
-| `blocked` | Needs attention | The task is blocked; shows Responding · Task blocked while a model turn is running |
-| `completing` | Preparing delivery | Preparing the deliverable |
-| `completed` | Completed | The user task is complete |
-| `cancelled` | Cancelled | The user task was cancelled |
-| `recovering` | Checking recovery | Checking recovery state |
-
-The row can instead show operational or connection information:
-
-| Display | Condition |
+| Display | Meaning |
 | --- | --- |
-| Checking status | No Monitor snapshot for this session yet |
-| No current task | No registered user task |
-| Checking recovery | The controller has not completed its first check |
-| Checking continuation / Preparing continuation | An active task is idle, without / with a continuation reservation |
-| Automatic continuation off | An active task is idle and automatic continuation is disabled |
-| Connection lost | A Monitor request or subscription failed |
-| Status is stale | Invalid snapshot timestamp or no update for over 30 seconds |
-| Continuation error: … | A task controller error |
-| Continuation check overdue | An active/waiting task has not been checked for the greater of 30 seconds or three check intervals |
+| Working | Research, continuation scheduling, final delivery, or an executing recovery |
+| Waiting | Waiting for compute or an automatic recovery retry |
+| Stopped | Paused, cancelled, blocked, unable to recover, or automatic continuation disabled while idle |
+| Completed | The user task finished its delivery |
+| Idle | No current task and no model response executing |
 
-Connection, snapshot freshness and controller checks take priority over cached task
-progress. `jobs running` counts running compute jobs, excluding queued jobs; it does
-not indicate whether a model turn is running. Read `/monitor` → `Reason` for the cause
-of a blocked task. `✓` is the normal status symbol; the adjacent text determines
-whether the task is complete. `Ⅱ` means paused, `…` checking or preparing, `!` attention,
-and `×` a connection or controller error.
+Missing observations, overdue controller checks, and connection or stale-snapshot
+failures display `—` instead of claiming work is progressing. A running response
+can still show Working before the first controller check or with automatic
+continuation disabled. Replies explaining a paused, blocked, cancelled, or
+attention-required task do not replace Stopped with a combined status name.
+Connection failure, missing session data, and snapshots older than 30 seconds also
+hide cached job counts. Open `/monitor` for the explanation and recovery guidance.
+
+A completed model reply does not imply a completed user task. `jobs running`
+counts running compute jobs for the current task, or the session if no task exists;
+it excludes queued jobs and does not indicate whether a model turn is running.
+No progress percentage or completion time is inferred. The row remains visible
+while idle and while command panels are open. Background refreshes preserve
+focus, selection, reading position, and the input draft.
+
+The five labels are a presentation mapping, not a new stored lifecycle. Task
+details and task lists retain the precise paused, blocked, cancelled, and delivery
+states. Reasons, automatic-continuation policy, and recovery records remain
+available in overview, task details, execution records, and health.
 
 `/monitor` is a compact live current-session overview. It displays the task state,
-objective, latest progress, concrete Job waits, recovery reason, Job counts,
-automatic-continuation setting and research-review state. Use `/monitor task <id>`
+objective, latest progress, next action, wait conditions, recovery reason, resume
+condition, and effective continuation status. Job counts cover all pages for the current
+task; up to five active jobs are previewed. Paused, blocked, or disabled continuation
+does not promise an automatic wakeup. Long summaries explicitly link to full details. Use `/monitor task <id>`
 for delivery criteria and research details, `/monitor jobs` for execution and
 collection, and `/monitor run <id>` for Pi generation/tool tasks. A successful Job
 is not treated as completed scientific analysis; the task's research review and

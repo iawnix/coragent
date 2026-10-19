@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { projectDecisionTask } from "../tasks/projection.mjs";
+import { projectDecisionTask, projectTaskContinuation } from "../tasks/projection.mjs";
 
 const KEY = "coragent.research-context/1";
 const PROJECTION_MAX_BYTES = 16000;
@@ -76,7 +76,8 @@ export function createContextManager({ bridge, coordinator, sessionId, estimateC
           required_action: "Read current research before scientific or completion decisions; execution records and delivery receipts remain authoritative." };
       }
       if (decision.contradictions?.length || decision.findings?.some(n => n.review_notice_count)) target = 4000;
-      const { review_id, review_digest, state_digest, bounds, runtime_synthesis, ...research } = decision;
+      // Orientation is historical data, never a receipt granting Node writes.
+      const { review_id, review_digest, state_digest, bounds, runtime_synthesis, read_basis: _readBasis, ...research } = decision;
       message = envelope("research_context", { ...control, research_review: { ...research,
         ...(runtime_synthesis ? { synthesis: runtime_synthesis } : {}),
         ...(bounds ? { omitted: bounds.omitted } : {}) },
@@ -145,6 +146,7 @@ export function createContextManager({ bridge, coordinator, sessionId, estimateC
       const control = envelope("runtime_control", { task: task ? {
         user_task_id: task.user_task_id, revision: task.revision, control_epoch: task.control_epoch,
         state: task.state, ...(task.reason ? { reason: task.reason } : {}), ...(task.wait ? { wait: task.wait } : {}),
+        ...projectTaskContinuation(task),
       } : null, actual_user_submission_ids, automatic_continuation_enabled });
       const messages = [...request.messages, control];
       const estimate = estimateContextTokens(messages);

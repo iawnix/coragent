@@ -84,20 +84,28 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
         const researchPayload = JSON.parse(researchEnvelope.content.split("\n")[1]);
         const snapshot = researchPayload.research_review || researchPayload.research;
         assert.ok(snapshot && snapshot.schema_version === "research-review/1");
+        if (node && task && requests === 2) {
+          assert.deepEqual(snapshot.scope.entry_node_ids, [node.id]);
+          assert.deepEqual(snapshot.scope.focus_node_ids, [node.id]);
+          assert.equal(task.revision, 1);
+          assert.ok(researchPayload.task.initial_plan && researchPayload.task.next_action);
+        }
         if (snapshot.scope.focus_node_ids?.length) {
           assert.ok(snapshot.findings.some(item => snapshot.scope.focus_node_ids.includes(item.ref)));
         }
         if (scenario === "branches" && snapshot.scope.entry_node_ids?.length) {
           assert.ok(snapshot.source_refs.includes(rootNode.id));
-          assert.ok(snapshot.source_refs.includes(branchA.id));
+          if (snapshot.scope.focus_node_ids.includes(branchA?.id)) assert.ok(snapshot.source_refs.includes(branchA.id));
         }
         const bind = (entry, focus) => ({ name: "task_update", arguments: { expected_revision: task?.revision,
           action: "set_research", research: { entry_node_ids: entry, focus_node_ids: focus } } });
         const singleSteps = [
           { name: "task_begin", arguments: { title: "Fixture research", objective: "Record a reproducible fixture finding without external delivery.",
-            source_submission_ids: userIds, criteria: [{ id: "finding", description: "Publish the fixture finding and report it." }] } },
+            source_submission_ids: userIds, criteria: [{ id: "finding", description: "Publish the fixture finding and report it." }],
+            initial_plan: "Create the fixture Node, record the finding and deliver the evidence-backed result.",
+            next_action: "Create the fixture research Node." } },
           { name: "research_create", arguments: { goal: "Verify continued analysis", plan: "Record a local deterministic observation." } },
-          bind([node?.id], [node?.id]),
+          { name: "task_read", arguments: {} },
           "Initial analysis is ready; the finding still needs to be recorded.",
           { name: "task_read", arguments: {} },
           { name: "research_result", arguments: { node_id: node?.id, conclusion: "The local fixture completed its analysis.", limitations: "Deterministic fixture only." } },
@@ -112,7 +120,9 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
         const synthesis = published.get("The comparison supports derivation B within the approximation bounds.");
         const branchSteps = [
           { name: "task_begin", arguments: { title: "Compare derivations", objective: "Compare independent derivations and retain their limitations without external delivery.",
-            source_submission_ids: userIds, criteria: [{ id: "comparison", description: "Retain both findings, approximation bounds and the comparison." }] } },
+            source_submission_ids: userIds, criteria: [{ id: "comparison", description: "Retain both findings, approximation bounds and the comparison." }],
+            initial_plan: "Create the comparison and bounds Nodes, test both derivations, and publish the supported comparison with limitations.",
+            next_action: "Create the comparison root Node." } },
           { name: "research_create", arguments: { title: "Compare derivations", goal: "Which derivation satisfies the boundary condition?", plan: "Compare independent candidates against shared approximation bounds." } },
           { name: "research_create", arguments: { title: "Approximation bounds", goal: "What is the approximation error?", plan: "Bound the neglected terms." } },
           { name: "research_create", arguments: { title: "Derivation A", goal: "Does derivation A satisfy the boundary condition?", plan: "Substitute at the boundary.",
@@ -137,6 +147,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
         const blockSteps = [
           ...singleSteps.slice(0, 5),
           { name: "task_update", arguments: { expected_revision: task?.revision, action: "block",
+            block_kind: "missing_user_input", resume_when: "The user supplies the required boundary value.",
             reason: "The required boundary value is missing; independent analysis is exhausted. Supply the boundary value to resume." } },
           "Research is blocked pending the required boundary value.",
           { name: "task_update", arguments: { expected_revision: task?.revision, action: "refine", source_submission_ids: userIds } },
@@ -219,7 +230,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
       assert.ifError(fixtureError);
       await assert.doesNotReject(async () => { overview = await backend.monitor("monitor/overview", scope); });
       if (scenario.endsWith("-recovery") && overview.task?.execution_recovery?.state === "retrying" && !recoveryRestarted) {
-        assert.equal(overview.task.execution_recovery.failures, 1);
+        assert.equal((await backend.monitor("monitor/task/read", { ...scope, user_task_id: overview.task.user_task_id })).task.execution_recovery.failures, 1);
         assert.equal(overview.task.state, scenario === "delivery-recovery" ? "completing" : "active");
         await backend.close(); backend = await createCoRAgentHarnessBackend(options); recoveryRestarted = true;
       }
@@ -259,7 +270,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
         await assert.rejects(readFile(join(workspaceRoot, "task-flow", "forbidden-delivery-write")), { code: "ENOENT" });
       }
     }
-    if (scenario === "single") assert.deepEqual(tools, ["task_begin", "research_create", "task_update", "task_read", "research_result", "task_update"]);
+    if (scenario === "single") assert.deepEqual(tools, ["task_begin", "research_create", "task_read", "task_read", "research_result", "task_update"]);
     else if (scenario === "branches") assert.equal(tools.filter(name => name === "research_create").length, 4);
     assert.equal(overview.jobs.counts.total, 0, "continued analysis must not require a compute event");
     const runs = await backend.monitor("monitor/runs", { ...scope, user_task_id: overview.task.user_task_id });
@@ -295,7 +306,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
     }
     const count = requests;
     const research = await backend.monitor("monitor/task/read", { ...scope, user_task_id: overview.task.user_task_id });
-    assert.deepEqual(research.research.research.entry_node_ids, overview.task.research.entry_node_ids);
+    assert.deepEqual(research.research.research.entry_node_ids, research.task.research.entry_node_ids);
     if (scenario === "branches") {
       assert.equal(research.research.research.nodes.find(node => node.title === "Derivation A").status, "closed");
       assert.equal(research.research.research.nodes.find(node => node.title === "Approximation bounds").status, "open", "completing a task leaves shared research open");
@@ -304,7 +315,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
     const restored = await backend.monitor("monitor/overview", scope);
     assert.equal(restored.task.state, "completed");
     assert.equal(restored.task.user_task_id, overview.task.user_task_id);
-    assert.deepEqual(restored.task.research, overview.task.research, "restart retains the same research identities");
+    assert.deepEqual((await backend.monitor("monitor/task/read", { ...scope, user_task_id: restored.task.user_task_id })).task.research, research.task.research, "restart retains the same research identities");
     await new Promise(done => setTimeout(done, 100));
     assert.equal(requests, count, "restart and read-only Monitor queries cannot repeat delivery");
     const objective = scenario !== "branches" ? "Record a reproducible fixture finding" : "Compare independent derivations";

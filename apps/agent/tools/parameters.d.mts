@@ -155,12 +155,16 @@ export interface ToolParameters {
       "id": string;
       "description": string;
     }>;
+    "initial_plan": string;
+    "next_action": string;
   };
   taskRead: Record<string, never>;
   taskUpdate: {
     "expected_revision": number;
     "action": "refine" | "progress" | "wait" | "block" | "propose_completion" | "set_research" | "apply_user_control";
     "reason"?: string;
+    "block_kind"?: "missing_user_input" | "resource_unavailable" | "execution_failure" | "budget_exhausted" | "scientific_dead_end";
+    "resume_when"?: string;
     "objective"?: string;
     "criteria"?: Array<{
       "id": string;
@@ -168,6 +172,7 @@ export interface ToolParameters {
     }>;
     "source_submission_ids"?: Array<string>;
     "evidence_refs"?: Array<string>;
+    "next_action"?: string;
     "wait"?: {
       "job_ids": Array<string>;
       "mode": "all" | "any";

@@ -4,6 +4,7 @@ import {EventEmitter} from 'node:events';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {pinnedPiSource} from './test-environment.mjs';
+import {projectMonitorContinuation} from '../../../apps/agent/tasks/projection.mjs';
 import {activityStatus,contextMatches,createStatusPresentation,usageTotals} from '../../../apps/agent/terminal/status/presentation.mjs';
 import {createDocumentView} from '../../../apps/agent/terminal/renderers/document.mjs';
 import {createCommandPresentation} from '../../../apps/agent/terminal/commands/panel.mjs';
@@ -31,27 +32,49 @@ test('usage ledger survives compacted entries and model switch invalidates conte
 });
 
 const task = {user_task_id:'t1',title:'Research',objective:'Compare paths',state:'active',reason:null,criteria:[{id:'c1',description:'Final report'}],wait:null,progress:null,continuation:{reservation:null},updated_at:new Date().toISOString()};
-const snapshot = (changes={}) => ({session_id:'s',workspace_id:'w',task, jobs:{items:[{job_id:'j1',state:'running'}],counts:{running:1,queued:0},next_cursor:null},execution:{state:'running'},task_controller:{error:null,last_checked_at:new Date().toISOString(),checking:false,check_interval_ms:1000},automatic_continuation_enabled:true,updated_at:new Date().toISOString(),...changes});
+const snapshot = (changes={}) => {
+ const data = {session_id:'s',workspace_id:'w',task,jobs:{scope:'task',active:[{job_id:'j1',state:'running'}],counts:{running:1,queued:0},active_omitted:0},execution:{state:'running'},task_controller:{error:null,last_checked_at:new Date().toISOString(),check_interval_ms:1000},automatic_continuation_enabled:true,updated_at:new Date().toISOString(),...changes};
+ const {task_controller,automatic_continuation_enabled,...wire}=data;
+ return {...wire,continuation:projectMonitorContinuation(data.task,{...task_controller,automatic_continuation_enabled})};
+};
 
-test('task status distinguishes execution, waits and control state, with stale data taking priority',()=>{
+test('Monitor uses only five activity labels and a placeholder for unavailable observations',()=>{
+ const cases = [
+  [{}, 'Working'],
+  [{task:{...task,state:'completing'}}, 'Working'],
+  [{task:{...task,state:'waiting',wait:{job_ids:['j1'],mode:'all'}}}, 'Waiting'],
+  [{task:{...task,state:'paused'}}, 'Stopped'],
+  [{task:{...task,state:'blocked',reason:'Missing reference data'}}, 'Stopped'],
+  [{task:{...task,state:'cancelled'}}, 'Stopped'],
+  [{task:{...task,state:'completed'}}, 'Completed'],
+  [{execution:{state:'idle'}}, 'Working'],
+  [{execution:{state:'idle'},task:{...task,continuation:{reservation:'r1'}}}, 'Working'],
+  [{execution:{state:'idle'},automatic_continuation_enabled:false}, 'Stopped'],
+  [{automatic_continuation_enabled:false}, 'Working'],
+  [{task:null,execution:{state:'idle'}}, 'Idle'],
+  [{task:null}, 'Working'],
+  [{task_controller:{error:{code:'task_reconcile_failed'}}}, 'Stopped'],
+  [{task_controller:{last_checked_at:null}}, 'Working'],
+  [{execution:{state:'idle'},task_controller:{last_checked_at:null}}, '—'],
+  [{task_controller:{last_checked_at:new Date(Date.now()-31000).toISOString(),check_interval_ms:1000}}, '—'],
+ ];
+ const labels = new Set();
+ for (const [changes, expected] of cases) {
+  const result = activityStatus({monitor:snapshot(changes),sessionId:'s'});
+  assert.equal(result.reason, expected);
+  assert.equal(result.text, `Monitor ${result.symbol} · ${expected} · 1 jobs running`);
+  labels.add(result.reason);
+ }
+ assert.deepEqual([...labels].sort(), ['Completed','Idle','Stopped','Waiting','Working','—']);
  const monitor=snapshot();
- const state={monitor,sessionId:'s'};
- assert.match(activityStatus(state).text,/Researching · 1 jobs running/);
- assert.match(activityStatus({...state,monitor:snapshot({task:{...task,state:'waiting',wait:{job_ids:['j1'],mode:'all'}}})}).text,/Waiting for compute.*Continues when ready/);
- assert.match(activityStatus({...state,monitor:snapshot({task:{...task,state:'paused'}})}).text,/Paused/);
- assert.match(activityStatus({...state,monitor:snapshot({task:{...task,state:'blocked',reason:'Budget exhausted'}})}).text,/Responding · Task blocked/);
- assert.match(activityStatus({...state,monitor:snapshot({execution:{state:'idle'},task:{...task,state:'blocked',reason:'Budget exhausted'}})}).text,/Needs attention · 1 jobs running/);
- assert.match(activityStatus({...state,monitor:snapshot({execution:{state:'idle'}})}).text,/Checking continuation/);
- assert.match(activityStatus({...state,monitor:snapshot({execution:{state:'idle'},task:{...task,continuation:{reservation:'r1'}}})}).text,/Preparing continuation/);
- assert.match(activityStatus({...state,monitor:snapshot({execution:{state:'idle'},automatic_continuation_enabled:false})}).text,/Automatic continuation off/);
- assert.match(activityStatus({...state,monitor:snapshot({task:null})}).text,/No current task/);
- assert.match(activityStatus({...state,monitorError:'offline'}).text,/Connection lost/);
- assert.match(activityStatus({...state,monitor:snapshot({task_controller:{error:{code:'task_reconcile_failed'},last_checked_at:new Date().toISOString(),check_interval_ms:1000}})}).text,/Continuation error: task_reconcile_failed/);
- assert.match(activityStatus({...state,monitor:snapshot({task_controller:{error:null,last_checked_at:null,checking:true,check_interval_ms:1000}})}).text,/Checking recovery/);
- assert.match(activityStatus({...state,monitor:snapshot({task_controller:{error:null,last_checked_at:new Date(Date.now()-31000).toISOString(),check_interval_ms:1000}})}).text,/Continuation check overdue/);
- assert.match(activityStatus({...state,now:Date.now()+31000}).text,/Status is stale/);
- assert.match(activityStatus({...state,sessionId:'other'}).text,/Checking status · — jobs running/);
- assert.match(activityStatus({...state,monitor:snapshot({jobs:{items:[],next_cursor:null}})}).text,/— jobs running/);
+ for (const changes of [{monitorError:'offline'},{now:Date.now()+31000},{sessionId:'other'}]) {
+  const result=activityStatus({monitor,sessionId:'s',...changes});
+  assert.equal(result.reason,'—');
+  assert.equal(result.running,null);
+  assert.equal(result.queued,null);
+  assert.ok(result.detail);
+ }
+ assert.match(activityStatus({sessionId:'s',monitor:snapshot({jobs:{active:[]}})}).text,/— jobs running/);
 });
 
 test('blocked task details stay in Monitor while the activity line remains short and tracks recovery',()=>{
@@ -59,14 +82,14 @@ test('blocked task details stay in Monitor while the activity line remains short
  const reason='输入构造失败，需要修正结构。'.repeat(40)+'\n等待进一步指令。';
  status.update({monitor:snapshot({execution:{state:'idle'},task:{...task,state:'blocked',reason}})});
  const line=status.activity.render(80).join('');
- assert.match(line,/Needs attention · 1 jobs running/);
+ assert.match(line,/Stopped · 1 jobs running/);
  assert.doesNotMatch(line,/输入构造|等待进一步/);
  assert.ok(tui.visibleWidth(line)<=80);
  assert.ok(status.monitorDetails().includes(reason));
  status.update({monitor:snapshot({task:{...task,state:'blocked',reason}})});
- assert.match(status.activity.render(80).join(''),/Responding · Task blocked · 1 jobs running/);
+ assert.match(status.activity.render(80).join(''),/Stopped · 1 jobs running/);
  status.update({monitor:snapshot()});
- assert.match(status.activity.render(80).join(''),/Researching · 1 jobs running/);
+ assert.match(status.activity.render(80).join(''),/Working · 1 jobs running/);
  assert.doesNotMatch(status.monitorDetails(),/输入构造|Task blocked|Needs attention/);
 });
 
@@ -74,14 +97,14 @@ test('monitor symbol colors and narrow width do not hide state in the normal lay
  const colors=[];
  const status=createStatusPresentation({session:{workspaceId:'w',sessionId:'s'},monochrome:false,theme:{fg:(color,text)=>{colors.push([color,text]);return text;}},...tui});
  status.update({monitor:snapshot({task:{...task,state:'paused'}})});
- assert.match(status.activity.render(80).join(''),/Monitor Ⅱ · Paused · 1 jobs running/);
- assert.deepEqual(colors.map(([color])=>color),['muted','muted','muted']);
+ assert.match(status.activity.render(80).join(''),/Monitor ! · Stopped · 1 jobs running/);
+ assert.deepEqual(colors.map(([color])=>color),['muted','warning','muted']);
  for(const width of [0,1,2,8,12,20,80]) for(const line of status.activity.render(width)) assert.ok(tui.visibleWidth(line)<=width);
- assert.match(status.monitorDetails(),/Task: Research · Paused/);
+ assert.match(status.monitorDetails(),/The task is paused/);
  assert.match(status.monitorDetails(),/Goal: Compare paths/);
  assert.doesNotMatch(status.monitorDetails(),/control_epoch|producer|generation/);
  const plain=createStatusPresentation({session:{sessionId:'s'},monochrome:true,theme:{fg(){throw new Error('monochrome must not color activity');}},...tui});
- assert.match(plain.activity.render(80).join(''),/Checking status · — jobs running/);
+ assert.match(plain.activity.render(80).join(''),/— · — jobs running/);
 });
 
 test('document pages resize without overflowing or losing their logical anchor',()=>{
@@ -140,7 +163,7 @@ test('widening a wrapped line retains the same logical line',()=>{
 });
 
 test('document fields use theme roles and repaint across themes without changing text or anchors',()=>{
- const body='workspace id: 中文\nrevision: 18\ninput refs: []\nstate: blocked\ncontent omitted: false\n'
+ const body='Status: Stopped\nrevision: 18\ninput refs: []\nstate: blocked\ncontent omitted: false\n'
    + 'Input: 10 · Output: 20\n' + Array.from({length:25},(_,i)=>`entry: line-${i}`).join('\n');
  const make=monochrome=>createDocumentView({...tui,wrapText:tui.wrapTextWithAnsi,command:'research',title:'Research',
    body,theme:()=>nativeTheme.theme,monochrome});
@@ -148,7 +171,7 @@ test('document fields use theme roles and repaint across themes without changing
  const doc=make(false);doc.setViewport(12);
  const dark=doc.render(80).join('\n');
  for(const [role,value] of [['accent','revision:'],['syntaxNumber','18'],['muted','[]'],['warning','blocked'],
-   ['syntaxKeyword','false'],['accent','Output:']]) assert.ok(dark.includes(nativeTheme.theme.fg(role,value)),value);
+   ['syntaxKeyword','false'],['accent','Output:'],['warning','Stopped']]) assert.ok(dark.includes(nativeTheme.theme.fg(role,value)),value);
  nativeTheme.initTheme('light');
  const light=doc.render(80).join('\n');
  assert.notEqual(dark,light);assert.equal(stripVTControlCharacters(dark),stripVTControlCharacters(light));
@@ -184,8 +207,13 @@ test('usage and monitor details stay separate while disconnection overrides cach
  assert.doesNotMatch(status.usageDetails(),/Monitor|Task:/);
  assert.doesNotMatch(status.monitorDetails(),/tokens|Context/);
  status.update({monitorError:'offline'});
- assert.match(status.activity.render(80).join(''),/Connection lost/);
+ assert.match(status.activity.render(80).join(''),/Monitor × · — · — jobs running/);
+ assert.match(status.monitorDetails(),/Connection lost/);
+ assert.doesNotMatch(status.monitorDetails(),/Working|Task: Research/);
  assert.match(status.monitorDetails(),/Connection: offline/);
+ status.update({monitorError:null,monitor:snapshot({updated_at:new Date(Date.now()-31000).toISOString()})});
+ assert.match(status.monitorDetails(),/Status is stale/);
+ assert.doesNotMatch(status.monitorDetails(),/Working|Task: Research/);
  status.update({monitorError:null,monitor:snapshot({task:{...task,state:'completed'}})});
  assert.match(status.activity.render(80).join(''),/Completed/);
 });
@@ -283,26 +311,29 @@ test('execution recovery is visible without claiming research is blocked', () =>
  const base = { session_id: 'recovery', updated_at: new Date().toISOString(), jobs: { counts: { running: 1, queued: 0 } },
    execution: { state: 'idle' }, automatic_continuation_enabled: true,
    task_controller: { error: null, last_checked_at: new Date().toISOString(), check_interval_ms: 30000 } };
- for (const [state,phase,label] of [['retrying','research','Recovering execution'], ['running','delivery','Recovering final response'],
-   ['attention_required','research','Execution needs attention']]) {
+ for (const [state,phase,label] of [['retrying','research','Waiting'], ['running','delivery','Waiting'],
+   ['attention_required','research','Stopped']]) {
    const task = { state: phase === 'delivery' ? 'completing' : 'active', execution_recovery: { state, phase } };
-   const status = activityStatus({ monitor: { ...base, task }, sessionId: 'recovery' });
+   const monitor = { ...base, task, continuation:projectMonitorContinuation(task,{...base.task_controller,automatic_continuation_enabled:true}) };
+   const status = activityStatus({ monitor, sessionId: 'recovery' });
    assert.equal(status.reason, label); assert.doesNotMatch(status.text, /Task blocked/);
+   assert.equal(activityStatus({ monitor: { ...monitor, execution: { state: 'running' } }, sessionId: 'recovery' }).reason,
+     state === 'attention_required' ? 'Stopped' : 'Working');
  }
 });
 
-test('a running user response takes display priority over pending recovery without hiding its details', () => {
+test('recovery requiring attention stays stopped while its explanation is delivered', () => {
  const recovery = { state: 'attention_required', phase: 'research', reason: 'request_blocked', detail: 'Previous request exceeded context' };
  const taskWithRecovery = { ...task, execution_recovery: recovery };
  const status = createStatusPresentation({session:{workspaceId:'w',sessionId:'s'},theme,...tui});
  const running = snapshot({task:taskWithRecovery});
  status.update({monitor:running});
- assert.equal(activityStatus({monitor:running,sessionId:'s'}).symbol,'…');
- assert.match(status.activity.render(120).join(''),/Responding · Recovery pending/);
+ assert.equal(activityStatus({monitor:running,sessionId:'s'}).symbol,'!');
+ assert.match(status.activity.render(120).join(''),/Stopped/);
  assert.match(status.monitorDetails(),/Previous request exceeded context/);
  status.update({monitor:snapshot({task:taskWithRecovery,execution:{state:'idle'}})});
- assert.match(status.activity.render(120).join(''),/Monitor ! · Execution needs attention/);
+ assert.match(status.activity.render(120).join(''),/Monitor ! · Stopped/);
  status.update({monitor:snapshot({task})});
- assert.match(status.activity.render(120).join(''),/Researching/);
+ assert.match(status.activity.render(120).join(''),/Working/);
  assert.doesNotMatch(status.monitorDetails(),/Previous request exceeded context/);
 });

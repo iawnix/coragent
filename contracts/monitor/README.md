@@ -13,7 +13,7 @@ Host exposes the result directly through its normal RPC result envelope.
 | Method | Additional parameters | Result |
 | --- | --- | --- |
 | `monitor/overview` | none | Overview |
-| `monitor/tasks` | `limit?`, `cursor?` | Page of UserTask |
+| `monitor/tasks` | `limit?`, `cursor?` | Page of TaskListItem |
 | `monitor/task/read` | `user_task_id` | `{task: UserTask, research: ResearchSnapshot, session_job_ids: string[]}` |
 | `monitor/task/pause` | task control fields | TaskControl |
 | `monitor/task/resume` | task control fields | TaskControl |
@@ -64,6 +64,8 @@ type UserTask = {
   conversation_id: string;
   title: string;
   objective: string;
+  initial_plan?: string; // Required for new tasks; absent in older persisted tasks.
+  next_action?: string; // Absent in older tasks until the next plan update.
   sources: { submission_id: string; entry_id: unknown; text: string }[];
   criteria: Criterion[];
   research: { entry_node_ids: string[]; focus_node_ids: string[] };
@@ -77,6 +79,11 @@ type UserTask = {
   } | null;
   state: TaskState;
   reason: string | null;
+  block_details?: {
+    kind: "missing_user_input" | "resource_unavailable" | "execution_failure" | "budget_exhausted" | "scientific_dead_end";
+    resume_when: string;
+    evidence_refs: string[];
+  } | null;
   revision: number;
   control_epoch: number;
   wait: { job_ids: string[]; mode: "all" | "any" } | null;
@@ -122,23 +129,44 @@ type UserTask = {
   created_at: string;
   updated_at: string;
 };
+type TaskListItem = {
+  user_task_id: string;
+  revision: number; // Retained for optimistic task controls.
+  title: string; // At most 256 serialized UTF-8 bytes.
+  state: TaskState;
+  updated_at: string;
+  truncated: boolean;
+};
+type TaskSummary = TaskListItem & {
+  objective: string; // At most 1024 serialized UTF-8 bytes.
+  next_action: string | null; // 1024 bytes; legacy tasks may have none.
+  progress: { summary: string | null; at: string } | null; // Summary: 512 bytes.
+  reason: string | null; // 512 bytes.
+  resume_when: string | null; // 512 bytes.
+  wait: { mode: "all" | "any"; job_count: number } | null;
+  execution_recovery: {
+    state: "retrying" | "running" | "attention_required";
+    phase: "research" | "delivery";
+    detail: string | null; // 512 bytes.
+    next_retry_at: string | null;
+  } | null;
+};
+type ContinuationState = "idle" | "paused" | "blocked" | "error"
+  | "attention_required" | "disabled" | "checking" | "overdue"
+  | "retrying" | "waiting" | "pending" | "ready";
 type Overview = {
-  schema_version: "coragent-monitor/1";
+  schema_version: "coragent-monitor/2";
   workspace_id: string;
   session_id: string;
-  task: UserTask | null;
-  research_review: {
-    current_review_ref: string | null;
-    last_reviewed_state_digest: string | null;
-    review_digest: string | null;
-    review_status: "current" | "pending" | "stale" | "running" | "failed";
-    trigger: string | null;
-    updated_at: string | null;
-  } | null;
-  jobs: Page<Job> & { counts: { running: number; queued: number; total: number } };
+  task: TaskSummary | null;
+  jobs: {
+    scope: "task" | "session";
+    counts: { running: number; queued: number; total: number };
+    active: { job_id: string; state: string }[]; // At most five active jobs.
+    active_omitted: number;
+  };
   execution: { state: "running" | "idle"; run_id: string | null };
-  task_controller: ControllerHealth;
-  automatic_continuation_enabled: boolean;
+  continuation: { state: ContinuationState };
   updated_at: string;
 };
 type TaskControl = {
@@ -187,6 +215,42 @@ type Health = {
   supervisor_health: object | null;
 };
 ```
+
+Overview v2 replaces the v1 full task and job page with bounded summaries. The
+standalone `research_review`, `task_controller`, and `automatic_continuation_enabled`
+fields are removed from overview. Upgrade consumers with the server; v1 response
+aliases are not provided. Request methods and parameters are unchanged.
+
+Task lists retain only identity, revision, title, lifecycle state, update time,
+and truncation status. Overview adds the latest progress, next action, reason,
+and recovery condition. `truncated: true` directs clients to `monitor/task/read`
+for complete text. Audit history, original sources, criteria, research and Review
+references, evidence, deduplication identities, and scheduling reservations remain
+in full task detail and control responses. Controller diagnostics remain in
+`monitor/health`. Summaries do not change durable task records.
+
+`continuation.state` is computed when reading overview, not persisted as another
+lifecycle. No task or a finished task is `idle`; paused and blocked tasks preserve
+those states regardless of automatic-continuation configuration. For remaining
+tasks the precedence is controller error, recovery requiring attention, disabled
+automatic continuation, unchecked/overdue controller, execution recovery, waiting
+for compute, pending reservation, then ready. A check is overdue after the greater
+of 30 seconds or three check intervals. `ready` means eligible for controller
+checking, not proof of an active model response; `execution.state` reports that
+separately. Only `waiting` warrants “Continues when ready.”
+
+The terminal maps these observations to five activity labels: Working, Waiting,
+Stopped, Completed, and Idle. It shows `—` when the observation cannot establish
+current activity. Detailed continuation explanations remain in overview; precise
+lifecycle states remain in task detail and task lists. This is presentation only:
+it does not change these wire fields, durable state, or scheduling behavior.
+
+Job counts include every page for the current task within the authenticated
+session. With no current task they cover the session instead. Total includes
+ended jobs; queued includes created, submitted, queued, and held observations.
+The active preview includes only running or queued jobs, with at most five entries;
+`active_omitted` counts additional active jobs. Fetch full pages using
+`monitor/jobs` with the same task scope. These reads are not atomic across pages.
 
 `Job` is the existing Job observation/receipt DTO returned by `job.list`,
 `job.status`, and `job.cancel`, with immutable `session_id` and `user_task_id`

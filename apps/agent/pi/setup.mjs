@@ -64,7 +64,10 @@ export async function createCoRAgentHarness(databasePath, options) {
     const loadedSkills = await loadProductSkills();
     commandBridge = create_python_runtime_bridge({ workspace_root: cwd, workspace_id: workspaceId });
     const transactionCoordinator = createTransactionCoordinator({ bridge: commandBridge, workspaceRoot: cwd });
-    const businessTools = createCoreTools({ commandBridge, getTaskBinding: context => taskController.binding(context) });
+    const businessTools = createCoreTools({ commandBridge,
+      getTaskBinding: context => taskController.binding(context),
+      getResearchTaskId: async context => (await taskController.current(context))?.user_task_id ?? null,
+      bindResearchNode: (nodeId, context, taskId) => taskController.bindResearchNode(nodeId, context, taskId) });
     const promptManifest = createSystemPromptManifest({
       native: { source: join(loadedSkills.packageRoot, "prompts/coragent.md"), text: `Working directory: ${cwd}\n\n${await readFile(join(loadedSkills.packageRoot, "prompts/coragent.md"), "utf8")}` },
       skills: { source: loadedSkills.skillsRoot, items: loadedSkills.skills },

@@ -1079,13 +1079,29 @@
           },
           "maxItems": 32,
           "description": "Concrete delivery criteria with distinct stable IDs. Completion must provide fixed Result/Artifact evidence for every criterion. Preserve the user-requested deliverables. Do not replace unfinished calculations or validation with an unsolicited alternative to explain limitations."
+        },
+        "initial_plan": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000,
+          "description": "Initial bounded plan covering the user's deliverables, the first evidence-producing action and the decision that will select the next action.",
+          "pattern": "\\S"
+        },
+        "next_action": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "The first concrete action to perform now. Do not use a status summary or a final answer.",
+          "pattern": "\\S"
         }
       },
       "required": [
         "title",
         "objective",
         "source_submission_ids",
-        "criteria"
+        "criteria",
+        "initial_plan",
+        "next_action"
       ],
       "additionalProperties": false
     },
@@ -1112,13 +1128,31 @@
             "set_research",
             "apply_user_control"
           ],
-          "description": "refine requires source_submission_ids; progress requires evidence_refs; wait requires wait; block requires reason; propose_completion requires completion; set_research requires research. Send only the fields for the selected action. apply_user_control applies an explicit user pause/resume/cancel instruction with control and source_submission_ids; cancel also requires jobs."
+          "description": "refine requires source_submission_ids; progress requires evidence_refs; wait requires wait; block requires reason, block_kind and resume_when; all kinds except missing_user_input also require evidence_refs; propose_completion requires completion; set_research requires research. Send only the fields for the selected action. apply_user_control applies an explicit user pause/resume/cancel instruction with control and source_submission_ids; cancel also requires jobs."
         },
         "reason": {
           "type": "string",
           "minLength": 1,
           "maxLength": 2000,
-          "description": "Progress summary, audit explanation or blocker description. Required and nonempty for block. For block: identify the concrete unmet prerequisite or exhausted budget, the change needed to resume, and why no independent authorized work remains. Missing results or an unfinished turn alone are not blockers."
+          "description": "Progress summary, audit explanation or blocker description. Required and nonempty for block. For block: identify the concrete unmet prerequisite or exhausted budget, the change needed to resume, and why no independent authorized work remains. Missing results or an unfinished turn alone are not blockers.",
+          "pattern": "\\S"
+        },
+        "block_kind": {
+          "enum": [
+            "missing_user_input",
+            "resource_unavailable",
+            "execution_failure",
+            "budget_exhausted",
+            "scientific_dead_end"
+          ],
+          "description": "block only: classify the concrete reason work cannot continue."
+        },
+        "resume_when": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "block only: the concrete condition or user input that will allow the task to resume.",
+          "pattern": "\\S"
         },
         "objective": {
           "type": "string",
@@ -1175,7 +1209,14 @@
           "minItems": 1,
           "uniqueItems": true,
           "maxItems": 64,
-          "description": "progress only: existing Result/Artifact references or Jobs owned by this task. Node/note/user references can provide context but do not establish new substantive progress. Job collection receipts are not accepted here; cite the Job or its collected Artifacts. Use owned job_id, Result or Artifact references. job_result_* receipts are not accepted here; use their job_id or collected Artifact references."
+          "description": "progress or block: existing Result/Artifact references or Jobs owned by this task. Node/note/user references can provide context but do not establish new substantive progress. Job collection receipts are not accepted here; cite the Job or its collected Artifacts. Use owned job_id, Result or Artifact references. job_result_* receipts are not accepted here; use their job_id or collected Artifact references. For block, all kinds except missing_user_input require verified Result, Artifact or owned Job evidence; plans and notes alone are insufficient."
+        },
+        "next_action": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "progress or refine only: the next concrete evidence-producing action for the active task.",
+          "pattern": "\\S"
         },
         "wait": {
           "type": "object",
@@ -1306,6 +1347,9 @@
             "properties": {
               "completion": false,
               "evidence_refs": false,
+              "block_kind": false,
+              "resume_when": false,
+              "next_action": true,
               "research": false,
               "wait": false,
               "control": false,
@@ -1332,6 +1376,9 @@
               "completion": false,
               "criteria": false,
               "objective": false,
+              "block_kind": false,
+              "resume_when": false,
+              "next_action": true,
               "research": false,
               "source_submission_ids": false,
               "wait": false,
@@ -1359,6 +1406,9 @@
               "completion": false,
               "criteria": false,
               "evidence_refs": false,
+              "block_kind": false,
+              "resume_when": false,
+              "next_action": false,
               "objective": false,
               "research": false,
               "source_submission_ids": false,
@@ -1380,19 +1430,48 @@
           },
           "then": {
             "required": [
-              "reason"
+              "reason",
+              "block_kind",
+              "resume_when"
             ],
             "properties": {
               "completion": false,
               "criteria": false,
-              "evidence_refs": false,
+              "evidence_refs": true,
+              "block_kind": true,
+              "resume_when": true,
+              "next_action": false,
               "objective": false,
               "research": false,
               "source_submission_ids": false,
               "wait": false,
               "control": false,
               "jobs": false
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "block_kind": {
+                      "enum": [
+                        "resource_unavailable",
+                        "execution_failure",
+                        "budget_exhausted",
+                        "scientific_dead_end"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "block_kind"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "evidence_refs"
+                  ]
+                }
+              }
+            ]
           }
         },
         {
@@ -1413,6 +1492,9 @@
             "properties": {
               "criteria": false,
               "evidence_refs": false,
+              "block_kind": false,
+              "resume_when": false,
+              "next_action": false,
               "objective": false,
               "research": false,
               "source_submission_ids": false,
@@ -1441,6 +1523,9 @@
               "completion": false,
               "criteria": false,
               "evidence_refs": false,
+              "block_kind": false,
+              "resume_when": false,
+              "next_action": false,
               "objective": false,
               "source_submission_ids": false,
               "wait": false,
@@ -1469,6 +1554,9 @@
               "objective": false,
               "criteria": false,
               "evidence_refs": false,
+              "block_kind": false,
+              "resume_when": false,
+              "next_action": false,
               "wait": false,
               "completion": false,
               "research": false,

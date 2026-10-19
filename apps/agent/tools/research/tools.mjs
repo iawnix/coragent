@@ -6,7 +6,7 @@ import { RESEARCH_MEMORY_WRITE_PRINCIPAL } from "../../bridge/ports.mjs";
 
 const RESEARCH_OUTPUT_LIMITS = Object.freeze({ maxBytes: 50 * 1024, maxLines: 2000, retain: "head" });
 
-export function createResearchTools({ commandBridge }) {
+export function createResearchTools({ commandBridge, getResearchTaskId = async () => null, bindResearchNode = async () => null }) {
   const commands = createCommandService({ execute: ({ command, params, signal }) => {
     signal?.throwIfAborted();
     return commandBridge.execute_command(command, params);
@@ -23,7 +23,12 @@ export function createResearchTools({ commandBridge }) {
         requireNativeWrites(`research_${operation}`, api.coragent);
         request.request_id = `${api.coragent.session_id}:${api.coragent.operation_id}:${api.callId}`;
       }
-      const result = await commands.execute(`research.${operation}`, root, request, context?.abortSignal);
+      const taskId = operation === "create" ? await getResearchTaskId(context) : null;
+      let result = await commands.execute(`research.${operation}`, root, request, context?.abortSignal);
+      if (operation === "create" && result?.node?.id && taskId) {
+        const binding = await bindResearchNode(result.node.id, context, taskId);
+        if (binding) result = { ...result, task_research_binding: binding };
+      }
       const visible = researchToolView(result, operation, params);
       if (visible.complete && result?.read_basis) await commands.execute("research.observe", root, { session_id: request.session_id, read_basis: result.read_basis }, context?.abortSignal);
       if (!writing) recordJobLookup(root);
@@ -50,6 +55,7 @@ function researchToolView(result, operation, params) {
     message: "The response exceeds the tool output budget. Read the listed references in smaller pages. For a large Node, select one field, for example field=proposal. Omitted Node fields have not been acknowledged as read.",
     ...Object.fromEntries(["schema_version", "accepted", "result_saved", "assessment_selected", "conflict", "ref"].filter(key => key in result).map(key => [key, result[key]])),
     ...(result.node ? {node: {id: result.node.id, revision: result.node.revision}} : {}),
+    ...(result.task_research_binding ? {task_research_binding: result.task_research_binding} : {}),
     ...(result.result ? {result: {id: result.result.id, node_id: result.result.node_id}} : {}), read};
   return {value, text: JSON.stringify(value), complete: false};
 }

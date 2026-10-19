@@ -151,8 +151,8 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
       const facet = await createCoRAgentNativeClientFacet({ sourceRoot, session: {
         workspaceId: "startup", sessionId: created.session.session_id, quit() { quit = true; },
         async monitor() { return {workspace_id:'startup',session_id:created.session.session_id,task:null,
-          jobs:{items:Array.from({length:monitorRunning},(_,i)=>({job_id:`job_${i}`,state:'running'})),counts:{running:monitorRunning,queued:0},next_cursor:null},
-          execution:{state:'idle'},task_controller:{error:null,last_checked_at:new Date().toISOString(),check_interval_ms:1000,checking:false},automatic_continuation_enabled:true,updated_at:new Date().toISOString()}; },
+          jobs:{scope:'session',active:Array.from({length:monitorRunning},(_,i)=>({job_id:`job_${i}`,state:'running'})),counts:{running:monitorRunning,queued:0,total:monitorRunning},active_omitted:0},
+          execution:{state:'idle'},continuation:{state:'idle'},updated_at:new Date().toISOString()}; },
         subscribeMonitor(onChange) { refreshMonitor=onChange; return ()=>{refreshMonitor=undefined;}; },
         async list() { return [...await backend.listSessions("startup"), {session_id:'another-session'}]; },
         async resume() { throw new Error("Selecting the current session should be a no-op"); },
@@ -255,9 +255,9 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
         assert.equal(ui.getFocusedComponent(),monitorFocus);
         assert.match(renderedText(),/job_1 · running/);
         assertDock(frameAt());
-        assert.match(renderedText(),/Monitor ✓ · No current task · 2 jobs running/);
+        assert.match(renderedText(),/Monitor ✓ · Idle · 2 jobs running/);
         terminal.sendInput('\x1b');
-        await waitFor(()=>renderedText().includes('Monitor ✓ · No current task · 2 jobs running'));
+        await waitFor(()=>renderedText().includes('Monitor ✓ · Idle · 2 jobs running'));
         await new Promise(resolve=>setImmediate(resolve));
         submit("/research read");
         await waitFor(() => renderedText().includes("Research state"));

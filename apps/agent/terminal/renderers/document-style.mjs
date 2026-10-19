@@ -1,11 +1,12 @@
 import { stripVTControlCharacters } from 'node:util';
 
 const STATE_ROLES = {
-  accent: ['active', 'running', 'queued', 'pending', 'submitted', 'researching', 'completing', 'preparing delivery',
-    'recovering', 'checking recovery', 'checking continuation', 'preparing continuation'],
-  warning: ['blocked', 'waiting', 'waiting for compute', 'needs attention', 'responding', 'task blocked',
-    'automatic continuation off', 'status is stale', 'continuation check overdue'],
-  error: ['failed', 'error', 'timed_out', 'connection lost'],
+  accent: ['working', 'active', 'running', 'queued', 'pending', 'submitted', 'researching', 'completing', 'preparing delivery',
+    'recovering', 'checking recovery', 'checking continuation', 'preparing continuation',
+    'recovering execution', 'recovering final response'],
+  warning: ['stopped', 'blocked', 'waiting', 'waiting for compute', 'needs attention', 'responding', 'task blocked',
+    'automatic continuation off', 'status is stale', 'continuation check overdue', 'execution needs attention', 'recovery pending'],
+  error: ['failed', 'error', 'timed_out', 'connection lost', 'continuation needs attention'],
   success: ['completed', 'succeeded', 'success'],
   muted: ['paused', 'cancelled', 'canceled', 'idle', 'closed', 'ended', 'unknown', 'no current task', 'checking status'],
 };
@@ -19,7 +20,7 @@ export function styleDocument(text, { theme, monochrome, markdown = false }) {
   const fg = (role, value) => current.fg(role, value);
   const inline = value => value.replace(/(`+)([^`\n]+)\1/g, code => fg('mdCode', code));
   const scalar = (value, status = false) => {
-    const role = status && (stateRole(value) || (/^Continuation error:/.test(value) ? 'error' : undefined));
+    const role = status && stateRole(value);
     if (role) return fg(role, value);
     if (/^(?:—|\[\]|\{\}|""|Unknown|Not recorded)$/.test(value)) return fg('muted', value);
     if (/^(?:true|false|On|Off|Yes|No)$/.test(value)) return fg('syntaxKeyword', value);
@@ -51,7 +52,7 @@ export function styleDocument(text, { theme, monochrome, markdown = false }) {
       const field = /^(\s*(?:• )?)([\w][\w /().-]*:)(\s*)(.*)$/.exec(part);
       if (!field) return scalar(part, parts.length > 1 && partIndex > 0);
       const [, prefix, label, space, value] = field;
-      const status = /^(?:state|status|execution|collection|action outcome):$/i.test(label);
+      const status = /^(?:state|status|execution|collection|action outcome|continuation):$/i.test(label);
       return prefix + fg('accent', label) + space + scalar(value, status);
     }).join(fg('muted', ' · '));
   }).join('\n');

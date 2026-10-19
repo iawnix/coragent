@@ -261,15 +261,18 @@ test('Monitor overview stays compact and links to detailed views', async () => {
   const {formatMonitor} = await import('../../../apps/agent/terminal/commands/monitor.mjs');
   const overview = formatMonitor('monitor/overview', {
     task: {user_task_id: 't1', title: 'Research', objective: 'Compare paths', state: 'waiting',
-      wait: {job_ids: ['job_1'], mode: 'all'}, reason: null, progress: null,
-      research_review: {review_status: 'pending'}},
-    jobs: {items: [{job_id: 'job_1', state: 'running', collection_state: 'not_collected'}],
+      wait: {job_count: 1, mode: 'all'}, reason: null, progress: null,
+      next_action: 'Inspect the computed result'},
+    jobs: {scope: 'task', active: [{job_id: 'job_1', state: 'running'}],
       counts: {running: 1, queued: 0, total: 1}},
-    automatic_continuation_enabled: true,
+    continuation: {state: 'waiting'},
   });
-  assert.match(overview, /Task: Research · Waiting for compute/);
-  assert.match(overview, /Jobs: 1 running · 0 queued · 1 total/);
-  assert.match(overview, /Research review: pending/);
+  assert.match(overview, /Task: Research/);
+  assert.match(overview, /Task jobs: 1 running · 0 queued · 1 total/);
+  assert.match(overview, /Next: Inspect the computed result/);
+  assert.match(overview, /Status: Waiting/);
+  assert.match(overview, /Details: Waiting for compute. Continues when ready./);
+  assert.doesNotMatch(overview, /Research review|Automatic continuation: On/);
   assert.match(overview, /\/monitor task t1 · \/monitor jobs --task t1/);
   assert.doesNotMatch(overview, /Delivery criteria|Compute jobs|Analysis: Not recorded/);
 });

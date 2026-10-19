@@ -185,6 +185,32 @@ test('oversized Unicode replies preserve saved outcomes without acknowledging om
   assert.ok(response.content[0].text.split('\n').length <= tool.outputLimits.maxLines);
 });
 
+test('large creation replies retain their task binding and skip binding when creation started without a task',async()=>{
+  let currentTaskId='task_1';
+  const binding={user_task_id:'task_1',research:{entry_node_ids:['node_1'],focus_node_ids:['node_1']},auto_bound:true};
+  const bound=[];
+  const tools=createResearchTools({
+    getResearchTaskId:async()=>currentTaskId,
+    bindResearchNode:async(nodeId,ctx,taskId)=>{bound.push({nodeId,taskId});return binding;},
+    commandBridge:{async execute_command(){
+      currentTaskId='task_2';
+      return {node:{id:'node_1',revision:1,goal:'研究'.repeat(12000)},read_basis:'unseen'};
+    }},
+  });
+  const tool=tools.find(t=>t.name==='research_create');
+  const api={callId:'create',coragent:{workspace_root:'/tmp/memory',session_id:'s',operation_id:'create',principal:'root_agent'}};
+  const reply=await tool.execute({goal:'Research a route'},api);
+  const visible=JSON.parse(reply.content[0].text);
+  assert.equal(visible.content_omitted,true);
+  assert.deepEqual(visible.task_research_binding,binding);
+  assert.deepEqual(bound,[{nodeId:'node_1',taskId:'task_1'}]);
+  assert.equal(visible.read_basis,undefined);
+  assert.ok(Buffer.byteLength(reply.content[0].text)<tool.outputLimits.maxBytes);
+  currentTaskId=null;
+  await tool.execute({goal:'Another route'},api);
+  assert.equal(bound.length,1);
+});
+
 test('an oversized committed Node reply cannot silently advance its read revision',async()=>{
   await mkdir(TEST_ROOT,{recursive:true});
   const root=await mkdtemp(join(TEST_ROOT,'large-'));

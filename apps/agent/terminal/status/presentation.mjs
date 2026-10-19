@@ -1,4 +1,4 @@
-import { formatMonitor, taskStateLabel } from '../commands/monitor.mjs';
+import { formatMonitor, continuationLabel } from '../commands/monitor.mjs';
 import { stripVTControlCharacters } from 'node:util';
 
 /** Pure presentation of durable usage, current context and operational observations. */
@@ -22,47 +22,26 @@ export function contextMatches(view, telemetry) {
 
 export function activityStatus({ monitor, monitorError, sessionId, now = Date.now() }) {
   const scoped = monitor?.session_id === sessionId ? monitor : null;
-  const running = scoped?.jobs.counts?.running ?? null;
-  const queued = scoped?.jobs.counts?.queued ?? null;
-  const task = scoped?.task;
-  const controller = scoped?.task_controller;
+  const running = scoped?.jobs?.counts?.running ?? null;
+  const queued = scoped?.jobs?.counts?.queued ?? null;
   const updated = Date.parse(scoped?.updated_at);
-  let symbol = '✓', color = 'muted', reason;
+  let symbol = '✓', color = 'muted', reason = '—', detail = null;
   if (monitorError) {
-    symbol = '×'; color = 'error'; reason = 'Connection lost';
+    symbol = '×'; color = 'error'; detail = 'Connection lost. Reconnect to refresh Monitor.';
   } else if (!scoped) {
-    symbol = '…'; reason = 'Checking status';
+    symbol = '…'; detail = 'Waiting for a Monitor snapshot for this session.';
   } else if (!Number.isFinite(updated) || now - updated > 30_000) {
-    symbol = '!'; color = 'warning'; reason = 'Status is stale';
-  } else if (controller.error) {
-    symbol = '×'; color = 'error'; reason = `Continuation error: ${controller.error.code}`;
-  } else if (!task) {
-    reason = 'No current task';
-  } else if (controller.last_checked_at === null) {
-    symbol = '…'; reason = 'Checking recovery';
-  } else if (['active', 'waiting'].includes(task.state) && now - Date.parse(controller.last_checked_at) > Math.max(30_000, controller.check_interval_ms * 3)) {
-    symbol = '!'; color = 'warning'; reason = 'Continuation check overdue';
-  } else if (task.state === 'blocked') {
-    symbol = '!'; color = 'warning'; reason = scoped.execution.state === 'running'
-      ? 'Responding · Task blocked' : 'Needs attention';
-  } else if (['active', 'completing'].includes(task.state) && task.execution_recovery) {
-    const recovery = task.execution_recovery;
-    const responding = recovery.state === 'attention_required' && scoped.execution.state === 'running';
-    symbol = recovery.state === 'attention_required' && !responding ? '!' : '…';
-    color = recovery.state === 'attention_required' && !responding ? 'warning' : 'muted';
-    reason = responding ? 'Responding · Recovery pending' : recovery.state === 'attention_required' ? 'Execution needs attention'
-      : recovery.phase === 'delivery' ? 'Recovering final response' : 'Recovering execution';
-  } else if (task.state === 'active' && !scoped.automatic_continuation_enabled && scoped.execution.state === 'idle') {
-    symbol = '!'; color = 'warning'; reason = 'Automatic continuation off';
-  } else if (task.state === 'active' && scoped.execution.state === 'idle') {
-    symbol = '…'; reason = task.continuation.reservation ? 'Preparing continuation' : 'Checking continuation';
+    symbol = '!'; color = 'warning'; detail = 'Status is stale. Refresh Monitor before relying on these details.';
   } else {
-    reason = taskStateLabel(task.state);
-    if (task.state === 'paused') symbol = 'Ⅱ';
-    if (task.state === 'recovering') symbol = '…';
+    reason = continuationLabel(scoped);
+    if (reason === 'Stopped') {
+      symbol = '!'; color = 'warning';
+    } else if (['Working', 'Waiting', '—'].includes(reason)) symbol = '…';
   }
-  const suffix = ` · ${running ?? '—'} jobs running${reason === 'Waiting for compute' && scoped.automatic_continuation_enabled ? ' · Continues when ready' : ''}`;
-  return { text: `Monitor ${symbol} · ${reason}${suffix}`, symbol, color, reason, running, queued };
+  const observedRunning = detail ? null : running;
+  const observedQueued = detail ? null : queued;
+  return { text: `Monitor ${symbol} · ${reason} · ${observedRunning ?? '—'} jobs running`,
+    symbol, color, reason, detail, running: observedRunning, queued: observedQueued };
 }
 
 export function createStatusPresentation({ session, theme, truncateToWidth, visibleWidth, ring = true,
@@ -139,8 +118,8 @@ export function createStatusPresentation({ session, theme, truncateToWidth, visi
     monitorDetails() {
       const state = activityStatus({monitor,monitorError,sessionId:session.sessionId});
       return [`Status: ${state.text}`,
-        ...(monitor ? [formatMonitor('monitor/overview', monitor)] : []),
-        `Last update: ${monitor?.updated_at || '—'}`,
+        ...(state.detail ? [state.detail] : []),
+        ...(monitor && !state.detail ? [formatMonitor('monitor/overview', monitor)] : []),
         ...(monitorError ? [`Connection: ${monitorError}`] : [])].join('\n');
     },
   };

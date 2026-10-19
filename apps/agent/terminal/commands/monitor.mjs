@@ -15,8 +15,9 @@ export function formatTask(task) {
     `Task: ${task.title} · ${taskStateLabel(task.state)}`,
     `Goal: ${task.objective}`,
     `Progress: ${text(task.progress?.summary)}`,
-    ...(task.research_review ? [`Research Review: ${text(task.research_review.review_status)} · ${text(task.research_review.current_review_ref)}`,
-      `Reviewed state: ${text(task.research_review.last_reviewed_state_digest)}`] : []),
+    ...(task.initial_plan ? [`Plan: ${task.initial_plan}`] : []),
+    ...(task.next_action && !['completed', 'cancelled'].includes(task.state) ? [`Next: ${task.next_action}`] : []),
+    ...(task.block_details?.resume_when ? [`To resume: ${task.block_details.resume_when}`] : []),
     ...(task.execution_recovery ? [
       `Execution recovery: ${task.execution_recovery.state} · ${task.execution_recovery.phase}`,
       `Failure: ${task.execution_recovery.reason} · ${text(task.execution_recovery.detail)}`,
@@ -39,34 +40,70 @@ function jobRow(job) {
   return `${job.job_id} · ${text(job.state)} · Collection: ${text(job.collection_state)}`;
 }
 
-function formatOverview(task, jobs, automaticContinuation) {
+// Five user-facing activity labels. A dash means the observation is not ready.
+// Detailed lifecycle and controller facts remain in task details and health.
+export function continuationLabel(response) {
+  const task = response.task, running = response.execution?.state === 'running';
+  switch (response.continuation?.state) {
+    case 'idle': return task?.state === 'completed' ? 'Completed'
+      : task?.state === 'cancelled' ? 'Stopped' : running ? 'Working' : 'Idle';
+    case 'paused':
+    case 'blocked':
+    case 'error':
+    case 'attention_required': return 'Stopped';
+    case 'disabled': return running ? 'Working' : 'Stopped';
+    case 'checking': return running ? 'Working' : '—';
+    case 'retrying': return running ? 'Working' : 'Waiting';
+    case 'waiting': return 'Waiting';
+    case 'pending':
+    case 'ready': return 'Working';
+    default: return '—';
+  }
+}
+
+export function continuationDetail(response) {
+  switch (response.continuation?.state) {
+    case 'idle': return response.task?.state === 'cancelled' ? 'The task was cancelled.' : null;
+    case 'paused': return 'The task is paused. Resume it when ready.';
+    case 'blocked': return 'Research is blocked. Resolve the reason below before continuing.';
+    case 'disabled': return 'Automatic continuation is off. Inspect /monitor health before resuming.';
+    case 'checking': return 'Waiting for the first continuation check.';
+    case 'overdue': return 'Continuation checks are overdue. Inspect /monitor health.';
+    case 'error': return 'Automatic continuation failed. Inspect /monitor health and the task execution records.';
+    case 'attention_required': return 'Execution recovery needs attention. Inspect the task execution records before resuming.';
+    case 'retrying': return response.execution?.state === 'running'
+      ? 'Execution recovery is running.' : 'Execution will retry automatically.';
+    case 'waiting': return 'Waiting for compute. Continues when ready.';
+    default: return null;
+  }
+}
+
+function formatOverview(response) {
+  const { task, jobs } = response;
   const counts = jobs?.counts || {};
-  const jobSummary = `${counts.running ?? 0} running · ${counts.queued ?? 0} queued · ${counts.total ?? jobs?.items?.length ?? 0} total`;
-  // Keep the common one-job overview compact. When several jobs are active,
-  // include their identities so the status view remains actionable without
-  // requiring an immediate second command.
-  const activeJobs = jobs?.items?.length > 1
-    ? ['', 'Active jobs', ...jobs.items.map(jobRow)]
-    : [];
-  if (!task) return [
-    'No current task',
-    `Jobs: ${jobSummary}`,
-    `Automatic continuation: ${automaticContinuation ? 'On' : 'Off'}`,
-    ...activeJobs,
-    '', '/monitor tasks · /monitor jobs · /monitor health',
-  ].join('\n');
+  const jobSummary = `${counts.running ?? 0} running · ${counts.queued ?? 0} queued · ${counts.total ?? 0} total`;
+  const scopeLabel = jobs?.scope === 'task' ? 'Task jobs' : 'Session jobs';
+  const command = jobs?.scope === 'task' && task ? `/monitor jobs --task ${task.user_task_id}` : '/monitor jobs';
+  const continuation = continuationLabel(response);
+  const detail = continuationDetail(response);
   return [
-    `Task: ${task.title} · ${taskStateLabel(task.state)}`,
-    `Goal: ${task.objective}`,
-    ...(task.progress?.summary ? [`Progress: ${task.progress.summary}`] : []),
-    ...(task.wait ? [`Waiting for: ${task.wait.job_ids.join(', ')} (${task.wait.mode})`] : []),
-    ...(task.execution_recovery ? [`Recovery: ${task.execution_recovery.phase} · ${task.execution_recovery.reason} · ${text(task.execution_recovery.detail)}`] : []),
-    ...(task.reason ? [`Reason: ${task.reason}`] : []),
-    ...(task.research_review ? [`Research review: ${text(task.research_review.review_status)}`] : []),
-    `Jobs: ${jobSummary}`,
-    `Automatic continuation: ${automaticContinuation ? 'On' : 'Off'}`,
-    ...activeJobs,
-    '', `/monitor task ${task.user_task_id} · /monitor jobs --task ${task.user_task_id}`,
+    task ? `Task: ${task.title}` : 'No current task',
+    `Status: ${continuation}`,
+    ...(detail ? [`Details: ${detail}`] : []),
+    ...(task ? [`Goal: ${task.objective}`] : []),
+    ...(task?.progress?.summary ? [`Progress: ${task.progress.summary}`] : []),
+    ...(task?.next_action && !['completed', 'cancelled'].includes(task.state) ? [`Next: ${task.next_action}`] : []),
+    ...(task?.wait ? [`Waiting for: ${task.wait.job_count} jobs (${task.wait.mode === 'all' ? 'all must finish' : 'any may finish'})`] : []),
+    ...(task?.reason ? [`Reason: ${task.reason}`] : []),
+    ...(task?.resume_when ? [`To resume: ${task.resume_when}`] : []),
+    ...(task?.execution_recovery?.detail ? [`Execution: ${task.execution_recovery.detail}`] : []),
+    ...(task?.execution_recovery?.next_retry_at ? [`Retry after: ${task.execution_recovery.next_retry_at}`] : []),
+    `${scopeLabel}: ${jobSummary}`,
+    ...(jobs?.active?.length ? ['Active jobs', ...jobs.active.map(job => `${job.job_id} · ${job.state}`)] : []),
+    ...(jobs?.active_omitted ? [`${jobs.active_omitted} more active jobs: ${command}`] : []),
+    ...(task?.truncated ? [`Task summary shortened. Read /monitor task ${task.user_task_id} for complete details.`] : []),
+    `Updated: ${text(response.updated_at)}`,
+    '', task ? `/monitor task ${task.user_task_id} · ${command}` : '/monitor tasks · /monitor jobs · /monitor health',
   ].join('\n');
 }
 
@@ -113,9 +150,9 @@ function formatResearch(snapshot, sessionJobIds) {
 export function formatMonitor(method, response, params = {}) {
   switch (method) {
     case 'monitor/overview':
-      return formatOverview(response.task, response.jobs, response.automatic_continuation_enabled);
+      return formatOverview(response);
     case 'monitor/tasks':
-      return lines(response.items.map(task => `${task.user_task_id} · ${task.title} · ${taskStateLabel(task.state)}`))
+      return lines(response.items.map(task => `${task.user_task_id} · ${task.title}${task.truncated ? '…' : ''} · ${taskStateLabel(task.state)}`))
         + '\n\nDetails: /monitor task <task-id>' + nextPage(response, 'tasks', params);
     case 'monitor/task/read':
       return formatTask(response.task) + '\n\n' + formatResearch(response.research, response.session_job_ids);

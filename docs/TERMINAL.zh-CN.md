@@ -107,45 +107,35 @@ Esc 关闭候选并保留输入，Tab 可重新打开。`/monitor` 按当前参�
 上下键只滚动内容，不改变面板高度；短文档只显示返回提示。
 关闭后恢复输入草稿、光标和聊天阅读位置；面板打开期间隐藏后台任务的取消快捷键提示。
 
-输入框正上方的 Monitor 常驻行先显示用户任务，再显示作业数。例如
-`Monitor ✓ · Researching · 2 jobs running` 表示正在研究且有两个计算作业运行。
-状态分别表达等待计算、准备继续、已暂停、需要处理和已完成；一轮模型回复结束不代表用户任务完成。
-断线和快照陈旧优先于缓存中的进展显示；未知数量使用 `—`，不推算完成百分比或时间。
-没有运行作业、打开选择器或阅读页时也保持显示。后台刷新保留焦点、选择、阅读位置和输入草稿。
+输入框正上方的 Monitor 常驻行显示简短状态和计算作业数，例如
+`Monitor … · Working · 2 jobs running`。这个位置只使用五个状态名称：
 
-Monitor 的基础任务状态如下。`jobs running` 只统计运行中的计算作业，不表示模型是否正在回复，
-也不包含排队数量。`Needs attention` 的具体原因见 `/monitor` 的 `Reason`。
-
-| 任务状态 | 显示 | 含义 |
-| --- | --- | --- |
-| `active` | Researching | 用户任务仍在推进 |
-| `waiting` | Waiting for compute | 等待登记的计算条件；自动推进开启时附加 Continues when ready |
-| `paused` | Paused | 自动推进已暂停 |
-| `blocked` | Needs attention | 任务被阻塞；若模型正在回复，显示 Responding · Task blocked |
-| `completing` | Preparing delivery | 正在准备交付 |
-| `completed` | Completed | 用户任务已完成 |
-| `cancelled` | Cancelled | 用户任务已取消 |
-| `recovering` | Checking recovery | 正在检查恢复状态 |
-
-状态行也会显示以下运行或连接提示，优先级由连接、快照新鲜度和任务控制检查决定：
-
-| 显示 | 触发条件 |
+| 显示 | 含义 |
 | --- | --- |
-| Checking status | 尚无当前会话的 Monitor 快照 |
-| No current task | 当前没有登记的用户任务 |
-| Checking recovery | 控制器尚未完成首次检查 |
-| Checking continuation / Preparing continuation | 任务 active、执行空闲，分别表示尚无／已有继续执行预留 |
-| Automatic continuation off | 任务 active、执行空闲且自动推进关闭 |
-| Connection lost | Monitor 请求或订阅失败 |
-| Status is stale | 快照时间无效或超过 30 秒未更新 |
-| Continuation error: … | 任务控制器报告错误 |
-| Continuation check overdue | active/waiting 任务的控制检查超过 30 秒或三个检查周期中的较大值 |
+| Working | 推进中：研究、安排后续执行、最终交付或正在执行恢复 |
+| Waiting | 等待中：等待计算结果或自动重试 |
+| Stopped | 已停止：暂停、取消、研究阻塞、恢复需要处理，或自动推进关闭且执行空闲 |
+| Completed | 已完成：用户任务完成最终交付 |
+| Idle | 空闲：没有当前任务，也没有正在执行的回复 |
 
-`✓` 是普通状态标记，任务是否完成以旁边的文字为准；`Ⅱ` 表示暂停，`…` 表示检查或准备，
-`!` 表示需要注意，`×` 表示连接或控制错误。
+状态尚未取得、控制检查超时、断线或快照过期时使用 `—`，不把旧状态当成当前事实。
+首次控制检查尚未完成或自动推进关闭时，如果确实正在回复，仍可显示 Working。
+暂停、阻塞、取消或恢复需要处理时，即使模型正在解释原因，也保持 Stopped，
+不再拼接 Responding 等组合状态。断线、缺少当前会话快照或快照超过 30 秒未更新时，
+计算作业数量也显示 `—`。具体原因和恢复方式在 `/monitor` 中说明。
+
+一轮模型回复结束不代表用户任务完成。`jobs running` 只统计当前任务运行中的计算作业；
+没有当前任务时统计本会话，不包含排队数量，也不代表模型是否正在回复。
+不推算完成百分比或时间。没有运行作业、打开选择器或阅读页时也保持显示。
+后台刷新保留焦点、选择、阅读位置和输入草稿。
+
+这五个标签只是界面映射，不新增持久化状态。任务详情和列表仍保留暂停、阻塞、取消、
+准备交付等准确区别；原因、自动推进设置和恢复记录保留在概览、详情、执行记录与健康检查中。
 
 `/monitor` 概览提供紧凑的实时摘要，展示任务状态、目标、最近进展、具体 Job 等待条件、恢复原因、
-Job 数量、自动推进设置和 Research Review 状态。用 `/monitor task <id>` 查看交付条件与研究详情，
+下一步、恢复条件和实际推进状态。暂停、阻塞或关闭自动推进时，不显示“就绪后自动继续”。
+Job 数量统计当前任务的全部分页；没有当前任务时统计本会话。最多预览五个运行中或排队中的 Job。
+长摘要会提示查看完整详情。用 `/monitor task <id>` 查看交付条件与研究详情，
 用 `/monitor jobs` 查看执行和收集状态，用 `/monitor run <id>` 查看 Pi generation/tool Task。
 Job 成功不直接等于科学分析完成；该区别以任务的 Research Review 和 Result 为准。
 

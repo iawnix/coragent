@@ -37,7 +37,7 @@ test('task action contracts require their own payloads and reject ignored fields
     ['refine',{source_submission_ids:['12'],objective:'Updated objective'}],
     ['progress',{evidence_refs:['result_example']}],
     ['wait',{wait:{job_ids:['job_example'],mode:'all'}}],
-    ['block',{reason:'Missing user input'}],
+    ['block',{reason:'Missing user input',block_kind:'missing_user_input',resume_when:'The user supplies the missing input.'}],
     ['propose_completion',{completion:[{criterion_id:'c1',evidence_refs:['a1']}]}],
     ['set_research',{research:{entry_node_ids:[],focus_node_ids:[]}}],
     ['apply_user_control',{control:'cancel',jobs:'cancel',source_submission_ids:['12']}],
@@ -45,6 +45,27 @@ test('task action contracts require their own payloads and reject ignored fields
   for (const [action,fields] of actions) {
     check('taskUpdate',{...base,action,...fields});
     assert.throws(()=>check('taskUpdate',{...base,action}));
+    for (const field of ['block_kind','resume_when','next_action']) {
+      const value = field === 'block_kind' ? 'missing_user_input' : 'Concrete next step';
+      const args = {...base,action,...fields,[field]:value};
+      if (field === 'next_action' ? ['refine','progress'].includes(action) : action === 'block') check('taskUpdate',args);
+      else assert.throws(()=>check('taskUpdate',args));
+    }
+  }
+  for (const block_kind of ['resource_unavailable','execution_failure','budget_exhausted','scientific_dead_end']) {
+    const args = {...base,action:'block',block_kind,reason:'Verified obstacle',resume_when:'The prerequisite becomes available.'};
+    assert.throws(()=>check('taskUpdate',args));
+    check('taskUpdate',{...args,evidence_refs:['result_1']});
+  }
+  const blocker = {...base,action:'block',reason:'Missing user input',block_kind:'missing_user_input',resume_when:'The user supplies the input.'};
+  for (const field of ['reason','resume_when']) {
+    assert.throws(()=>check('taskUpdate',{...blocker,[field]:' \n\t'}));
+  }
+  assert.throws(()=>check('taskUpdate',{...base,action:'progress',evidence_refs:['result_1'],next_action:' \n\t'}));
+  assert.throws(()=>check('taskUpdate',{...base,action:'refine',source_submission_ids:['12'],next_action:' \n\t'}));
+  for (const field of ['reason','block_kind','resume_when']) {
+    const args = {...blocker}; delete args[field];
+    assert.throws(()=>check('taskUpdate',args));
   }
   assert.throws(()=>check('taskUpdate',{...base,action:'wait',wait:{job_ids:['job_example'],mode:'all'},completion:[{criterion_id:'c1',evidence_refs:['a1']}]}));
   assert.throws(()=>check('taskUpdate',{...base,action:'refine',source_submission_ids:['user_1']}));
@@ -61,7 +82,12 @@ test('task action contracts require their own payloads and reject ignored fields
   }
   assert.throws(()=>check('taskUpdate',{...cancel,reason:'ignored'}));
   assert.throws(()=>check('taskUpdate',{...cancel,source_submission_ids:[]}));
-  const begin={title:'Research',objective:'Compare candidates',criteria:[{id:'c1',description:'Evidence collected'}]};
+  const begin={title:'Research',objective:'Compare candidates',criteria:[{id:'c1',description:'Evidence collected'}],initial_plan:'Compare the candidates and record evidence.',next_action:'Read the candidate inputs and perform the first comparison.'};
   check('taskBegin',{...begin,source_submission_ids:['12']});
+  for (const field of ['initial_plan','next_action']) {
+    const args = {...begin,source_submission_ids:['12']}; delete args[field];
+    assert.throws(()=>check('taskBegin',args));
+    assert.throws(()=>check('taskBegin',{...begin,source_submission_ids:['12'],[field]:' \n\t'}));
+  }
   assert.throws(()=>check('taskBegin',{...begin,source_submission_ids:['user_1']}));
 });
