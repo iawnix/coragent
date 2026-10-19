@@ -15,7 +15,12 @@ helper = importlib.util.module_from_spec(spec); spec.loader.exec_module(helper)
 
 
 def gjf(path, route='Opt=(TS,CalcFC) Freq'):
-    path.write_text('%nprocshared=12\n%mem=4000MB\n%chk=ts.chk\n#p M062X/6-31G** '+route+'\n\nfixture\n\n0 1\nO 0 0 0\nH 0 0 1\nH 0 1 0\n\n')
+    geometry = '0 1\nO 0 0 0\nH 0 0 1\nH 0 1 0\n\n'
+    if 'QST2' in route.upper():
+        body = 'reactant\n\n' + geometry + 'product\n\n' + geometry
+    else:
+        body = 'fixture\n\n' + geometry
+    path.write_text('%nprocshared=12\n%mem=4000MB\n%chk=ts.chk\n#p M062X/6-31G** '+route+'\n\n' + body)
     return path
 
 
@@ -30,6 +35,12 @@ def test_explicit_gaussian_input_preserves_ts_and_irc_routes(tmp_path):
         helper.inspect_input(path, 'M062X', '6-31G**', 0, 1, 24, 4000)
     path.write_text(path.read_text().replace('%chk=ts.chk', '%chk=../escape.chk'))
     with pytest.raises(ValueError, match='relative staged'):
+        helper.inspect_input(path, 'M062X', '6-31G**', 0, 1, 12, 4000)
+
+
+def test_qst_requires_complete_structure_sections(tmp_path):
+    path = gjf(tmp_path/'input.gjf', 'Opt=QST3')
+    with pytest.raises(ValueError, match='QST3 requires'):
         helper.inspect_input(path, 'M062X', '6-31G**', 0, 1, 12, 4000)
 
 

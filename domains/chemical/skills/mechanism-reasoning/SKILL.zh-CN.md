@@ -1,14 +1,20 @@
 ---
 name: mechanism-reasoning
-description: 使用明确的物种身份、原子映射、基元步骤、替代假设与可证伪条件形成、比较并修订反应机理假设。
+description: 协调反应路径与过渡态研究，从输入和机理假设推进到候选搜索、验证、失败恢复及有证据支持的结论。
 ---
 
 # CoRAgent 反应机理思考
 
 [English version](SKILL.md)
 
-使用本 Skill 定义和质疑反应机理假设、识别基元步骤与竞争路径，或判断哪种观察能够区分
-替代解释。本 Skill 基于检查过的原始输出及明确引用的研究结果推理，不能替代过渡态验证、IRC 或能量学。
+反应机理或过渡态研究（包括恢复未完成搜索）使用本 Skill。它负责跨操作 Skill 的科学计划：
+识别下一项未解决问题，选择可区分假设的计算，检查证据，并将结果带入下一步决策。
+也可单独用于机理推理；概念性问题不要求运行计算。
+
+计算任务先读[反应研究闭环](references/reaction_investigation.zh-CN.md)。交给 chemical-input、
+reactive-geometry、candidate-generation、validation、energetics 或 report 时，仍负责决定下一步。
+这些 Skill 是同一 Agent 使用的方法说明，不是独立 Agent 或自动工作流。
+通用运行时保存任务、Job 与证据，不选择化学前置条件，也不判定机理是否成立。
 
 显式定义物种、组成、电荷、自旋或电子态、原子映射、成键变化、环境与可逆性。在 Node 的 proposal 中写明机理假设，在 plan 中描述预测与可证伪观察；结果中的支持或冲突用 conclusion 和证据说明。需要独立比较的方案可用 alternative_to 关联。研究依赖不表示化学连通性。
 

@@ -15,6 +15,13 @@ This is the scientific search-operation layer. Gaussian, xTB and other software
 recipes remain backend concerns; their presence here only describes how a search
 can be executed through the existing Job interface.
 
+Within a reaction investigation, follow the [mechanism-reasoning loop](../mechanism-reasoning/references/reaction_investigation.md).
+Return a selected candidate with its source, remaining validation and next operation,
+or a diagnosed failure with a changed construction/search action. A preparation Job
+that only writes inputs has not performed the search: execute and inspect the solver.
+Candidate status permits further exploration; a verified minimum of the complete
+reactant complex is not a prerequisite for every search method.
+
 Start from explicit reactant/product identities, atom mapping, charge,
 multiplicity, and relevant conformers. Choose chemically informed construction,
 a relaxed scan, QST2/QST3, direct TS optimization, NEB, or fragment orientation

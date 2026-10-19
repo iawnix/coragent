@@ -137,6 +137,13 @@ def assess(elements, coordinates, *, bonded_pairs=(), reaction_pairs=(), profile
             if distance < max(.35, .50 * radius_sum):
                 collapse_pairs.append({'atoms': [j, i], 'distance_angstrom': distance,
                                        'reaction_pair': pair in reaction})
+            elif pair not in bonded and pair not in reaction and elements[i] == 'H' and elements[j] == 'H' and distance < .70:
+                # Hydrogen pairs have no ordinary covalent contact in the
+                # supported Cartesian material contract.  The radius-scaled
+                # screen alone is too permissive for the 0.54 Å artifact that
+                # otherwise reached a Gaussian optimization.
+                short_contacts.append({'atoms': [j, i], 'distance_angstrom': distance,
+                                         'radius_sum_angstrom': radius_sum, 'kind': 'short_hydrogen_contact'})
             elif pair not in bonded and pair not in reaction and distance < clash_scale * radius_sum:
                 short_contacts.append({'atoms': [j, i], 'distance_angstrom': distance,
                                          'radius_sum_angstrom': radius_sum})

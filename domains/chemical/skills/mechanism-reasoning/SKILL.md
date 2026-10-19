@@ -1,16 +1,24 @@
 ---
 name: mechanism-reasoning
-description: Form, compare, and revise reaction-mechanism hypotheses using explicit species identities, atom mappings, elementary steps, alternatives, and falsifiers.
+description: Coordinate reaction-path and transition-state investigations from input and mechanism hypotheses through candidate searches, validation, recovery, and evidence-based conclusions.
 ---
 
 # CoRAgent Mechanism Reasoning
 
 [Chinese version](SKILL.zh-CN.md)
 
-Use this Skill to define and challenge reaction-mechanism hypotheses, identify
-elementary steps and competing pathways, or decide which observation would
-distinguish alternatives. It reasons over inspected source outputs and explicitly cited research results; it does not
-replace transition-state validation, IRC, or energetics.
+Use this Skill for a reaction-mechanism or transition-state investigation, including
+resuming an unfinished search. It owns the scientific plan across operation Skills:
+identify the next unresolved question, choose a discriminating calculation, inspect
+its evidence, and carry the result into the next decision. It also supports standalone
+mechanism reasoning; a conceptual question does not require running calculations.
+
+For a calculation task, read the [reaction investigation loop](references/reaction_investigation.md).
+Keep responsibility for the next action when handing work to chemical-input,
+reactive-geometry, candidate-generation, validation, energetics or report. These
+are instructions used by the same Agent, not separate agents or automatic workflows.
+The generic runtime stores tasks, Jobs and evidence; it does not choose chemical
+prerequisites or decide when a mechanism is established.
 
 Define species, composition, charge, spin or electronic state, atom mapping,
 bond changes, environment, and reversibility explicitly. Put the current mechanism hypothesis in the Node proposal and predictions/falsifying observations in its plan. Explain support or conflict in Result conclusions with evidence. Independently compared approaches can use alternative_to. Research dependencies do not define chemical connectivity.

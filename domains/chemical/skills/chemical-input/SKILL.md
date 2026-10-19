@@ -12,6 +12,12 @@ input, chosen structure, source, charge and multiplicity with the resulting file
 This is the structure and reaction-definition layer; it does not choose a quantum
 method, run a solver, or certify a transition state.
 
+For reaction work, return prepared materials to the [mechanism-reasoning loop](../mechanism-reasoning/references/reaction_investigation.md),
+binding the original graph to explicit-H order and selected geometry. Reuse collected
+optimized fragments by explicit transforms/permutations; check composition, graph and
+intrafragment geometry separately from clash screening. Construct missing mapping when
+the supplied species make it determinable.
+
 Use `chemical.material@1` when handing off a name, SMILES or supplied XYZ with its
 original text, graph/coordinates, fragments, unknown settings, state declaration
 and reversible atom order. Preserve XYZ coordinates and complex orientations;
@@ -80,14 +86,10 @@ Use `chemical.reaction@1` when the task needs reactant/product atom mapping. Che
 composition, charge and explicit mappings, and supply the intended bond changes
 with `--transformation`. These steps apply to reaction work; a single-molecule
 optimization or single-point calculation needs no reaction mapping.
-
 Retain the chosen target structure as an Artifact and use `chemical.compare@1` to
 compare a calculated structure with it when the study calls for that check. Cite
 checks and source structures in the research record and explain relevant differences.
-
-
-See [script layout](references/script_layout.md) for the implementation boundaries and canonical script paths.
-
+See [script layout](references/script_layout.md) for implementation boundaries and canonical script paths.
 ## References
 
 - [name_resolution.md](references/name_resolution.md): lookup, inference input and result fields.

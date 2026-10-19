@@ -12,6 +12,14 @@ structure. Candidate generation supplies the candidate; bidirectional IRC
 connectivity is a validation dimension that tests its connection to declared
 reactant and product basins.
 
+For a reaction investigation, validation must return a decision to the
+[mechanism-reasoning loop](../mechanism-reasoning/references/reaction_investigation.md):
+validated saddle, candidate requiring another check, or a diagnosed failure with
+the next construction/search operation. A missing criterion is unresolved evidence;
+it is not a task blocker when a justified candidate or diagnostic next experiment
+can still be generated. Validation closes one candidate's evidence loop, not the
+whole reaction study.
+
 Use `chemical.stationary-check@1`, `chemical.mode-check@1` and
 `chemical.irc-check@1` for independent, reaction-independent checks on normalized
 evidence. `chemical.gaussian-evidence@1` adapts a selected raw Gaussian log section.

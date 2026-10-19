@@ -12,6 +12,12 @@ revise an existing scan, NEB, optimization or IRC geometry for another search.
 `chemical.reactive-geometry@1` edits existing coordinates through the ordinary Job
 lifecycle; it does not determine a mechanism or run a quantum solver.
 
+For reaction investigations, return accepted poses and rejected-candidate reasons to
+the [mechanism-reasoning loop](../mechanism-reasoning/references/reaction_investigation.md).
+An accepted pose is a handoff to constrained refinement or candidate generation, not
+a reason to stop. Preserve the source material, fragment-internal geometry, mapping,
+bond changes and actual local contacts in that handoff.
+
 Treat this Skill as a tool kit and decision aid. The Agent chooses and combines
 the tools from the evidence; the tools enforce input, coordinate and provenance
 invariants but do not impose a fixed research sequence. Read the [capability map](references/capability_map.md)
