@@ -1,84 +1,36 @@
 ---
 name: research-memory
-description: Resume research through persistent problem Nodes, explicit relations, execution observations and immutable Results.
+description: Preserve research questions, attempts, evidence, relations, and immutable conclusions so work can resume with context.
 ---
 
-# Research Memory
+# Research memory
 
-Start from the injected `research-review/1` context or `research_read {}`. The Review is a disposable projection of Research State: it preserves references to original requirements, relevant Nodes, Results and execution facts, and calls out contradictions, uncertainties, limitations and follow-up reads within a budget. Omitted content is not absent or completed; use the returned references to inspect it. Scientific interpretation belongs to you and the domain Skill, not the execution receipt.
+[Chinese version](SKILL.zh-CN.md)
 
-User task control belongs to `task_read` and `task_update`: objective, delivery criteria, waiting, blockers and completion. A Node's open/paused/closed status does not pause or complete that task. Apply actual user stop/resume instructions through `task_update action=apply_user_control`; cancelling Jobs alone also leaves the task active. See the [research workflow](../research-workflow/SKILL.md) for source authorization and Job policy. Keep scientific interpretation and evidence here, and reference those records from task progress or completion.
+Use this Skill to keep a scientific study coherent across turns. Nodes hold questions and hypotheses, Jobs and Artifacts hold execution evidence, and Results hold durable interpretations. The runtime supplies a `research-review/1` projection; read the referenced source records when details matter.
 
-## Five small operations
+## Core operations
 
-- `research_read {}` restores the workspace overview; `{ref}` reads a returned Node, Result or record reference. Follow pagination to inspect a long object.
-- `research_search {query}` finds research. Use the tool's declared filters and paging fields; copy exact returned references.
-- `research_create {goal}` creates a persistent local problem. Optionally supply title, proposal, plan, initial explicit relations and source bindings. For current Task Controller inputs use `source_submission_ids` exactly as supplied by runtime context (for example `['11']`); the adapter resolves them to Research Memory refs. Use `source_refs` only with an exact returned `user_*` reference (for example `['user_1']`). These are different namespaces: never construct `user_11` from submission `11`.
-- `research_update {node_id, note}` records a new observation or explanation. Optionally replace proposal, plan or progress, choose status (`open`, `paused`, `closed`), change explicit relations or set assessment_ref.
-- `research_result {node_id, conclusion}` publishes an immutable, independently useful result. Optional observation, limitations, inputs, evidence_refs and files distinguish observations from interpretation. Set as_assessment only when this result should become the Node's current synthesis.
+- `research_read {}` restores the current workspace overview; use a returned `ref` to read a Node, Result, or record.
+- `research_search {query}` finds prior work with the declared filters and paging fields.
+- `research_create {goal}` opens a persistent question with optional title, proposal, plan, relations, and source bindings.
+- `research_update {node_id, note}` records observations, plans, status, relations, or an assessment reference.
+- `research_result {node_id, conclusion}` publishes an immutable conclusion with observations, limitations, evidence references, and files.
 
-Framework identity, request deduplication, read basis and Node revisions are supplied by the adapter. Do not invent transaction fields. On a stale-read conflict, inspect the returned current Node, merge the scientific change, and retry through a new tool call. A Job update does not change the Node's authored revision. No global progress object or end-of-turn checkpoint exists.
+Keep a question, its retries, and parameter changes in one Node. Create a related Node for an independently interpretable branch and connect it with `requires`, `part_of`, or `alternative_to`. Associate entry/focus Nodes with the current task through `task_update action=set_research` using actual returned IDs.
 
-## Use the Research Review
+## Evidence loop
 
-`research-review/1` is the default context projection, not a second memory state. Its `state_digest` and `review_digest` identify the Research State seen when it was produced; a new Monitor batch, terminal or collected Job, Result/Artifact evidence, or changed user requirement creates a new review boundary. Ordinary progress logs, intermediate Job states and tool turns reuse the existing anchor. When the Review is `pending`, the runtime may add one bounded model synthesis; the same `state_digest` is synthesized at most once. It remains temporary context and cannot replace source evidence or write to Memory. `contradictions` and `uncertainties` are prompts for verification, not scientific conclusions. `follow_up` suggests reads or checks and never grants write permission, closes a Node or starts a Job. Use the original tools for full history, Node fields, Result bodies, Job receipts and Artifact contents. The domain delivery Skill still produces the final user report; Review does not replace `chemical.research-report`.
+After collecting a Job, inspect its output, then write the scientific observation with `research_update`. Publish a Result when the observation is useful independently; cite immutable Artifacts or Results rather than mutable work files. Keep measured observations, authored conclusions, and check references separate. Negative or inconclusive results are valid research records.
 
-For a large Node, inspect the specific field you intend to change:
+A review projection is a navigation aid: its `state_digest` and `review_digest` identify the state it saw, while the cited Nodes, Results, Jobs, and Artifacts remain authoritative. Follow pagination for long fields and reread before replacing a field after a revision conflict. Use [storage and recovery](references/storage.md) for workspace paths, revisions, and immutable files, [planning](references/planning.md) for decomposition, and [research workflow](../research-workflow/SKILL.md) for task control and Job policy.
 
-```json
-{"ref":"node_returned_by_create","field":"plan"}
-```
+## Working pattern
 
-Supported fields are goal, title, proposal, plan, progress, status, assessment_ref and relations. Follow next_offset for omitted content. All pages actually received for the same Node revision and field content together supply a replacement basis. Missing or unacknowledged pages do not authorize overwriting unseen text; if the revision changes, reread the field. The adapter acknowledges and combines read receipts.
+1. Restore the review and current task.
+2. Read the focused Node and its evidence references.
+3. Choose the next calculation or analysis in the domain Skill.
+4. Record what changed after execution.
+5. Publish a Result or revise the plan, preserving competing branches and unresolved questions.
 
-## Continue a problem or start a branch
-
-Keep parameter changes, different initial geometries and repeated attempts at the same question in one Node. Create another Node when the question or independently tracked branch changes. proposal states the current hypothesis or approach; goal states the question; plan states how to investigate. A hypothesis is optional for preparation or reporting work.
-
-Split a broad study when its parts have independently interpretable conclusions, distinct alternatives or shared evidence needs. Create the questions you can already investigate and expand them as evidence arrives. A root Node is optional; a parameter sweep can remain one question with many Jobs. For compound studies or a failed approach, read [planning and revisiting questions](references/planning.md).
-
-Associate the chosen entry Nodes and focus with the current task using `task_update` action `set_research`, its current `expected_revision`, and `research: {entry_node_ids: [...], focus_node_ids: [...]}`. Use actual returned Node IDs. Entries restore the study's structure; focus guides the next request's context. The lists are navigation, not exclusive ownership. Change them when the research focus changes. Read-only exploration uses Node/relations reads without changing the task. Plan edits, notes and empty Nodes do not count as new progress.
-
-```json
-{"goal":"Find a transition state connecting A and B","proposal":"A concerted path may exist"}
-```
-
-After inspecting a failed calculation, use its actual Node ID:
-
-```json
-{"node_id":"node_returned_by_create","note":"Geometry X did not converge; this does not refute the path. Try geometry Y.","plan":"Search from Y, then inspect frequency and IRC connectivity."}
-```
-
-## Express only necessary research relations
-
-`add_relations` entries contain kind (`requires`, `part_of`, `alternative_to`), target and optional reason. Use `remove_relations` with returned relation IDs to withdraw a declaration. The framework stores the reverse query and history; do not update both endpoints yourself.
-
-```json
-{"node_id":"node_2","note":"Compare once the candidate has usable energy and connectivity evidence.","add_relations":[{"kind":"requires","target":"node_1","reason":"Need a comparable candidate result"}]}
-```
-
-The map can contain feedback and competing approaches. A dependency is research intent, not permission to call tools. Actual material usage and explicit result citations preserve their concrete versions. Merely reading or retrieving a result does not mean adopting it as evidence.
-
-## Publish results without inventing success
-
-A useful result can be negative or inconclusive. Job exit zero does not establish scientific validity; failure does not erase previous evidence. Publication does not close the Node. Closing a Node means stopping active work on that question, not proving its hypothesis.
-
-```json
-{"node_id":"node_1","conclusion":"This candidate's IRC does not connect the target product.","evidence_refs":["art_7"],"limitations":"Only this candidate was checked; other geometries remain possible."}
-```
-
-For files use `files: [{name, purpose?, artifact_ref}]` referencing registered materials. Never cite a mutable work file as an immutable result. To correct a result, publish another with `supersedes` referencing the original. Ordinary new results do not overwrite the Node's assessment. Read a downstream review notice when an input result is corrected; it does not automatically change old inputs or rerun work.
-
-Monitor events identify the Job and its research Node. Inspect or collect the execution, then record your interpretation here. No lifecycle repair prompt or mandatory disposition is needed to finish a turn.
-
-See [storage and recovery](references/storage.md), [public tools](../research-workflow/references/public_contract.md), and [中文说明](SKILL.zh-CN.md).
-
-## Subjects, checks and revisions
-
-Use `subjects` to name immutable Artifact or Result references, for example `{"target":"art_1","calculated":"art_2"}`. Nodes describe intended subjects; Results record the subjects actually interpreted. Roles are explicit labels, not proof of identity. Domain tools compare structures; Memory never parses molecular graphs or certifies scientific truth.
-
-Keep measured `observation`, authored `conclusion`, and exact `check_refs` separate. Checks may be failed or inconclusive; either may be cited in a Result. A check receipt records execution, parsing and scoped scientific checks separately.
-
-To revise the current synthesis and progress together, publish with `supersedes`, `as_assessment:true` and `progress`. This operation is atomic: a stale read saves neither the Result nor the progress. Plain publication without progress retains its existing save-even-if-assessment-conflicts behavior. Read `subjects` before replacing them.
-
-Result reads, current-assessment cards and generated Markdown expose review notices when the authored Node context changes or a cited Result is superseded. A report should be a Result with its files and exact input Results attached; those same notices apply to it. Notices request review, not retraction. Notes alone never rewrite progress. Historical Results and report bytes remain immutable.
+Do not infer chemical identity or scientific validity from a receipt alone; domain Skills interpret structures and calculations. The memory layer stores those interpretations and their sources.

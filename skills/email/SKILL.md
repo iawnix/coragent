@@ -1,39 +1,21 @@
 ---
 name: email
-description: Deliver an explicitly authorized email through the installation's SMTP transport, with durable idempotent receipts.
+description: Deliver an authorized email through configured SMTP with prepared attachments and durable idempotent receipts.
 ---
 
-# Email transport
+# Email delivery
 
-This Skill is a transport interface. It does not decide when a message should
-be sent, what a message means, which domain event it represents, or which files
-belong in an attachment. A caller prepares a generic email message and invokes
-this Skill only after the user has authorized the delivery.
+[Chinese version](SKILL.zh-CN.md)
 
-The configured recipient owns addressing. The SMTP configuration is inspected
-through `CORAGENT_NOTIFICATION_CONFIG`; credentials are never copied into a
-message request or a receipt.
+Use this Skill after a domain Skill has composed a message and the user has authorized sending. It checks the configured SMTP transport, pins attachment digests, sends once, and records a receipt that can be reconciled after an interrupted delivery.
 
-The generic message contract is `ts-email-message/1`:
+## Message workflow
 
-```json
-{
-  "schema_version": "ts-email-message/1",
-  "message_id": "stable-authorized-delivery-id",
-  "subject": "Message subject",
-  "body": "Message body",
-  "attachments": [
-    {"ref": "artifacts/example.txt", "sha256": "sha256:...", "size_bytes": 123}
-  ],
-  "metadata": {"optional": "caller-owned context"}
-}
-```
-
-`prepare` pins the configured recipient and attachment digests without sending.
-`send` accepts the prepared message, revalidates the SMTP configuration and
-attachments, and returns a receipt. `sent` means the SMTP server accepted the
-message; `already_sent` is the idempotent result for the same message. An
-`unknown` result must be reconciled before another attempt.
+1. Write a `ts-email-message/1` request with a stable `message_id`, subject, body, attachment references/digests, and caller metadata.
+2. Run `check` against `CORAGENT_NOTIFICATION_CONFIG` to confirm the configured recipient and transport.
+3. Run `prepare` to pin the recipient and attachment files. Review the prepared message before delivery.
+4. Run `send` with the prepared request. A successful SMTP acceptance returns `sent`; repeating the same message returns `already_sent`.
+5. If the receipt is `unknown`, inspect the delivery record and SMTP state before another attempt. Keep the receipt with the research report.
 
 ```text
 "$CORAGENT_PYTHON" <this Skill directory>/scripts/email_cli.py check --root <workspace> --output <workspace>/email-check.json
@@ -41,8 +23,4 @@ message; `already_sent` is the idempotent result for the same message. An
 "$CORAGENT_PYTHON" <this Skill directory>/scripts/email_cli.py send --root <workspace> --request-file <workspace>/email-prepared.json --output <workspace>/email-result.json
 ```
 
-Domain Skills own message composition and domain-specific authorization before
-calling this transport.
-
-Read [delivery protocol](references/email_delivery.md) for the generic
-message, receipt, and retry contract.
+The caller owns message composition, recipient intent, and domain authorization. SMTP credentials stay in the configured environment and are absent from requests and receipts. Read [delivery protocol](references/email_delivery.md) for schema, receipt states, attachment pinning, and reconciliation.
