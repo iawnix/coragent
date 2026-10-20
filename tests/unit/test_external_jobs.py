@@ -123,6 +123,33 @@ def test_cancelled_lease_expiry_does_not_prove_process_exit(queue, tmp_path):
     assert platform.status(receipt).state == JobState.UNKNOWN
 
 
+def test_confirmed_cancellation_without_exit_code_is_terminal(queue, tmp_path):
+    config, state = queue
+    platform = ExternalJobPlatform(config)
+    receipt = platform.start(spec(tmp_path, command=("/bin/true",)))
+    update_task(state, state="cancel", started_at="earlier", lease_id="lease-1",
+                cancel_confirmed=False)
+    assert platform.status(receipt).state == JobState.RUNNING
+    update_task(state, finished_at="now", lease_id=None, exit_code=None,
+                cancel_confirmed=True, completion_reason="node_completion")
+    assert platform.status(receipt).state == JobState.CANCELLED
+    assert ExternalJobPlatform(config).collect(receipt)["status"]["state"] == JobState.CANCELLED
+
+
+@pytest.mark.parametrize("exit_code", [None, -15])
+def test_explicit_unconfirmed_cancel_remains_unknown(queue, tmp_path, exit_code):
+    config, state = queue
+    platform = ExternalJobPlatform(config)
+    receipt = platform.start(spec(tmp_path, command=("/bin/true",)))
+    update_task(state, state="cancel", started_at="earlier", finished_at="now",
+                lease_id=None, exit_code=exit_code, cancel_confirmed=False,
+                completion_reason="lease_expired")
+    assert platform.status(receipt).state == JobState.UNKNOWN
+    assert not (Path(receipt.cwd) / "status.json").exists()
+    with pytest.raises(RuntimeError, match="not complete"):
+        platform.collect(receipt)
+
+
 def test_queued_cancel_and_config_change(queue, tmp_path):
     config, state = queue
     platform = ExternalJobPlatform(config)

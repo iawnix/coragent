@@ -30,7 +30,9 @@ def observation(task):
     state = {"wait": "queued", "run": "running", "done": "succeeded", "fail": "failed",
              "timed_out": "timed_out", "cancel": "cancelled", "blocked": "held", "lost": "unknown"}.get(task["state"], "unknown")
     finished = bool(task.get("finished_at")) and not task.get("lease_id")
-    if state == "cancelled" and finished and task.get("started_at") and task.get("exit_code") is None:
+    if (state == "cancelled" and finished and task.get("started_at")
+            and not task.get("cancel_confirmed", False)
+            and ("cancel_confirmed" in task or task.get("exit_code") is None)):
         # TRI also closes cancelled records when a node lease expires. That
         # does not establish that the process on the unreachable node exited.
         state, finished = "unknown", False
@@ -42,7 +44,9 @@ def observation(task):
             "error": task.get("error"), "diagnostics": {
                 "native_state": task["state"], "node": task.get("node"), "attempt": task.get("attempt"),
                 "lease_id": task.get("lease_id"), "stdout_path": task.get("stdout_path"),
-                "stderr_path": task.get("stderr_path"), "cancellation_requested": task["state"] == "cancel"}}
+                "stderr_path": task.get("stderr_path"), "cancellation_requested": task["state"] == "cancel",
+                "cancel_confirmed": task.get("cancel_confirmed", False),
+                "completion_reason": task.get("completion_reason")}}
 
 
 def handle(request):
