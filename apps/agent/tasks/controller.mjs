@@ -442,7 +442,8 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       const task = await settleWait(ctx);
       if (!task || terminal.has(task.state)) return null;
       requireValue(task.state === "active", "task_not_active", "Only an active user task may start new Jobs");
-      return { user_task_id: task.user_task_id };
+      return { user_task_id: task.user_task_id,
+        ...(task.compute_environment ? { compute_environment: task.compute_environment } : {}) };
     },
     async read({ user_task_id }, ctx) {
       const task = await harness.snapshot(UserTask, conversation.id, user_task_id, ctx);
@@ -504,6 +505,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         Object.assign(task, { schema_version: "coragent-user-task/2", user_task_id: id,
           workspace_id: workspaceId, session_id: sessionId, conversation_id: conversation.id,
           title: params.title, objective: params.objective, sources, criteria: params.criteria,
+          compute_environment: params.compute_environment ?? null,
           initial_plan: params.initial_plan || "Preserve the user's deliverables, establish the research scope, and produce evidence for the first decision before choosing the next action.",
           next_action: params.next_action || "Read the current requirements and perform the first concrete evidence-producing action.",
           state: "active", reason: null, revision: 1, control_epoch: 1, wait: null,
@@ -529,6 +531,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       }
       const sources = params.action === "refine" ? await sourceRecords(params.source_submission_ids, ctx) : null;
       requireValue(params.action === "set_research" || params.research === undefined, "task_research_invalid", "Research bindings use set_research");
+      requireValue(params.action === "refine" || params.compute_environment === undefined, "task_constraint_invalid", "Execution destination changes require refine and a new user source");
       if (params.action === "set_research") await verifyResearch(params.research);
       const identities = params.action === "progress" ? await verifyEvidence(params.evidence_refs, ctx, { userTaskId: basis?.user_task_id }) : [];
       if (params.action === "block") {
@@ -562,7 +565,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         requireValue(task.state !== "blocked" || ["refine", "progress", "set_research", "block"].includes(params.action),
           "task_blocked", "Resolve the blocker with refine and the new user submission ID before continuing work");
         if (params.action === "refine") {
-          if (params.objective !== undefined || params.criteria !== undefined) {
+          if (params.objective !== undefined || params.criteria !== undefined || params.compute_environment !== undefined) {
             requireValue(sources.some(source => !task.sources.some(previous => previous.submission_id === source.submission_id)),
               "task_source_required", "Changing the agreed scope requires a new user instruction; partial evidence does not reduce delivery criteria");
           }
@@ -574,6 +577,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           }
           if (params.objective !== undefined) task.objective = params.objective;
           if (params.criteria !== undefined) task.criteria = params.criteria;
+          if (params.compute_environment !== undefined) task.compute_environment = params.compute_environment;
           task.execution_recovery = null;
           task.block_details = null;
           task.completion = null; delete task.completion_submission_id; delete task.completion_control_epoch;

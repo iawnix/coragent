@@ -61,3 +61,30 @@ def test_job_pages_follow_numeric_order(tmp_path):
     assert [row['job_id'] for row in page['jobs']] == [f'job_{n}' for n in range(1, 10)]
     next_page = list_executions(tmp_path, cursor=page['next_cursor'])
     assert [row['job_id'] for row in next_page['jobs']] == ['job_10', 'job_11', 'job_12']
+
+
+@pytest.mark.parametrize('form', ['raw', 'file', 'reference', 'target_alias'])
+def test_task_destination_is_checked_before_staging_even_for_prepared_jobs(tmp_path, form):
+    import hashlib
+    from research_agent.application.references import prepare_job
+    workspace(tmp_path)
+    request = {'request_id': 'wrong-destination', 'work_id': 'work', 'platform': 'local',
+               'command': [sys.executable, '-c', 'raise RuntimeError("must not execute")']}
+    if form == 'target_alias':
+        request['platform'] = 'tri'
+        request['execution_target'] = {'target': 'local'}
+    params = request
+    if form in {'file', 'reference'}:
+        source = tmp_path / 'request.json'; source.write_text(json.dumps(request))
+        params = {'request_file': str(source), 'request_sha256': hashlib.sha256(source.read_bytes()).hexdigest()}
+        if form == 'reference': params = {'prepared_ref': prepare_job(tmp_path, params)['prepared_ref']}
+    with pytest.raises(ValueError, match='execution_target_mismatch'):
+        dispatch('start', {**params, 'root': str(tmp_path), 'required_environment': 'tri', 'user_task_id': 'task_1'})
+    assert not list((tmp_path / 'runs/jobs').glob('job_*'))
+
+
+def test_matching_task_destination_does_not_block_normal_execution(tmp_path):
+    workspace(tmp_path)
+    result = dispatch('start', {'root': str(tmp_path), 'request_id': 'allowed', 'required_environment': 'local',
+                              'user_task_id': 'task_1', 'command': [sys.executable, '-c', 'pass']})
+    assert result['platform'] == 'local'

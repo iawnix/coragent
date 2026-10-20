@@ -57,6 +57,7 @@ export function projectTaskContinuation(task) {
     truncated ||= clipped !== value;
     return clipped;
   };
+  if (task?.compute_environment) result.compute_environment = task.compute_environment;
   if (task?.next_action) result.next_action = text(task.next_action, 1024);
   if (task?.block_details) {
     const block = task.block_details;
@@ -87,6 +88,7 @@ export function projectUserTask(task) {
   const criteria = task.criteria.slice(0, 8);
   const projection = {
     user_task_id: task.user_task_id, title: text(task.title, 256), objective: text(task.objective, 2048),
+    compute_environment: task.compute_environment ?? null,
     initial_plan: text(task.initial_plan ?? null, 2048), next_action: text(task.next_action ?? null, 1024),
     state: task.state, reason: text(task.reason, 512), revision: task.revision, control_epoch: task.control_epoch,
     research: { entry_node_ids: task.research.entry_node_ids.slice(0, 8), focus_node_ids: task.research.focus_node_ids.slice(0, 8),
@@ -136,6 +138,7 @@ export function projectDecisionTask(task) {
   if (!task) return null;
   const { user_task_id, revision, state, objective, criteria } = task;
   const result = { user_task_id, revision, state, objective, criteria,
+    ...(task.compute_environment ? { compute_environment: task.compute_environment } : {}),
     ...(task.initial_plan ? { initial_plan: task.initial_plan } : {}),
     ...(task.next_action ? { next_action: task.next_action } : {}) };
   if (task.title !== objective) result.title = task.title;

@@ -33,3 +33,5 @@ description: 根据目标观测量、体系、电子态、环境和不确定性�
 - [job probes.zh CN](references/job_probes.zh-CN.md)
 - [runner results.zh CN](references/runner_results.zh-CN.md)
 - [xtb operation recipes.zh CN](references/xtb_operation_recipes.zh-CN.md)
+
+在昂贵的 TS、IRC 或多点搜索前，明确探索层、精修层以及候选晋级依据。柔性体系和分离片段优先考虑适用的 xTB/CREST 构象或姿态探索；跳过时说明原因和有界替代方案。最终 DFT 方法要求不等于所有几何探索都必须使用 DFT，低层路径不能替代最终高层连通证据。

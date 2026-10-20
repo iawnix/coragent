@@ -34,3 +34,35 @@ test("paused task binding rejects a new Job before invoking the runtime", async 
   await assert.rejects(start.execute({ command: ["true"] }, api, context), /task_not_active/);
   assert.equal(submitted, false);
 });
+
+test("task destination reaches runtime for raw, file and registered requests", async () => {
+  const calls = [];
+  const [start] = createJobTools({
+    commandBridge: { execute_command: async (_command, params) => { calls.push(params); return { job_id: "job_1" }; } },
+    getTaskBinding: async () => ({ user_task_id: "task_1", compute_environment: "cluster_a" }),
+  });
+  assert.equal("required_environment" in start.parameters.properties, false);
+  for (const params of [{ command: ["true"] }, { request_file: "request.json", request_sha256: "abc" }, { prepared_ref: "prepared_1" }]) {
+    await start.execute(params, api, context);
+  }
+  assert.equal(calls.length, 3);
+  assert.ok(calls.every(p => p.required_environment === "cluster_a"));
+  assert.equal(calls[1].request_file, "request.json");
+  assert.equal("platform" in calls[1], false, "task constraint checks but never rewrites a prepared request");
+});
+
+test("unchanged Job observations recommend waiting while terminal results stay fresh", async () => {
+  let state = "running", reads = 0;
+  const [, status] = createJobTools({ commandBridge: { execute_command: async () => {
+    reads += 1; return { job_id: "job_1", state };
+  } } });
+  for (const seconds of [10, 20, 40, 60, 60]) {
+    const result = await status.execute({ job_id: "job_1" }, api, context);
+    assert.equal(result.details.polling.recommended_interval_seconds, seconds);
+  }
+  state = "succeeded";
+  const result = await status.execute({ job_id: "job_1" }, api, context);
+  assert.equal(reads, 6);
+  assert.equal(result.details.result.state, "succeeded");
+  assert.equal(result.details.polling, undefined);
+});

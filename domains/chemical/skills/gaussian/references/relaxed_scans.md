@@ -10,3 +10,5 @@ A missing scan recipe does not imply the solver cannot scan. Use an explicit Gau
 6. Compare relative energies **within each method**, subtracting that method's lowest verified grid energy. Label incomplete coverage, interpolation, constrained minima and any unconstrained follow-up separately. Do not rank methods using their raw absolute energies.
 
 Keep scan points as attempts under the same research question. A point failure should not block independent points; changed seeds or settings get new attempt identities. Report coverage against the requested grid before completion.
+
+The registered Gaussian scan projects the starting geometry onto all requested coordinates, then freezes them with value-less `B/A/D ... F` cards. It checks the final measured coordinates against every target. A value-bearing `B i j value F` card alone did not maintain the freeze in the reviewed G16 A.03 case; normal termination is not evidence that a constraint held.

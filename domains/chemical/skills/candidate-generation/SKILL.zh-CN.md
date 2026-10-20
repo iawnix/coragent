@@ -44,3 +44,5 @@ description: 根据映射端点、反应坐标和结构证据构建并搜索过�
 - [path preparation.zh CN](references/path_preparation.zh-CN.md)
 - [reaction task interface.zh CN](references/reaction_task_interface.zh-CN.md)
 - [script layout.zh CN](references/script_layout.zh-CN.md)
+
+昂贵搜索前先读[方法选择](../method-selection/SKILL.zh-CN.md)，区分探索与精修。复用已验证结构和失败证据，用实际映射几何、二面角及立体化学去重，不能把文件名或随机初始结构当成不同构象。不要预设每个起始构象必须有独立反应 TS：区分构象转化到可反应盆地的路径与不同成键鞍点，候选先通过几何检查再精修。

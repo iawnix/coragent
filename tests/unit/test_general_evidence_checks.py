@@ -65,8 +65,8 @@ def path(m, endpoint, direction):
             'calculation': e['calculation'], 'sources': e['sources'], 'coordinate_unit': 'angstrom',
             'termination': 'normal', 'direction': direction, 'complete': True, 'max_points_reached': False,
             'origin_coordinates': m['coordinates'].tolist(),
-            'points': [{'index': 1, 'coordinates': ((m['coordinates'] + endpoint['coordinates']) / 2).tolist()},
-                       {'index': 2, 'coordinates': endpoint['coordinates'].tolist()}],
+            'points': [{'index': 1, 'energy_hartree': -1.0, 'coordinates': ((m['coordinates'] + endpoint['coordinates']) / 2).tolist()},
+                       {'index': 2, 'energy_hartree': -1.1, 'coordinates': endpoint['coordinates'].tolist()}],
             'endpoint': {'material': endpoint['value'], 'minimum_evidence': evidence(endpoint, minimum=True)}}
 
 
@@ -222,6 +222,42 @@ def test_endpoint_relaxation_must_start_from_the_recorded_last_point():
     p['endpoint']['minimum_evidence']['optimization']['start_coordinates'] = copy.deepcopy(p['points'][-1]['coordinates'])
     assert irc_check(m, e, paths, targets)['verdict'] == 'pass'
     p['endpoint']['minimum_evidence']['optimization']['start_coordinates'][1][0] -= .1
+    assert irc_check(m, e, paths, targets)['verdict'] == 'fail'
+
+
+def test_fragment_translation_changes_conformer_but_not_endpoint_species():
+    m, e, paths, targets = study()
+    endpoint = material([[0, 5, 0], [3.26, 0, 0], [4, 0, 0]], '[H:1].[H:2][H:3]')
+    minimum = evidence(endpoint, minimum=True)
+    minimum['optimization']['start_coordinates'] = paths[0]['points'][-1]['coordinates']
+    paths[0]['endpoint'] = {'material': endpoint['value'], 'minimum_evidence': minimum}
+    result = irc_check(m, e, paths, targets)
+    assert result['verdict'] == 'pass'
+    identity = result['checks']['path_1_endpoint_identity']['details']
+    assert identity['target_index'] == 1
+    assert identity['conformer_reference']['geometry_status'] == 'different'
+
+
+@pytest.mark.parametrize('change', ['missing_energy', 'uphill', 'jump', 'graph_geometry_conflict'])
+def test_path_or_actual_endpoint_counterevidence_is_not_hidden_by_graph_match(change):
+    m, e, paths, targets = study()
+    if change == 'missing_energy': paths[0]['points'][0].pop('energy_hartree')
+    if change == 'uphill': paths[0]['points'][-1]['energy_hartree'] = -.9
+    if change == 'jump': paths[0]['points'][0]['coordinates'][0][1] += 10
+    if change == 'graph_geometry_conflict':
+        endpoint = material([[0, 0, 0], [1.5, 0, 0], [4, 0, 0]], '[H:1].[H:2][H:3]')
+        paths[0]['endpoint'] = {'material': endpoint['value'], 'minimum_evidence': evidence(endpoint, minimum=True)}
+        paths[0]['endpoint']['minimum_evidence']['optimization']['start_coordinates'] = paths[0]['points'][-1]['coordinates']
+    assert irc_check(m, e, paths, targets)['verdict'] != 'pass'
+
+
+def test_endpoint_optimization_start_allows_only_rigid_frame_changes():
+    m, e, paths, targets = study()
+    paths[0]['points'][-1]['coordinates'][1][0] -= .1
+    start = np.asarray(paths[0]['points'][-1]['coordinates'])
+    paths[0]['endpoint']['minimum_evidence']['optimization']['start_coordinates'] = (start[:, [1, 0, 2]] + 3).tolist()
+    assert irc_check(m, e, paths, targets)['verdict'] == 'pass'
+    paths[0]['endpoint']['minimum_evidence']['optimization']['start_coordinates'][1][0] += .3
     assert irc_check(m, e, paths, targets)['verdict'] == 'fail'
 
 

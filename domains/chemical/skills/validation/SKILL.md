@@ -16,6 +16,7 @@ Use this Skill after candidate generation and an actual TS optimization or path 
 3. **Mode**: use `chemical.mode-check@1` and inspect the frequency vector. A classical first-order saddle has one relevant imaginary mode whose displacement follows the proposed forming/breaking bonds, atom transfer, or torsion.
 4. **Structure and state**: compare atom mapping, composition, stereochemistry, key distances, spin/electronic-state declaration, and mode orientation with the reaction hypothesis.
 5. **Connectivity**: prepare forward and reverse paths with `chemical.path-irc@1`, execute the declared IRC calculation, and check each endpoint with `chemical.irc-check@1` against the selected reactant/product artifacts.
+   Treat chemical identity, path completeness, endpoint stationarity and conformer similarity separately. Whole-system RMSD is diagnostic, especially for separated fragments; it must not become a species-identity gate.
 6. **Decision**: record satisfied criteria, unresolved evidence, source artifacts, and a changed next operation. A candidate that has the right mode but reaches the wrong basin returns to candidate generation with revised endpoints or geometry.
 
 ## Registered checks

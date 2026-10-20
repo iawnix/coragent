@@ -48,3 +48,5 @@ Monitor 事件提供执行事实。推进前检查相关 Job、Node 与最新用
 结果尚未获得属于待办，不自动构成阻塞。只有 task_update action=block 携带 block_kind、具体 reason、resume_when，并说明为何没有其它可独立推进的已授权工作时才登记阻塞；execution_failure、budget_exhausted、scientific_dead_end 和 resource_unavailable 还必须引用证据。开始工作前，对照用户原始请求核对目标和交付条件，避免遗漏任何交付物。方法尚不确定属于研究工作：先检查可用输入，再选择一个有界的初步实验。没有实质证据时，只有确实缺少不可或缺、且无法从可用来源找回的用户输入，才可阻塞。可选偏好和未完成的分析不属于缺少必要输入。独立工作耗尽后才使用 wait。新用户指令解决阻塞时，用 task_update 的 refine 动作引用其实际 submission ID 恢复任务；progress 本身不恢复。保留用户要求的交付条件：除非用户修改范围，否则说明局限不能代替未执行的计算。
 
 执行故障由 execution_recovery 单独记录，不等于研究 blocked。无新证据轮数提示重新评估方法，不是固定停止阈值。失败后先检查已有回执，不能盲目重复已完成或结果未知的外部操作。最终回复恢复沿用完成证据，仅补充说明，不启动新计算或重复发送。执行待处理时说明故障；新指令解决问题后可用 refine，用户也可在 Monitor 显式 resume。
+
+计算任务应在 task_begin 的 compute_environment 中记录用户明确要求的配置目标；队列执行与本地直接执行是不同目标，只有新的用户指令才能修改该约束。将用户交付要求、研究假设和辅助诊断分开，不能把某种搜索策略悄悄变成额外验收条件。遵循 job_status 返回的查询间隔；没有独立工作时登记 task_update wait 并结束本轮，交由 Monitor 唤醒，避免反复读取相同状态或日志。

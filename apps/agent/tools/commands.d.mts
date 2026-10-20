@@ -139,6 +139,7 @@ export interface CommandParameters {
       "queue"?: string;
       "queue_wait_seconds"?: number;
     };
+    "required_environment"?: string;
   };
   "job.status": {
     "job_id"?: string;

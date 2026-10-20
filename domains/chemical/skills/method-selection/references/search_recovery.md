@@ -52,3 +52,5 @@ spin and competing sites. Use discriminating calculations and revise the plan;
 small seed variations are useful only when they test a specific remaining uncertainty.
 Final classical TS claims still require stationarity, appropriate mode and endpoint
 connectivity; excited/crossing problems need their own criteria.
+
+Before another costly attempt, compare its actual mapped geometry and settings with prior successes and failures. State which unresolved cause the change tests and what outcome will change the next decision. Repeated optimizer failures without new geometric evidence should trigger pose/conformer exploration or a bounded lower-cost scan/path search, not only new Gaussian keywords. Inspect the first substantive solver diagnostic before a final crash/termination footer.

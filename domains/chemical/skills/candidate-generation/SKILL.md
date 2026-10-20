@@ -9,6 +9,8 @@ description: Build and search transition-state and reaction-path candidate geome
 
 Use this Skill to turn a reaction hypothesis into one or more geometries that a TS or path solver can search. The input is a mapped elementary step: reactants/products or fragments, bond changes, charge, multiplicity, relevant conformers, and any evidence about approach, proton transfer, or stereochemistry. The output is a candidate set with method, constraints, source frame, and the next validation action.
 
+Before selecting a costly search, read [method selection](../method-selection/SKILL.md) and identify the exploration/refinement levels. Reuse verified structures and failed-search evidence; compare actual mapped geometry, torsions and stereochemistry before treating filenames or random embeddings as distinct candidates.
+
 ## Choose a construction method
 
 - **QST2**: use when mapped reactant and product geometries are available and the step is a single, smooth rearrangement. Keep atom order and charge/spin aligned.
@@ -29,6 +31,12 @@ Keep multiple site, face, conformer, and mechanism hypotheses until validation o
 4. Run the bounded scan, gradient, QST, or NEB executor and inspect convergence, reaction-center distances, and path frames.
 5. Keep the best few chemically distinct frames, attach their source digests, and send them to a TS optimizer and `validation`.
 6. If a search collapses to a minimum or distorts, use the failure geometry to change the pose, coordinate, endpoint pair, or method before retrying.
+
+Do not require one independent TS for every starting conformer by default. A
+conformer may first relax to another conformer and then enter the same reactive
+basin. Distinguish a conformational-access path from a distinct reaction
+saddle, and state which one the calculation tests. Promote only chemically
+distinct, geometry-checked candidates to an expensive Gaussian refinement.
 
 ## Registered operations
 

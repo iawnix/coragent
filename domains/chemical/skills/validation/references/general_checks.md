@@ -146,7 +146,7 @@ stationary evidence, plus:
 - `complete` and `max_points_reached`: boolean/null. Only explicit completion
   without hitting the limit and normal termination passes completeness.
 - `points`: at least two `{index, coordinates, energy_hartree?}` records, indexed
-  contiguously from 1. Energies are optional finite numbers; no reference SCF is
+  contiguously from 1. Energies must be finite for every point to pass descent assessment; missing energies remain inconclusive. No reference SCF is
   silently promoted to a different method's target energy.
 - `endpoint`: null until basin evidence is available; otherwise an object with
   a material and `minimum_evidence` in the stationary contract.
@@ -159,20 +159,38 @@ UTF-8, unescaped Unicode, no NaN and no trailing newline. Supply exactly one for
 The common `material_sha256` on the path still binds the source saddle, not the endpoint.
 
 The endpoint uses the source atom IDs, elements and isotopes and must equal the
-last path point within 1e-5 angstrom in the same frame. If separately optimized,
-minimum_evidence.optimization.start_coordinates must equal that last point;
+last path point within 1e-5 angstrom after proper rigid alignment in fixed atom-ID order. If separately optimized,
+minimum_evidence.optimization.start_coordinates must match that last point under the same rigid-alignment rule;
 its final geometry remains bound to the endpoint material. Preserve the actual
 optimization output and its provenance; declaring a start coordinate is not
 independent proof that an optimization ran. Require a passing unconstrained
 minimum check at the same method/basis and compatible source state.
 
 `reactant`/`product` are explicit reference materials with graphs, geometries
-and compatible declared states. Assignment reuses the bounded conformer comparator
-(default `--endpoint-rmsd 0.2` angstrom, `--max-search 20000`, `--max-candidates 64`).
-One target must match and the other must be explicitly excluded. Ambiguous,
-unexplored or unexpected basins retain the actual endpoint and remain unresolved.
+and compatible declared states. Assignment first checks mapped graph, bond
+order, charge, spin and stereochemistry. The bounded conformer comparator
+(default `--endpoint-rmsd 0.2` angstrom, `--max-search 20000`, `--max-candidates 64`)
+is reported as a conformer diagnostic; it does not by itself reject a chemically
+matching endpoint that relaxed into another conformer or separated fragment
+pose. One target must match and the other must be explicitly excluded.
+Ambiguous, unexplored or unexpected basins retain the actual endpoint and remain
+unresolved.
 Both directions must reach opposite target indexes; direction exchange is allowed.
-This assesses the selected reference conformers, not every conformer of a species.
+The endpoint geometry must support its declared connectivity and specified
+stereochemistry; missing graphs, unspecified stereochemistry and ambiguous short
+contacts remain inconclusive. Covalent radii screen connectivity inconsistencies,
+not bond orders. Graph/state correspondence establishes the chemical assignment;
+whole-system RMSD only describes reference-conformer differences. Fragment motion
+cannot change species identity. A match does not establish a global minimum or a
+conformer-specific pathway.
+
+Every path point needs energy evidence. The default upward-noise allowance is
+`--energy-tolerance 1e-6` hartree per step, independent of the energy zero. A
+fixed-atom aligned jump screen uses `--max-step-rmsd 1.0` angstrom; justify any
+changed bound against the sampling and integration settings. These checks do not
+replace inspection of gradients, reaction-coordinate evolution or mode character.
+MaxPoints remains a truncated path requiring continuation; endpoint optimization
+provides separately attributed basin evidence, not a fabricated completion marker.
 Missing minima call for continuation/endpoint optimization, not target fabrication.
 
 ## Gaussian adapter

@@ -23,7 +23,7 @@ from material import build_material
 from ase_neb import neb
 from path_contract import BOHR_ANGSTROM, material, qst
 from path_xtb import XtbCalculator, gradient_file
-from path_gaussian import GaussianOptimizer
+from path_gaussian import GaussianOptimizer, constrained_start
 from scan_engine import axes_for, scan
 
 
@@ -250,7 +250,9 @@ def fake_gaussian(path):
     path.write_text(f'''#!{sys.executable}
 import sys
 text=sys.stdin.read();route=next(l for l in text.splitlines() if l.startswith('#'))
-target=float(next(l for l in text.splitlines() if l.startswith('B ')).split()[-2])
+atoms=[list(map(float,l.split()[1:])) for l in text.splitlines() if l.startswith('H ')]
+target=sum((a-b)**2 for a,b in zip(atoms[0],atoms[1]))**.5
+assert next(l for l in text.splitlines() if l.startswith('B ')).split() == ['B','1','2','F']
 print(route+'\\n ----------------')
 print(' Charge = 0 Multiplicity = 1')
 print(' Standard orientation:\\n ----\\n Center Atomic Atomic Coordinates (Angstroms)\\n Number Number Type X Y Z\\n ----')
@@ -295,8 +297,10 @@ def test_gaussian_scan_uses_native_constraints_and_checks_actual_coordinates(tmp
             ' Stationary point found.', ' Optimization completed on the basis of negligible forces.\\n Stationary point found.'))
     result=scan(scan_input(backend='gaussian'),tmp_path/'scan','gaussian',lambda m,s:GaussianOptimizer(m,s,str(native)))
     assert result['status']=='completed'
-    assert result['points'][-1]['actual']==[2.]
-    assert 'B 1 2 2 F' in (tmp_path/'scan/points/0002/input.gjf').read_text()
+    assert result['points'][-1]['actual'] == pytest.approx([2.], abs=1e-7)
+    text = (tmp_path/'scan/points/0002/input.gjf').read_text()
+    assert '\nB 1 2 F\n' in text and 'B 1 2 2 F' not in text
+    assert result['points'][-1]['evidence']['start_coordinates']
 
 
 def test_failed_gaussian_scan_preserves_parsed_last_geometry(tmp_path):
@@ -310,6 +314,28 @@ def test_failed_gaussian_scan_preserves_parsed_last_geometry(tmp_path):
     folder = tmp_path / 'scan/points/0000'
     assert (folder / 'last_geometry.xyz').is_file()
     assert not json.loads((folder / 'parsed.json').read_text())['summary']['optimization_completed']
+
+
+@pytest.mark.parametrize('kind,indexes,target', [
+    ('distance', [0, 1], 2.5), ('angle', [0, 1, 2], 115.), ('dihedral', [0, 1, 2, 3], -179.),
+])
+def test_gaussian_seed_projection_matches_internal_coordinates(kind, indexes, target):
+    from conformers import internal_value
+    xyz = np.array([[1., 0, 0], [0, 0, 0], [0, 0, 1], [1., 1, 1]])
+    before = xyz.copy()
+    result = constrained_start(xyz, [{'kind': kind, 'indexes': indexes}], [target])
+    assert internal_value(result[indexes]) == pytest.approx(target, abs=1e-5)
+    assert np.array_equal(xyz, before)
+
+
+def test_gaussian_projection_handles_coupled_axes_and_rejects_inconsistent_targets():
+    xyz = np.array([[0., 0, 0], [1., 0, 0], [1., 1, 0]])
+    axes = [{'kind': 'distance', 'indexes': [0, 1]}, {'kind': 'distance', 'indexes': [1, 2]}]
+    result = constrained_start(xyz, axes, [2., 3.])
+    assert np.linalg.norm(result[0] - result[1]) == pytest.approx(2.)
+    assert np.linalg.norm(result[1] - result[2]) == pytest.approx(3.)
+    with pytest.raises(ValueError, match='cannot satisfy'):
+        constrained_start(xyz, [axes[0], axes[0]], [2., 3.])
 
 
 @pytest.mark.parametrize('operation',['qst-prepare','scan-xtb','scan-gaussian','neb-xtb','gradient-xtb'])

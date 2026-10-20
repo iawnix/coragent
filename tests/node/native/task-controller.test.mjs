@@ -61,14 +61,14 @@ async function fixture(t, storage = new MemoryStorage(), controllerOptions = {},
   const session = createSessionAdmission({ harness, conversation, LiveDoc, taskController: controller });
   const native = bindUserInputConversation(conversation, admission, harness, session);
   t.after(async () => { await controller.close(); await harness.close(context); });
-  const begin = async () => {
+  const begin = async (overrides = {}) => {
     faux.setResponses([fauxAssistantMessage("Starting the research")]);
     const source = await admission.submitUser({ requestId: "user-research", content: "Research this mechanism and deliver an evidence-backed report" }, context);
     await conversation.waitForIdle(context);
     const task = await controller.begin({ title: "Research mechanism", objective: "Deliver the mechanism report",
       source_submission_ids: [String(source.id)], criteria: [{ id: "report", description: "Report supported by evidence" }],
       initial_plan: "Investigate the mechanism and deliver a report supported by evidence.",
-      next_action: "Inspect the available mechanism inputs." }, "begin", context);
+      next_action: "Inspect the available mechanism inputs.", ...overrides }, "begin", context);
     return task;
   };
   return { harness, conversation, admission, get controller() { return controller; }, native, faux, begin, jobStates, calls, kernel, session, artifacts,
@@ -1113,4 +1113,24 @@ for (const control of ["pause", "cancel"]) test(`a ${control} steered into a con
   await assert.rejects(env.controller.assertExecutionAllowed(record, origin, context));
   for (let i = 0; i < 3; i++) await env.controller.reconcile();
   assert.equal((await env.controller.current(context)).continuation.sequence, 1);
+});
+
+
+test("compute destination persists and only a new user source can change it", async t => {
+  const f = await fixture(t);
+  const task = await f.begin({ compute_environment: "cluster_a" });
+  assert.equal((await f.controller.binding(context)).compute_environment, "cluster_a");
+  await f.reopen();
+  assert.equal((await f.controller.current(context)).compute_environment, "cluster_a");
+  await assert.rejects(f.controller.update({ action: "refine", expected_revision: task.revision,
+    source_submission_ids: [task.sources[0].submission_id], compute_environment: "local" }, "bad-refine", context), /new user instruction/);
+  await assert.rejects(f.controller.update({ action: "progress", expected_revision: task.revision,
+    compute_environment: null, evidence_refs: [] }, "bad-progress", context), /Execution destination changes/);
+  f.faux.setResponses([fauxAssistantMessage("Using the newly requested destination")]);
+  const source = await f.admission.submitUser({ requestId: "change-destination", content: "Use local for the remaining calculations" }, context);
+  await f.conversation.waitForIdle(context);
+  const current = await f.controller.current(context);
+  await f.controller.update({ action: "refine", expected_revision: current.revision,
+    source_submission_ids: [String(source.id)], compute_environment: "local" }, "good-refine", context);
+  assert.equal((await f.controller.binding(context)).compute_environment, "local");
 });

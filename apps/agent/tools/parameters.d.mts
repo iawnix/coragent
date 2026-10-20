@@ -168,6 +168,7 @@ export interface ToolParameters {
     }>;
     "initial_plan": string;
     "next_action": string;
+    "compute_environment"?: string | null;
   };
   taskRead: Record<string, never>;
   taskUpdate: {
@@ -198,5 +199,6 @@ export interface ToolParameters {
     };
     "control"?: "pause" | "resume" | "cancel";
     "jobs"?: "keep" | "cancel";
+    "compute_environment"?: string | null;
   };
 }

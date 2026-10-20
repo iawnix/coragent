@@ -31,3 +31,5 @@ description: 为过渡态候选建立鞍点、振动模式、电子态、结构�
 - [gaussian validation.zh CN](references/gaussian_validation.zh-CN.md)
 - [general checks.zh CN](references/general_checks.zh-CN.md)
 - [irc preparation.zh CN](references/irc_preparation.zh-CN.md)
+
+IRC 验收分别报告路径完整性、映射化学身份、端点极小点与构象差异。全体系 RMSD 是构象诊断，不作为化学身份门槛；分离片段的相对取向变化不能否决物种身份。声明的键连与立体化学仍须由实际端点几何支持。

@@ -81,6 +81,18 @@ def test_managed_launcher_classifies_import_failure(tmp_path):
     assert run.returncode == 1 and error['code'] == 'module_unavailable'
 
 
+def test_managed_validation_error_retains_reason_and_location_without_credentials(tmp_path):
+    message = 'axis atoms require two IDs; token="private value"; password=hidden; https://u:secret@example.invalid'
+    (tmp_path / 'tool.py').write_text('raise ValueError(' + repr(message) + ')\n')
+    run = subprocess.run([sys.executable, '-I', '-S', str(ROOT / 'backend/src/research_agent/jobs/python_entrypoint.py'),
+                          '[]', 'tool.py'], cwd=tmp_path, capture_output=True, text=True, timeout=10)
+    error = json.loads(run.stderr)
+    assert error['message'].startswith('axis atoms require two IDs')
+    assert error['location'] == 'tool.py:1'
+    assert all(secret not in run.stderr for secret in ('private value', 'hidden', 'u:secret'))
+    assert 'Traceback' not in run.stderr
+
+
 def test_registered_comparison_runs_as_job_and_mismatch_remains_publishable(tmp_path):
     from tests.unit.test_job_recovery import workspace
     from tests.unit.test_chemical_path_execution import run_job, selected

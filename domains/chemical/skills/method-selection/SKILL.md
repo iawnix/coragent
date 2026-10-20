@@ -1,6 +1,6 @@
 ---
 name: method-selection
-description: Select a scientific method and execution backend from the observable, system, electronic state, environment, and uncertainty budget.
+description: Choose exploration and refinement methods before costly searches, or revise the method after repeated search failures.
 ---
 
 # Method and backend selection
@@ -18,6 +18,13 @@ Use this Skill when a study must choose a method, compare methods, or prepare a 
 5. Probe the named environment with `job_probe`; prepare the executor request with the method Skill; start, submit, and collect the Job.
 6. For a method matrix, expand every requested method x environment x operation cell before launching. Record each unavailable cell independently and keep successful cells comparable.
 7. When a search fails, classify the failure as environment, input, numerical, or hypothesis; use [search recovery](references/search_recovery.md) to change the next action.
+
+Before launching a costly TS, IRC, or multi-point Gaussian search, record the
+exploration method and the decision that promotes a candidate to refinement.
+For flexible molecules or separate fragments, prefer an applicable registered xTB/CREST
+operation when available; if it is deliberately skipped, record the reason and
+the bounded alternative. A final DFT requirement does not force exploratory
+geometry generation to use DFT.
 
 ## Practical choices
 

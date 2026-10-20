@@ -3115,7 +3115,8 @@
         "request_sha256",
         "node_id",
         "user_task_id",
-        "submission"
+        "submission",
+        "required_environment"
       ],
       "required": [],
       "schema": {
@@ -3302,6 +3303,12 @@
             },
             "additionalProperties": false,
             "description": "Direct Job or validator only: per-job resource request. Defaults are not limits. memory_mb is total MiB including program overhead. For prepared requests use preparer --cpus/--job-memory-mb/--walltime and re-prepare; never override a pinned request."
+          },
+          "required_environment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Runtime task constraint injected by the tool adapter; checked after resolving any prepared request."
           }
         },
         "required": [],

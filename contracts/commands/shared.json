@@ -1134,6 +1134,16 @@
           "maxLength": 2000,
           "description": "The first concrete action to perform now. Do not use a status summary or a final answer.",
           "pattern": "\\S"
+        },
+        "compute_environment": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "description": "Configured compute environment required by the user (for example tri), or null when unrestricted. Preserve it across follow-ups; refine can change it only with a new actual user instruction. This is an execution destination, not a scientific method."
         }
       },
       "required": [
@@ -1362,6 +1372,16 @@
             "cancel"
           ],
           "description": "apply_user_control with control=cancel only: keep existing Jobs or request cancellation of all Jobs owned by this task, according to the user instruction. Cancellation failures remain pending; verify receipts before claiming Jobs stopped."
+        },
+        "compute_environment": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "description": "Configured compute environment required by the user (for example tri), or null when unrestricted. Preserve it across follow-ups; refine can change it only with a new actual user instruction. This is an execution destination, not a scientific method."
         }
       },
       "required": [
@@ -1424,7 +1444,8 @@
               "source_submission_ids": false,
               "wait": false,
               "control": false,
-              "jobs": false
+              "jobs": false,
+              "compute_environment": false
             }
           }
         },
@@ -1454,7 +1475,8 @@
               "research": false,
               "source_submission_ids": false,
               "control": false,
-              "jobs": false
+              "jobs": false,
+              "compute_environment": false
             }
           }
         },
@@ -1487,7 +1509,8 @@
               "source_submission_ids": false,
               "wait": false,
               "control": false,
-              "jobs": false
+              "jobs": false,
+              "compute_environment": false
             },
             "allOf": [
               {
@@ -1541,7 +1564,8 @@
               "source_submission_ids": false,
               "wait": false,
               "control": false,
-              "jobs": false
+              "jobs": false,
+              "compute_environment": false
             }
           }
         },
@@ -1571,7 +1595,8 @@
               "source_submission_ids": false,
               "wait": false,
               "control": false,
-              "jobs": false
+              "jobs": false,
+              "compute_environment": false
             }
           }
         },
@@ -1601,7 +1626,8 @@
               "wait": false,
               "completion": false,
               "research": false,
-              "reason": false
+              "reason": false,
+              "compute_environment": false
             },
             "allOf": [
               {

@@ -7,6 +7,7 @@ from analysis_material import numeric_array, validate_material
 from check_common import check, common_checks, content_digest, positive, report, stationary, unsupported
 from conformers import compare_conformers, state_comparison
 from material import digest
+from endpoint_identity import compare_identity, geometry_identity
 
 
 def aligned_rmsd(left, right):
@@ -17,8 +18,10 @@ def aligned_rmsd(left, right):
 
 
 def irc_check(material, reference, paths, targets, *, negative_threshold=20., near_zero=10.,
-              endpoint_rmsd=.2, origin_rmsd=.01, max_search=20000, max_candidates=64):
+              endpoint_rmsd=.2, origin_rmsd=.01, max_search=20000, max_candidates=64,
+              energy_tolerance=1e-6, max_step_rmsd=1.):
     positive(endpoint_rmsd, 'endpoint_rmsd'); positive(origin_rmsd, 'origin_rmsd')
+    positive(energy_tolerance, 'energy_tolerance'); positive(max_step_rmsd, 'max_step_rmsd')
     base = stationary(material, reference, kind='saddle', negative_threshold=negative_threshold, near_zero=near_zero)
     if base.get('scientific_verdict') == 'not_assessed':
         return {**base, 'kind': 'irc', 'stationary': base}
@@ -61,6 +64,23 @@ def irc_check(material, reference, paths, targets, *, negative_threshold=20., ne
             if point.get('energy_hartree') is not None:
                 numeric_array([point['energy_hartree']], (1,), 'point energy')
         current['coordinate_path'] = check(True if len(points) >= 2 else None, {'point_count': len(points), 'minimum': 2})
+        energies = [p.get('energy_hartree') for p in points]
+        if energies and all(e is not None for e in energies):
+            # IRC energies should descend away from the saddle.  Permit small
+            # numerical noise, but reject a path whose endpoint is uphill.
+            scale = energy_tolerance
+            uphill = sum(1 for a, b in zip(energies, energies[1:]) if b > a + scale)
+            current['energy_descent'] = check(uphill == 0 and energies[-1] <= energies[0] + scale,
+                                              {'uphill_steps': uphill, 'first_hartree': energies[0], 'last_hartree': energies[-1],
+                                               'tolerance_hartree': scale})
+        else:
+            current['energy_descent'] = check(None, 'Every path point needs energy evidence to assess descent')
+        frames = ([numeric_array(origin, xyz.shape, 'origin_coordinates')] if origin is not None else []) + [
+            numeric_array(p['coordinates'], xyz.shape, 'point coordinates') for p in points]
+        steps = [aligned_rmsd(a, b) for a, b in zip(frames, frames[1:])]
+        current['path_continuity'] = check(None if not steps else all(v <= max_step_rmsd for v in steps),
+            {'step_rmsd_angstrom': steps, 'maximum': max_step_rmsd,
+             'scope': 'Fixed-atom proper-alignment jump screen; inspect reaction coordinates and solver step evidence'})
         endpoint = path.get('endpoint')
         assignment = None
         endpoint_details = {'status': 'unassigned', 'next_step': 'Continue the path or optimize its endpoint, then supply a bound minimum and reference materials'}
@@ -88,21 +108,30 @@ def irc_check(material, reference, paths, targets, *, negative_threshold=20., ne
                 current['endpoint_minimum'] = check(None, 'A complete minimum assessment is required for basin assignment')
             start = None if evidence is None else (evidence.get('optimization') or {}).get('start_coordinates')
             if same_order and end_xyz is not None and last is not None:
-                linked = bool(np.max(np.abs(end_xyz - last)) <= 1e-5)
+                linked = aligned_rmsd(last, end_xyz) <= 1e-5
                 if not linked and start is not None:
-                    linked = bool(np.max(np.abs(numeric_array(start, xyz.shape, 'optimization start_coordinates') - last)) <= 1e-5)
-                current['endpoint_path_binding'] = check(linked, 'Endpoint must be the final point or a minimum optimized from that exact point, without rotation/relabeling')
+                    linked = aligned_rmsd(last, numeric_array(start, xyz.shape, 'optimization start_coordinates')) <= 1e-5
+                current['endpoint_path_binding'] = check(linked, 'Endpoint must be the final point or a minimum optimized from that exact point, allowing proper rigid rotation/translation with fixed atom IDs')
             else:
                 current['endpoint_path_binding'] = check(None)
+            # Species/basin identity is graph/state based.  Conformer RMSD is
+            # retained as a separate diagnostic and must not reject a valid
+            # endpoint that relaxed into another conformer or separated pose.
             comparisons = [compare_conformers(endpoint_material, target, rmsd_threshold=endpoint_rmsd,
                                               max_search=max_search, max_candidates=max_candidates) for target in targets]
-            matched = [i for i, comp in enumerate(comparisons) if comp['geometry_status'] == 'match'
-                       and comp['state_comparison']['status'] == 'compatible_declarations']
-            excluded = [comp['geometry_status'] == 'different' or comp['status'] in ('incompatible_graph', 'state_conflict') for comp in comparisons]
+            current['endpoint_geometry_identity'] = geometry_identity(endpoint_material)
+            identity_comparisons = [compare_identity(endpoint_material, target,
+                max_search=max_search, max_candidates=max_candidates) for target in targets]
+            matched = [i for i, comp in enumerate(identity_comparisons) if comp['status'] == 'match']
+            excluded = [comp['status'] == 'mismatch' for comp in identity_comparisons]
             if len(matched) == 1 and all(i == matched[0] or excluded[i] for i in range(len(comparisons))):
                 assignment = matched[0]
             endpoint_details = {'status': 'assigned' if assignment is not None else 'ambiguous_or_unexpected',
                                 'target_index': assignment, 'comparisons': comparisons,
+                                'identity_comparisons': identity_comparisons,
+                                'conformer_reference': None if assignment is None else {
+                                    'geometry_status': comparisons[assignment]['geometry_status'],
+                                    'rmsd_is_diagnostic_only': True, 'threshold_angstrom': endpoint_rmsd},
                                 'actual_material_sha256': endpoint_material['sha256']}
             current['endpoint_identity'] = check(True if assignment is not None else None, endpoint_details)
         else:
@@ -114,4 +143,4 @@ def irc_check(material, reference, paths, targets, *, negative_threshold=20., ne
     checks['opposite_target_basins'] = check(None if any(a is None for a in assignments) else sorted(assignments) == [0, 1],
                                             {'assignments': assignments, 'target_order': ['reactant', 'product'], 'direction_swap_allowed': True})
     return report('irc', checks, stationary=base, paths=details,
-                  scope='Bound single-surface paths and minimum/reference conformer assignments; includes supplied graph/state declarations but does not prove wavefunction continuity, intended mode character or mechanism uniqueness')
+                  scope='Bound single-surface paths and mapped chemical endpoint assignments; reference conformers are diagnostics; includes supplied graph/state declarations but does not prove wavefunction continuity, intended mode character or mechanism uniqueness')

@@ -219,7 +219,7 @@ def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
     preparation = None
     if operation == "start" and (params.get("prepared_ref") or params.get("request_file")):
         from research_agent.application.references import read_prepared_file, resolve_prepared_job
-        transport = {key: params[key] for key in ("root", "workspace_root", "session_id", "user_task_id") if key in params}
+        transport = {key: params[key] for key in ("root", "workspace_root", "session_id", "user_task_id", "required_environment") if key in params}
         controls = {key: params[key] for key in ("timeout_seconds", "repeat", "node_id") if key in params}
         allowed = {*transport, *controls, "prepared_ref"} if params.get("prepared_ref") else {
             *transport, *controls, "request_file", "request_sha256"}
@@ -233,7 +233,7 @@ def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
             )
         if params.get("prepared_ref"):
             request = resolve_prepared_job(root, {key: value for key, value in params.items()
-                                                  if key not in {"session_id", "user_task_id", "node_id"}})
+                                                  if key not in {"session_id", "user_task_id", "node_id", "required_environment"}})
         else:
             if not isinstance(params.get("request_sha256"), str):
                 raise ValueError("prepared_request_digest_required")
@@ -242,6 +242,10 @@ def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
         params = {**request, **controls, **transport}
     runtime = _runtime(root)
     if operation == "start":
+        required = params.get("required_environment")
+        actual = _platform_name(params) or runtime.default
+        if required and actual != required:
+            raise ValueError(f"execution_target_mismatch: task requires {required}, request selects {actual}; prepare for the required environment")
         return _start(root, runtime, params, preparation=preparation)
     if operation == "probe":
         # Probe is a capability query and intentionally does not require a

@@ -117,7 +117,7 @@ sources 和坐标单位字段，以及：
   （`--origin-rmsd` 默认 0.01 angstrom），不做对称重新标号或反射。
 - complete、max_points_reached：布尔/null，只有明确完成、未达到上限且正常终止才通过。
 - points：至少两个 `{index, coordinates, energy_hartree?}`，index 从 1 连续递增。
-  能量可缺失，提供时须为有限数；不将参考 SCF 冒充其它目标方法能量。
+  每点均有有限能量才可通过下降趋势检查，缺失则保持未确定；不将参考 SCF 冒充其它目标方法能量。
 - endpoint：尚无势阱证据时为 null，否则包含材料及驻点合同的 minimum_evidence。
 
 已有端点材料可用 endpoint.material_json 保存原文件精确 UTF-8 文本，包括换行，
@@ -125,16 +125,25 @@ minimum_evidence 继续绑定原文件摘要。也可用 endpoint.material 对�
 canonical JSON：键排序、逗号/冒号紧凑分隔、UTF-8、Unicode 不转义、无 NaN、无末尾换行。
 两种形式只能选一个。路径公共 material_sha256 始终绑定来源鞍点，不是端点。
 
-端点沿用来源原子 ID、元素和同位素，必须与路径末点同坐标系、逐分量误差不超过 1e-5
-angstrom。若另做优化，minimum_evidence.optimization.start_coordinates 必须等于
-末点，最终几何仍绑定端点材料。保留真实优化输出及来源；填写起始坐标本身不证明优化
+端点沿用来源原子 ID、元素和同位素，必须在固定 ID 对应的刚体对齐后与路径末点的 RMSD
+不超过 1e-5 angstrom；不允许任意重标或反射。若另做优化，
+minimum_evidence.optimization.start_coordinates 必须按相同规则绑定末点，
+最终几何仍绑定端点材料。保留真实优化输出及来源；填写起始坐标本身不证明优化
 运行过。要求同方法/基组、与来源态相容，且无约束极小点检查通过。
 
-reactant/product 是有明确图、几何和相容态声明的参考材料。归属复用有界构象比较
-（`--endpoint-rmsd` 默认 0.2 angstrom，`--max-search 20000`，`--max-candidates 64`）。
+reactant/product 是有明确图、几何和相容态声明的参考材料。物种归属采用有界映射图匹配、
+键级、电荷、自旋和立体化学比较（`--max-search 20000`，`--max-candidates 64`）。
+同时用实际端点几何筛查明显键连冲突和已指定立体化学；模糊距离、缺图或未指定立体化学
+保持未确定。键级来自可追溯的图证据，不能由共价半径单独证明。
 必须匹配一个目标并明确排除另一个。歧义、未探索完或意外势阱保留实际材料与未确定结论。
-两个方向须分别到达不同目标索引，允许方向互换。这检查选定参考构象，不覆盖同一物种的
-所有构象。缺极小点证据时继续路径或优化末点，不伪造目标结构。
+两个方向须分别到达不同目标索引，允许方向互换。构象比较（`--endpoint-rmsd` 默认
+0.2 angstrom）只报告参考构象差异，不决定物种归属；片段相对取向也不改变物种身份。
+通过不证明全局最低构象或构象特定路径。缺极小点证据时继续路径或优化末点，不伪造目标结构。
+
+`--energy-tolerance 1e-6`（hartree）允许每步向上的数值噪声，与能量零点无关；
+`--max-step-rmsd 1.0`（angstrom）筛查固定原子对应下的几何跳变。改变阈值需结合实际
+采样与积分设置说明理由，仍须检查关键反应坐标、梯度和模式归属。MaxPoints 保留为
+路径截断，不能因另做端点优化就将其升级为完整路径。
 
 ## Gaussian 转换
 
