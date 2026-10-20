@@ -50,3 +50,46 @@ JSON
 设置 `file_mode="shared"`，并将 `work_root` 指向共享工作区父目录，即可直接在
 工作区任务目录执行；本机和 SSH 提交均支持。默认 `file_mode="staged"` 保留输入
 传输与输出回收。共享检查由通用执行层负责，TRI 协议和处理器无需改变。
+
+## 提交与诊断
+
+原生 `invalid_request` 明确拒绝会保存为失败 Job，标记
+`action_outcome=not_submitted`。响应丢失、`request_id_reused` 和
+`external_id_conflict` 仍表示结果不确定，应先核对原 Job，再考虑替代计算。
+保留原生错误码和可重试标记；可重试标记本身不代表可以再次提交。
+
+提交和恢复响应必须匹配稳定外部身份；查询和取消还要核对原数字 ID。
+身份不符保持未知，并阻止取消。TRI 当前仅支持按数字 ID 取消，因此核对与取消
+无法组成原子操作；操作进行时不要重建或替换队列。
+
+诊断分别显示实际观察到的节点、申请的 CPU/内存/GPU 和分配的 CPU/GPU 集合。
+申请量不能当成实际分配证据。排队或挂起时，`wait_seconds` 表示距 TRI
+`created_at` 的时间；时间戳缺失仍为未知。该值接入已有 `queue_wait_seconds`
+Monitor 阈值，每个 Job 仅产生一次排队超时事件，普通排队/运行变化不唤醒代理。
+运行中任务取消需完成证据及 `cancel_confirmed=true` 才视为终态；
+`completion_reason=lease_expired` 不能证明进程已停止。
+
+## 按计算节点和后端验收
+
+登录主机环境探测通过，或一个自由调度的 Job 成功，不等于所有计算节点可用。
+为配置了此 TRI handler 的目标显式运行验收入口。将 `CORAGENT_PYTHON` 设为
+已安装 CoRAgent 运行环境的 Python，`CORAGENT_PACKAGE_ROOT` 设为软件包目录，
+`TRI_ACCEPTANCE_DIR` 选择尚不存在的私有目录（仓库测试必须位于 `local_debug/`）：
+
+```bash
+"$CORAGENT_PYTHON" "$CORAGENT_PACKAGE_ROOT/scripts/verify_tri_nodes.py" \
+  --config "$HOME/.config/coragent/config.toml" \
+  --package-root "$CORAGENT_PACKAGE_ROOT" --directory "$TRI_ACCEPTANCE_DIR" \
+  --target compute --nodes '["fed1","fed2"]' --timeout 180
+```
+
+将目标和节点名替换为部署的准确名称。脚本通过私有配置副本设置
+`CORAGENT_TRI_NODE`，提交有时间限制的验收 Job，不改动现用配置。
+对带有软件包验收检查的后端，核验结果，并要求实际节点与指定节点相同。
+`report.json` 逐节点记录已验证/未验证后端、实际节点和资源诊断。
+未选择的节点仍未验证；缺少检查、检查失败、节点缺失或不匹配，均不能得到完整成功退出码。
+这些检查证明环境就绪，不证明科学结果准确或计算性能达标。
+
+成功后删除共享验收工作区和私有配置副本；失败时保留核对任务所需的工作区与配置。
+取消操作有确认等待时限，尚未确认则保留证据。配置可能含连接凭据，相关文件应保持私有。
+核心安装器不会自动执行这项集群验收。

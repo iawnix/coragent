@@ -135,6 +135,25 @@ An unavailable service, malformed response, or ambiguous result remains unknown.
 Scope native idempotency/workflow identifiers to the supplied `request_id`, which
 distinguishes equal Job numbers in different workspaces and targets.
 
+
+A handler may return a structured error with exit code zero:
+
+```json
+{"schema_version":"coragent-external-job/1","error":{"code":"invalid_request","message":"invalid resource request","retryable":false,"action_outcome":"not_submitted"}}
+```
+
+Use `action_outcome: "not_submitted"` only with proof that no task was accepted.
+CoRAgent persists this as a failed Job with no scheduler ID; `job_start` immediately
+returns `state: "failed"`, `action_outcome: "not_submitted"` and an error. The full
+error remains in `metadata.submission_error`. Replays, Monitor and collection use
+that durable result without submitting again. Corrected work needs a new request
+identity and the ordinary repeat policy when applicable.
+Use `action_outcome: "unknown"` for transport loss, identity conflicts or uncertain
+acceptance. `retryable` preserves the native diagnostic; it never authorizes an
+automatic resubmission. Unstructured exceptions also require reconciliation.
+Handlers must validate both workflow identity and scheduler ID before operating
+on a task; a numeric ID alone is not sufficient after queue replacement.
+
 ## Skills and extension authors
 
 Describe resource selection, job-script conventions and native CLI usage in the
@@ -194,3 +213,10 @@ unverified. Memory and CPU enforcement depend on the selected runtime/scheduler.
 TRI owns node capacity, queueing and allocation. CoRAgent does not treat a busy node or a
 4-CPU default as a 4-CPU hardware limit. A 12-thread shared-memory job needs one eligible
 node with sufficient capacity; capacities on separate nodes are not added together.
+
+Failures during validation, probing or staging, before invoking the submit handler,
+are also recorded as `not_submitted` with `submission_error.phase: "preparation"`.
+Their recovery and collection use local failure evidence without contacting the
+unavailable queue or storage. Once submission has been invoked, transport errors
+remain ambiguous. Existing execution evidence is never classified as a fresh
+preparation failure.

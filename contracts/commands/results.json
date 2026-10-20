@@ -1127,6 +1127,16 @@
         },
         "prepared_ref": {
           "type": "string"
+        },
+        "state": {
+          "const": "failed",
+          "description": "Present when submission was conclusively rejected before execution."
+        },
+        "action_outcome": {
+          "const": "not_submitted"
+        },
+        "error": {
+          "type": "string"
         }
       },
       "required": [

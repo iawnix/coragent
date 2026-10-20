@@ -8,21 +8,48 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 
 
 SCHEMA = "coragent-external-job/1"
 
 
+class QueueError(RuntimeError):
+    def __init__(self, code, message, *, retryable=False, action_outcome="unknown"):
+        super().__init__(message)
+        self.details = {"code": code, "message": message, "retryable": retryable,
+                        "action_outcome": action_outcome}
+
+
+def identity(task, request, *, existing=False):
+    if not isinstance(task, dict) or task.get("external_id") != request["request_id"]:
+        raise QueueError("task_identity_mismatch", "TRI external identity does not match this Job")
+    if type(task.get("id")) is not int or task["id"] < 1:
+        raise QueueError("task_identity_mismatch", "TRI returned an invalid task ID")
+    if existing and str(task["id"]) != request["scheduler_id"]:
+        raise QueueError("task_identity_mismatch", "TRI scheduler identity does not match this Job")
+    return task
+
+
 def native(command, *args):
     executable = os.environ.get("CORAGENT_" + command.upper(), command)
-    result = subprocess.run([executable, *args], text=True, capture_output=True, timeout=45)
+    try:
+        result = subprocess.run([executable, *args], text=True, capture_output=True, timeout=45)
+    except OSError as exc:
+        raise QueueError("cli_unavailable", f"{command}: {exc.strerror}",
+                         action_outcome="not_submitted" if command == "tri_sub" else "unknown") from None
     try:
         value = json.loads(result.stdout)
     except ValueError:
         raise RuntimeError(f"{command}: invalid JSON (exit {result.returncode})") from None
     if result.returncode:
         error = value.get("error", {}) if isinstance(value, dict) else {}
-        raise RuntimeError(f"{command}: {error.get('message', result.stderr.strip())}")
+        code = error.get("code", "request_failed")
+        # Identity conflicts may refer to an already accepted task. A transport
+        # failure can also hide acceptance: neither proves non-submission.
+        raise QueueError(code, f"{command}: {error.get('message', result.stderr.strip())}",
+                         retryable=error.get("retryable") is True,
+                         action_outcome="not_submitted" if command == "tri_sub" and code == "invalid_request" else "unknown")
     return value
 
 
@@ -38,6 +65,16 @@ def observation(task):
         state, finished = "unknown", False
     if state == "cancelled" and not finished:
         state = "running" if task.get("started_at") else "submitted"
+    created = task.get("created_at")
+    wait_seconds = None
+    if state in {"queued", "held"}:
+        try:
+            stamp = float(created)
+            if math.isfinite(stamp) and stamp >= 0:
+                wait_seconds = max(0., time.time() - stamp)
+        except (TypeError, ValueError):
+            pass  # Missing evidence is not a fabricated zero-second wait.
+    spec = task.get("spec") or {}
     return {"schema_version": SCHEMA, "scheduler_id": str(task["id"]), "state": state,
             "execution_finished": finished, "exit_code": task.get("exit_code"),
             "started_at": task.get("started_at"), "finished_at": task.get("finished_at"),
@@ -46,7 +83,14 @@ def observation(task):
                 "lease_id": task.get("lease_id"), "stdout_path": task.get("stdout_path"),
                 "stderr_path": task.get("stderr_path"), "cancellation_requested": task["state"] == "cancel",
                 "cancel_confirmed": task.get("cancel_confirmed", False),
-                "completion_reason": task.get("completion_reason")}}
+                "completion_reason": task.get("completion_reason"),
+                "external_id": task.get("external_id"), "created_at": created,
+                "wait_seconds": wait_seconds,
+                "requested_resources": {"cpus": spec.get("requested_cpu"),
+                                        "memory_bytes": spec.get("requested_mem_bytes"),
+                                        "gpus": spec.get("requested_gpus")},
+                "assigned_cpus": task.get("assigned_cpus"),
+                "assigned_gpus": task.get("assigned_gpus")}}
 
 
 def handle(request):
@@ -63,7 +107,8 @@ def handle(request):
     if action == "submit":
         resources = request.get("resources", {})
         if request.get("queue") or resources.get("select"):
-            raise ValueError("TRI resources use cpu/mem/gpu; configure the target without queue or PBS select")
+            raise QueueError("invalid_request", "TRI resources use cpu/mem/gpu; configure the target without queue or PBS select",
+                             action_outcome="not_submitted")
         args = ["--json", "--name", request["job_id"], "--request-id", request["request_id"],
                 "--external-id", request["request_id"], "--chdir", request["cwd"],
                 "--output", "logs/scheduler.stdout", "--error", "logs/scheduler.stderr"]
@@ -76,18 +121,19 @@ def handle(request):
             args += ["--node", os.environ["CORAGENT_TRI_NODE"]]
         # Absolute wrapper path remains valid on the assigned node's shared filesystem.
         task = native("tri_sub", *args, "--", request["script"])["task"]
-        return observation(task)
+        return observation(identity(task, request))
     if action == "recover":
         # A read-only lookup by persistent workflow identity. An unavailable
         # server or removed record remains unresolved; recovery never submits.
         task = native("tri_stat", "--json", "--external-id", request["request_id"])
-        if task.get("external_id") != request["request_id"]:
-            raise ValueError("TRI recovery identity mismatch")
-        return observation(task)
-    if action == "status":
-        return observation(native("tri_stat", "--json", request["scheduler_id"]))
-    if action == "cancel":
-        task = native("tri_del", "--json", request["scheduler_id"])
+        return observation(identity(task, request))
+    if action in {"status", "cancel"}:
+        task = identity(native("tri_stat", "--json", "--external-id", request["request_id"]), request, existing=True)
+        if action == "status":
+            return observation(task)
+        # Check before the destructive command, then verify its response too.
+        # TRI's numeric-only cancel API cannot make this lookup atomic with cancel.
+        task = identity(native("tri_del", "--json", request["scheduler_id"]), request, existing=True)
         return {**observation(task), "accepted": task["state"] in {"cancel", "done", "fail", "timed_out"}}
     raise ValueError("unknown external Job action: " + str(action))
 
@@ -96,6 +142,9 @@ def main():
     try:
         response = handle(json.load(sys.stdin))
         print(json.dumps(response))
+        return 0
+    except QueueError as exc:
+        print(json.dumps({"schema_version": SCHEMA, "error": exc.details}))
         return 0
     except (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.SubprocessError) as exc:
         print(str(exc), file=sys.stderr)

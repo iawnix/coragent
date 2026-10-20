@@ -1,6 +1,7 @@
 """Run bounded offline installation Jobs through the ordinary runtime APIs."""
 from __future__ import annotations
 import argparse
+from collections import Counter
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -25,6 +26,15 @@ from research_agent.research.workspace import initialize_workspace, admit_resear
 TERMINAL = {'succeeded', 'failed', 'cancelled', 'timed_out', 'collected'}
 
 
+class AcceptanceJobError(RuntimeError):
+    def __init__(self, message, receipt, status):
+        super().__init__(message)
+        diagnostics = status.get('diagnostics') or {}
+        self.job = {'job_id': receipt['job_id'], 'status': 'failed',
+                    'actual_node': diagnostics.get('node'), 'diagnostics': diagnostics,
+                    'error': message}
+
+
 def run_job(root, request, timeout):
     path = root / (request['request_id'] + '.json')
     raw = (json.dumps(request) + '\n').encode()
@@ -38,12 +48,15 @@ def run_job(root, request, timeout):
             if status['state'] in TERMINAL:
                 terminal = True
                 if status['state'] != 'succeeded':
-                    raise RuntimeError('acceptance_job_' + status['state'])
+                    raise AcceptanceJobError('acceptance_job_' + status['state'], receipt, status)
                 collected = execute('job.collect', root, {'job_id': receipt['job_id']})
                 collected_outputs = True
                 if not collected['output_validation']['complete']:
-                    raise RuntimeError('acceptance_outputs_incomplete')
-                return {'job_id': receipt['job_id'], 'status': 'execution_verified', 'cwd': receipt['cwd']}
+                    raise AcceptanceJobError('acceptance_outputs_incomplete', receipt, status)
+                diagnostics = status.get('diagnostics') or {}
+                return {'job_id': receipt['job_id'], 'status': 'execution_verified', 'cwd': receipt['cwd'],
+                        'actual_node': diagnostics.get('node'),
+                        'diagnostics': diagnostics}
             time.sleep(.2)
         raise RuntimeError('acceptance_queue_or_execution_timeout')
     finally:
@@ -73,7 +86,7 @@ def run_job(root, request, timeout):
             platform.run_command('rm -rf -- ' + shlex.quote(remote))
 
 
-def accept(config, package, directory, targets, timeout, *, bindings_only=False):
+def accept(config, package, directory, targets, timeout, *, bindings_only=False, expected_node=None):
     os.environ['CORAGENT_JOB_CONFIG'] = str(config)
     os.environ['CORAGENT_PACKAGE_ROOT'] = str(package)
     settings = load_job_config(config)
@@ -85,7 +98,9 @@ def accept(config, package, directory, targets, timeout, *, bindings_only=False)
         if name not in targets:
             report['targets'][name] = {'status': 'not_verified'}
             continue
-        row = report['targets'][name] = {'status': 'configuration_validated', 'jobs': []}
+        row = report['targets'][name] = {'status': 'configuration_validated', 'jobs': [],
+            'tested_backends': [], 'untested_backends': sorted(target.get('backends', {})),
+            'expected_node': expected_node, 'node_coverage': 'selected_node' if expected_node else 'observed_only'}
         shared_workspace = None
         accepted = False
         try:
@@ -104,7 +119,9 @@ def accept(config, package, directory, targets, timeout, *, bindings_only=False)
                 root.mkdir(mode=0o700)
             initialize_workspace(root, 'installation_' + name, 'research')
             admit_research_workspace(root)
-            tested = set()
+            expected_checks = Counter(check['backend'] for profile in available.values()
+                for check in profile.get('checks', []) if not bindings_only or check.get('script'))
+            completed_checks = Counter()
             for profile in available.values():
                 for check in profile.get('checks', []):
                     if bindings_only and not check.get('script'):
@@ -126,18 +143,29 @@ def accept(config, package, directory, targets, timeout, *, bindings_only=False)
                     # The bound walltime and cancellation cover both process
                     # execution and queue waits; no live research workspace is used.
                     request['timeout_seconds'] = timeout
-                    result = run_job(root, request, timeout)
+                    try:
+                        result = run_job(root, request, timeout)
+                    except AcceptanceJobError as error:
+                        row['jobs'].append({**error.job, 'backend': backend})
+                        raise
+                    job = {**{k: v for k, v in result.items() if k != 'cwd'}, 'backend': backend}
+                    row['jobs'].append(job)
+                    if expected_node is not None and result.get('actual_node') != expected_node:
+                        job['status'] = 'failed'
+                        raise RuntimeError('acceptance_node_mismatch: expected ' + expected_node
+                                           + ', observed ' + str(result.get('actual_node')))
                     expected = check.get('result')
                     if expected:
                         value = json.loads((Path(result['cwd']) / expected['path']).read_text())
                         for key, wanted in expected.get('fields', {}).items():
                             if value.get(key) != wanted:
+                                job['status'] = 'failed'
                                 raise RuntimeError('acceptance_result_mismatch')
-                    row['jobs'].append({k: v for k, v in result.items() if k != 'cwd'})
-                    tested.add(backend)
-            row['tested_backends'] = sorted(tested)
-            row['untested_backends'] = sorted(target.get('backends', {}).keys() - tested)
-            row['status'] = 'execution_verified' if tested else 'environment_verified'
+                    completed_checks[backend] += 1
+                    row['tested_backends'] = sorted(key for key, count in completed_checks.items()
+                                                   if count == expected_checks[key])
+                    row['untested_backends'] = sorted(target.get('backends', {}).keys() - set(row['tested_backends']))
+            row['status'] = 'execution_verified' if row['tested_backends'] else 'environment_verified'
             accepted = True
         except (OSError, RuntimeError, ValueError) as error:
             row['status'] = 'failed'

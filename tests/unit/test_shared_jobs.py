@@ -96,25 +96,33 @@ def test_shared_storage_probe_rejects_same_path_without_round_trip(queue, monkey
     platform = shared_platform(config, monkeypatch)
     # A successful command alone cannot prove that its write reached this host.
     monkeypatch.setattr(platform.transport, 'run', lambda *args, **kw: subprocess.CompletedProcess([], 0, '', ''))
-    with pytest.raises(ValueError, match='round-trip failed'):
-        platform.start(request)
+    receipt = platform.start(request)
+    assert platform.status(receipt).state == JobState.FAILED
+    assert 'round-trip failed' in receipt.metadata['submission_error']['message']
+    assert receipt.metadata['submission_error']['action_outcome'] == 'not_submitted'
     assert not (state / 'tasks.json').exists()
-    assert not (request.cwd / 'spec.json').exists()
+    assert (request.cwd / 'spec.json').exists()  # Durable non-submission evidence.
     assert not list(request.cwd.glob('.coragent-storage-*'))
 
 
-def test_shared_mode_rejects_cwd_outside_root_and_external_inputs(queue, tmp_path, monkeypatch):
+@pytest.mark.parametrize('case', ['cwd', 'external', 'traversal'])
+def test_shared_mode_rejects_cwd_outside_root_and_external_inputs(queue, tmp_path, monkeypatch, case):
     config, state = queue
     platform = shared_platform(config, monkeypatch)
-    with pytest.raises(ValueError, match='below work_root'):
-        platform.start(spec(tmp_path, command=('/bin/true',)))
-    source = tmp_path / 'external'; source.write_text('input')
-    with pytest.raises(ValueError, match='escapes Job directory'):
-        platform.start(spec(Path(config['work_root']), command=('/bin/true',), inputs=(source,)))
-    sibling = Path(config['work_root']) / 'sibling'; sibling.write_text('outside job')
-    traversal = Path(config['work_root']) / 'controller' / '..' / 'sibling'
-    with pytest.raises(ValueError, match='escapes Job directory'):
-        platform.start(spec(Path(config['work_root']), command=('/bin/true',), inputs=(traversal,)))
+    if case == 'cwd':
+        request = spec(tmp_path, command=('/bin/true',))
+        expected = 'below work_root'
+    else:
+        source = tmp_path / 'external' if case == 'external' else Path(config['work_root']) / 'sibling'
+        source.write_text('outside job')
+        if case == 'traversal':
+            source = Path(config['work_root']) / 'controller' / '..' / 'sibling'
+        request = spec(Path(config['work_root']), command=('/bin/true',), inputs=(source,))
+        expected = 'escapes Job directory'
+    receipt = platform.start(request)
+    assert platform.status(receipt).state == JobState.FAILED
+    assert expected in receipt.metadata['submission_error']['message']
+    assert receipt.metadata['submission_error']['action_outcome'] == 'not_submitted'
     assert not (state / 'tasks.json').exists()
 
 

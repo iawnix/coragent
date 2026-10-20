@@ -1,5 +1,12 @@
 # Connect TRI to CoRAgent Jobs
 
+## Contents
+
+- [Handler environment](#handler-environment)
+- [Resource and state handling](#resource-and-state-handling)
+- [Submission and diagnostics](#submission-and-diagnostics)
+- [Verify each compute node and backend](#verify-each-compute-node-and-backend)
+
 Use the bundled [queue.py](../scripts/queue.py) as the handler for a generic
 external target. It needs Python 3 and the native `tri_sub`, `tri_stat`, `tri_del`
 commands on the submission host. It reads one JSON request from stdin and writes
@@ -58,3 +65,55 @@ directly in each workspace Job directory. Both local and SSH submission support
 this mode. The default `file_mode="staged"` retains input/output transfers.
 Storage probes and compute-node guards belong to the generic runtime; the TRI
 protocol and helper do not change.
+
+## Submission and diagnostics
+
+An explicit native `invalid_request` is recorded as a failed Job with
+`action_outcome=not_submitted`. A lost response, `request_id_reused` or
+`external_id_conflict` remains ambiguous: reconcile the existing Job before
+considering replacement work. Native error code and retryability remain available;
+retryability alone is not permission to submit again.
+
+Submit/recovery responses must match the stable external identity. Status and
+cancellation also check the original numeric ID. A mismatch remains unknown and
+blocks cancellation. TRI currently cancels by numeric ID only, so the helper's
+lookup and cancellation are not an atomic operation; do not reset/replace a queue
+while operations are in flight.
+
+Diagnostics show the observed node, requested CPU/memory/GPU resources and assigned
+CPU/GPU sets separately. A request is not evidence of allocation. While queued or
+held, `wait_seconds` is the age since TRI's `created_at`; missing timestamps remain
+unknown. This feeds the existing `queue_wait_seconds` Monitor threshold, with one
+queue-delay event per Job. Normal queue/running changes do not wake the Agent.
+Running cancellation is terminal only with completion evidence and
+`cancel_confirmed=true`; `completion_reason=lease_expired` is not stop proof.
+
+## Verify each compute node and backend
+
+A successful login-host environment probe or one arbitrarily placed Job does not
+verify every compute node. Use the explicit acceptance entrypoint for a target
+configured with this TRI handler. Set `CORAGENT_PYTHON` to the installed CoRAgent
+runtime Python and `CORAGENT_PACKAGE_ROOT` to its package directory; select a fresh
+private `TRI_ACCEPTANCE_DIR` (repository tests must use `local_debug/`):
+
+```bash
+"$CORAGENT_PYTHON" "$CORAGENT_PACKAGE_ROOT/scripts/verify_tri_nodes.py" \
+  --config "$HOME/.config/coragent/config.toml" \
+  --package-root "$CORAGENT_PACKAGE_ROOT" --directory "$TRI_ACCEPTANCE_DIR" \
+  --target compute --nodes '["fed1","fed2"]' --timeout 180
+```
+
+Replace the target and node names with the deployment's exact names. This submits
+bounded acceptance Jobs, using private per-node configurations with
+`CORAGENT_TRI_NODE`; the active configuration is unchanged. For every backend with
+a packaged acceptance check, verify outputs and require the observed node to match.
+`report.json` records each node's tested and untested backends, actual execution
+node and resource diagnostics. Unselected nodes remain unverified. A missing check,
+failed check or missing/mismatched node cannot produce a full success exit code.
+These checks establish environment readiness, not scientific accuracy or performance.
+
+Successful shared acceptance workspaces and private configuration copies are removed.
+Failures retain the workspace/configuration needed for diagnosis and reconciliation;
+bounded cancellation waits for confirmation, and pending cancellation retains evidence.
+Keep these files private because configurations can contain connection credentials.
+The core installer does not automatically run this cluster acceptance.

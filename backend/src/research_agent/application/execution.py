@@ -341,6 +341,15 @@ def _request_digest(params):
     return hashlib.sha256(json.dumps(semantic, sort_keys=True, default=str).encode()).hexdigest()
 
 
+def _start_result(receipt, intent):
+    result = {**receipt.__dict__, "command": list(receipt.command),
+              **({"prepared_ref": intent["prepared_ref"]} if intent.get("prepared_ref") else {})}
+    rejected = receipt.metadata.get("submission_error")
+    if rejected:
+        result.update(state="failed", action_outcome="not_submitted", error=rejected["message"])
+    return result
+
+
 def _admit_start(root, params):
     job_id = _job_id(params)
     request_id = params.get("request_id")
@@ -362,7 +371,7 @@ def _admit_start(root, params):
         fingerprint = _request_digest(params)
         if old.get("request_digest") != fingerprint: raise ValueError("job ID reused with different parameters")
         path = _receipt_path(root, job_id)
-        if path.is_file(): return {**_receipt(root, params).__dict__, **({"prepared_ref": old["prepared_ref"]} if old.get("prepared_ref") else {})}
+        if path.is_file(): return _start_result(_receipt(root, params), old)
         return {"job_id":job_id,"state":"unknown","error":"dispatch already attempted; reconcile before resubmitting"}
 
 
@@ -544,9 +553,8 @@ def _start(root, runtime, params, preparation=None):
     receipt = None
     try:
         receipt = runtime.job_start(spec, platform=intent["platform"])
-        result = {**receipt.__dict__, "command": list(receipt.command),
-                  **({"prepared_ref": intent["prepared_ref"]} if intent.get("prepared_ref") else {})}
-        committed = {**intent, "state": "submitted", "receipt": result}
+        result = _start_result(receipt, intent)
+        committed = {**intent, "state": result.get("state", "submitted"), "receipt": result}
         coordinator.commit_files(f"{request_id}:receipt", "job.receipt", result, writes={_intent_path(root, spec.job_id): committed}, result=result)
         from .job_monitor import bind
         bind(root, committed, params.get("session_id"))
@@ -562,4 +570,6 @@ def _start(root, runtime, params, preparation=None):
             f"submission_ambiguous: job {spec.job_id}: submission outcome requires reconciliation: {error}")
         failure.details = {"job_id": spec.job_id, "recovery": "job_reconcile",
                            "action_outcome": "unknown", "retryable_without_change": False}
+        if isinstance(getattr(error, "details", None), dict):
+            failure.details["handler_error"] = error.details
         raise failure from error

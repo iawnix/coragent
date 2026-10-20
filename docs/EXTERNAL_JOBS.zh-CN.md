@@ -159,3 +159,25 @@ prepared reference 的资源。软件环境、输入哈希和配置漂移校验�
 
 TRI 负责节点容量、排队和分配。节点暂时忙碌以及默认 4 核均不代表硬件只能用 4 核。
 12 线程共享内存任务需要某个合格节点单独满足容量，不能将多个节点的核数直接相加。
+
+## 提交错误与任务身份
+
+Handler 可以通过退出码零返回结构化错误：
+
+```json
+{"schema_version":"coragent-external-job/1","error":{"code":"invalid_request","message":"invalid resource request","retryable":false,"action_outcome":"not_submitted"}}
+```
+
+只有确定任务未被接收时，才使用 `action_outcome: "not_submitted"`。
+CoRAgent 将其保存为没有调度器 ID 的失败 Job；`job_start` 立即返回
+`state: "failed"`、`action_outcome: "not_submitted"` 和错误说明，完整错误保存在
+`metadata.submission_error`。重复调用、Monitor 和结果收集均使用该记录，不再次提交。
+修正后的工作使用新的请求身份，并在适用时遵循普通重复执行规则。
+连接中断、身份冲突或接收结果不确定时使用 `action_outcome: "unknown"`。
+`retryable` 只保留原生诊断含义，不授权自动重提；非结构化异常也仍需核对原任务。
+Handler 操作任务前必须同时核对工作流身份和调度器 ID；队列重建后，数字 ID 单独不能证明身份。
+
+在调用提交 handler 之前，校验、探测或文件准备失败也记录为 `not_submitted`，
+并标记 `submission_error.phase: "preparation"`。恢复与收集使用本地失败证据，
+不再访问不可用的队列或存储。已经调用提交接口后的连接异常仍保持不确定；
+发现已有执行记录时，不会将其误判成一次新提交的准备失败。

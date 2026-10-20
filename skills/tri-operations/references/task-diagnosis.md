@@ -46,7 +46,7 @@ tri_del --json "$TRI_TASK_ID"
 tri_stat --json "$TRI_TASK_ID"
 ```
 
-A cancellation record can appear before a running process exits: the client receives it on heartbeat. Confirm the node task unit has stopped and its allocation has been released. If the node is unreachable, report cancellation recorded and execution still unverified.
+A cancellation record can appear before a running process exits: the client receives it on heartbeat. Inspect `cancel_confirmed` and `completion_reason`; lease expiry is not process-stop evidence, even with `finished_at` and no lease. Resources stay allocated while cancellation awaits completion confirmation. Confirm the node task unit has stopped and its allocation has been released. If the node is unreachable, report cancellation recorded and execution still unverified.
 
 `tri_log ID` reads stdout, `tri_log --stderr ID` reads stderr, and `--follow` follows output interactively. Without separate output options, both streams go to `tri-<id>.out` in the job directory. `%j` in output/error options expands to the task ID; relative paths resolve against `--chdir`.
 

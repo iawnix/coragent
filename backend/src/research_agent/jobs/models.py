@@ -48,6 +48,8 @@ class JobSpec:
     workspace_id: str | None = None
 
     def __post_init__(self) -> None:
+        if 'submission_error' in self.metadata:
+            raise ValueError('job_submission_error_runtime_only: submission evidence cannot be supplied by a caller')
         if not self.command or not all(isinstance(item, str) and item and '\0' not in item for item in self.command):
             raise ValueError("job command must contain at least one non-empty argument")
         if self.timeout_seconds is not None and (type(self.timeout_seconds) not in {int, float}

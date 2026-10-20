@@ -4,6 +4,7 @@ from pathlib import Path
 import shlex
 import subprocess
 import sys
+import time
 
 import pytest
 from jsonschema import Draft202012Validator
@@ -79,6 +80,128 @@ def test_queue_lifecycle_uses_shared_files_without_ssh(queue, tmp_path):
     assert "--gpu" in tasks(state)[0]["arguments"]
     (state / "invalid-status").touch()
     assert platform.status(receipt).state == JobState.SUCCEEDED  # Durable terminal receipt.
+
+
+@pytest.mark.parametrize('fields', [{'id': 99}, {'external_id': 'another-workflow'}])
+def test_status_and_cancel_refuse_replaced_task_identity(queue, tmp_path, fields):
+    config, state = queue
+    platform = ExternalJobPlatform(config)
+    receipt = platform.start(spec(tmp_path, command=('/bin/true',)))
+    (state / 'response-overrides.json').write_text(json.dumps({'tri_stat': fields}))
+    status = platform.status(receipt)
+    assert status.state == JobState.UNKNOWN
+    assert status.diagnostics['handler_error']['code'] == 'task_identity_mismatch'
+    assert platform.cancel(receipt).state == JobState.UNKNOWN
+    assert not (state / 'cancel-called').exists()
+    assert tasks(state)[0]['state'] == 'wait'
+
+
+def test_submission_and_recovery_verify_external_identity(queue, tmp_path):
+    from research_agent.jobs.external import ExternalHandlerError
+    config, state = queue
+    platform = ExternalJobPlatform(config)
+    request = spec(tmp_path, command=('/bin/true',))
+    (state / 'response-overrides.json').write_text(json.dumps({
+        name: {'external_id': 'wrong-workflow'} for name in ('tri_sub', 'tri_stat')}))
+    with pytest.raises(ExternalHandlerError) as error:
+        platform.start(request)
+    assert error.value.details['action_outcome'] == 'unknown'
+    with pytest.raises(ExternalHandlerError, match='task_identity_mismatch'):
+        platform.recover_receipt(request.job_id, request.cwd)
+    assert len(tasks(state)) == 1
+    assert not (request.cwd / 'receipt.json').exists()
+
+
+@pytest.mark.parametrize('code,retryable', [('request_id_reused', False), ('external_id_conflict', False), ('request_failed', True)])
+def test_native_errors_preserve_ambiguity_and_retryability(queue, tmp_path, code, retryable):
+    from research_agent.jobs.external import ExternalHandlerError
+    config, state = queue
+    (state / 'submit-error.json').write_text(json.dumps({'code': code, 'message': 'fixture error', 'retryable': retryable}))
+    with pytest.raises(ExternalHandlerError) as error:
+        ExternalJobPlatform(config).start(spec(tmp_path, command=('/bin/true',)))
+    assert error.value.details == {'code': code, 'message': 'tri_sub: fixture error',
+                                  'retryable': retryable, 'action_outcome': 'unknown'}
+
+
+def application_queue(queue, tmp_path, monkeypatch, file_mode='staged'):
+    from tests.unit.test_job_recovery import workspace
+    from scripts._job_install import toml_bytes
+    config, state = queue
+    config = {**config, 'file_mode': file_mode, 'submission': {'queue_wait_seconds': 60}}
+    path = tmp_path / 'external.toml'
+    path.write_bytes(toml_bytes({'execution': {'default_target': 'compute', 'targets': {'compute': config}}}))
+    monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(path))
+    root = (Path(config['work_root']) if file_mode == 'shared' else tmp_path) / 'research'
+    workspace(root)
+    request = {'root': str(root), 'request_id': 'external-check', 'session_id': 'fixture', 'command': ['/bin/true']}
+    return root, request, state
+
+
+@pytest.mark.parametrize('file_mode', ['staged', 'shared'])
+def test_rejected_submission_is_durable_failed_job_without_scheduler_retries(queue, tmp_path, monkeypatch, file_mode):
+    from research_agent.application.execution import dispatch, _RUNTIMES
+    from research_agent.application.job_monitor import command
+    root, request, state = application_queue(queue, tmp_path, monkeypatch, file_mode)
+    (state / 'submit-error.json').write_text(json.dumps({'code': 'invalid_request', 'message': 'invalid resources', 'retryable': False}))
+    first = dispatch('start', request)
+    assert first['state'] == 'failed'
+    assert first['action_outcome'] == 'not_submitted'
+    assert first['metadata']['scheduler_id'] is None
+    schema = json.loads((ROOT / 'contracts/commands/results.json').read_text())['definitions']['JobReceipt']
+    Draft202012Validator(schema).validate(first)
+    _RUNTIMES.clear()
+    assert dispatch('start', request) == first
+    selector = {'root': str(root), 'job_id': first['job_id']}
+    for action in ('status', 'reconcile', 'cancel'):
+        assert dispatch(action, selector)['state'] == 'failed'
+    assert not command(root, 'tick', {})['registration_errors']
+    deliveries = command(root, 'pending', {})['deliveries']
+    assert len(deliveries) == 1
+    assert command(root, 'event', {'event_id': deliveries[0]['event_id']})['state'] == 'failed'
+    assert dispatch('collect', selector)['status']['state'] == 'failed'
+    assert not (state / 'tasks.json').exists()
+    assert not (state / 'cancel-called').exists()
+
+
+def test_rejection_recovers_after_receipt_write_failure(queue, tmp_path, monkeypatch):
+    config, state = queue
+    (state / 'submit-error.json').write_text(json.dumps({'code': 'invalid_request', 'message': 'invalid resources', 'retryable': False}))
+    platform = ExternalJobPlatform(config)
+    request = spec(tmp_path, command=('/bin/true',))
+    monkeypatch.setattr(platform, '_receipt', lambda *args: (_ for _ in ()).throw(OSError('fixture disk error')))
+    with pytest.raises(OSError):
+        platform.start(request)
+    restored = ExternalJobPlatform(config)
+    receipt = restored.recover_receipt(request.job_id, request.cwd)
+    assert restored.status(receipt).state == JobState.FAILED
+    assert not (state / 'tasks.json').exists()
+
+
+def test_real_handler_queue_age_wakes_monitor_once_and_reports_allocation(queue, tmp_path, monkeypatch):
+    from research_agent.application.execution import dispatch
+    from research_agent.application.job_monitor import command
+    root, request, state = application_queue(queue, tmp_path, monkeypatch)
+    request['submission'] = {'resources': {'cpus': 12, 'memory_mb': 16384, 'gpus': 1}}
+    dispatch('start', request)
+    command(root, 'tick', {})
+    assert command(root, 'pending', {})['deliveries'] == []
+    update_task(state, created_at=str(time.time() - 120))
+    for _ in range(3):
+        assert not command(root, 'tick', {})['registration_errors']
+    deliveries = command(root, 'pending', {})['deliveries']
+    assert len(deliveries) == 1
+    event = command(root, 'event', {'event_id': deliveries[0]['event_id']})
+    assert event['status']['reason'] == 'queue_wait_exceeded'
+    diagnostics = event['status']['diagnostics']
+    assert diagnostics['wait_seconds'] >= 120
+    assert diagnostics['requested_resources'] == {'cpus': 12, 'memory_bytes': 16384 * 1024**2, 'gpus': 1}
+    assert diagnostics['assigned_cpus'] is None
+    update_task(state, state='run', node='fed1', assigned_cpus='0-11', assigned_gpus='2')
+    diagnostics = dispatch('status', {'root': str(root), 'job_id': 'job_1'})['diagnostics']
+    assert diagnostics['node'] == 'fed1'
+    assert diagnostics['assigned_cpus'] == '0-11'
+    assert diagnostics['assigned_gpus'] == '2'
+    assert diagnostics['wait_seconds'] is None
 
 
 def test_recover_lost_submission_response_without_resubmitting(queue, tmp_path):
@@ -311,4 +434,120 @@ def test_application_jobs_reconcile_and_collect_external_tasks(queue, tmp_path, 
     result = dispatch("collect", selector)
     assert result["status"]["state"] == "succeeded"
     assert result["output_validation"]["complete"]
+    assert len(tasks(state)) == 1
+
+
+@pytest.mark.parametrize('failure', [None, 'wrong_node', 'backend_failure'])
+def test_node_acceptance_checks_each_selected_node_and_keeps_unverified_backends(queue, tmp_path, monkeypatch, failure):
+    from scripts import _job_acceptance as acceptance
+    from scripts.verify_tri_nodes import verify
+    from scripts._job_install import toml_bytes
+    from research_agent.jobs.config_contract import load_job_config, resolve_binding
+    config, state = queue
+    (state / 'auto-run').touch()
+    if failure == 'wrong_node':
+        (state / 'response-overrides.json').write_text(json.dumps({'tri_stat': {'node': 'unexpected'}}))
+    script = tmp_path / 'check.py'
+    script.write_text("import json\nfrom pathlib import Path\nPath('result.json').write_text(json.dumps({'ok': True}))\n")
+    if failure == 'backend_failure':
+        script.write_text('raise SystemExit(7)\n')
+    monkeypatch.setattr(acceptance, 'profiles', lambda _: {'fixture': {'root': str(tmp_path), 'checks': [
+        {'backend': 'fixture', 'script': 'check.py', 'collect': ['result.json'],
+         'result': {'path': 'result.json', 'fields': {'ok': True}}}]}})
+    settings = load_job_config(os.environ['CORAGENT_JOB_CONFIG'])
+    python = resolve_binding(settings, 'local', 'validation', runtime='python')['python']
+    config = {**config, 'file_mode': 'shared', 'bindings': {
+        'fixture': {'python': python}, 'uncovered': {'python': python}}}
+    path = tmp_path / 'source.toml'
+    original = toml_bytes({'schema_version': 1,
+        'execution': {'default_target': 'compute', 'targets': {'compute': config}}})
+    path.write_bytes(original)
+    original_env = os.environ.get('CORAGENT_JOB_CONFIG')
+    report = verify(path, ROOT, tmp_path / 'acceptance', 'compute', ['fed1', 'fed2'], 10)
+    assert report['unselected_nodes'] == 'not_verified'
+    assert set(report['nodes']) == {'fed1', 'fed2'}
+    assert path.read_bytes() == original
+    assert os.environ.get('CORAGENT_JOB_CONFIG') == original_env
+    for node, row in report['nodes'].items():
+        assert row['expected_node'] == node
+        assert row['jobs'][0]['actual_node'] == ('unexpected' if failure == 'wrong_node' else node)
+        assert row['jobs'][0]['backend'] == 'fixture'
+        if failure:
+            assert row['status'] == 'failed'
+            assert row['tested_backends'] == []
+            assert row['untested_backends'] == ['fixture', 'uncovered']
+            assert ('acceptance_node_mismatch' if failure == 'wrong_node' else 'acceptance_job_failed') in row['error']
+            assert Path(row['retained_config']).is_file()
+            assert Path(row['retained_workspace']).is_dir()
+        else:
+            assert row['status'] == 'execution_verified'
+            assert row['tested_backends'] == ['fixture']
+            assert row['untested_backends'] == ['uncovered']
+            assert not (tmp_path / 'acceptance' / node / 'config.toml').exists()
+    assert len(tasks(state)) == 2
+    for task, node in zip(tasks(state), ('fed1', 'fed2')):
+        assert task['arguments'][task['arguments'].index('--node') + 1] == node
+    if not failure:
+        assert not list(Path(config['work_root']).glob('.coragent-acceptance-*'))
+
+
+def test_ambiguous_submission_exposes_native_error_without_authorizing_retry(queue, tmp_path, monkeypatch):
+    from research_agent.application.execution import dispatch
+    root, request, state = application_queue(queue, tmp_path, monkeypatch)
+    (state / 'submit-error.json').write_text(json.dumps({'code': 'request_failed', 'message': 'connection interrupted', 'retryable': True}))
+    with pytest.raises(RuntimeError, match='submission_ambiguous') as error:
+        dispatch('start', request)
+    assert error.value.details['handler_error']['retryable'] is True
+    assert error.value.details['action_outcome'] == 'unknown'
+    assert error.value.details['retryable_without_change'] is False
+    assert dispatch('start', request)['state'] == 'unknown'
+
+
+def test_caller_cannot_forge_submission_rejection(tmp_path):
+    with pytest.raises(ValueError, match='job_submission_error_runtime_only'):
+        spec(tmp_path, metadata={'submission_error': {'message': 'forged rejection'}})
+
+
+@pytest.mark.parametrize('file_mode', ['staged', 'shared'])
+@pytest.mark.parametrize('stage', ['probe', 'stage_inputs', '_wrapper'])
+def test_pre_submission_failures_are_durable_without_contacting_queue_again(queue, tmp_path, monkeypatch, file_mode, stage):
+    from research_agent.application.execution import dispatch, _RUNTIMES
+    from research_agent.application.job_monitor import command
+    root, request, state = application_queue(queue, tmp_path, monkeypatch, file_mode)
+    request['outputs'] = [{'path': 'result.txt', 'required': True}]
+    def fail(*args, **kwargs):
+        raise OSError('fixture preparation failure')
+    monkeypatch.setattr(ExternalJobPlatform, stage, fail)
+    receipt = dispatch('start', request)
+    assert receipt['state'] == 'failed'
+    assert receipt['action_outcome'] == 'not_submitted'
+    assert receipt['metadata']['submission_error']['phase'] == 'preparation'
+    assert not (state / 'tasks.json').exists()
+    monkeypatch.setattr(ExternalJobPlatform, '_invoke', lambda *args: pytest.fail('must not contact queue'))
+    monkeypatch.setattr(ExternalJobPlatform, '_pull_path', lambda *args: pytest.fail('must not contact storage'))
+    _RUNTIMES.clear()
+    assert dispatch('start', request) == receipt
+    # Receipt recovery uses local preparation evidence even if the connection
+    # is still unavailable, and must not mistake another Job for this one.
+    cwd = Path(receipt['cwd'])
+    (cwd / 'receipt.json').unlink()
+    selector = {'root': str(root), 'job_id': receipt['job_id']}
+    assert dispatch('reconcile', selector)['state'] == 'failed'
+    assert dispatch('cancel', selector)['state'] == 'failed'
+    result = dispatch('collect', selector)
+    assert result['status']['state'] == 'failed'
+    assert result['outputs'] == [{'path': 'result.txt', 'required': True, 'exists': False}]
+    assert not result['output_validation']['complete']
+    assert not command(root, 'tick', {})['registration_errors']
+    assert len(command(root, 'pending', {})['deliveries']) == 1
+
+
+def test_existing_submission_evidence_is_never_classified_as_preflight_rejection(queue, tmp_path):
+    config, state = queue
+    platform = ExternalJobPlatform(config)
+    request = spec(tmp_path, command=('/bin/true',))
+    receipt = platform.start(request)
+    with pytest.raises(ValueError, match='reconcile instead'):
+        platform.start(request)
+    assert platform.status(receipt).state == JobState.QUEUED
     assert len(tasks(state)) == 1

@@ -613,6 +613,9 @@ export interface CommandResults {
     "metadata": Record<string, JsonValue>;
     "workspace_id": string | null;
     "prepared_ref"?: string;
+    "state"?: "failed";
+    "action_outcome"?: "not_submitted";
+    "error"?: string;
   } | {
     "job_id": string;
     "state": "unknown";

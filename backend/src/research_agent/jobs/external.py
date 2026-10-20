@@ -19,6 +19,12 @@ PROTOCOL = "coragent-external-job/1"
 TERMINAL = {JobState.SUCCEEDED, JobState.FAILED, JobState.CANCELLED, JobState.TIMED_OUT}
 
 
+class ExternalHandlerError(RuntimeError):
+    def __init__(self, error):
+        self.details = error
+        super().__init__(error['code'] + ': ' + error['message'])
+
+
 class ExternalJobPlatform(StagedJobPlatform):
     """The handler owns native CLI syntax; this platform owns Job lifecycle."""
 
@@ -51,6 +57,13 @@ class ExternalJobPlatform(StagedJobPlatform):
         value = json.loads(result.stdout)
         if not isinstance(value, dict) or value.get("schema_version") != PROTOCOL:
             raise ValueError("invalid external handler response")
+        if isinstance(value.get('error'), dict):
+            error = value['error']
+            if (not isinstance(error.get('code'), str) or not isinstance(error.get('message'), str)
+                    or type(error.get('retryable')) is not bool
+                    or error.get('action_outcome') not in {'unknown', 'not_submitted'}):
+                raise ValueError('invalid external handler error')
+            raise ExternalHandlerError(error)
         return value
 
     def probe(self, spec):
@@ -76,11 +89,29 @@ class ExternalJobPlatform(StagedJobPlatform):
         return identity
 
     def start(self, spec):
+        # Existing execution evidence never proves that a submission is new.
+        if any((spec.cwd / name).exists() for name in ("receipt.json", "spec.json")):
+            raise ValueError("job directory already contains an execution; reconcile instead of resubmitting")
+        try:
+            request, metadata = self._prepare_submission(spec)
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+            # No submit action has been invoked. A probe/copy failure cannot
+            # hide acceptance by the scheduler, even if its transport failed.
+            return self._not_submitted(spec, {
+                'code': 'submission_preparation_failed', 'message': str(exc),
+                'retryable': False, 'action_outcome': 'not_submitted', 'phase': 'preparation'})
+        try:
+            value = self._invoke(request)
+        except ExternalHandlerError as exc:
+            if exc.details['action_outcome'] != 'not_submitted':
+                raise
+            return self._not_submitted(spec, exc.details)
+        return self._receipt(spec.job_id, spec.cwd, self._identity(value), metadata, spec.command, spec.workspace_id)
+
+    def _prepare_submission(self, spec):
         validate_submission({key: value for key, value in spec.metadata.items() if key in SUBMISSION_FIELDS},
                             kind="local", driver="external",
                             allowed_queues=(self.allowed_queues,))
-        if any((spec.cwd / name).exists() for name in ("receipt.json", "spec.json")):
-            raise ValueError("job directory already contains an execution; reconcile instead of resubmitting")
         probe = self.probe(spec)
         if not all(probe[key] for key in ("available", "cwd_exists", "inputs_present")):
             raise ValueError(f"external execution probe failed: {probe}")
@@ -120,8 +151,24 @@ class ExternalJobPlatform(StagedJobPlatform):
             path.unlink(missing_ok=True)
         if not self.shared:
             self.run_command("chmod 700 " + shlex.quote(request["script"]))
-        value = self._invoke(request)
-        return self._receipt(spec.job_id, spec.cwd, self._identity(value), metadata, spec.command, spec.workspace_id)
+        return request, metadata
+
+    def _not_submitted(self, spec, error):
+        path = spec.cwd / 'spec.json'
+        saved = json.loads(path.read_text()) if path.exists() else {
+            'job_id': spec.job_id, 'command': list(spec.command), 'cwd': str(spec.cwd),
+            'outputs': [output.__dict__ for output in spec.outputs],
+            'workspace_id': spec.workspace_id, 'metadata': {
+                **spec.metadata, 'file_mode': self.file_mode, 'driver': 'external',
+                'target_name': self.name, 'transport': self.transport.name,
+                'target_config_digest': getattr(self, 'target_config_digest', None)}}
+        metadata = {**saved['metadata'], 'submission_error': error}
+        # Save evidence before the receipt so an interrupted receipt write can
+        # recover locally, without contacting an unavailable submission host.
+        self._write(path, {**saved, 'metadata': metadata})
+        receipt = self._receipt(spec.job_id, spec.cwd, None, metadata, spec.command, spec.workspace_id)
+        self._persist(receipt, self.status(receipt))
+        return receipt
 
     def _receipt(self, job_id, cwd, scheduler_id, metadata, command, workspace_id):
         receipt = JobReceipt(job_id, self.name, _now(), tuple(command), str(cwd), None,
@@ -140,9 +187,12 @@ class ExternalJobPlatform(StagedJobPlatform):
         spec = json.loads((cwd / "spec.json").read_text())
         metadata = spec["metadata"]
         self._check_target(metadata)
-        request = metadata["external_request"]
-        if request["job_id"] != job_id:
+        recorded_id = spec.get('job_id') or metadata.get('external_request', {}).get('job_id')
+        if recorded_id != job_id:
             raise ValueError("external recovery identity mismatch")
+        if metadata.get('submission_error'):
+            return self._receipt(job_id, cwd, None, metadata, spec['command'], spec.get('workspace_id'))
+        request = metadata["external_request"]
         value = self._invoke({**request, "action": "recover"})
         if value.get("found") is False:
             return None
@@ -157,6 +207,10 @@ class ExternalJobPlatform(StagedJobPlatform):
     def status(self, receipt):
         try:
             self._check_target(receipt.metadata)
+            rejected = receipt.metadata.get('submission_error')
+            if rejected:
+                return JobStatus(receipt.job_id, JobState.FAILED, self.name, finished_at=receipt.submitted_at,
+                                 error=rejected['message'], diagnostics={'submission_error': rejected})
             path = Path(receipt.cwd) / "status.json"
             if path.exists():
                 saved = json.loads(path.read_text())
@@ -189,6 +243,9 @@ class ExternalJobPlatform(StagedJobPlatform):
             if state in TERMINAL:
                 self._persist(receipt, status)
             return status
+        except ExternalHandlerError as exc:
+            return JobStatus(receipt.job_id, JobState.UNKNOWN, self.name, error=str(exc),
+                             diagnostics={'handler_error': exc.details})
         except (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.SubprocessError) as exc:
             return JobStatus(receipt.job_id, JobState.UNKNOWN, self.name, error=str(exc))
 
@@ -203,6 +260,9 @@ class ExternalJobPlatform(StagedJobPlatform):
                     raise ValueError("external cancellation was not acknowledged")
                 self._write(Path(receipt.cwd) / "cancel.request", {"schema_version": "external-cancellation/1",
                             "scheduler_id": receipt.metadata["scheduler_id"], "acknowledged_at": _now()})
+            except ExternalHandlerError as exc:
+                return JobStatus(receipt.job_id, JobState.UNKNOWN, self.name, error=str(exc),
+                                 diagnostics={'handler_error': exc.details})
             except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
                 return JobStatus(receipt.job_id, JobState.UNKNOWN, self.name, error=str(exc))
         return self.status(receipt)
@@ -210,4 +270,15 @@ class ExternalJobPlatform(StagedJobPlatform):
     def collect(self, receipt):
         # Even a cached terminal status must collect from its original target.
         self._check_target(receipt.metadata)
+        if receipt.metadata.get('submission_error'):
+            # Nothing executed, so no staged input is a produced output. Do not
+            # contact storage/SSH or require a successfully prepared shared token.
+            declared = json.loads((Path(receipt.cwd) / 'spec.json').read_text()).get('outputs', [])
+            outputs = [{'path': item['path'], 'required': item.get('required', False), 'exists': False}
+                       for item in declared]
+            errors = [{'path': item['path'], 'error': 'not_submitted'} for item in outputs if item['required']]
+            return {'job_id': receipt.job_id, 'status': self.status(receipt).__dict__, 'outputs': outputs,
+                    'output_validation': {'complete': not errors, 'errors': errors},
+                    'stdout': str(Path(receipt.cwd) / 'logs/stdout.log'),
+                    'stderr': str(Path(receipt.cwd) / 'logs/stderr.log')}
         return super().collect(receipt)
