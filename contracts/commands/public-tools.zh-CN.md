@@ -22,4 +22,4 @@ artifact_create
 artifact_read
 ```
 
-Research Memory 保存原始要求、研究 Node、不可变 Result 和显式关系。Job Runtime 负责执行，Artifact Store 保存材料与来源。研究记录更新不授予工具权限，也不触发 next_run。
+Research Memory 保存原始要求、研究 Node、不可变 Result 和显式关系。Job Manager 负责执行，Artifact Store 保存材料与来源。研究记录更新不授予工具权限，也不触发 next_run。

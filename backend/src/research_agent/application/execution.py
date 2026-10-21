@@ -12,15 +12,15 @@ from pathlib import Path
 from typing import Any
 
 from research_agent.jobs.inputs import content_digest
-from research_agent.jobs import JobOutput, JobRuntime, JobSpec, platforms_from_config
+from research_agent.jobs import JobOutput, JobManager, JobSpec, platforms_from_config
 from research_agent.foundation.transactions import TransactionCoordinator, workspace_transaction, write_json
 
 _JOB_ID = re.compile(r"^job_[1-9][0-9]*$")
 
 
-_RUNTIMES: dict[tuple[str, str], JobRuntime] = {}
+_JOB_MANAGERS: dict[tuple[str, str], JobManager] = {}
 
-def _runtime(root: Path) -> JobRuntime:
+def _job_manager(root: Path) -> JobManager:
     configured = os.environ.get("CORAGENT_JOB_CONFIG")
     if not configured:
         raise ValueError("job_config_required: configure the installation job.toml explicitly")
@@ -28,13 +28,13 @@ def _runtime(root: Path) -> JobRuntime:
     if not config.is_file():
         raise ValueError(f"explicit job configuration is missing: {config}")
     key = (str(root), hashlib.sha256(config.read_bytes()).hexdigest())
-    if key not in _RUNTIMES:
+    if key not in _JOB_MANAGERS:
         try:
             platforms, default = platforms_from_config(config)
         except (OSError, TypeError, ValueError) as exc:
             raise ValueError(f"invalid job runtime configuration: {config}: {exc}") from exc
-        _RUNTIMES[key] = JobRuntime(platforms, default=default)
-    return _RUNTIMES[key]
+        _JOB_MANAGERS[key] = JobManager(platforms, default=default)
+    return _JOB_MANAGERS[key]
 
 
 def _root(params: dict[str, Any]) -> Path:
@@ -75,7 +75,7 @@ def _resolve_selector(root, params):
     if params.get("job_id"):
         selected.append(_job_id(params))
     if params.get("event_id"):
-        from .job_monitor import validate_event
+        from .job_manager import validate_event
         matches = [json.loads(path.read_text()) for path in (root / "operations/monitors").glob("*/events/*.json")]
         event = next((validate_event(e) for e in matches if e["event_id"] == params["event_id"]), None)
         if not event:
@@ -202,7 +202,7 @@ def _receipt(root: Path, params: dict[str, Any]):
     path = _receipt_path(root, job_id)
     if not path.is_file():
         raise FileNotFoundError(f"job receipt not found: {job_id}")
-    runtime = _runtime(root)
+    runtime = _job_manager(root)
     return runtime.receipt_from_disk(str(path))
 
 
@@ -243,7 +243,7 @@ def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
         return resolve_selection(load_job_config(os.environ["CORAGENT_JOB_CONFIG"]), params.get("target"),
                                  scheduler=params.get("scheduler"), location=params.get("location"),
                                  source_text=params.get("source_text"))
-    runtime = _runtime(root)
+    runtime = _job_manager(root)
     if operation == "targets":
         # Task state records the resolved default once, so a later installation
         # config change cannot silently retarget an in-flight task. Expose only
@@ -531,7 +531,7 @@ def _stage_start(root, runtime, params, job_id, preparation=None, prepared_param
 def _commit_dispatch(root, request):
     from types import SimpleNamespace
     from .job_state import register_execution
-    from .job_monitor import bind
+    from .job_manager import bind
     intent = request["intent"]
     if request.get("preparation") is not None:
         from research_agent.application.references import register_prepared_payload
@@ -564,7 +564,7 @@ def _start(root, runtime, params, preparation=None):
     # Validator expansion just observed the target; file/ref submissions carry
     # an older observation and require a new probe here.
     check_binding(prepared_params, probe=not bool(params.get("validator_id")))
-    runtime = _runtime(root)
+    runtime = _job_manager(root)
     with coordinator.locked():
         prepared = _prepare_start(root, runtime, params, preparation, prepared_params)
     if isinstance(prepared, dict):
@@ -576,7 +576,7 @@ def _start(root, runtime, params, preparation=None):
         result = _start_result(receipt, intent)
         committed = {**intent, "state": result.get("state", "submitted"), "receipt": result}
         coordinator.commit_files(f"{request_id}:receipt", "job.receipt", result, writes={_intent_path(root, spec.job_id): committed}, result=result)
-        from .job_monitor import bind
+        from .job_manager import bind
         bind(root, committed, params.get("session_id"))
         return result
     except Exception as error:

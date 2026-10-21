@@ -51,7 +51,7 @@ def test_python_payload_digest_covers_code_and_runtime_data() -> None:
         "backend/src/research_agent/foundation/path_safety.py",
         "backend/src/research_agent/application/command_catalog.json",
         "backend/src/research_agent/artifacts/__init__.py",
-        "backend/src/research_agent/jobs/runtime.py",
+        "backend/src/research_agent/jobs/manager.py",
         "backend/src/research_agent/research/nodes.py",
         "backend/src/research_agent/foundation/protocol.json",
         "backend/src/research_agent/research/operational_ids.py",

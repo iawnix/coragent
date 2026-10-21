@@ -4,6 +4,14 @@
 
 ## 未发布
 
+- 统一 Job Manager 的执行、后台跟踪和事件投递职责；Monitor 只表示管理界面。
+  Task Controller 统一执行推进策略，执行记录区分可信来源与实际执行原因。
+- 研究上下文改用 research-brief/1，按当前范围的事实指纹刷新；取消 review_pending，
+  分开显示数据同步完整性与模型综合摘要结果。相关事实变化可在普通工具轮次生效。
+- 不兼容合同更新：Host 使用 coragent-host/3，Task 使用 coragent-user-task/3，报告输入使用
+  chemical-research-report-input/2，执行观察使用 execution-observation/2。旧输入来源和 Review 接口明确拒绝，不提供兼容别名；
+  旧客户端需升级，旧 Task 需在新会话中显式重新绑定研究记录。
+
 - 为 CoRHub 0.20.0+64 增加经认证的 Host `files/list`、`files/stat`、`files/read` 和
   `files/pin`：通过既有 Link 有界浏览材料、按版本固定文件快照，不唤醒 Pi 或暴露状态文件。
 

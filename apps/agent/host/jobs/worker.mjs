@@ -11,8 +11,8 @@ const executeFile = promisify(execFile);
 import { packageRoot } from "../../platform/resources.mjs";
 const python = process.env.CORAGENT_PYTHON || "python3";
 
-// Monitor only wakes the owning Agent; notification decisions belong to email Skill.
-export async function deliverMonitorEvent({ workspace, delivery, deliveries = [delivery], runJson, sendWake }) {
+// Job Manager only wakes the owning Agent; notification decisions belong to email Skill.
+export async function deliverJobEvent({ workspace, delivery, deliveries = [delivery], runJson, sendWake }) {
   const errors = [];
   const claims = [];
   try {
@@ -24,7 +24,7 @@ export async function deliverMonitorEvent({ workspace, delivery, deliveries = [d
     let hostWorkspaceId;
     for (const { claimed } of claims) {
       const event = await runJson("event", workspace, ["--event-id", claimed.event_id]);
-      hostWorkspaceId = await monitorHostWorkspaceId(workspace, event);
+      hostWorkspaceId = await jobHostWorkspaceId(workspace, event);
       if (!claimed.session_id) throw new Error("monitor has no owning session; wake remains pending");
     }
     {
@@ -33,7 +33,7 @@ export async function deliverMonitorEvent({ workspace, delivery, deliveries = [d
       // The Worker authenticates this producer and assesses immutable events
       // before its short Pi admission transaction.
       const response = await sendWake({ workspace_id: hostWorkspaceId, session_id: first.session_id,
-        request_id: first.request_id, client_message_id: first.request_id, source: "monitor", mode: "next_run",
+        request_id: first.request_id, client_message_id: first.request_id, source: "job_manager", mode: "next_run",
         event_ids: ids });
       if (response?.error?.code === "busy" || response?.pending === true) return errors;
       if (response?.accepted !== true || response?.state === "uncertain") {
@@ -50,7 +50,7 @@ export async function deliverMonitorEvent({ workspace, delivery, deliveries = [d
   return errors;
 }
 
-export async function monitorHostWorkspaceId(workspace, event) {
+export async function jobHostWorkspaceId(workspace, event) {
   // The canonical manifest identity is the same value used by the compute
   // plane and Host routes. The physical directory name is not an identity.
   const root = resolve(workspace);
@@ -80,21 +80,21 @@ export function wakeMessage(event) {
   ].filter(Boolean).join("\n");
 }
 
-export async function runMonitorWorker(options, signal) {
+export async function runJobWorker(options, signal) {
   const { connectHost } = await import("../../transport/host-client.mjs");
-  const token = process.env.CORAGENT_INTERNAL_MONITOR_TOKEN;
-  delete process.env.CORAGENT_INTERNAL_MONITOR_TOKEN;
-  if (!token) throw new Error("Monitor must be started by the installation Host");
+  const token = process.env.CORAGENT_INTERNAL_JOB_TOKEN;
+  delete process.env.CORAGENT_INTERNAL_JOB_TOKEN;
+  if (!token) throw new Error("Job Manager must be started by the installation Host");
   let client;
   const catalog = createWorkspaceCatalog(options.workspaceRoot, { python });
   let lastSuccessfulPoll = null;
   const sendWake = async (params) => {
     try {
       client ??= await connectHost({ socketPath: options.hostSocket });
-      return await client.request("internal/monitor-wake", { ...params, token });
+      return await client.request("internal/job-event", { ...params, token });
     } catch (error) { client?.close(); client = undefined; throw error; }
   };
-  const runJson = (command, workspace, extra) => runMonitorJson(command, workspace, extra, signal);
+  const runJson = (command, workspace, extra) => runJobManagerJson(command, workspace, extra, signal);
   try {
     do {
       const errors = [];
@@ -115,7 +115,7 @@ export async function runMonitorWorker(options, signal) {
           }
           for (const deliveries of batches.values()) {
             if (signal.aborted) break;
-            deliveryErrors.push(...await deliverMonitorEvent({ workspace, deliveries, runJson, sendWake }));
+            deliveryErrors.push(...await deliverJobEvent({ workspace, deliveries, runJson, sendWake }));
           }
           await runJson("health", workspace, deliveryErrors.length ? ["--error", deliveryErrors.join("; ")] : []);
           errors.push(...deliveryErrors);
@@ -137,20 +137,20 @@ export async function runMonitorWorker(options, signal) {
 async function writeHealth(stateRoot, value) {
   if (!stateRoot) return;
   await mkdir(stateRoot, { recursive: true, mode: 0o700 });
-  const temporary = join(stateRoot, `monitor-health.${process.pid}.tmp`);
+  const temporary = join(stateRoot, `job-manager-health.${process.pid}.tmp`);
   await writeFile(temporary, `${JSON.stringify(value)}\n`, { mode: 0o600 });
-  await rename(temporary, join(stateRoot, "monitor-health.json"));
+  await rename(temporary, join(stateRoot, "job-manager-health.json"));
 }
 
-async function runMonitorJson(command, workspace, extra = [], signal) {
-  const completed = await executeFile(python, [join(packageRoot, "apps", "agent-cli", "monitor.py"), command, "--root", workspace, ...extra], {
+async function runJobManagerJson(command, workspace, extra = [], signal) {
+  const completed = await executeFile(python, [join(packageRoot, "apps", "agent-cli", "job_manager.py"), command, "--root", workspace, ...extra], {
     cwd: workspace, env: { ...process.env, PYTHONNOUSERSITE: "1" }, maxBuffer: 8 * 1024 * 1024, timeout: 60_000, signal });
   const value = JSON.parse(completed.stdout.trim());
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`invalid monitor JSON for ${command}`);
   return value;
 }
-export function parseMonitorArguments(arguments_) {
-  const values = { intervalMs: Number(process.env.CORAGENT_MONITOR_INTERVAL_MS || "5000"), once: false };
+export function parseJobWorkerArguments(arguments_) {
+  const values = { intervalMs: Number(process.env.CORAGENT_JOB_POLL_INTERVAL_MS || "5000"), once: false };
   const properties = { "workspace-root": "workspaceRoot", "host-socket": "hostSocket", "state-root": "stateRoot",
     "server-directory": "serverDirectory", "server-id": "serverId", "interval-ms": "intervalMs" };
   for (let index = 0; index < arguments_.length; index += 1) {
@@ -186,6 +186,6 @@ function errorMessage(error) { return error instanceof Error ? error.message : S
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const controller = new AbortController();
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) process.once(signal, () => controller.abort());
-  try { await runMonitorWorker(parseMonitorArguments(process.argv.slice(2)), controller.signal); }
-  catch (error) { if (!controller.signal.aborted) { process.stderr.write(`CoRAgent Monitor stopped: ${errorMessage(error)}\n`); process.exitCode = 1; } }
+  try { await runJobWorker(parseJobWorkerArguments(process.argv.slice(2)), controller.signal); }
+  catch (error) { if (!controller.signal.aborted) { process.stderr.write(`CoRAgent Job Manager stopped: ${errorMessage(error)}\n`); process.exitCode = 1; } }
 }

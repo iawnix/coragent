@@ -45,7 +45,7 @@ Python 测试按 `tests/unit/`、`tests/contract/` 和 `tests/integration/` 分�
 
 Agent 使用 research_read / research_search / research_create / research_update / research_result。创建只要求 goal，记事只要求 node_id 与 note，发布只要求 node_id 与 conclusion。身份、读取依据、修订号和事务由适配层提供。后台 Job 不修改 Node 内容版本。显式关系单次存储，反向查询自动生成；实际 uses 需要确证输入，搜索不是采用证据。
 
-Job Runtime 拥有执行回执，Artifact Store 拥有文件和来源。Monitor next_run 只依赖事件及投递身份，不读取 Memory sequence，也不要求 checkpoint。邮件去重属于发送回执，Memory 失败不能触发重发。新旧工作区不迁移或混写。
+Job Manager 拥有执行回执，Artifact Store 拥有文件和来源。Monitor next_run 只依赖事件及投递身份，不读取 Memory sequence，也不要求 checkpoint。邮件去重属于发送回执，Memory 失败不能触发重发。新旧工作区不迁移或混写。
 
 ## 研究视图修复
 

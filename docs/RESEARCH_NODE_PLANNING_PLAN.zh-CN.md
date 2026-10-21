@@ -133,7 +133,7 @@ flowchart TB
     Pi -->|"现有研究工具"| Memory["Research Memory：Node、关系、Result"]
     Memory --> Projection
     TC -->|"入口和焦点引用"| Projection
-    Pi -->|"job_start 等"| Jobs["Job Runtime：执行和回执"]
+    Pi -->|"job_start 等"| Jobs["Job Manager：执行和回执"]
     Jobs --> JM["Job monitoring：观察和事件"]
     JM --> Host
 ```
@@ -308,7 +308,7 @@ CoRHub 页面继续延期。本方案只规划终端/现有 Monitor 的最小读
 
 按用户明确要求，本次不兼容现有 workspace，不实施自动迁移或旧大 Node 整理。
 
-- UserTask 唯一 schema 为 `coragent-user-task/2`，初始化即含研究引用；研究快照唯一版本为 `research-snapshot/3`。
+- UserTask 唯一 schema 为 `coragent-user-task/3`，初始化即含研究引用；研究快照唯一版本为 `research-snapshot/3`。
 - Node/Result schema 保持现有语义。Task DTO、研究概览、生成合同和所有消费者一起切换，不保留旧版读取分支、别名或双写。
 - 不恢复旧 `tree.json`、ResearchPhase、Decision checkpoint 或 Gate 接口；生成文档仍为可重建视图。
 - 不复制旧 Task、重写旧 Job/Result 归属，或根据最近活动猜研究关联。重新安装后创建新任务和研究记录。

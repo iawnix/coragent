@@ -39,7 +39,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
         const request = JSON.parse(body);
         // Review synthesis is an internal tool-free request and must not
         // consume one of the continuation fixture's scripted steps.
-        if (JSON.stringify(request).includes('deterministic review')) {
+        if (JSON.stringify(request).includes('deterministic brief')) {
           const response = { id: `review_${observedRequests.length}`, object: "chat.completion",
             choices: [{ index: 0, message: { role: "assistant", content: JSON.stringify({
               status: "uncertain", summary: "Inspect the recorded research evidence.",
@@ -85,8 +85,8 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
         const branchA = latestNodes.get("Derivation A"), branchB = latestNodes.get("Derivation B");
         const researchEnvelope = request.messages.findLast(message => typeof message.content === "string" && message.content.startsWith('<research_context origin="runtime">'));
         const researchPayload = JSON.parse(researchEnvelope.content.split("\n")[1]);
-        const snapshot = researchPayload.research_review || researchPayload.research;
-        assert.ok(snapshot && snapshot.schema_version === "research-review/1");
+        const snapshot = researchPayload.research_brief;
+        assert.ok(snapshot && snapshot.schema_version === "research-brief/1");
         if (node && task && requests === 2) {
           assert.deepEqual(snapshot.scope.entry_node_ids, [node.id]);
           assert.deepEqual(snapshot.scope.focus_node_ids, [node.id]);

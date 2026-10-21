@@ -50,7 +50,7 @@ must not be added to the default Python suite.
 
 Agent tools are research_read / research_search / research_create / research_update / research_result. Creation needs goal; a note needs node_id and note; publication needs node_id and conclusion. The trusted adapter supplies identities, read basis, revisions and transactions. Background Jobs do not change Node content revision. Relations are stored once with generated reverse queries. Actual uses requires proven inputs; search is not evidence adoption.
 
-Job Runtime owns execution receipts; Artifact Store owns bytes and provenance. Monitor next_run depends on event and delivery identity, never Memory sequence or checkpoint. Email receipts own deduplication; Memory failure cannot trigger resending. Old workspaces are rejected without migration or mixed writes.
+Job Manager owns execution receipts; Artifact Store owns bytes and provenance. Monitor next_run depends on event and delivery identity, never Memory sequence or checkpoint. Email receipts own deduplication; Memory failure cannot trigger resending. Old workspaces are rejected without migration or mixed writes.
 
 ## Repair research views
 

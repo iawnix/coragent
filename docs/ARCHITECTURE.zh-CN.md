@@ -11,9 +11,10 @@ CoRAgent 只使用 Pi 原生 Harness 循环。Workspace 是跨会话存在的研
 | Agent Server / Host | 整体服务宿主；Host 负责工作区准入、认证、会话路由与 Worker 恢复发现 |
 | Pi SessionWorker / durable Harness | 会话存储的唯一拥有者，负责对话、模型/工具执行、原子输入接纳与恢复 |
 | Research Memory | Workspace 存储合同、原始要求、Node、不可变 Result、显式研究关系 |
-| Job Runtime | 派发、执行、取消、协调和收集回执 |
+| Job Manager | 派发、执行、取消、核对、收集、后台跟踪和可靠事件投递 |
 | Artifact Store | 不可变文件及来源 manifest |
-| Monitor / Task Controller | SessionWorker 内的用户任务意图和推进策略；Job monitoring 观察计算并投递事件 |
+| Task Controller | SessionWorker 内的用户任务意图、生命周期和推进策略 |
+| Monitor | Task、Run、Job 的统一管理面板与 API，不另建调度状态 |
 | Email Skill | 已授权报告投递、附件固定和运输回执 |
 | 检索 / Web | 可重建的预算内视图、排序理由和只读导航 |
 
@@ -23,7 +24,7 @@ CoRAgent 只使用 Pi 原生 Harness 循环。Workspace 是跨会话存在的研
 
 Node 承载持续推进的局部问题。goal 是问题，proposal 是当前假设或思路，plan 是调查方案，progress 是进展说明。假设可为空；调参数、换构型、同目标重试通常留在原 Node。独立问题才另建 Node，不要求模型创建 Attempt 对象。
 
-复杂研究以可独立解释的问题及现有 `part_of`、`requires`、`alternative_to` 关系组织。根节点可选，共享问题可以有多个父节点。UserTask `/2` 只保存 `research.entry_node_ids` 与 `research.focus_node_ids`，通过 `task_update` 的 `set_research` 动作一起替换。这些是导航引用，不是所有权、执行顺序或第二份计划。Node 与 Result schema 保持不变。
+复杂研究以可独立解释的问题及现有 `part_of`、`requires`、`alternative_to` 关系组织。根节点可选，共享问题可以有多个父节点。UserTask `/3` 只保存 `research.entry_node_ids` 与 `research.focus_node_ids`，通过 `task_update` 的 `set_research` 动作一起替换。这些是导航引用，不是所有权、执行顺序或第二份计划。Node 与 Result schema 保持不变。
 
 Node 状态为 open / paused / closed。关闭表示停止主动推进，不表示科学成功，也不取消 Job。内容修订号独立于后台执行观察；并发修改需要重新读取并明确合并，单纯追加笔记不覆盖其他人的判断。
 
@@ -61,9 +62,9 @@ uses / cites 必须来自确证材料输入或明确结果引用。文件名相�
 
 上下文预算先保留原始要求与认证触发原因，再按事件归属、明确焦点、待处理执行事实和研究关系选择 Node，并补充必要的结果及直接依赖。省略内容提供读取/检索入口，不视为完成。普通用户文本不能冒充 Monitor 元数据。
 
-CoRAgent 在 Pi durable 历史上统一管理上下文。`GenerationTask.prepareContext` 在首次进入研究范围、切换焦点或采用新要求来源时追加被动 `pi.context` 记录，与请求截止位置原子提交；记录归属于 generation，不作为用户输入接收。外部读取通过 memo 固定，重启和正常工具回合复用已有背景。Monitor 事件已有认证输入记录，不再触发另一份完整快照。背景读取失败会明确说明，并可在下一次接收输入时重试。
+Research Context 是 Agent Runtime 内部的上下文准备模块。每个 generation 边界通过 `research_read view=brief` 读取本地确定性概览，比较当前范围和相关事实指纹；首次进入、范围变化或事实变化才追加 pi.context，并与请求截止位置原子提交。无关研究变化和重复事件不重复注入。输入来自哪个组件不决定刷新。读取和无变化判断通过 memo 固定，失败在新输入边界重试。
 
-背景采用内部 `research.read view=review`，返回通用的 `research-review/1` 派生审查，而不是把完整 Research Snapshot 放入默认上下文。Review 汇总当前范围的事实、矛盾、未知项、限制和带引用的后续建议，并绑定 `state_digest`；Node、Result、Job 和 Artifact 仍是事实来源，完整快照及具体对象仍可通过原有工具分页读取。Review 通过唯一的 `research.read view=review` 合同生成，并不作为写入或调度授权。研究 Review 通常以 2,000 tokens 为目标，发现失败或矛盾时可扩至 4,000；任务原文可超出软目标，但最终请求仍需通过预算检查。自动背景不授予字段读取凭据，显式 research_read 与 Monitor 保留完整分页查询。
+Research Brief（research-brief/1）整理范围内事实、矛盾、未知项、限制和原始引用，指纹包含因大小限制而省略的候选记录。通常以 2,000 tokens 为目标，出现矛盾可扩至 4,000。运行事件同步是否完整与模型综合摘要是否成功分别记录；结果、终态 Job 或矛盾可触发无工具的模型综合，失败保留基础概览。概览和摘要均不授予写权限，也不证明科学有效性。完整证据通过 research_read、job_status 等工具读取。详见[研究上下文](RESEARCH_CONTEXT.zh-CN.md)。
 
 `CompactionTask.prepareSummary` 只从选定的不可变旧历史范围生成指引和元数据。补充材料在原生摘要调用前固定，重试和恢复保持一致；摘要记录保留非模型可见的范围标记，后续完整历史中的新背景优先。不读取最新研究状态并倒填到旧摘要，不从摘要推导授权或读取凭据。Pi 继续负责安全切分、摘要调用、重试、用量记录以及原子提交和过期判断；reset 会重新建立背景。
 
@@ -100,3 +101,5 @@ Host 重启从 Pi 现有 session catalog 发现会话，最多并行恢复四个
 Pi 原生加载 Skill。CoRAgent 验证安装资源摘要。使用 Pi 提供的真实 Skill 路径，相对引用以该 Skill 目录为基准。research-memory 教五种小操作，research-workflow 协调 Job 和材料，领域 Skill 提供科学方法。reaction_mapping.md 位于 material-preparation/references/。
 
 进程完成、文件存在和 Node 关闭都不证明科学结论。Email 使用已有用户授权和独立投递回执；运输接受后 Memory 记录失败，只恢复记录，不重发。安装、运行和科学结论分别需要对应证据。
+
+职责、执行原因和单协议升级边界见[任务、作业与执行](TASK_JOB_ARCHITECTURE.zh-CN.md)。

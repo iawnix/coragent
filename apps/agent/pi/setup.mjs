@@ -1,14 +1,14 @@
 import { loadPi } from "./source.mjs";
 import { createContextManager, contextPolicy, contextInputBudget } from "../context/manager.mjs";
-import { createResearchReviewer } from "../context/reviewer.mjs";
+import { createResearchSynthesis } from "../context/synthesis.mjs";
 import { recordUserSources } from "../tools/user-sources.mjs";
 import { createInputAdmission, createInputService, bindUserInputConversation, INPUT_ADMISSION_SERVICE_ID } from "../host/admission/input.mjs";
-import { createMonitorAdmission, MONITOR_ADMISSION_SERVICE_ID } from "../host/admission/monitor.mjs";
+import { createJobAdmission, JOB_ADMISSION_SERVICE_ID } from "../host/admission/jobs.mjs";
 import { createSessionAdmission, SESSION_ADMISSION_SERVICE_ID } from "../host/admission/session.mjs";
 import { createTaskController } from "../tasks/controller.mjs";
 import { createTaskTools } from "../tasks/tools.mjs";
 import { createMonitorService, recordRun, MONITOR_SERVICE_ID } from "../tasks/service.mjs";
-import { wakeMessage } from "../host/monitor/worker.mjs";
+import { wakeMessage } from "../host/jobs/worker.mjs";
 import { CLIENT_QUERIES_SERVICE_ID, createClientQueries } from "./services/queries.mjs";
 import { dirname, join } from "node:path";
 import { readFile } from "node:fs/promises";
@@ -38,7 +38,7 @@ const setupModule = await loadPi("setup", sourceRoot);
 const { createHarnessSettings, configureHarnessHttp, ExecutionEnvs, findInitialAgentModel } = setupModule;
 // Pinned Pi transaction primitive keeps Monitor admission atomic with native input.
 const { admitSubmission } = await loadPi("submissions", sourceRoot);
-const CoRAgentMonitorAdmission = defineService(MONITOR_ADMISSION_SERVICE_ID);
+const CoRAgentJobAdmission = defineService(JOB_ADMISSION_SERVICE_ID);
 const CoRAgentInputAdmission = defineService(INPUT_ADMISSION_SERVICE_ID);
 const CoRAgentSessionAdmission = defineService(SESSION_ADMISSION_SERVICE_ID);
 const CoRAgentClientQueries = defineService(CLIENT_QUERIES_SERVICE_ID);
@@ -74,10 +74,12 @@ export async function createCoRAgentHarness(databasePath, options) {
 
     });
     const harnessSettings = contextPolicy(createHarnessSettings(settingsManager));
-    const reviewerModel = resolved.model ? modelRuntime.getModel(resolved.model.provider, resolved.model.modelId) : null;
-    const synthesizeReview = createResearchReviewer({ modelRuntime, model: reviewerModel });
+    const synthesizeBrief = createResearchSynthesis({ modelRuntime, getModel: async () => {
+      const agent = await conversation.agent(PI_TODO_CONTEXT);
+      return agent?.model ? modelRuntime.getModel(agent.model.provider, agent.model.modelId) : null;
+    } });
     const contextManager = createContextManager({ bridge: commandBridge, coordinator: transactionCoordinator,
-      synthesizeReview,
+      synthesizeBrief,
       sessionId, estimateContextTokens, getCompactionPolicy: () => harnessSettings.compaction,
     });
     const packageReadGuard = createPackageSourceReadGuard({ packageRoot: loadedSkills.packageRoot, cwd,
@@ -98,7 +100,7 @@ export async function createCoRAgentHarness(databasePath, options) {
       invocation: api => ({ workspaceRoot: cwd, sessionId,
         operationId: String(api.taskId) }),
     }));
-    let monitorAdmission, inputAdmission;
+    let jobAdmission, inputAdmission;
     const recordedUserSources = new Set();
     const registry = createRegistry();
     registry.install(defineExtension({ name: "coding-tools", tools:
@@ -116,27 +118,16 @@ export async function createCoRAgentHarness(databasePath, options) {
           prepareContext: async (view, api, context) => {
             const live = await api.snapshot(LiveDoc, api.conversationId, context);
             const task = await taskController.current(context);
-            await recordUserSources({ harness, admission: inputAdmission, monitorAdmission, taskController, api, context,
+            const sources = await recordUserSources({ harness, admission: inputAdmission, jobAdmission, taskController, api, context,
               inputIds: live?.run?.inputs, bridge: commandBridge, sessionId, recordedIds: recordedUserSources });
             const inputIds = live?.run?.inputs || [];
-            const origins = await Promise.all(inputIds.map(async id => {
-              const record = await (await harness.submission(id, context)).status(context);
-              return inputAdmission.origin(record, context);
-            }));
-            const monitorEvidence = origins.some(origin => origin?.producer === "monitor");
-            const taskEvidence = origins.some(origin => origin?.producer === "task_controller")
-              && task?.progress?.review_pending === true;
-            // Internal monitor/task continuations are the coalescing boundary for
-            // a new Review. Ordinary tool turns reuse the durable context anchor.
-            const refresh = (monitorEvidence || taskEvidence) && (!task || task.state === "active");
-            const prepared = await contextManager.prepare(view, api, context, { task,
-              input_ids: inputIds, refresh_research: refresh,
-              review_trigger: refresh ? "new_evidence" : "context_refresh" });
-            // Review persistence is a Monitor pointer. A durable pointer write
+            const prepared = await contextManager.prepare(view, api, context, { task, input_ids: inputIds,
+              event_ids: sources.event_ids });
+            // Context persistence is a Monitor pointer. A durable pointer write
             // must never turn an otherwise usable model context into a failed
-            // generation; the canonical Review remains readable from research.
+            // generation; the canonical brief remains readable from research.
             if (prepared?.data) {
-              try { await taskController.recordResearchReview(prepared.data, context, task?.user_task_id ?? null); }
+              try { await taskController.recordResearchContext(prepared.data, context, task?.user_task_id ?? null); }
               catch { /* Monitor can report the last durable pointer; context stays usable. */ }
             }
             return prepared;
@@ -147,7 +138,7 @@ export async function createCoRAgentHarness(databasePath, options) {
           beforeRequest: (request, api, context) => {
             return (async () => {
               const live = await api.snapshot(LiveDoc, api.conversationId, context);
-              await recordUserSources({ harness, admission: inputAdmission, monitorAdmission, taskController, api, context, inputIds: live?.run?.inputs,
+              await recordUserSources({ harness, admission: inputAdmission, jobAdmission, taskController, api, context, inputIds: live?.run?.inputs,
                 bridge: commandBridge, sessionId, recordedIds: recordedUserSources });
               const task = await taskController.current(context);
               await recordRun({ conversation, api, inputIds: live?.run?.inputs || [], userTaskId: task?.user_task_id ?? null, context });
@@ -198,15 +189,15 @@ export async function createCoRAgentHarness(databasePath, options) {
       kernel: commandBridge, workspaceId, sessionId, context: PI_TODO_CONTEXT,
       enabled: process.env.CORAGENT_AUTOMATIC_CONTINUATION !== "0" });
     await inputAdmission.checkRecovery(PI_TODO_CONTEXT);
-  monitorAdmission = createMonitorAdmission({ admission: inputAdmission, kernel: commandBridge, sessionId,
+  jobAdmission = createJobAdmission({ admission: inputAdmission, kernel: commandBridge, sessionId,
       wakeMessage, producerToken, taskController });
     const sessionAdmission = createSessionAdmission({ harness, conversation, LiveDoc, taskController });
     taskController.start();
     return {
       harness, conversation: bindUserInputConversation(conversation, inputAdmission, harness, sessionAdmission), modelRuntime, settingsManager,
       facetLoader: createStaticFacetLoader([defineFacet({ id: "@coragent/client-queries", setup(env) {
-        const { validateConsumption: _validate, ...monitorService } = monitorAdmission;
-        env.provide(CoRAgentMonitorAdmission, monitorService);
+        const { validateConsumption: _validate, ...jobEventService } = jobAdmission;
+        env.provide(CoRAgentJobAdmission, jobEventService);
         env.provide(CoRAgentInputAdmission, createInputService(inputAdmission));
         env.provide(CoRAgentSessionAdmission, sessionAdmission);
         env.provide(CoRAgentMonitor, createMonitorService({ controller: taskController, harness, conversation, kernel: commandBridge, workspaceId, sessionId, LiveDoc }));

@@ -87,7 +87,7 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
       const request = JSON.parse(body);
       // Review synthesis is an internal, tool-free model call. Keep it out of
       // the fixture's step counter while still returning a valid projection.
-      if (JSON.stringify(request).includes('deterministic review')) {
+      if (JSON.stringify(request).includes('deterministic brief')) {
         const response = { id: `review_${requests.length}`, object: "chat.completion",
           choices: [{ index: 0, message: { role: "assistant", content: JSON.stringify({
             status: "attention", summary: "Inspect the recorded evidence before interpretation.",
@@ -144,8 +144,8 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     stage = "send-input";
     await backend.sendInput({ workspace_id: "flow", session_id, request_id: "fixture_request", client_message_id: "fixture_message",
       text: "Exercise the local fixture without sending mail.", mode: "auto" });
-    const {deliverMonitorEvent} = await import(pathToFileURL(join(packageRoot,"apps/agent/host/monitor/worker.mjs")));
-    const runJson = async (command, root, extra=[]) => JSON.parse((await execute(python,[join(packageRoot,"apps/agent-cli/monitor.py"),command,"--root",root,...extra])).stdout);
+    const {deliverJobEvent} = await import(pathToFileURL(join(packageRoot,"apps/agent/host/jobs/worker.mjs")));
+    const runJson = async (command, root, extra=[]) => JSON.parse((await execute(python,[join(packageRoot,"apps/agent-cli/job_manager.py"),command,"--root",root,...extra])).stdout);
     let read, restarted=false, monitorDelivered=false;
     stage = "wait-flow";
     for (let i = 0; i < 250; i++) {
@@ -156,9 +156,9 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
         const pending=await runJson("pending",workspace);
         if (pending.deliveries.length) {
           const delivery=pending.deliveries[0];
-          const errors=await deliverMonitorEvent({workspace,delivery,runJson,sendWake:params=>{monitorRequest=params;return backend.sendInput(params);}});
+          const errors=await deliverJobEvent({workspace,delivery,runJson,sendWake:params=>{monitorRequest=params;return backend.sendInput(params);}});
           assert.deepEqual(errors,[]);
-          assert.deepEqual(await deliverMonitorEvent({workspace,delivery,runJson,sendWake:params=>backend.sendInput(params)}),[]);
+          assert.deepEqual(await deliverJobEvent({workspace,delivery,runJson,sendWake:params=>backend.sendInput(params)}),[]);
           monitorDelivered=(await runJson("pending",workspace)).deliveries.length===0;
         }
       }

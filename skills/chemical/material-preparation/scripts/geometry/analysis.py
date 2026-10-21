@@ -6,7 +6,7 @@ _SCRIPTS = _SKILLS / "material-preparation" / "scripts"
 for _part in ("materials", "reaction", "geometry", "diagnostics", "tensor", "_shared"):
     sys.path.insert(0, str(_SCRIPTS / _part if _part != "_shared" else _SKILLS / _part))
 
-"""Independent structure analysis entry points for the existing Job runtime."""
+"""Independent structure analysis entry points for the existing Job manager."""
 import json
 
 from analysis_cli import parse_arguments

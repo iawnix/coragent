@@ -29,7 +29,7 @@ const socketPath = join(resolve(options.directory), `${options["server-id"]}.soc
 // public socket in a private child directory to avoid endpoint collisions.
 const piServerDirectory = join(resolve(options.directory), "pi");
 const python = process.env.CORAGENT_PYTHON || "python3";
-const monitorToken = randomBytes(32).toString("hex");
+const jobToken = randomBytes(32).toString("hex");
 const provider = options.provider ?? process.env.CORAGENT_PROVIDER;
 const model = options.model ?? process.env.CORAGENT_MODEL;
 if ((provider === undefined) !== (model === undefined)) throw new Error("CORAGENT_PROVIDER and CORAGENT_MODEL must be provided together");
@@ -157,7 +157,7 @@ startupPromise = (async () => {
     if (stopping) return;
     host = await startCoRAgentHost({
       socketPath, workspaceRoot, stateRoot, packageRoot, python, serverId: options["server-id"],
-      sessionBackend, monitorToken,
+      sessionBackend, jobToken,
     });
   } catch (error) {
     try { await sessionBackend?.close?.(); } catch { /* startup cleanup is best effort */ }
@@ -170,13 +170,12 @@ startupPromise = (async () => {
 })();
 await startupPromise;
 
-// The monitor worker is optional at the package boundary.  Older releases
-// carried a Python monitor CLI; the generic Job Runtime release may omit it.
+// Job Manager owns background tracking and reliable event delivery.
 // Do not put the Host into a restart loop when that optional component is not
 // present.  Host session traffic remains available either way.
-if (process.env.CORAGENT_MONITOR_DISABLED !== "1" && existsSync(join(packageRoot, "apps/agent-cli/monitor.py"))) supervise("monitor", "apps/agent/host/monitor/worker.mjs", [
+if (process.env.CORAGENT_JOB_TRACKING_DISABLED !== "1" && existsSync(join(packageRoot, "apps/agent-cli/job_manager.py"))) supervise("job-manager", "apps/agent/host/jobs/worker.mjs", [
   "--workspace-root", workspaceRoot, "--host-socket", socketPath, "--state-root", stateRoot,
-], { CORAGENT_INTERNAL_MONITOR_TOKEN: monitorToken });
+], { CORAGENT_INTERNAL_JOB_TOKEN: jobToken });
 if (process.env.CORAGENT_LINK_URL || process.env.CORAGENT_LINK_HOST_TOKEN_FILE) {
   supervise("link", "apps/agent/transport/link.mjs", [
     "--relay-url", process.env.CORAGENT_LINK_URL, "--token-file", process.env.CORAGENT_LINK_HOST_TOKEN_FILE, "--socket-path", socketPath,

@@ -4,7 +4,7 @@ import sys
 import time
 from pathlib import Path
 from research_agent.application.execution import dispatch
-from research_agent.application.job_monitor import command
+from research_agent.application.job_manager import command
 from tests.unit.test_job_recovery import workspace
 
 
@@ -77,7 +77,7 @@ def test_pending_delivery_does_not_read_research_memory(tmp_path):
 def test_long_queue_emits_one_diagnostic_event_without_poll_wakes(tmp_path, monkeypatch):
     from types import SimpleNamespace
     from research_agent.jobs import JobReceipt, JobState, ExternalJobPlatform
-    from research_agent.application import job_monitor
+    from research_agent.application import job_manager
     workspace(tmp_path)
     config = tmp_path/'job.toml'
     config.write_text('[execution]\ndefault_target="cluster"\n[execution.targets.cluster]\n'
@@ -96,7 +96,7 @@ def test_long_queue_emits_one_diagnostic_event_without_poll_wakes(tmp_path, monk
     dispatch('start',{'root':str(tmp_path),'request_id':'job_queue','session_id':'s',
         'command':['/bin/true']})
     status = SimpleNamespace(state=JobState.QUEUED,exit_code=None,error=None,diagnostics={'wait_seconds':10})
-    monkeypatch.setattr(job_monitor,'_runtime',lambda root:SimpleNamespace(job_status=lambda receipt:status))
+    monkeypatch.setattr(job_manager,'_job_manager',lambda root:SimpleNamespace(job_status=lambda receipt:status))
     command(tmp_path,'tick',{})
     assert command(tmp_path,'pending',{})['deliveries']==[]
     status.diagnostics={'wait_seconds':61,'queue_diagnosis':'feasible procs: 0'}
@@ -159,7 +159,7 @@ def test_delivery_retry_identity_is_independent_of_research_notes(tmp_path):
 
 @pytest.mark.parametrize('extra', [{'enabled': True}, {'enabled': False}, {'unexpected': 'field'}])
 def test_unknown_binding_fields_cannot_mutate_or_claim_outbox(tmp_path, extra):
-    from research_agent.application.job_monitor import read_binding
+    from research_agent.application.job_manager import read_binding
     workspace(tmp_path)
     folder = tmp_path / 'operations/monitors/monitor_1'
     (folder / 'deliveries').mkdir(parents=True)
@@ -186,7 +186,7 @@ def test_unknown_binding_fields_cannot_mutate_or_claim_outbox(tmp_path, extra):
     lambda value: value.update(schema_version='unsupported'),
 ])
 def test_invalid_binding_is_rejected_without_rewriting(tmp_path, mutation):
-    from research_agent.application.job_monitor import read_binding
+    from research_agent.application.job_manager import read_binding
     value = binding_record()
     mutation(value)
     path = tmp_path / 'binding.json'
@@ -198,7 +198,7 @@ def test_invalid_binding_is_rejected_without_rewriting(tmp_path, mutation):
 
 @pytest.mark.parametrize('kind', ['event', 'delivery'])
 def test_outbox_records_are_checked_against_current_schema(tmp_path, kind):
-    from research_agent.application.job_monitor import validate_event, read_delivery
+    from research_agent.application.job_manager import validate_event, read_delivery
     if kind == 'event':
         value = {**binding_record(), 'schema_version': 'coragent-job-monitor-event/2',
             'event_id': 'event_1', 'sequence': 1, 'state': 'failed', 'previous_state': None,

@@ -1356,7 +1356,7 @@ def _copy_private_config(source_value: str, destination: Path, *, kind: str) -> 
 
 def _validate_job_config(parsed: dict[str, object]) -> dict:
     """Validate the shared environment shape before installing it."""
-    # Import the same public contract as Job Runtime and the Skill helper.
+    # Import the same public contract as Job Manager and the Skill helper.
     import importlib.util
     spec = importlib.util.spec_from_file_location("research_agent_job_config", ROOT / "backend/src/research_agent/jobs/config_contract.py")
     contract = importlib.util.module_from_spec(spec)

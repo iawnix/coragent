@@ -5,7 +5,7 @@ import pytest
 
 from research_agent.application.api import execute
 from research_agent.application.execution import dispatch
-from research_agent.application.job_monitor import command
+from research_agent.application.job_manager import command
 from tests.unit.test_job_recovery import workspace
 
 

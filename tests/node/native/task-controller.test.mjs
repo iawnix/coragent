@@ -95,7 +95,7 @@ test("idle active tasks continue beyond three evidence-free runs and explicit bl
   const { controller, conversation, faux, begin, admission } = await fixture(t);
   const task = await begin();
   assert.match(task.user_task_id, /^task_/);
-  assert.equal(task.schema_version, "coragent-user-task/2");
+  assert.equal(task.schema_version, "coragent-user-task/3");
   assert.deepEqual(task.research, { entry_node_ids: [], focus_node_ids: [] });
   assert.match(task.sources[0].text, /evidence-backed/);
   assert.equal(task.initial_plan, "Investigate the mechanism and deliver a report supported by evidence.");
@@ -229,21 +229,20 @@ test("a Node creation finishing after task replacement cannot bind the new task"
 const nodeId = n => `node_${n + 1}`;
 const observed = (toolName, result) => [{ id: 200, model: [{ role: "toolResult", toolName, content: [], details: { result } }] }];
 
-test("Research Review lifecycle is an idempotent Task pointer and does not advance revision", async t => {
+test("Research Brief lifecycle is an idempotent Task pointer and does not advance revision", async t => {
   const { controller, begin } = await fixture(t);
   let task = await begin();
-  const review = { schema_version: "research-review/1", review_id: "review_state",
-    state_digest: "sha256:state", review_digest: "sha256:review", status: "attention",
-    review_status: "current", trigger: "context_refresh" };
+  const review = { schema_version: "research-context/1", brief_id: "brief_state",
+    state_digest: "sha256:state", brief_digest: "sha256:brief", availability: "available",
+    projection_status: "complete", synthesis_status: "not_requested", refresh_reason: "initial" };
   const revision = task.revision;
-  task = await controller.recordResearchReview(review, context, task.user_task_id);
+  task = await controller.recordResearchContext(review, context, task.user_task_id);
   assert.equal(task.revision, revision);
-  assert.deepEqual(task.research_review, { current_review_ref: "review_state",
-    last_reviewed_state_digest: "sha256:state", review_digest: "sha256:review",
-    review_status: "current", trigger: "context_refresh", updated_at: task.research_review.updated_at });
-  const again = await controller.recordResearchReview(review, context, task.user_task_id);
+  const { schema_version, ...pointer } = review;
+  assert.deepEqual(task.research_context, { ...pointer, updated_at: task.research_context.updated_at });
+  const again = await controller.recordResearchContext(review, context, task.user_task_id);
   assert.equal(again.revision, revision);
-  assert.deepEqual(projectUserTask(again).research_review, task.research_review);
+  assert.deepEqual(projectUserTask(again).research_context, task.research_context);
 });
 
 test("research binding has one bounded write path, preserves task control and allows shared Nodes", async t => {
@@ -663,14 +662,14 @@ test("pause wins while completed waits are being observed", async t => {
   assert.equal((await controller.current(context)).state, "paused");
 });
 
-for (const producer of ["task_controller", "monitor"]) for (const control of [null, "pause", "cancel", "user"]) test(`${producer} blocked run finalization respects ${control || "its consumed run identity"}`, async t => {
+for (const producer of ["task_controller", "job_manager"]) for (const control of [null, "pause", "cancel", "user"]) test(`${producer} blocked run finalization respects ${control || "its consumed run identity"}`, async t => {
   const { controller, begin, conversation, faux, admission, harness } = await fixture(t);
   let task = await begin();
   let entered, finish;
   const ready = new Promise(resolve => { entered = resolve; });
   faux.setResponses([() => new Promise(resolve => { entered(); finish = () => resolve(fauxAssistantMessage("Need a missing input from the user")); })]);
-  const requestId = producer === "monitor" ? "monitor-block" : `task:${task.user_task_id}:continue:1`;
-  if (producer === "monitor") await admission.submitInternal({ requestId, producer, content: "Review the completed fixture Job",
+  const requestId = producer === "job_manager" ? "monitor-block" : `task:${task.user_task_id}:continue:1`;
+  if (producer === "job_manager") await admission.submitInternal({ requestId, producer, content: "Review the completed fixture Job",
     identity: { event_ids: ["event_fixture"] }, basis: { task_revision: task.revision,
       control_epoch: task.control_epoch, task_owners: [task.user_task_id] } }, context);
   else await controller.reconcile();
@@ -828,7 +827,7 @@ test("recovery budget survives restart, ignores new evidence, and rejects Monito
     assert.equal(current.execution_recovery.failures, failure);
     assert.equal(current.state, "active");
     assert.equal(current.execution_recovery.state, failure < 3 ? "retrying" : "attention_required");
-    await assert.rejects(env.admission.submitInternal({ requestId: `event-${failure}`, producer: "monitor",
+    await assert.rejects(env.admission.submitInternal({ requestId: `event-${failure}`, producer: "job_manager",
       identity: { event_ids: ["event_1"] }, content: "A Job finished", basis: { task_revision: current.revision,
         control_epoch: current.control_epoch, task_owners: [current.user_task_id] } }, context), { code: "task_execution_recovery" });
     await env.reopen();
@@ -999,9 +998,9 @@ for (const action of ["pause", "cancel"]) test(`natural-language ${action} persi
   for (let i = 0; i < 4; i++) await env.controller.reconcile();
   task = await env.controller.current(context);
   assert.equal(task.continuation.sequence, 0);
-  if (action === "cancel") assert.deepEqual((await env.controller.prepareMonitor([
+  if (action === "cancel") assert.deepEqual((await env.controller.prepareJobEvents([
     { event: { event_id: "ended", user_task_id: task.user_task_id } }], context)).events, []);
-  await assert.rejects(env.admission.submitInternal({ requestId: "late-event", producer: "monitor", content: "Job ended",
+  await assert.rejects(env.admission.submitInternal({ requestId: "late-event", producer: "job_manager", content: "Job ended",
     identity: { event_ids: ["ended"] }, basis: { task_revision: task.revision,
       control_epoch: task.control_epoch, task_owners: [task.user_task_id] } }, context), { code: "task_paused" });
   if (action === "pause") {

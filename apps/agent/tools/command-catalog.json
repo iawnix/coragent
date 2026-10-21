@@ -16,8 +16,7 @@
         "entry_node_ids",
         "source_submission_ids",
         "view",
-        "waited_job_ids",
-        "trigger"
+        "waited_job_ids"
       ],
       "required": [],
       "schema": {
@@ -130,10 +129,10 @@
             },
             "maxItems": 64,
             "uniqueItems": true,
-            "description": "Current task submission IDs used only to expose their exact Research Memory user_* bindings in the review context."
+            "description": "Current task submission IDs used only to expose their exact Research Memory user_* bindings in the research brief."
           },
           "view": {
-            "const": "review",
+            "const": "brief",
             "description": "Internal bounded research-state brief; it does not authorize writes or schedule work."
           },
           "waited_job_ids": {
@@ -142,14 +141,6 @@
               "type": "string"
             },
             "description": "Internal task waits to retain even outside research focus."
-          },
-          "trigger": {
-            "type": "string",
-            "enum": [
-              "context_refresh",
-              "new_evidence"
-            ],
-            "description": "Internal Review refresh reason. It never authorizes writes or schedules work."
           }
         },
         "required": [],
@@ -1149,15 +1140,15 @@
             "type": "object",
             "properties": {
               "schema_version": {
-                "const": "research-review/1"
+                "const": "research-brief/1"
               },
-              "review_id": {
+              "brief_id": {
                 "type": "string"
               },
               "state_digest": {
                 "type": "string"
               },
-              "review_digest": {
+              "brief_digest": {
                 "type": "string"
               },
               "status": {
@@ -1165,21 +1156,6 @@
                   "attention",
                   "uncertain",
                   "oriented"
-                ]
-              },
-              "review_status": {
-                "enum": [
-                  "current",
-                  "pending",
-                  "stale",
-                  "running",
-                  "failed"
-                ]
-              },
-              "trigger": {
-                "enum": [
-                  "new_evidence",
-                  "context_refresh"
                 ]
               },
               "scope": {
@@ -1257,16 +1233,20 @@
               },
               "guidance": {
                 "type": "string"
+              },
+              "projection_status": {
+                "enum": [
+                  "complete",
+                  "incomplete"
+                ]
               }
             },
             "required": [
               "schema_version",
-              "review_id",
+              "brief_id",
               "state_digest",
-              "review_digest",
+              "brief_digest",
               "status",
-              "review_status",
-              "trigger",
               "scope",
               "user_sources",
               "coverage",
@@ -1277,7 +1257,8 @@
               "follow_up",
               "source_refs",
               "read_more",
-              "guidance"
+              "guidance",
+              "projection_status"
             ],
             "additionalProperties": false
           }
@@ -3987,7 +3968,7 @@
                 "type": "object",
                 "properties": {
                   "schema_version": {
-                    "const": "execution-observation/1"
+                    "const": "execution-observation/2"
                   },
                   "observation_id": {
                     "type": "string"
@@ -4006,7 +3987,7 @@
                     "type": "string"
                   },
                   "source": {
-                    "const": "job_runtime"
+                    "const": "job_manager"
                   },
                   "state": {
                     "anyOf": [
@@ -4902,7 +4883,7 @@
       }
     },
     {
-      "id": "job_monitor_assess",
+      "id": "job_manager_assess",
       "domain": "job",
       "effect": "read",
       "allowed": [

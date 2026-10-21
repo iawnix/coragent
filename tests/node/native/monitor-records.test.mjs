@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { join } from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
-import { createMonitorEvents } from "../../../apps/agent/host/monitor/events.mjs";
+import { createJobEvents } from "../../../apps/agent/host/jobs/events.mjs";
 import { TEST_ROOT, managedPython } from "./test-environment.mjs";
 
 const exec = promisify(execFile);
@@ -16,7 +16,7 @@ test("Host relays current Monitor records and rejects invalid formats and mismat
 import sys
 from pathlib import Path
 from research_agent.research.workspace import initialize_workspace, admit_research_workspace
-from research_agent.application.job_monitor import bind
+from research_agent.application.job_manager import bind
 root = Path(sys.argv[1])
 initialize_workspace(root, 'monitor_records', 'research')
 admit_research_workspace(root)
@@ -37,7 +37,7 @@ bind(root, {'job_id': 'job_1', 'user_task_id': 'task_1'}, 'session_1')
     await writeFile(bindingPath, JSON.stringify(bindingValue));
     await writeFile(eventPath, JSON.stringify(eventValue));
     const notices = [];
-    const scanner = createMonitorEvents({ epoch: "test", listWorkspaces: async () => [{ root, workspace_id: "monitor_records" }],
+    const scanner = createJobEvents({ epoch: "test", listWorkspaces: async () => [{ root, workspace_id: "monitor_records" }],
       clients: [{ monitorWorkspaces: new Set(["monitor_records"]), peer: { notify: (...args) => notices.push(args), close() {} } }] });
     try { await scanner.pollMonitors(); } finally { scanner.stop(); }
     return notices;

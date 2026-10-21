@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { monitorHostWorkspaceId } from "../../apps/agent/host/monitor/worker.mjs";
+import { jobHostWorkspaceId } from "../../apps/agent/host/jobs/worker.mjs";
 import { create_workspace_initializer } from "../../apps/agent/host/workspace.mjs";
 import { is_workspace_id } from "../../apps/agent/contracts/workspace-id.mjs";
 
@@ -25,7 +25,7 @@ test("monitor identity uses the research workspace manifest", async () => {
       workspace_mode: "research",
     });
     await create_workspace_initializer().admit_workspace(workspace);
-    assert.equal(await monitorHostWorkspaceId(workspace, { workspace_id: "workspace_research" }), "workspace_research");
+    assert.equal(await jobHostWorkspaceId(workspace, { workspace_id: "workspace_research" }), "workspace_research");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -35,7 +35,7 @@ test("monitor identity rejects legacy-only workspace records", async () => {
   const root = await mkdtemp(join(tmpdir(), "t-"));
   try {
     await writeFile(join(root, "workspace.json"), JSON.stringify({ schema_version: "research-workspace/1", workspace_id: "ws_aaaaaaaaaaaaaaaaaaaaaaaa" }));
-    await assert.rejects(monitorHostWorkspaceId(root, { workspace_id: "ws_aaaaaaaaaaaaaaaaaaaaaaaa" }), /physical initialized directory/);
+    await assert.rejects(jobHostWorkspaceId(root, { workspace_id: "ws_aaaaaaaaaaaaaaaaaaaaaaaa" }), /physical initialized directory/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

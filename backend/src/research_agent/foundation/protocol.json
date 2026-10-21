@@ -1,5 +1,5 @@
 {
-  "host_protocol": "coragent-host/2",
+  "host_protocol": "coragent-host/3",
   "workspace_id": {
     "type": "string",
     "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}(?![\\s\\S])"

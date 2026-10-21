@@ -15,7 +15,7 @@ Root Agent 根据科学问题、不确定性、体系大小、电子结构、目
 Gaussian 显式输入 runner 可执行已提供的 TS、扫描、QST 输入与后续计算，但不自动构造
 完整机理研究。xTB/CREST 与 ASE NEB 可能适合探索，需区分科学适用性与实际执行入口。
 内置 xTB runner 只支持 opt/SP；CREST、NEB 和外部交叉点工具需核实已安装命令或具体脚本，
-通过通用 Job Runtime 执行。先检查共享 runner 与安装软件，再判断能力是否不可用，
+通过通用 Job Manager 执行。先检查共享 runner 与安装软件，再判断能力是否不可用，
 根据研究问题决定使用顺序。
 
 在 Researchresearch conclusion 中记录方法选择及其可证伪目的。方法变化时保留之前的 intent；

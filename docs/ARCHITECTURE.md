@@ -12,9 +12,10 @@ CoRAgent uses the native Pi Harness as its only Agent loop. Workspace is the per
 | Agent Server / Host | Service hosting; Host owns workspace admission, authentication, session routing and worker recovery discovery |
 | Pi SessionWorker / durable Harness | Sole owner of session storage, conversation, model/tool execution, atomic input admission and recovery |
 | Research Memory | Workspace storage contract, original requirements, Nodes, immutable Results and explicit research relations |
-| Job Runtime | Dispatch, execution, cancellation, reconciliation and collection receipts |
+| Job Manager | Dispatch, execution, cancellation, reconciliation, collection, background tracking and reliable event delivery |
 | Artifact Store | Immutable file bytes and provenance manifests |
-| Monitor / Task Controller | User task intent and continuation policy in the SessionWorker; Job monitoring observes execution and delivers events |
+| Task Controller | User task intent, lifecycle and continuation policy in the SessionWorker |
+| Monitor | Management interface for Task, Run and Job; no independent scheduling state |
 | Email Skill | Authorized report delivery, attachment pinning and transport receipts |
 | Retrieval / Web | Rebuildable bounded views, ranking explanations and read-only navigation |
 
@@ -24,7 +25,7 @@ The `research_agent.research` namespace is the sole research implementation. Run
 
 A Node is a persistent local research question. `goal` states the question, `proposal` the current hypothesis or approach, `plan` the investigation, and `progress` the current explanation. Hypotheses are optional. Repeated parameters, geometries and failures stay within the same Node unless an independently tracked question emerges. No model-maintained Attempt entity is required.
 
-Compound studies use independently interpretable questions and existing `part_of`, `requires` and `alternative_to` relations. A root Node is optional; shared questions can have multiple parents. UserTask `/2` stores only `research.entry_node_ids` and `research.focus_node_ids`, set together through `task_update` action `set_research`. These are navigation references, not ownership, a schedule or a second plan. Node and Result schemas remain unchanged.
+Compound studies use independently interpretable questions and existing `part_of`, `requires` and `alternative_to` relations. A root Node is optional; shared questions can have multiple parents. UserTask `/3` stores only `research.entry_node_ids` and `research.focus_node_ids`, set together through `task_update` action `set_research`. These are navigation references, not ownership, a schedule or a second plan. Node and Result schemas remain unchanged.
 
 Node status is `open`, `paused` or `closed`. Closing means stopping active work on that question; it does not imply scientific success or cancel a Job. The authored revision changes when Node content changes, independently of background execution observations. Concurrent content changes require a new reading and explicit merge; append-only notes do not replace another author's judgment.
 
@@ -62,9 +63,9 @@ Transactions publish coherent research updates and recover interrupted commits. 
 
 A bounded model context preserves original user intent and the authenticated trigger, then ranks relevant Nodes using event association, explicit focus, pending execution facts and research relations. Necessary result summaries and direct dependencies accompany selected Nodes. Omission has explicit read/search routes; retrieval never presents missing content as completed work. Ordinary user text cannot impersonate Monitor metadata.
 
-CoRAgent uses one context lifecycle on Pi's durable history. `GenerationTask.prepareContext` appends a passive `pi.context` entry when entering a research scope, changing focus, or adopting new requirement sources. It commits atomically with the request cutoff, is attributed to the generation, and is never admitted as user input. External reads are memoized for recovery. Healthy session recovery and ordinary tool rounds reuse the existing context; new Monitor events already have authenticated input entries and do not trigger another full snapshot. Failed orientation is explicit and may be retried on a new admitted input.
+Research Context is an internal part of the Agent Runtime. At each generation boundary it reads the deterministic `research_read view=brief` projection and compares scoped facts with the last committed context anchor. Initial context, scope changes and relevant fact changes append a passive `pi.context` entry atomically with the request cutoff. Unrelated activity and duplicate events do not add another entry. Input producer identity does not decide freshness. Reads and no-change decisions are memoized for recovery; failed reads are explicit and retried at a new input boundary.
 
-Orientation uses the internal `research.read view=review`, without new model-facing fields. It preserves task objective, criteria and original source text, selecting explicit focus and direct relations instead of recent journal rows. Cards distinguish assessments, limitations and other results; omissions retain read routes. The research view is bounded (normally targeting 2,000 tokens, up to 4,000 for review/failure); required task text may exceed that target and remains subject to final admission. Orientation grants no read receipts. Explicit research_read and Monitor browsing retain their complete paginated contracts.
+Research Brief (`research-brief/1`) contains bounded facts, contradictions, uncertainties, limitations and source references. Its state digest covers candidate records, including those omitted for size, rather than the global journal sequence. The view normally targets 2,000 tokens, up to 4,000 for contradictions. Projection completeness and optional model synthesis success are separate statuses. A tool-free synthesis may summarize results, terminal Jobs or contradictions; failure retains the deterministic brief. Neither projection nor synthesis grants read/write authority or proves scientific validity. Original evidence remains accessible through research_read and job_status.
 
 `CompactionTask.prepareSummary` supplies instructions and metadata from the selected immutable historical prefix only. Supplements are pinned before the native summary call and preserved over retry/recovery. The resulting summary retains the scope anchor as non-model metadata. Later retained context entries supersede it. No live research read is backdated into a checkpoint, and no summary establishes authorization or field-read grants. Pi retains safe tool boundaries, summary calls, retries, usage accounting and atomic/stale-aware placement. A reset deliberately starts a new orientation.
 
@@ -111,3 +112,5 @@ projection bounds directory pages and version-checked file ranges. Explicit
 phone draft; it is not a Research Memory Artifact. These operations do not attach
 a session or invoke Pi. CoRHub retains the existing text-message/outbox protocol
 when submitting the reference. Private state paths and links are excluded.
+
+Task means the user objective; Run means one input-driven Agent execution; Job means external computation. Input admission is an internal Pi integration boundary for authentication, idempotency and atomic submission. Job events and task continuations use the same Task Controller policy. Producers are user, job_manager and task_controller; the separate reason field identifies user_message, job_event, task_continue, execution_retry or final_response_retry. Retired producers and research Review interfaces have no compatibility aliases.

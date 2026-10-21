@@ -149,8 +149,8 @@ def _job_resolve_prepared(root, value):
     return resolve_prepared_job(root, value)
 
 
-def _job_monitor_assess(root, value):
-    from .job_monitor import assess
+def _job_manager_assess(root, value):
+    from .job_manager import assess
     return assess(root, **value)
 
 
@@ -176,7 +176,7 @@ COMMAND_HANDLERS = {
     "job_list": _job("list"),
     "job_prepare": _job_prepare,
     "job_resolve_prepared": _job_resolve_prepared,
-    "job_monitor_assess": _job_monitor_assess,
+    "job_manager_assess": _job_manager_assess,
     "artifact_create": _artifact("create"),
     "artifact_register": _artifact("register"),
     "artifact_read": _artifact("read"),

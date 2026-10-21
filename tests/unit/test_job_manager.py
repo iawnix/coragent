@@ -6,16 +6,16 @@ import time
 
 import pytest
 
-from research_agent.jobs import JobOutput, JobRuntime, JobSpec, JobState, LocalProcessPlatform, ExternalJobPlatform, platforms_from_config
+from research_agent.jobs import JobOutput, JobManager, JobSpec, JobState, LocalProcessPlatform, ExternalJobPlatform, platforms_from_config
 from research_agent.jobs.local import _process_state
 from research_agent.application.execution import _spec
 
 
-def _runtime() -> JobRuntime:
-    return JobRuntime({"local": LocalProcessPlatform()})
+def _job_manager() -> JobManager:
+    return JobManager({"local": LocalProcessPlatform()})
 
 
-def _wait(runtime: JobRuntime, receipt):
+def _wait(runtime: JobManager, receipt):
     for _ in range(100):
         status = runtime.job_status(receipt)
         if status.state not in {JobState.RUNNING, JobState.SUBMITTED}:
@@ -27,7 +27,7 @@ def _wait(runtime: JobRuntime, receipt):
 def test_arbitrary_argv_job_collects_declared_output(tmp_path: Path) -> None:
     work = tmp_path / "work"
     work.mkdir()
-    runtime = _runtime()
+    runtime = _job_manager()
     spec = JobSpec(job_id="job_1",
         command=(sys.executable, "-c", "from pathlib import Path; Path('result.txt').write_text('ok')"),
         cwd=work,
@@ -49,7 +49,7 @@ def test_arbitrary_argv_job_collects_declared_output(tmp_path: Path) -> None:
 
 
 def test_job_probe_reports_missing_cwd_or_inputs_without_execution(tmp_path: Path) -> None:
-    runtime = _runtime()
+    runtime = _job_manager()
     spec = JobSpec(job_id="job_1", command=(sys.executable, "-c", "raise SystemExit(99)"), cwd=tmp_path / "missing")
 
     probe = runtime.job_probe(spec)
@@ -64,7 +64,7 @@ def test_output_paths_cannot_escape_job_cwd(tmp_path: Path) -> None:
 
 
 def test_job_runtime_preserves_research_identity_without_domain_parsing(tmp_path: Path) -> None:
-    runtime = _runtime()
+    runtime = _job_manager()
     request = JobSpec(
         command=(sys.executable, "-c", "print('raw evidence')"),
         cwd=tmp_path,
@@ -133,7 +133,7 @@ driver = "process"
         encoding="utf-8",
     )
     platforms, default = platforms_from_config(config)
-    runtime = JobRuntime(platforms, default=default)
+    runtime = JobManager(platforms, default=default)
     spec = JobSpec(
         job_id="job_1",
         command=(sys.executable, "-c", "print('target')"),

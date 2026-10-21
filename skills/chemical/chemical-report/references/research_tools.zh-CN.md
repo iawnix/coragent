@@ -42,14 +42,14 @@ display_bonds 最多 512 对显式 ID，不推断键。animation_frames 为 2–
 
 ## 研究报告输入
 
-chemical-research-report-input/1 要求非空 title、question、assessment 和显式
+chemical-research-report-input/2 要求非空 title、question、assessment 和显式
 limitations 列表（可为空）。assessment 是**作者解释**，不是程序自动认证结论。
 evidence 为 1–128 条，每条含唯一 id、label、带 schema_version 的 result、与 result
 规范化内容匹配的 source_sha256，以及可选 artifact_id。artifact_id 是来源标注，
 不自动查询 Artifact 存储。result.json 完整保留原结果、报告状态及限制，不提升为新认证。
 
-可选的 `research_review` 字段接受完整的 `research-review/1` 投影。脚本会在排除
-`review_digest` 字段后重新计算摘要，并把 Review 的 ID、状态摘要、来源引用、矛盾和
+可选的 `research_brief` 字段接受完整的 `research-brief/1` 投影。脚本会在排除
+`brief_digest` 字段后重新计算摘要，并把 Review 的 ID、状态摘要、来源引用、矛盾和
 不确定性保存在 `result.json` 与 `report.md` 中。Review 不能替代必需的原始
 Result/Artifact 证据，也不能认证过渡态。
 

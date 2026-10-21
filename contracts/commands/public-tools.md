@@ -22,4 +22,4 @@ artifact_create
 artifact_read
 ```
 
-Research Memory retains original requirements, problem Nodes, immutable Results and explicit relations. Job Runtime owns execution; Artifact Store owns payloads and provenance. Research updates do not gate tools or trigger next_run.
+Research Memory retains original requirements, problem Nodes, immutable Results and explicit relations. Job Manager owns execution; Artifact Store owns payloads and provenance. Research updates do not gate tools or trigger next_run.

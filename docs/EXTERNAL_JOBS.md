@@ -120,7 +120,7 @@ The wrapper already contains the calculation argv, environment, stdin, timeout
 and stdout/stderr redirection. Submit that wrapper in the supplied `cwd`. It
 writes calculation logs under `logs/` and exit evidence in the execution
 directory. GPU visibility assigned by the scheduler is preserved for external
-Jobs. The Job runtime uses handler observations to determine completion.
+Jobs. The Job manager uses handler observations to determine completion.
 
 States are `submitted`, `queued`, `held`, `running`, `succeeded`, `failed`,
 `cancelled`, `timed_out`, and `unknown`. A terminal response requires

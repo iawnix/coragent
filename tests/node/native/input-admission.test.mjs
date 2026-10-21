@@ -21,6 +21,22 @@ async function fixture(t) {
   return { harness, conversation, admission, native: bindUserInputConversation(conversation, admission, harness), faux };
 }
 
+test("input reasons are authenticated, persisted and part of idempotency", async t => {
+  const { admission, conversation } = await fixture(t);
+  const input = {requestId:"reason-fixture", producer:"task_controller", reason:"execution_retry",
+    identity:{user_task_id:"task_fixture"}, basis:{}, content:"Retry authorized work", whenBusy:"reject"};
+  await assert.rejects(admission.submitInternal({...input,producer:"monitor"},context), {code:"invalid_producer"});
+  await assert.rejects(admission.submitInternal({...input,reason:"job_event"},context), {code:"invalid_producer"});
+  const first = await admission.submitInternal(input,context);
+  await conversation.waitForIdle(context);
+  const record = await admission.status(input.requestId,context);
+  const provenance = await admission.origin(record,context);
+  assert.equal(provenance.producer,"task_controller");
+  assert.equal(provenance.reason,"execution_retry");
+  assert.equal((await admission.submitInternal(input,context)).id,first.id);
+  await assert.rejects(admission.submitInternal({...input,reason:"task_continue"},context), {code:"request_id_reused"});
+});
+
 test("queued compaction writes do not block an idle internal wake", async t => {
   const { harness, conversation, admission, faux } = await fixture(t);
   let started;
@@ -68,7 +84,7 @@ test("request ID spelling cannot impersonate an internal producer", async t => {
   await conversation.waitForIdle(context);
   const record = await admission.status(requestId, context);
   assert.equal((await admission.origin(record, context)).producer, "user");
-  await assert.rejects(admission.submitInternal({ requestId, content: "Actual user request", producer: "monitor" }, context), { code: "request_id_reused" });
+  await assert.rejects(admission.submitInternal({ requestId, content: "Actual user request", producer: "job_manager" }, context), { code: "request_id_reused" });
 });
 
 test("pinned native controller preserves business identity and specific rejection codes", async t => {
@@ -94,7 +110,7 @@ test("a busy internal wake leaves no provenance or submission behind", async t =
   })]);
   await admission.submitUser({ requestId: "running", content: "User task" }, context);
   await started;
-  await assert.rejects(admission.submitInternal({ requestId: "wake", producer: "monitor", content: "Wake",
+  await assert.rejects(admission.submitInternal({ requestId: "wake", producer: "job_manager", content: "Wake",
     identity: { event_ids: ["event_1"] }, basis: "3:checkpoint_1" }, context), { code: "busy" });
   assert.equal(await admission.status("wake", context), null);
   assert.equal(await admission.origin({ requestId: "wake" }, context), null);

@@ -12,9 +12,8 @@ export interface CommandParameters {
     "field"?: "goal" | "title" | "proposal" | "plan" | "progress" | "status" | "assessment_ref" | "relations" | "subjects" | null;
     "entry_node_ids"?: Array<string>;
     "source_submission_ids"?: Array<string>;
-    "view"?: "review";
+    "view"?: "brief";
     "waited_job_ids"?: Array<string>;
-    "trigger"?: "context_refresh" | "new_evidence";
   };
   "research_search": {
     "query"?: string;
@@ -191,7 +190,7 @@ export interface CommandParameters {
       "budget": string;
     };
   };
-  "job_monitor_assess": {
+  "job_manager_assess": {
     "event_id": string;
     "session_id": string | null;
   };
@@ -407,13 +406,11 @@ export interface CommandResults {
     "work_dir"?: string;
     [key: string]: unknown;
   } | {
-    "schema_version": "research-review/1";
-    "review_id": string;
+    "schema_version": "research-brief/1";
+    "brief_id": string;
     "state_digest": string;
-    "review_digest": string;
+    "brief_digest": string;
     "status": "attention" | "uncertain" | "oriented";
-    "review_status": "current" | "pending" | "stale" | "running" | "failed";
-    "trigger": "new_evidence" | "context_refresh";
     "scope": Record<string, JsonValue>;
     "user_sources": Array<{
       "submission_id": string;
@@ -428,6 +425,7 @@ export interface CommandResults {
     "source_refs": Array<string>;
     "read_more": Record<string, JsonValue>;
     "guidance": string;
+    "projection_status": "complete" | "incomplete";
   };
   "research_search": {
     "schema_version": "research-search/2";
@@ -713,11 +711,11 @@ export interface CommandResults {
       "node_revision": number | null;
       "execution_state": string;
       "execution_observation": {
-        "schema_version": "execution-observation/1";
+        "schema_version": "execution-observation/2";
         "observation_id": string;
         "workspace_id": string | null;
         "job_id": string;
-        "source": "job_runtime";
+        "source": "job_manager";
         "state": string | null;
         "exit_code": number | null;
         "started_at": string | null;
@@ -829,7 +827,7 @@ export interface CommandResults {
     "request_sha256"?: string | null;
     "node_id"?: string;
   };
-  "job_monitor_assess": {
+  "job_manager_assess": {
     "event_id": string;
     "event": {
       "event_id": string;

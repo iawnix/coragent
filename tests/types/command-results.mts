@@ -23,7 +23,7 @@ export async function checkCommandResultTypes(bridge: RuntimeBridge) {
     const offset: number = read.offset;
     void offset;
   } else {
-    const review: string = read.review_id;
+    const review: string = read.brief_id;
     void review;
   }
   const start = await bridge.execute_command("job_start", { command: ["/bin/true"] });

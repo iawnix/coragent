@@ -7,7 +7,7 @@ import { Value } from "../../pi/typebox.mjs";
 const MONITOR_ID = /^monitor_[1-9][0-9]*$/u;
 const MONITOR_EVENT_ID = /^event_[1-9][0-9]*$/u;
 
-export function createMonitorEvents({ listWorkspaces, clients, epoch }) {
+export function createJobEvents({ listWorkspaces, clients, epoch }) {
   const monitorFiles = new Map();
   let monitorSequence = 0, polling = false, closed = false;
   async function scanMonitorFiles({ notify = true } = {}) {

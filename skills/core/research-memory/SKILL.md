@@ -7,7 +7,7 @@ description: Preserve research questions, attempts, evidence, relations, and imm
 
 [Chinese version](SKILL.zh-CN.md)
 
-Use this Skill to keep a scientific study coherent across turns. Nodes hold questions and hypotheses, Jobs and Artifacts hold execution evidence, and Results hold durable interpretations. The runtime supplies a `research-review/1` projection; read the referenced source records when details matter.
+Use this Skill to keep a scientific study coherent across turns. Nodes hold questions and hypotheses, Jobs and Artifacts hold execution evidence, and Results hold durable interpretations. The runtime supplies a `research-brief/1` projection; read the referenced source records when details matter.
 
 ## Core operations
 
@@ -23,7 +23,7 @@ Keep a question, its retries, and parameter changes in one Node. Create a relate
 
 After collecting a Job, inspect its output, then write the scientific observation with `research_update`. Publish a Result when the observation is useful independently; cite immutable Artifacts or Results rather than mutable work files. Keep measured observations, authored conclusions, and check references separate. Negative or inconclusive results are valid research records.
 
-A review projection is a navigation aid: its `state_digest` and `review_digest` identify the state it saw, while the cited Nodes, Results, Jobs, and Artifacts remain authoritative. Follow pagination for long fields and reread before replacing a field after a revision conflict. Use [storage and recovery](references/storage.md) for workspace paths, revisions, and immutable files, [planning](references/planning.md) for decomposition, and [research workflow](../research-workflow/SKILL.md) for task control and Job policy.
+A review projection is a navigation aid: its `state_digest` and `brief_digest` identify the state it saw, while the cited Nodes, Results, Jobs, and Artifacts remain authoritative. Follow pagination for long fields and reread before replacing a field after a revision conflict. Use [storage and recovery](references/storage.md) for workspace paths, revisions, and immutable files, [planning](references/planning.md) for decomposition, and [research workflow](../research-workflow/SKILL.md) for task control and Job policy.
 
 ## Working pattern
 

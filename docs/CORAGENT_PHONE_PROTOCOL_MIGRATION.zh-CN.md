@@ -8,7 +8,7 @@
 
 | 位置 | 当前值 | 目标值 |
 | --- | --- | --- |
-| Host initialize 请求/响应 `protocol` | `research-agent-host/2` | `coragent-host/2` |
+| Host initialize 请求/响应 `protocol` | `research-agent-host/2` | `coragent-host/3` |
 | WebSocket 子协议 | `research-agent-link.v1` | `coragent-link.v1` |
 | 配对响应 `protocol` | `research-agent-link.v1` | `coragent-link.v1` |
 | Phone 设备 token 前缀 | `rad_` | `cad_` |
@@ -37,7 +37,7 @@
   "id": "phone-1",
   "method": "initialize",
   "params": {
-    "protocol": "coragent-host/2",
+    "protocol": "coragent-host/3",
     "server_id": "00000000-0000-4000-8000-000000000001",
     "client": { "name": "corhub" }
   }
@@ -72,7 +72,7 @@
 
 ## 5. Monitor 与模型请求的跨端合同
 
-Monitor 使用唯一的 `coragent-host/2` 接口；客户端按 initialize 的 capabilities 展示功能。
+Monitor 使用唯一的 `coragent-host/3` 接口；客户端按 initialize 的 capabilities 展示功能。
 旧 `monitor/list`、`monitor/status`、`monitor/enable`、`monitor/disable` 已移除，不提供别名或回退。
 
 - 概览与用户任务：`monitor/overview`、`monitor/tasks`、`monitor/task/read`。

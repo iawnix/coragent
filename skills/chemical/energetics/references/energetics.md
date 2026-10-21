@@ -4,7 +4,7 @@ The [independent analysis executors](energy_execution.md) combine thermal source
 convert standard states, calculate finite conformer free energies and balanced
 profiles, and export successful scan slices. CF22D supplies the underlying RRHO
 calculator. [Kinetic executors](kinetics_execution.md) provide bounded classical
-TST, common-precursor branching and explicit closed mass-action integration. Run calculations through Job Runtime and register their
+TST, common-precursor branching and explicit closed mass-action integration. Run calculations through Job Manager and register their
 inputs/outputs; `artifact_derive` only records a descriptor.
 The [Gaussian runner](../../gaussian/SKILL.md) parses electronic energy and available
 thermal corrections; inspect the actual output fields and missing values.

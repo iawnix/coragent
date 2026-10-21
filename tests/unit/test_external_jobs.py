@@ -9,7 +9,7 @@ import time
 import pytest
 from jsonschema import Draft202012Validator
 
-from research_agent.jobs import JobOutput, JobSpec, JobState, JobRuntime, platforms_from_config
+from research_agent.jobs import JobOutput, JobSpec, JobState, JobManager, platforms_from_config
 from research_agent.jobs.config_contract import job_config_schema, validate_job_config, resolve_submission, validate_catalog_bindings
 from research_agent.jobs.external import ExternalJobPlatform
 
@@ -139,8 +139,8 @@ def application_queue(queue, tmp_path, monkeypatch, file_mode='staged'):
 
 @pytest.mark.parametrize('file_mode', ['staged', 'shared'])
 def test_rejected_submission_is_durable_failed_job_without_scheduler_retries(queue, tmp_path, monkeypatch, file_mode):
-    from research_agent.application.execution import dispatch, _RUNTIMES
-    from research_agent.application.job_monitor import command
+    from research_agent.application.execution import dispatch, _JOB_MANAGERS
+    from research_agent.application.job_manager import command
     root, request, state = application_queue(queue, tmp_path, monkeypatch, file_mode)
     (state / 'submit-error.json').write_text(json.dumps({'code': 'invalid_request', 'message': 'invalid resources', 'retryable': False}))
     first = dispatch('start', request)
@@ -149,7 +149,7 @@ def test_rejected_submission_is_durable_failed_job_without_scheduler_retries(que
     assert first['metadata']['scheduler_id'] is None
     schema = json.loads((ROOT / 'contracts/commands/results.json').read_text())['definitions']['JobReceipt']
     Draft202012Validator(schema).validate(first)
-    _RUNTIMES.clear()
+    _JOB_MANAGERS.clear()
     assert dispatch('start', request) == first
     selector = {'root': str(root), 'job_id': first['job_id']}
     for action in ('status', 'reconcile', 'cancel'):
@@ -179,7 +179,7 @@ def test_rejection_recovers_after_receipt_write_failure(queue, tmp_path, monkeyp
 
 def test_real_handler_queue_age_wakes_monitor_once_and_reports_allocation(queue, tmp_path, monkeypatch):
     from research_agent.application.execution import dispatch
-    from research_agent.application.job_monitor import command
+    from research_agent.application.job_manager import command
     root, request, state = application_queue(queue, tmp_path, monkeypatch)
     request['submission'] = {'resources': {'cpus': 12, 'memory_mb': 16384, 'gpus': 1}}
     dispatch('start', request)
@@ -390,12 +390,12 @@ def test_external_config_supports_multiple_local_clusters_and_gpu(queue, tmp_pat
                     ''.join(f'{key}={json.dumps(value)}\n' for key, value in config['handler_environment'].items()))
     platforms, default = platforms_from_config(path)
     assert isinstance(platforms[default], ExternalJobPlatform)
-    runtime = JobRuntime(platforms, default)
+    runtime = JobManager(platforms, default)
     receipt = runtime.job_start(spec(tmp_path, command=("/bin/echo", "configured target")))
     assert receipt.metadata["cluster_name"] == "compute"
     assert receipt.metadata["target_config_digest"].startswith("sha256:")
     platforms, default = platforms_from_config(path)
-    restored = JobRuntime(platforms, default)
+    restored = JobManager(platforms, default)
     receipt = restored.receipt_from_disk(str(Path(receipt.cwd) / "receipt.json"))
     assert restored.job_reconcile(receipt).state == JobState.QUEUED
     finish(state)
@@ -437,7 +437,7 @@ def test_handler_runs_over_ssh_with_same_lifecycle(queue, tmp_path, monkeypatch)
 @pytest.mark.parametrize("lose_response", [False, True])
 @pytest.mark.parametrize("file_mode", ["staged", "shared"])
 def test_application_jobs_reconcile_and_collect_external_tasks(queue, tmp_path, monkeypatch, lose_response, file_mode):
-    from research_agent.application.execution import dispatch, _RUNTIMES
+    from research_agent.application.execution import dispatch, _JOB_MANAGERS
     from tests.unit.test_job_recovery import workspace
     from scripts._job_install import toml_bytes
 
@@ -458,7 +458,7 @@ def test_application_jobs_reconcile_and_collect_external_tasks(queue, tmp_path, 
             dispatch("start", request)
     else:
         assert dispatch("start", request)["job_id"] == "job_1"
-    _RUNTIMES.clear()
+    _JOB_MANAGERS.clear()
     selector = {"root": str(root), "job_id": "job_1"}
     assert dispatch("reconcile", selector)["state"] == "queued"
     finish(state)
@@ -542,8 +542,8 @@ def test_caller_cannot_forge_submission_rejection(tmp_path):
 @pytest.mark.parametrize('file_mode', ['staged', 'shared'])
 @pytest.mark.parametrize('stage', ['probe', 'stage_inputs', '_wrapper'])
 def test_pre_submission_failures_are_durable_without_contacting_queue_again(queue, tmp_path, monkeypatch, file_mode, stage):
-    from research_agent.application.execution import dispatch, _RUNTIMES
-    from research_agent.application.job_monitor import command
+    from research_agent.application.execution import dispatch, _JOB_MANAGERS
+    from research_agent.application.job_manager import command
     root, request, state = application_queue(queue, tmp_path, monkeypatch, file_mode)
     request['outputs'] = [{'path': 'result.txt', 'required': True}]
     def fail(*args, **kwargs):
@@ -556,7 +556,7 @@ def test_pre_submission_failures_are_durable_without_contacting_queue_again(queu
     assert not (state / 'tasks.json').exists()
     monkeypatch.setattr(ExternalJobPlatform, '_invoke', lambda *args: pytest.fail('must not contact queue'))
     monkeypatch.setattr(ExternalJobPlatform, '_pull_path', lambda *args: pytest.fail('must not contact storage'))
-    _RUNTIMES.clear()
+    _JOB_MANAGERS.clear()
     assert dispatch('start', request) == receipt
     # Receipt recovery uses local preparation evidence even if the connection
     # is still unavailable, and must not mistake another Job for this one.

@@ -15,6 +15,17 @@ export const InputHead = defineDoc({ kind: "coragent.input-head", version: 1,
 
 const queueModes = { steeringMode: "one-at-a-time", followUpMode: "one-at-a-time" };
 const keyFor = requestId => createHash("sha256").update(requestId).digest("hex");
+const INPUT_REASONS = Object.freeze({
+  user: ["user_message"],
+  job_manager: ["job_event"],
+  task_controller: ["task_continue", "execution_retry", "final_response_retry"],
+});
+function inputReason(producer, reason = INPUT_REASONS[producer]?.[0]) {
+  if (!Object.hasOwn(INPUT_REASONS, producer) || !INPUT_REASONS[producer].includes(reason)) {
+    throw fail("invalid_producer", "Unsupported input producer or execution reason");
+  }
+  return reason;
+}
 export const RUNTIME_TASK_CONTINUATION_START = '<runtime_task_continuation origin="runtime">';
 export const RUNTIME_TASK_CONTINUATION_END = "</runtime_task_continuation>";
 
@@ -57,12 +68,12 @@ export function createInputAdmission({ harness, conversation, LiveDoc, InboxDoc,
       : null;
   }
 
-  async function submit({ requestId, content, whenBusy = "followUp", producer, identity, basis = null, idleOnly = false }, context) {
+  async function submit({ requestId, content, whenBusy = "followUp", producer, reason, identity, basis = null, idleOnly = false }, context) {
     requireRequestId(requestId);
-    if (!["user", "monitor", "task_controller"].includes(producer)) throw fail("invalid_producer", "Unknown trusted input producer");
+    reason = inputReason(producer, reason);
     if (!["reject", "steer", "followUp"].includes(whenBusy)) throw fail("invalid_input", "Unsupported input queue policy");
     if (typeof content !== "string" && !Array.isArray(content)) throw fail("invalid_message", "Input content is required");
-    const fingerprint = digest({ producer, whenBusy, identity: identity ?? content });
+    const fingerprint = digest({ producer, reason, whenBusy, identity: identity ?? content });
     const admitted = await conversation.commit(async tx => {
       const existing = await tx.submissionByRequest(conversation.id, requestId);
       const provenance = await tx.doc(InputProvenance, conversation.id, keyFor(requestId), null);
@@ -84,7 +95,7 @@ export function createInputAdmission({ harness, conversation, LiveDoc, InboxDoc,
       const id = await admitSubmission(tx, conversation.id, {
         type: "input", requestId, content: markInternalInput(content, producer), whenBusy,
       }, Date.now(), queueModes);
-      Object.assign(provenance, { producer, fingerprint, identity: identity ?? null, admission_basis: basis });
+      Object.assign(provenance, { producer, reason, fingerprint, identity: identity ?? null, admission_basis: basis });
       head.id = id;
       await policy?.afterAdmission(tx, { id, requestId, producer, identity, basis, control });
       return { id, duplicate: false };
@@ -99,7 +110,8 @@ export function createInputAdmission({ harness, conversation, LiveDoc, InboxDoc,
     async checkRecovery(context) {
       const pending = (await harness.inspect(context)).submissions.filter(record => record.conversationId === conversation.id && record.type === "input");
       for (const record of pending) {
-        if (!["user", "monitor", "task_controller"].includes((await origin(record, context))?.producer)) {
+      const provenance = await origin(record, context);
+      if (!provenance?.reason || !INPUT_REASONS[provenance.producer]?.includes(provenance.reason)) {
           throw fail("input_origin_unavailable", "Pending inputs have no verified provenance; create a new session");
         }
       }
@@ -131,7 +143,7 @@ export function createInputAdmission({ harness, conversation, LiveDoc, InboxDoc,
       if (!record) return null;
       const provenance = await origin(record, context);
       if (!provenance?.fingerprint) throw fail("input_origin_unavailable", "Input has no verified provenance; create a new session");
-      if (provenance.fingerprint !== digest({ producer, whenBusy: "reject", identity })) {
+      if (provenance.fingerprint !== digest({ producer, reason: inputReason(producer), whenBusy: "reject", identity })) {
         throw fail("request_id_reused", "The business input ID already belongs to different content or a different producer");
       }
       return record;

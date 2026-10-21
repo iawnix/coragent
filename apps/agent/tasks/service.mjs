@@ -49,7 +49,7 @@ export function createMonitorService({ controller, harness, conversation, kernel
       const record = await (await harness.submission(Number(run.run_id), context)).status(context);
       const origin = await controller.inputOrigin(record, context);
       return { run_id: run.run_id, user_task_id: run.user_task_id, state: record.status,
-        producer: origin.producer, generation_count: run.generation_ids.length };
+        producer: origin.producer, reason: origin.reason, generation_count: run.generation_ids.length };
     })), next_cursor: offset + limit < items.length ? String(offset + limit) : null };
   }
   const handlers = {

@@ -173,7 +173,7 @@ export function formatMonitor(method, response, params = {}) {
         ...(response.job.result_receipt ? ['Receipt:\n' + formatFields(response.job.result_receipt)] : []),
         '', `/monitor job cancel ${response.job.job_id}`].join('\n');
     case 'monitor/runs':
-      return lines(response.items.map(run => `${run.run_id} · ${text(run.producer)} · ${text(run.state)} · ${text(run.generation_count)} model calls`))
+      return lines(response.items.map(run => `${run.run_id} · ${text(({user_message: "User message", job_event: "Job event", task_continue: "Continue task", execution_retry: "Retry execution", final_response_retry: "Retry final response"})[run.reason])} · ${text(run.state)} · ${text(run.generation_count)} model calls`))
         + '\n\nExecution details: /monitor run <run-id>' + nextPage(response, 'runs', params);
     case 'monitor/run/read':
       return [`Execution: ${response.run.run_id}`, `User task: ${text(response.run.user_task_id)}`, '',

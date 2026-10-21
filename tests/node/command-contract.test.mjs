@@ -116,7 +116,7 @@ test("canonical tool inventory excludes internal commands and rejects dotted ali
       assert.equal(Object.hasOwn(contracts[name].parameters.properties, field), false, `${name}.${field}`);
     }
   }
-  for (const internal of ["research_source", "research_observe", "research_allocate_task", "job_prepare", "job_resolve_target", "job_monitor_assess"]) {
+  for (const internal of ["research_source", "research_observe", "research_allocate_task", "job_prepare", "job_resolve_target", "job_manager_assess"]) {
     assert.ok(COMMAND_IDS.includes(internal));
     assert.equal(contracts[internal], undefined);
   }

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { projectDecisionTask, projectTaskContinuation } from "../tasks/projection.mjs";
 
-const KEY = "coragent.research-context/1";
+const KEY = "coragent.research-context/2";
 const PROJECTION_MAX_BYTES = 16000;
 const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const envelope = (tag, value) => ({ role: "user", timestamp: 0,
@@ -12,6 +12,11 @@ const envelope = (tag, value) => ({ role: "user", timestamp: 0,
 export function contextAnchor(entries) {
   let anchor;
   for (const entry of entries) {
+    const keys = [entry.kind === "pi.context" ? entry.data?.key : null,
+      ...(entry.kind === "pi.compaction" ? (entry.data?.metadata || []).map(item => item?.key) : [])];
+    if (keys.some(key => typeof key === "string" && key.startsWith("coragent.research-context/") && key !== KEY)) {
+      throw new Error("context_schema_unsupported: start a new session with the current research context protocol");
+    }
     if (entry.kind === "pi.context" && entry.data?.key === KEY) anchor = entry.data.value;
     if (entry.kind === "pi.compaction") {
       for (const item of entry.data?.metadata || []) if (item?.key === KEY) anchor = item.anchor;
@@ -40,98 +45,98 @@ export function contextInputBudget(contextWindow, { reserveTokens = 16384, maxIn
 /** One policy over native history, research orientation, compaction and final
  * admission. Scientific facts remain in the research store; Pi owns persistence. */
 export function createContextManager({ bridge, coordinator, sessionId, estimateContextTokens,
-  inputTokens, reserveTokens = 16384, synthesizeReview = null,
+  inputTokens, reserveTokens = 16384, synthesizeBrief = null,
   getCompactionPolicy = () => ({ reserveTokens, maxInputTokens: inputTokens }) }) {
-  let lastReviewDigest = null;
-  async function projection(task, scope, { trigger = "context_refresh", event_ids = [] } = {}) {
+  async function projection(task, scope, eventIds) {
     const control = { task: projectDecisionTask(task) };
     const taskTokens = estimateContextTokens([envelope("research_context", control)]).tokens;
     let target = 2000;
     let limit = Math.min(PROJECTION_MAX_BYTES, Math.max(2048, Math.floor((target - taskTokens) * 3)));
-    let decision, message;
+    let brief;
     for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const request = { view: "review", limit, session_id: sessionId,
-          entry_node_ids: scope.entry_node_ids, focus_node_ids: scope.focus_node_ids,
-          source_submission_ids: scope.source_submission_ids,
-          waited_job_ids: task?.wait?.job_ids || [] };
-        if (event_ids.length) request.event_ids = event_ids;
-        if (trigger !== "context_refresh") request.trigger = trigger;
-        decision = await bridge.execute_command("research_read", request);
-        if (decision?.schema_version !== "research-review/1") throw new Error("Invalid research context projection");
-        if (Buffer.byteLength(JSON.stringify(decision)) > limit) throw new Error("Research context projection exceeds its byte budget");
-        if (synthesizeReview && decision.schema_version === "research-review/1"
-          && decision.review_status === "pending" && decision.review_digest !== lastReviewDigest) {
-          const synthesis = await synthesizeReview(decision);
-          if (synthesis) decision = { ...decision, runtime_synthesis: synthesis };
-          lastReviewDigest = decision.review_digest ?? lastReviewDigest;
-        }
-      } catch (error) {
-        decision = { schema_version: "research-review/1", availability: "unavailable",
-          review_id: null, state_digest: null, review_digest: null, status: "uncertain", review_status: "failed",
-          trigger: "context_refresh", scope: {}, coverage: {}, findings: [], contradictions: [], uncertainties: [],
-          limitations: [], follow_up: [], source_refs: [], read_more: {},
-          guidance: "Research review is unavailable; read current research before making scientific or completion decisions.",
-          error: { code: "research_context_unavailable", message: String(error?.message || error).slice(0, 512) },
-          required_action: "Read current research before scientific or completion decisions; execution records and delivery receipts remain authoritative." };
+      brief = await bridge.execute_command("research_read", {
+        view: "brief", limit, session_id: sessionId,
+        entry_node_ids: scope.entry_node_ids, focus_node_ids: scope.focus_node_ids,
+        source_submission_ids: scope.source_submission_ids, waited_job_ids: scope.waited_job_ids,
+        ...(eventIds.length ? { event_ids: eventIds } : {}),
+      });
+      if (brief?.schema_version !== "research-brief/1"
+        || !["complete", "incomplete"].includes(brief.projection_status)
+        || !["brief_id", "state_digest", "brief_digest"].every(key => typeof brief[key] === "string" && brief[key])
+        || !["findings", "contradictions", "uncertainties", "limitations", "follow_up", "source_refs"].every(key => Array.isArray(brief[key]))) {
+        throw new Error("Invalid research brief projection");
       }
-      if (decision.contradictions?.length || decision.findings?.some(n => n.review_notice_count)) target = 4000;
-      // Orientation is historical data, never a receipt granting Node writes.
-      const { review_id, review_digest, state_digest, bounds, runtime_synthesis, read_basis: _readBasis, ...research } = decision;
-      message = envelope("research_context", { ...control, research_review: { ...research,
-        ...(runtime_synthesis ? { synthesis: runtime_synthesis } : {}),
-        ...(bounds ? { omitted: bounds.omitted } : {}) },
-        ...(decision.availability ? { research: { availability: decision.availability } } : {}),
-        provenance: { review_id: review_id ?? null, review_digest: review_digest ?? null,
-          state_digest: state_digest ?? null, scope, observed_at: new Date().toISOString() },
-        notice: "Derived research review at this entry, not live state or a read receipt. Read current fields before replacing them." });
-      const tokens = estimateContextTokens([message]).tokens;
-      if (tokens <= target || limit === 2048 || attempt === 2 || decision.availability) break;
+      if (Buffer.byteLength(JSON.stringify(brief)) > limit) throw new Error("Research brief exceeds its byte budget");
+      if (brief.contradictions.length) target = 4000;
+      const tokens = estimateContextTokens([envelope("research_context", { ...control, research_brief: brief })]).tokens;
+      if (tokens <= target || limit === 2048 || attempt === 2) break;
       limit = Math.max(2048, Math.floor(limit * Math.max(0.25, (target - taskTokens) / Math.max(1, tokens - taskTokens)) * 0.9));
     }
-    return { message, availability: decision.availability ?? "available", status: decision.status ?? "uncertain",
-      review_id: decision.review_id ?? null, review_digest: decision.review_digest ?? null,
-      state_digest: decision.state_digest ?? null, review_status: decision.review_status ?? null,
-      trigger: decision.trigger ?? "context_refresh" };
+    return brief;
   }
 
   return {
-    async prepare(view, api, context, { task = null, input_ids = [], refresh_research = false,
-      review_trigger = "context_refresh" } = {}) {
+    async prepare(view, api, context, { task = null, input_ids = [], event_ids = [] } = {}) {
       const scope = { user_task_id: task?.user_task_id ?? null,
+        requirements_revision: task?.requirements_revision ?? null,
         entry_node_ids: [...(task?.research?.entry_node_ids || [])].sort(),
         focus_node_ids: [...(task?.research?.focus_node_ids || [])].sort(),
-        source_submission_ids: (task?.sources || []).map(s => s.submission_id) };
+        source_submission_ids: (task?.sources || []).map(s => s.submission_id),
+        waited_job_ids: [...(task?.wait?.job_ids || [])].sort() };
       const scopeId = hash(scope);
       const previous = contextAnchor(view.entries);
-      if (previous?.review_digest) lastReviewDigest = previous.review_digest;
-      const event_ids = [...new Set((task?.event_inputs || []).flatMap(item => item?.event_ids || []))].sort();
-      const progress_version = task?.progress_version ?? null;
-      const sameEvidenceBoundary = previous?.scope_id === scopeId
-        && previous?.progress_version === progress_version
-        && previous?.input_key === hash(input_ids)
-        && previous?.event_key === hash(event_ids);
-      // A failed hydration can be retried on a new admitted input, never on every
-      // tool turn. Healthy recovery and compaction reuse the durable anchor.
-      if ((!refresh_research || sameEvidenceBoundary) && previous?.scope_id === scopeId
-        && (previous.availability === "available" || previous.input_key === hash(input_ids))) return;
-      // A task continuation can have a new input ID without new research
-      // evidence. Its progress version is the durable coalescing boundary.
-      if (refresh_research && !event_ids.length && previous?.scope_id === scopeId
-        && previous?.progress_version === progress_version && previous?.availability === "available") return;
+      const eventIds = [...new Set([...event_ids, ...(task?.event_inputs || []).flatMap(item => item?.event_ids || [])])].sort();
+      if (eventIds.length > 256 || eventIds.some(id => typeof id !== "string" || !/^event_[1-9][0-9]*$/u.test(id))) {
+        throw new Error("invalid_job_events: research context requires authenticated event references");
+      }
+      const inputKey = hash(input_ids);
+      // A failed local read is retried on a new admitted input, not on every tool turn.
+      if (previous?.scope_id === scopeId && previous.availability === "unavailable" && previous.input_key === inputKey) return;
       const boundary = view.entries.at(-1)?.id ?? null;
-      const trigger = review_trigger === "context_refresh" && event_ids.length ? "new_evidence" : review_trigger;
-      const memoKey = `${KEY}:${hash(refresh_research ? { scopeId, boundary, input_ids, trigger, event_ids } : { scopeId, boundary })}`;
+      const memoKey = `${KEY}:${hash({ scopeId, boundary, input_ids, eventIds })}`;
       const pinned = await api.memo(memoKey, context);
-      if (pinned) return pinned;
-      const projected = await projection(task, scope, { trigger, event_ids });
-      const data = { schema_version: "research-review/1", status: projected.status ?? "uncertain",
-        scope_id: scopeId, availability: projected.availability, input_key: hash(input_ids),
-        snapshot_id: projected.snapshot_id, review_id: projected.review_id, review_digest: projected.review_digest,
-        state_digest: projected.state_digest, review_status: projected.review_status ?? null,
-        trigger: projected.trigger ?? trigger, progress_version, event_key: hash(event_ids),
-        after_entry: boundary };
-      return api.memo(memoKey, { key: KEY, messages: [projected.message], data }, context);
+      if (pinned) return pinned.prepared ?? undefined;
+      let brief;
+      try {
+        // Local deterministic read: every generation checks scoped facts, regardless
+        // of who submitted its input. A repeated fact version adds no history entry.
+        brief = await projection(task, scope, eventIds);
+      } catch (error) {
+        brief = { schema_version: "research-brief/1", brief_id: null, state_digest: null, brief_digest: null,
+          status: "uncertain", projection_status: "incomplete", availability: "unavailable",
+          findings: [], contradictions: [], uncertainties: [], limitations: [], follow_up: [], source_refs: [],
+          error: { code: "research_context_unavailable", message: String(error?.message || error).slice(0, 512) },
+          required_action: "Read current research before scientific or completion decisions." };
+      }
+      if (previous?.scope_id === scopeId && previous.availability === "available"
+        && previous.state_digest === brief.state_digest && previous.projection_status === brief.projection_status) {
+        await api.memo(memoKey, { prepared: null }, context);
+        return;
+      }
+      let synthesis = null;
+      let synthesisStatus = "not_requested";
+      const needsSynthesis = brief.projection_status === "complete" && (
+        brief.contradictions.length > 0 || brief.findings.some(item => item.kind === "result"
+          || item.kind === "job" && ["succeeded", "failed", "timed_out", "cancelled", "unknown"].includes(item.state)));
+      if (synthesizeBrief && needsSynthesis) {
+        try { synthesis = await synthesizeBrief(brief); } catch { /* The deterministic brief remains usable. */ }
+        synthesisStatus = synthesis ? "ready" : "failed";
+      }
+      const refreshReason = !previous ? "initial" : previous.scope_id !== scopeId ? "scope_changed"
+        : previous.availability === "unavailable" ? "retry" : "facts_changed";
+      const { read_basis: _readBasis, ...research } = brief;
+      const message = envelope("research_context", { task: projectDecisionTask(task),
+        research_brief: { ...research, synthesis_status: synthesisStatus, ...(synthesis ? { synthesis } : {}) },
+        provenance: { scope, refresh_reason: refreshReason, observed_at: new Date().toISOString() },
+        notice: "Historical research brief, not live state or a read receipt. Read current fields before replacing them." });
+      const data = { schema_version: "research-context/1", scope_id: scopeId,
+        availability: brief.availability ?? "available", status: brief.status, input_key: inputKey,
+        brief_id: brief.brief_id, brief_digest: brief.brief_digest, state_digest: brief.state_digest,
+        projection_status: brief.projection_status, synthesis_status: synthesisStatus,
+        refresh_reason: refreshReason, after_entry: boundary };
+      const prepared = { key: KEY, messages: [message], data };
+      await api.memo(memoKey, { prepared }, context);
+      return prepared;
     },
 
     prepareSummary({ entries, firstKept }) {

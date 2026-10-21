@@ -2,7 +2,7 @@
 
 [独立分析执行器](energy_execution.zh-CN.md) 已支持热化学来源组合、标准态转换、
 有限构象集合自由能、守恒计量剖面与成功扫描点导出。CF22D 提供底层 RRHO 计算。
-[动力学执行器](kinetics_execution.zh-CN.md) 提供有限经典 TST、共同前体分支与封闭质量作用积分。通过 Job Runtime 执行计算并登记
+[动力学执行器](kinetics_execution.zh-CN.md) 提供有限经典 TST、共同前体分支与封闭质量作用积分。通过 Job Manager 执行计算并登记
 输入输出；`artifact_derive` 只记录描述。[Gaussian runner](../../gaussian/SKILL.zh-CN.md) 解析电子能
 和可用热校正，必须检查实际输出字段及缺失值。
 使用目标能量和热化学总量前核对 `energy_evidence`；`reference_scf_energy_hartree`

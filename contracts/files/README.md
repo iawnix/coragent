@@ -1,7 +1,7 @@
 # Workspace files
 
 The phone uses `files/list`, `files/stat`, `files/read`, and `files/pin` capabilities over the
-existing authenticated `coragent-host/2` / Link connection. No public download
+existing authenticated `coragent-host/3` / Link connection. No public download
 URL or separate filesystem authority is introduced. Reads do not wake a model.
 
 All methods require `workspace_id`. `path` is a slash-separated relative path;

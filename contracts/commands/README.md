@@ -31,7 +31,7 @@ results.json declares JSON response DTOs, including read variants and unsuccessf
 | `job_reconcile` |  |  |
 | `job_prepare` | `request_file` | write |
 | `job_resolve_prepared` | `prepared_ref` | read |
-| `job_monitor_assess` | `event_id`, `session_id` | read |
+| `job_manager_assess` | `event_id`, `session_id` | read |
 | `job_list` |  | read |
 | `artifact_register` |  |  |
 | `artifact_create` |  |  |

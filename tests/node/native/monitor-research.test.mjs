@@ -6,12 +6,12 @@ import { createTerminalSession } from '../../../apps/agent/terminal/session.mjs'
 import { projectMonitorTask, projectMonitorContinuation } from '../../../apps/agent/tasks/projection.mjs';
 
 const task = {
-  schema_version: 'coragent-user-task/2', user_task_id: 'task_1', title: 'Compare methods',
+  schema_version: 'coragent-user-task/3', user_task_id: 'task_1', title: 'Compare methods',
   objective: 'Explain the comparison and its limits', state: 'active', criteria: [],
   research: { entry_node_ids: ['node_1', 'node_2'], focus_node_ids: ['node_3'] },
   updated_at: '2026-10-10T00:00:00Z', revision: 7,
-  research_review: { current_review_ref: 'review_state', last_reviewed_state_digest: 'sha256:state',
-    review_digest: 'sha256:review', review_status: 'current', trigger: 'context_refresh', updated_at: '2026-10-10T00:00:01Z' },
+  research_context: { brief_id: 'brief_state', state_digest: 'sha256:state',
+    brief_digest: 'sha256:review', availability: 'available', projection_status: 'complete', synthesis_status: 'not_requested', refresh_reason: 'initial', updated_at: '2026-10-10T00:00:01Z' },
 };
 const snapshot = {
   schema_version: 'research-snapshot/3', sequence: 42,
@@ -120,8 +120,8 @@ test('Monitor overview omits internal records and duplicate review and policy fi
   const response = await service.handle({ method: 'monitor/overview', params: {} });
   assert.equal(response.error, null);
   assert.equal(response.result.schema_version, 'coragent-monitor/2');
-  assert.equal(response.result.research_review, undefined);
-  assert.equal(response.result.task.research_review, undefined);
+  assert.equal(response.result.research_context, undefined);
+  assert.equal(response.result.task.research_context, undefined);
   assert.equal(response.result.task_controller, undefined);
   assert.equal(response.result.automatic_continuation_enabled, undefined);
   assert.equal(response.result.continuation.state, 'disabled');
@@ -192,7 +192,7 @@ test('Monitor summaries are bounded and task pages preserve control revisions wi
   const summary = projectMonitorTask(full);
   assert.ok(Buffer.byteLength(JSON.stringify(summary)) < 5000);
   assert.equal(summary.truncated, true);
-  for (const field of ['sources', 'criteria', 'audit', 'research', 'research_review', 'continuation', 'progress_identities', 'event_inputs']) {
+  for (const field of ['sources', 'criteria', 'audit', 'research', 'research_context', 'continuation', 'progress_identities', 'event_inputs']) {
     assert.equal(summary[field], undefined, field);
   }
   assert.equal(summary.execution_recovery.failures, undefined);
@@ -274,7 +274,7 @@ test('overview explains next action and blocker recovery without review internal
   assert.match(view, /Next: Compare the two verified datasets/);
   assert.match(view, /To resume: Provide the reference dataset/);
   assert.match(view, /Status: Stopped/);
-  assert.doesNotMatch(view, /sha256|review_state|Continues when ready|Automatic continuation: On/);
+  assert.doesNotMatch(view, /sha256|brief_state|Continues when ready|Automatic continuation: On/);
   const detail = formatMonitor('monitor/task/read', { task: blocked, research: snapshot, session_job_ids: [] });
   assert.match(detail, /To resume: Provide the reference dataset/);
 });

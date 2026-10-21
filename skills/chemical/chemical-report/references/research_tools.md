@@ -51,7 +51,7 @@ a mode animation is not evidence of trajectory completion or reaction connectivi
 
 ## Research report input
 
-`chemical-research-report-input/1` requires title, question, assessment (nonempty
+`chemical-research-report-input/2` requires title, question, assessment (nonempty
 strings) and an explicit limitations list (may be empty). Assessment is **author
 interpretation**, not an automatically accepted scientific verdict. Evidence contains
 1–128 rows:
@@ -65,8 +65,8 @@ canonical content. artifact_id is optional attribution, not an Artifact-store lo
 Full results, reported status and limitations remain in result.json; the generator
 does not promote their reported status to a new scientific certification.
 
-The optional `research_review` field accepts a complete `research-review/1`
-projection. Its `review_digest` is recomputed over the projection excluding the
+The optional `research_brief` field accepts a complete `research-brief/1`
+projection. Its `brief_digest` is recomputed over the projection excluding the
 digest field. The generated `result.json` and `report.md` preserve the Review's
 ID, state digest, source references, contradictions and uncertainties. A Review
 does not replace the required source Result/Artifact evidence or certify a

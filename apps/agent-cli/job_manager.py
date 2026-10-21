@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'scripts'))
 from _bootstrap import bootstrap_python_package
 bootstrap_python_package(ROOT, workspace_from_argv=True)
-from research_agent.application.job_monitor import command
+from research_agent.application.job_manager import command
 
 
 def main():

@@ -7,7 +7,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from research_agent.application.api import COMMAND_DEFINITIONS, execute
-from research_agent.application import job_monitor
+from research_agent.application import job_manager
 from research_agent.research.workspace import initialize_workspace, admit_research_workspace
 
 
@@ -80,9 +80,9 @@ def test_all_command_results_match_actual_api_replies(command_workspace):
         call('job_collect', job_id=job['job_id'])
         jobs = call('job_list', session_id='fixture', limit=1)
         assert jobs['jobs'][0]['job_id'] == job['job_id']
-        job_monitor.command(root, 'tick', {})
-        event = job_monitor.command(root, 'pending', {})['deliveries'][0]['event_id']
-        call('job_monitor_assess', event_id=event, session_id='fixture')
+        job_manager.command(root, 'tick', {})
+        event = job_manager.command(root, 'pending', {})['deliveries'][0]['event_id']
+        call('job_manager_assess', event_id=event, session_id='fixture')
     finally:
         execute('job_cancel', root, {'job_id': job['job_id']})
     assert covered == set(COMMAND_DEFINITIONS)

@@ -1,6 +1,6 @@
 import { MONITOR_SERVICE_ID } from "../contracts/monitor.mjs";
 import { loadPi } from "./source.mjs";
-import { MONITOR_ADMISSION_SERVICE_ID } from "../host/admission/monitor.mjs";
+import { JOB_ADMISSION_SERVICE_ID } from "../host/admission/jobs.mjs";
 import { SESSION_ADMISSION_SERVICE_ID } from "../host/admission/session.mjs";
 import { realpath, mkdir, open, lstat } from "node:fs/promises";
 import { createWorkspaceCatalog } from "../host/workspaces.mjs";
@@ -47,7 +47,7 @@ export async function createCoRAgentHarnessBackend(options = {}) {
   const { defineService } = await loadPi("chord", sourceRoot);
   const { INPUT_ADMISSION_SERVICE_ID } = await import("../host/admission/input.mjs");
   const InputAdmission = defineService(INPUT_ADMISSION_SERVICE_ID);
-  const MonitorAdmission = defineService(MONITOR_ADMISSION_SERVICE_ID);
+  const MonitorAdmission = defineService(JOB_ADMISSION_SERVICE_ID);
   const SessionAdmission = defineService(SESSION_ADMISSION_SERVICE_ID);
   const Monitor = defineService(MONITOR_SERVICE_ID);
   const { startForegroundServer } = serverModule;
@@ -268,7 +268,7 @@ export async function createCoRAgentHarnessBackend(options = {}) {
 
   async function dispatchInput(binding, params) {
     const requestId = params.client_message_id;
-    if (["monitor"].includes(params.source)) {
+    if (["job_manager"].includes(params.source)) {
       const response = await serviceCall(binding, MonitorAdmission,
         "admit",
         { requestId, eventIds: params.event_ids, mode: params.mode, token: producerToken });

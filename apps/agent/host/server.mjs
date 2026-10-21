@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHostFiles, FILE_METHODS } from "./files.mjs";
 import { hostIdentity } from "../platform/environment.mjs";
-import { createMonitorEvents } from "./monitor/events.mjs";
+import { createJobEvents } from "./jobs/events.mjs";
 import { createHostSessions } from "./sessions.mjs";
 import { createRequestStore } from "./requests.mjs";
 import { MONITOR_METHODS } from "../contracts/monitor.mjs";
@@ -29,7 +29,7 @@ export async function startCoRAgentHost(options) {
     packageRoot = PACKAGE_ROOT,
     releaseId = deriveReleaseId(packageRoot),
     monitorPollMs = 2_000,
-    monitorToken,
+    jobToken,
   } = options;
   if (!sessionBackend) throw protocolError("native_backend_required", "CoRAgent Host requires the Native Pi Harness backend");
   for (const [name, value] of Object.entries({ socketPath, workspaceRoot, stateRoot })) {
@@ -41,7 +41,7 @@ export async function startCoRAgentHost(options) {
   if ((await lstat(workspaceRoot)).isSymbolicLink()) throw protocolError("invalid_workspace_root", "Workspace container must not be a symlink");
   const physicalRoot = await realpath(workspaceRoot);
   const epoch = randomUUID();
-  const monitorAvailable = existsSync(join(packageRoot, "apps", "agent-cli", "monitor.py"));
+  const monitorAvailable = existsSync(join(packageRoot, "apps", "agent-cli", "job_manager.py"));
   const capabilities = [...BASE_CAPABILITIES, ...MONITOR_METHODS, ...FILE_METHODS];
   const clients = new Set();
   for (const marker of [
@@ -70,7 +70,7 @@ export async function startCoRAgentHost(options) {
   const files = createHostFiles({ workspace, python });
   const runMonitor = createHostMonitor({ sessionBackend, workspace, stateRoot });
 
-  const sessions = createHostSessions({ sessionBackend, workspace, deduplicate, clients, epoch, monitorToken });
+  const sessions = createHostSessions({ sessionBackend, workspace, deduplicate, clients, epoch, jobToken });
 
   async function handle(client, method, params) {
     if (!params || typeof params !== "object" || Array.isArray(params)) throw protocolError("invalid_params", "params must be an object");
@@ -89,7 +89,7 @@ export async function startCoRAgentHost(options) {
     if (!client.initialized) throw protocolError("not_initialized", "Send initialize before session requests");
     if (FILE_METHODS.includes(method)) return files.handle(method, params);
     if (method.startsWith("workspace/")) return workspaces.handle(method, params, deduplicate);
-    if (/^(session|input|turn|model|models)\//u.test(method) || method === "internal/monitor-wake") {
+    if (/^(session|input|turn|model|models)\//u.test(method) || method === "internal/job-event") {
       return sessions.handle(client, method, params);
     }
     if (MONITOR_METHODS.includes(method)) {
@@ -126,7 +126,7 @@ export async function startCoRAgentHost(options) {
     throw cause;
   }
 
-  const { scanMonitorFiles, pollMonitors, stop: stopMonitorEvents } = createMonitorEvents({
+  const { scanMonitorFiles, pollMonitors, stop: stopMonitorEvents } = createJobEvents({
     listWorkspaces, clients, epoch,
   });
 

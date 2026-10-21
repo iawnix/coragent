@@ -13,7 +13,7 @@ def execution(root, job_id):
 
 def list_executions(root, *, session_id=None, user_task_id=None, limit=50, cursor=None):
     """Read persisted Job observations and ownership without polling a platform."""
-    from .job_monitor import read_binding
+    from .job_manager import read_binding
     root = Path(root)
     bindings = {row['job_id']: row for path in (root / 'operations/monitors').glob('*/binding.json')
                 for row in [read_binding(path)]}
@@ -89,7 +89,7 @@ def observe_execution(root, receipt, value):
 def execution_observation(root, receipt, status):
     observation = {key: status.get(key) for key in ('state', 'exit_code', 'started_at', 'finished_at', 'error')}
     observation.update(workspace_id=receipt.workspace_id, job_id=receipt.job_id,
-                       source='job_runtime', schema_version='execution-observation/1')
+                       source='job_manager', schema_version='execution-observation/2')
     observation['observation_id'] = allocate_id(root, 'obs', observation)
     return observation
 

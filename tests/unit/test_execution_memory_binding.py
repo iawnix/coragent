@@ -8,7 +8,7 @@ from research_agent.research.records import journal
 from research_agent.application.execution import dispatch
 from research_agent.application.evidence import dispatch as material
 from research_agent.application.job_state import execution, project_events
-from research_agent.application.job_monitor import command
+from research_agent.application.job_manager import command
 from tests.unit.test_job_recovery import workspace
 
 

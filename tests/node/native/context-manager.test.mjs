@@ -10,7 +10,7 @@ import {openNodeSqliteStorage} from '@earendil-works/pi-durable/storage/sqlite/n
 import {createContextManager, contextAnchor, contextPolicy, contextInputBudget} from '../../../apps/agent/context/manager.mjs';
 import {pinnedPiSource, TEST_ROOT} from './test-environment.mjs';
 const {estimateContextTokens} = await import(pathToFileURL(join(pinnedPiSource(),'packages/ai/src/utils/estimate.ts')));
-const snapshot = () => ({schema_version:'research-review/1',review_id:'review_fixture',state_digest:'sha256:state',review_digest:'sha256:review',status:'oriented',review_status:'current',trigger:'context_refresh',scope:{},coverage:{},findings:[],contradictions:[],uncertainties:[],limitations:[],follow_up:[],source_refs:[],read_more:{},guidance:'review'});
+const snapshot = () => ({schema_version:'research-brief/1',brief_id:'brief_fixture',state_digest:'sha256:state',brief_digest:'sha256:review',status:'oriented',projection_status:'complete',scope:{},coverage:{},findings:[],contradictions:[],uncertainties:[],limitations:[],follow_up:[],source_refs:[],read_more:{},guidance:'review'});
 function fixtureManager(overrides = {}) {
   return createContextManager({sessionId:'fixture',estimateContextTokens,inputTokens:65536,reserveTokens:5120,
     bridge:{async execute_command(){return snapshot();}},coordinator:{async commit_files(){}},...overrides});
@@ -26,6 +26,21 @@ const memoApi = () => {const values = new Map();return {async memo(key, value, c
 const committed = (item,id=2) => ({id,kind:'pi.context',model:item.messages,data:{key:item.key,value:item.data}});
 const decode = message => JSON.parse(message.content.split('\n')[1]);
 
+test('retired context metadata is rejected instead of silently injected through a second protocol', () => {
+  assert.throws(()=>contextAnchor([{kind:'pi.context',data:{key:'coragent.research-context/1',value:{}}}]), /context_schema_unsupported/);
+  assert.throws(()=>contextAnchor([{kind:'pi.compaction',data:{metadata:[{key:'coragent.research-context/1',anchor:{}}]}}]), /context_schema_unsupported/);
+});
+
+test('authenticated job events select research context even without a user Task', async () => {
+  const requests=[];
+  const manager=fixtureManager({bridge:{async execute_command(_command,params){requests.push(params);return snapshot();}}});
+  await manager.prepare({entries:[]},memoApi(),context,{input_ids:[1],event_ids:['event_2','event_1','event_2']});
+  assert.deepEqual(requests[0].event_ids,['event_1','event_2']);
+  assert.deepEqual(requests[0].focus_node_ids,[]);
+  await assert.rejects(manager.prepare({entries:[]},memoApi(),context,{event_ids:['not-an-event']}),/invalid_job_events/);
+  assert.equal(requests.length,1);
+});
+
 for (const scenario of ['recovered','still-full','declined','compaction-failed','hook-threw']) {
   test(`request admission ${scenario} terminates without a model repair loop`, {timeout:10000}, async t => {
     const faux = fauxProvider({models:[{id:'faux-1',contextWindow:10000,maxTokens:1024}]});
@@ -35,7 +50,7 @@ for (const scenario of ['recovered','still-full','declined','compaction-failed',
     const inject = fixtureInjector({bridge:{async execute_command(){
       reads++;
       if (second && scenario === 'state-failed') throw Error('State offline');
-      return {schema_version:'research-review/1',review_id:`review_${revision}`,state_digest:'sha256:state',review_digest:'sha256:review',status:'oriented',review_status:'current',trigger:'context_refresh',scope:{},coverage:{},findings:[],contradictions:[],uncertainties:[],limitations:[],follow_up:[],source_refs:[],read_more:{},guidance:'review'};
+      return {schema_version:'research-brief/1',brief_id:`review_${revision}`,state_digest:'sha256:state',brief_digest:'sha256:review',status:'oriented',projection_status:'complete',scope:{},coverage:{},findings:[],contradictions:[],uncertainties:[],limitations:[],follow_up:[],source_refs:[],read_more:{},guidance:'review'};
     }}});
     registry.install(defineExtension({name:'bounded-admission',hooks:[
       hook(GenerationTask,{beforeRequest(request,api){
@@ -139,20 +154,20 @@ test('default admission follows model window and Pi reserve without the old fixe
   assert.equal(contextInputBudget(200000,native.compaction),167232,'native settings remain live');
 });
 
-test('tool turns, progress revisions and external events do not rehydrate; scope changes and reset do', async () => {
+test('unchanged scoped facts are checked without duplicate injection; scope changes and reset inject', async () => {
   let reads = 0;
   const manager = fixtureManager({bridge:{async execute_command(){reads++;return snapshot();}}});
   const task = fullTask(), api = memoApi();
   const first = await manager.prepare({entries:[]},api,context,{task,input_ids:[1]});
   const view = {entries:[committed(first)]};
   for (let i=0;i<20;i++) assert.equal(await manager.prepare(view,memoApi(),context,{task:{...task,revision:i+2},input_ids:[i+2]}),undefined);
-  assert.equal(reads,1);
+  assert.equal(reads,21);
   const focus = await manager.prepare(view,memoApi(),context,{task:{...task,research:{...task.research,focus_node_ids:['node_B']}}});
-  assert.ok(focus); assert.equal(reads,2);
+  assert.ok(focus); assert.equal(reads,22);
   assert.ok(await manager.prepare({entries:[]},memoApi(),context,{task}));
-  assert.equal(reads,3);
+  assert.equal(reads,23);
   assert.ok(await manager.prepare(view,memoApi(),context,{task:{...task,sources:[...task.sources,{submission_id:'new',text:'New constraint'}]}}));
-  assert.equal(reads,4);
+  assert.equal(reads,24);
 });
 
 test('latest action and blocker survive compaction without refreshing the historical review', async () => {
@@ -172,7 +187,7 @@ test('latest action and blocker survive compaction without refreshing the histor
   assert.deepEqual(decode(stopped.messages.at(-1)).task.block_details,blocked.block_details);
   const resumed = await manager.admit(request,'resume',{task:{...revised,block_details:null}});
   assert.equal(decode(resumed.messages.at(-1)).task.block_details,undefined);
-  assert.equal(reads,1);
+  assert.equal(reads,2);
   assert.equal(decode(first.messages[0]).task.next_action,'Inspect route A.');
   const long = '\u0001中文😀'.repeat(1000);
   const oversized = await manager.admit(request,'large-hints',{task:{...blocked,next_action:long,
@@ -200,60 +215,44 @@ test('hydration recovery reuses immutable memo, escapes data and grants no read 
   assert.ok(await manager.prepare({entries:[{kind:'pi.user',model:first.messages}]},memoApi(),context,{task}));
 });
 
-test('pending research review receives one bounded synthesis tied to its digest', async () => {
-  let calls = 0;
-  const manager = fixtureManager({
-    bridge: { async execute_command() { return {
-      schema_version: 'research-review/1', review_id: 'review_state', state_digest: 'sha256:state',
-      review_digest: 'sha256:review', status: 'attention', review_status: 'pending', trigger: 'new_evidence',
-      scope: {}, coverage: {}, findings: [], contradictions: [{ref: 'job_1', summary: 'failed'}],
-      uncertainties: [], limitations: [], follow_up: [], source_refs: ['job_1'], read_more: {}, guidance: 'review',
-    }; } },
-    synthesizeReview: async review => {
-      calls++;
-      assert.equal(review.state_digest, 'sha256:state');
-      return { schema_version: 'research-review-synthesis/1', source_state_digest: review.state_digest,
-        source_review_digest: review.review_digest, status: 'attention', summary: 'Inspect job_1',
-        key_findings: [], contradictions: [], uncertainties: [], next_actions: [{action: 'inspect', ref: 'job_1'}], source_refs: ['job_1'] };
-    },
-  });
-  const prepared = await manager.prepare({entries: []}, memoApi(), context, {task: fullTask(), refresh_research: true});
-  const body = decode(prepared.messages[0]);
-  assert.equal(body.research_review.synthesis.source_state_digest, 'sha256:state');
-  assert.equal(calls, 1);
+test('scoped fact changes refresh on ordinary inputs and repeated events do not duplicate context', async () => {
+  let version = 1, calls = 0;
+  const manager = fixtureManager({ bridge: { async execute_command(_command, params) {
+    assert.equal(params.view, 'brief');
+    assert.equal(params.trigger, undefined);
+    return {...snapshot(), state_digest: `sha256:${version}`, brief_digest: `sha256:${version}`,
+      findings: [{kind:'result',ref:'result_1',summary:'Recorded evidence'}]};
+  } }, synthesizeBrief: async brief => { calls++; return {summary:'Evidence',source_state_digest:brief.state_digest}; } });
+  const task = fullTask();
+  const first = await manager.prepare({entries:[]},memoApi(),context,{task,input_ids:[1]});
+  assert.equal(first.data.synthesis_status,'ready');
+  const view = {entries:[committed(first)]};
+  assert.equal(await manager.prepare(view,memoApi(),context,{task,input_ids:[2]}),undefined);
+  assert.equal(await manager.prepare(view,memoApi(),context,{task:{...task,event_inputs:[{event_ids:['event_1']}]},input_ids:[3]}),undefined);
+  version++;
+  const changed = await manager.prepare(view,memoApi(),context,{task,input_ids:[4]});
+  assert.equal(changed.data.refresh_reason,'facts_changed');
+  assert.equal(calls,2);
 });
 
-test('internal evidence refresh coalesces event ids and skips the same review digest', async () => {
-  const requests = [];
-  let calls = 0;
-  const manager = fixtureManager({
-    bridge: { async execute_command(command, params) {
-      assert.equal(command, 'research_read'); requests.push(params);
-      return { schema_version: 'research-review/1', review_id: 'review_state', state_digest: 'sha256:state',
-        review_digest: 'sha256:review', status: 'attention', review_status: 'pending', trigger: 'new_evidence',
-        scope: {}, coverage: {}, findings: [], contradictions: [], uncertainties: [], limitations: [], follow_up: [],
-        source_refs: [], read_more: {}, guidance: 'review' };
-    } },
-    synthesizeReview: async () => { calls++; return { schema_version: 'research-review-synthesis/1', source_state_digest: 'sha256:state',
-      source_review_digest: 'sha256:review', status: 'attention', summary: 'Inspect evidence', key_findings: [],
-      contradictions: [], uncertainties: [], next_actions: [], source_refs: [] }; },
-  });
-  const task = { ...fullTask(), event_inputs: [{ event_ids: ['event_2', 'event_1'] }] };
-  const first = await manager.prepare({entries: []}, memoApi(), context, { task, input_ids: [7], refresh_research: true,
-    review_trigger: 'new_evidence' });
-  const view = { entries: [committed(first)] };
-  await manager.prepare(view, memoApi(), context, { task, input_ids: [7], refresh_research: true,
-    review_trigger: 'new_evidence' });
-  assert.deepEqual(requests[0].event_ids, ['event_1', 'event_2']);
-  assert.equal(requests[0].trigger, 'new_evidence');
-  assert.equal(calls, 1);
+test('projection failures do not request synthesis and synthesis failures preserve deterministic facts', async () => {
+  let projectionStatus = 'incomplete', calls = 0;
+  const manager = fixtureManager({bridge:{async execute_command(){return {...snapshot(),projection_status:projectionStatus,
+    findings:[{kind:'result',ref:'result_1',summary:'Retained fact'}]};}},
+    synthesizeBrief:async()=>{calls++;throw Error('Unavailable synthesis');}});
+  const first=await manager.prepare({entries:[]},memoApi(),context,{task:fullTask()});
+  assert.equal(first.data.synthesis_status,'not_requested');assert.equal(calls,0);
+  projectionStatus='complete';
+  const next=await manager.prepare({entries:[committed(first)]},memoApi(),context,{task:fullTask()});
+  assert.equal(next.data.synthesis_status,'failed');assert.equal(calls,1);
+  assert.equal(decode(next.messages[0]).research_brief.findings[0].summary,'Retained fact');
 });
 
 test('failed hydration is explicit and retried only at a new input boundary', async () => {
   let reads = 0;
   const manager = fixtureManager({bridge:{async execute_command(){reads++;throw Error('State unavailable');}}});
   const first = await manager.prepare({entries:[]},memoApi(),context,{input_ids:[1]});
-  assert.equal(decode(first.messages[0]).research.availability,'unavailable');
+  assert.equal(decode(first.messages[0]).research_brief.availability,'unavailable');
   const view = {entries:[committed(first)]};
   assert.equal(await manager.prepare(view,memoApi(),context,{input_ids:[1]}),undefined);
   assert.equal(reads,1);
@@ -330,7 +329,7 @@ test('native compaction carries context metadata and a reopened SQLite session d
   assert.equal(view.head.kind,'pi.compaction');
   assert.ok(contextAnchor(view.entries));
   await (await first.conversation.submit({type:'input',content:'Next'},context)).wait(context);
-  assert.equal(first.reads,1);
+  assert.equal(first.reads,3);
   const all=await first.conversation.entries({},100,undefined,context);
   assert.equal(all.items.filter(e=>e.kind==='pi.context').length,1);
   assert.doesNotMatch(JSON.stringify(all.items),/<runtime_control/);
@@ -338,7 +337,7 @@ test('native compaction carries context metadata and a reopened SQLite session d
   const second=await nativeFixture(t,{storage:await openNodeSqliteStorage(db)});
   second.faux.setResponses([request=>{assert.match(JSON.stringify(request.messages),/no external delivery/);return fauxAssistantMessage('Restored');}]);
   await (await second.conversation.submit({type:'input',content:'Resume'},context)).wait(context);
-  assert.equal(second.reads,0);
+  assert.equal(second.reads,1);
 });
 
 test('native operating budget compacts far below a million-token model window', {timeout:15000}, async t => {
@@ -386,7 +385,7 @@ test('summary retry preserves selected supplements without another research read
   const id=await fixture.conversation.compact(undefined,context);
   const outcome=await fixture.harness.waitForTask(id,context);
   assert.equal(outcome.state.outcome.status,'completed');
-  assert.equal(attempts,2);assert.equal(prepared,1);assert.equal(fixture.reads,1);
+  assert.equal(attempts,2);assert.equal(prepared,1);assert.equal(fixture.reads,2);
   await fixture.conversation.waitForIdle(context);
   const view=await fixture.conversation.context(context);
   assert.ok(view.head.data.metadata.some(m=>m.fixture_revision===1));
@@ -414,7 +413,7 @@ test('a background summary never overwrites a newer scope or duplicates an admit
   assert.equal((await fixture.harness.waitForTask(id,context)).state.outcome.status,'completed');
   await fixture.conversation.waitForIdle(context);
   await (await fixture.conversation.submit({type:'input',content:'Continue'},context)).wait(context);
-  assert.equal(fixture.reads,2);
+  assert.equal(fixture.reads,4);
   const view=await fixture.conversation.context(context);
   assert.equal(view.messages.filter(m=>m.role==='user'&&m.content==='event_fixture arrived').length,1);
   assert.match(JSON.stringify(view.messages),/node_future/);

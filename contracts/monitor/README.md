@@ -1,6 +1,9 @@
 # Monitor API
 
-Monitor uses the existing `coragent-host/2` RPC envelope and authentication.
+Monitor is the management interface; Job Manager owns background observation and event delivery.
+Task Controller owns automatic continuation policy. Input admission is an internal Pi integration boundary.
+
+Monitor uses the existing `coragent-host/3` RPC envelope and authentication.
 `apps/agent/contracts/monitor.mjs` is the canonical method/capability list shared
 by Host and browser transports. All methods are scoped to `workspace_id` and
 `session_id`; there is no workspace-wide task mutation or alternate protocol.
@@ -45,7 +48,7 @@ commands to this same method set; queries never ask a model to interpret the com
 
 The following definitions document wire projections, not new state owners.
 Task state and control receipts belong to Pi durable, execution state belongs
-to Pi, and Job facts belong to Job Runtime. An overview is assembled from these
+to Pi, and Job facts belong to Job Manager. An overview is assembled from these
 sources and is not a cross-database atomic snapshot.
 
 ```ts
@@ -55,7 +58,7 @@ type TaskState = "active" | "waiting" | "paused" | "blocked"
 type Criterion = { id: string; description: string };
 type CompletionEvidence = { criterion_id: string; evidence_refs: string[] };
 type UserTask = {
-  schema_version: "coragent-user-task/2";
+  schema_version: "coragent-user-task/3";
   user_task_id: string;
   workspace_id: string;
   session_id: string;
@@ -67,12 +70,14 @@ type UserTask = {
   sources: { submission_id: string; entry_id: unknown; text: string }[];
   criteria: Criterion[];
   research: { entry_node_ids: string[]; focus_node_ids: string[] };
-  research_review: {
-    current_review_ref: string | null;
-    last_reviewed_state_digest: string | null;
-    review_digest: string | null;
-    review_status: "current" | "pending" | "stale" | "running" | "failed";
-    trigger: string | null;
+  research_context: {
+    brief_id: string | null;
+    state_digest: string | null;
+    brief_digest: string | null;
+    availability: "available" | "unavailable";
+    projection_status: "complete" | "incomplete";
+    synthesis_status: "not_requested" | "ready" | "failed";
+    refresh_reason: "initial" | "scope_changed" | "facts_changed" | "retry";
     updated_at: string | null;
   } | null;
   state: TaskState;
@@ -176,7 +181,8 @@ type RunSummary = {
   run_id: string;
   user_task_id: string | null;
   state: "queued" | "placed" | "done" | "unanswered";
-  producer: "user" | "monitor" | "task_controller";
+  producer: "user" | "job_manager" | "task_controller";
+  reason: "user_message" | "job_event" | "task_continue" | "execution_retry" | "final_response_retry";
   generation_count: number;
 };
 type RunDetail = {
@@ -255,7 +261,7 @@ Job lifecycle. Missing collection or scientific-analysis evidence must not be
 presented as successful analysis merely because execution succeeded.
 
 A session without registered tasks returns no current task. This protocol requires
-`coragent-user-task/2` and `research-snapshot/3`. Run indexes
+`coragent-user-task/3` and `research-snapshot/3`. Run indexes
 cover execution observed by the Task Controller; runs without an index are not
 invented from the active task graph. The diagnostic view presents
 structured execution summaries, not model reasoning or secret tool arguments.

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
-const REVIEW_MAX_TOKENS = 700;
+const SYNTHESIS_MAX_TOKENS = 700;
 
 function textFrom(response) {
   return (response?.content || []).filter(part => part?.type === "text").map(part => part.text).join("\n").trim();
@@ -22,10 +22,10 @@ function boundedText(value, limit = 1000) {
   return value.length <= limit ? value : value.slice(0, limit);
 }
 
-function validateSynthesis(value, review) {
+function validateSynthesis(value, brief) {
   if (!value || !["attention", "uncertain", "oriented"].includes(value.status)
     || typeof value.summary !== "string" || !value.summary.trim()) return null;
-  const refs = new Set(review.source_refs || []);
+  const refs = new Set(brief.source_refs || []);
   const list = (items, key) => Array.isArray(items) ? items.slice(0, 8).flatMap(item => {
     if (!item || typeof item !== "object" || typeof item.statement !== "string") return [];
     const ref = item.ref === undefined || item.ref === null ? null : item.ref;
@@ -42,9 +42,9 @@ function validateSynthesis(value, review) {
       ...(item.reason ? { reason: boundedText(item.reason, 500) } : {}) }];
   }) : [];
   return {
-    schema_version: "research-review-synthesis/1",
-    source_state_digest: review.state_digest,
-    source_review_digest: review.review_digest,
+    schema_version: "research-synthesis/1",
+    source_state_digest: brief.state_digest,
+    source_brief_digest: brief.brief_digest,
     status: value.status,
     summary: boundedText(value.summary),
     key_findings: list(value.key_findings, "statement"),
@@ -58,33 +58,38 @@ function validateSynthesis(value, review) {
 }
 
 /**
- * Create an optional model synthesis over a deterministic Research Review.
+ * Create an optional model synthesis over a deterministic Research Brief.
  * The call has no tools and returns a validated, reference-bound projection;
  * malformed or hallucinated references are discarded by the caller.
  */
-export function createResearchReviewer({ modelRuntime, model, timeoutMs = 30_000 }) {
-  if (!modelRuntime || !model) return null;
+export function createResearchSynthesis({ modelRuntime, getModel, timeoutMs = 30_000 }) {
+  if (typeof modelRuntime?.completeSimple !== "function" || typeof getModel !== "function") {
+    throw new TypeError("Research synthesis requires a model runtime and current-model resolver");
+  }
   const cache = new Map();
-  return async function synthesize(review, { signal } = {}) {
-    if (review?.schema_version !== "research-review/1" || review.review_status !== "pending") return null;
-    const cacheKey = review.state_digest || hash(review);
+  return async function synthesize(brief, { signal } = {}) {
+    if (brief?.schema_version !== "research-brief/1" || brief.projection_status !== "complete") return null;
+    const model = await getModel();
+    if (!model) return null;
+    const cacheKey = hash({ provider: model.provider, model: model.id, brief: brief.brief_digest || hash(brief) });
     if (cache.has(cacheKey)) return cache.get(cacheKey);
     const input = JSON.stringify({
-      state_digest: review.state_digest,
-      status: review.status,
-      coverage: review.coverage,
-      findings: review.findings,
-      contradictions: review.contradictions,
-      uncertainties: review.uncertainties,
-      limitations: review.limitations,
-      follow_up: review.follow_up,
-      source_refs: review.source_refs,
+      state_digest: brief.state_digest,
+      status: brief.status,
+      coverage: brief.coverage,
+      findings: brief.findings,
+      contradictions: brief.contradictions,
+      uncertainties: brief.uncertainties,
+      limitations: brief.limitations,
+      follow_up: brief.follow_up,
+      source_refs: brief.source_refs,
     });
     const request = modelRuntime.completeSimple(model, {
-      systemPrompt: "You are a research-state reviewer. Summarize only the supplied deterministic review. Do not invent facts, scientific validation, identities, or references. Every ref must be copied from source_refs. Return one JSON object only with status (attention|uncertain|oriented), summary, key_findings [{ref,statement}], contradictions [{ref,statement}], uncertainties [{ref,statement}], next_actions [{action,ref,reason}], source_refs []. Do not claim completion and do not propose a write unless the action is only to inspect evidence.",
+      systemPrompt: "You are a research context summarizer. Summarize only the supplied deterministic brief. Do not invent facts, scientific validation, identities, or references. Every ref must be copied from source_refs. Return one JSON object only with status (attention|uncertain|oriented), summary, key_findings [{ref,statement}], contradictions [{ref,statement}], uncertainties [{ref,statement}], next_actions [{action,ref,reason}], source_refs []. Do not claim completion and do not propose a write unless the action is only to inspect evidence.",
       messages: [{ role: "user", content: input, timestamp: 0 }],
-    }, { maxTokens: REVIEW_MAX_TOKENS, reasoning: "minimal", signal: signal || AbortSignal.timeout(timeoutMs) });
-    const result = request.then(response => validateSynthesis(parseObject(textFrom(response)), review)).catch(() => null);
+    }, { maxTokens: SYNTHESIS_MAX_TOKENS, reasoning: "minimal", signal: signal || AbortSignal.timeout(timeoutMs) });
+    const result = request.then(response => validateSynthesis(parseObject(textFrom(response)), brief)).catch(() => null);
+    if (cache.size >= 64) cache.delete(cache.keys().next().value);
     cache.set(cacheKey, result);
     return result;
   };

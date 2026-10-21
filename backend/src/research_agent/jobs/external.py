@@ -223,7 +223,7 @@ class ExternalJobPlatform(StagedJobPlatform):
                 raise ValueError("external status identity mismatch")
             state = JobState(value["state"])
             if state == JobState.COLLECTED:
-                raise ValueError("collection is owned by the Job runtime")
+                raise ValueError("collection is owned by the Job manager")
             if state == JobState.CREATED:
                 raise ValueError("external task has not been submitted")
             if not isinstance(value.get("diagnostics", {}), dict):

@@ -8,7 +8,7 @@ Prepare a domain request through its installed Skill. Submit the returned reques
 
 For a custom scientific script, prepare with `--script <file.py> --backend <binding>` through the configured executor preparation entrypoint. Direct argv submission does not select a scientific Python or software backend. Preparation and report formatting use native tools; calculations use managed Jobs.
 
-The adapter fixes the Node revision and actual inputs at submission. Later plan changes cannot change what an earlier Job tested. Job Runtime remains the source of dispatch and terminal facts. job_status observes, job_cancel requests cancellation, job_reconcile resolves uncertainty, and job_collect preserves outputs and provenance without executing again.
+The adapter fixes the Node revision and actual inputs at submission. Later plan changes cannot change what an earlier Job tested. Job Manager remains the source of dispatch and terminal facts. job_status observes, job_cancel requests cancellation, job_reconcile resolves uncertainty, and job_collect preserves outputs and provenance without executing again.
 
 artifact_create stores new text, artifact_register imports a file, and artifact_read reads bounded bytes. Scientific Job outputs should be collected with their producer identity. Analysis requests declare and stage their actual inputs; validators run as ordinary Jobs. Reading a file does not establish scientific evidence usage.
 

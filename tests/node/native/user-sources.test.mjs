@@ -11,8 +11,8 @@ test("only actual durable user entries become original task records", async () =
   };
   const calls = [];
   const options = {
-    admission: { origin: async record => ({ producer: record.id === "user" || record.id === "generated" ? "user" : "monitor", identity: {event_ids: record.id === "monitor" ? ["event_1"] : ["event_2"]} }) },
-    monitorAdmission: { validateConsumption: async () => {} },
+    admission: { origin: async record => ({ producer: record.id === "user" || record.id === "generated" ? "user" : "job_manager", identity: {event_ids: record.id === "monitor" ? ["event_1"] : ["event_2"]} }) },
+    jobAdmission: { validateConsumption: async () => {} },
     harness: { submission: async id => ({ status: async () => records[id] }) },
     api: { entry: async id => ({ byTaskId: id === "e_model" ? "task_1" : undefined,
       model: [{ role: "user", content: "Original user request" }] }) },

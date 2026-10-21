@@ -95,7 +95,7 @@
       }
     },
     {
-      "command": "job_monitor_assess",
+      "command": "job_manager_assess",
       "params": {
         "event_id": "event_1",
         "session_id": "fixture-session"

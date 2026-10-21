@@ -4,7 +4,7 @@ import pytest
 from jsonschema import Draft202012Validator
 from research_agent.application.api import execute as execute_api, COMMAND_DEFINITIONS
 from research_agent.research import results, nodes, relations, views
-from research_agent.research.review import build as build_review
+from research_agent.research.brief import build as build_review
 from tests.unit.test_job_recovery import workspace
 
 
@@ -76,22 +76,22 @@ def test_report_citing_corrected_result_requests_review_without_rewriting(tmp_pa
     assert results.get_result(tmp_path, report['id']) == report
 
 
-def test_research_review_is_bounded_derived_state_and_preserves_source_refs(tmp_path):
+def test_research_context_is_bounded_derived_state_and_preserves_source_refs(tmp_path):
     workspace(tmp_path)
     node = execute('research_create', tmp_path, {'goal': 'Compare two recorded alternatives'})['node']['id']
     result = execute('research_result', tmp_path, {'node_id': node,
         'conclusion': 'Preliminary comparison', 'limitations': 'Needs an independent check'})['result']['id']
-    review = execute('research_read', tmp_path, {'view': 'review', 'focus_node_ids': [node], 'limit': 8000})
-    assert review['schema_version'] == 'research-review/1'
+    review = execute('research_read', tmp_path, {'view': "brief", 'focus_node_ids': [node], 'limit': 8000})
+    assert review['schema_version'] == 'research-brief/1'
     assert review['state_digest'].startswith('sha256:')
-    assert review['review_id'].startswith('review_')
+    assert review['brief_id'].startswith('brief_')
     assert result in review['source_refs']
-    assert review['review_status'] == 'current'
-    assert review['guidance'].startswith('This is a derived review')
+    assert review['projection_status'] == 'complete'
+    assert review['guidance'].startswith('This is a derived brief')
     Draft202012Validator(COMMAND_DEFINITIONS['research_read']['result']).validate(json.loads(json.dumps(review)))
 
 
-def test_research_review_reports_failed_or_incomplete_jobs_as_follow_up(tmp_path):
+def test_research_context_reports_failed_or_incomplete_jobs_as_follow_up(tmp_path):
     workspace(tmp_path)
     node = execute('research_create', tmp_path, {'goal': 'Inspect execution evidence'})['node']['id']
     review = build_review(tmp_path, focus_node_ids=[node], jobs=[{
@@ -103,11 +103,57 @@ def test_research_review_reports_failed_or_incomplete_jobs_as_follow_up(tmp_path
     assert any(item['action'] == 'inspect_job' for item in review['follow_up'])
 
 
-def test_research_review_trigger_marks_new_evidence_pending(tmp_path):
+def test_brief_refresh_depends_on_scoped_facts_not_global_activity(tmp_path):
     workspace(tmp_path)
-    node = execute('research_create', tmp_path, {'goal': 'Review new evidence'})['node']['id']
-    review = execute('research_read', tmp_path, {
-        'view': 'review', 'focus_node_ids': [node], 'trigger': 'new_evidence', 'limit': 8000,
-    })
-    assert review['trigger'] == 'new_evidence'
-    assert review['review_status'] == 'pending'
+    selected = execute('research_create', tmp_path, {'goal': 'Selected'})
+    other = execute('research_create', tmp_path, {'goal': 'Unrelated'})
+    params = {'view': 'brief', 'focus_node_ids': [selected['node']['id']], 'limit': 8000}
+    initial = execute('research_read', tmp_path, params)
+    execute('research_update', tmp_path, {'node_id': other['node']['id'], 'note': 'Change other progress',
+        'progress': 'Unrelated progress', 'read_basis': other['read_basis']})
+    assert execute('research_read', tmp_path, params)['state_digest'] == initial['state_digest']
+    execute('research_update', tmp_path, {'node_id': selected['node']['id'], 'note': 'Change focus',
+        'progress': 'Relevant progress', 'read_basis': selected['read_basis']})
+    assert execute('research_read', tmp_path, params)['state_digest'] != initial['state_digest']
+
+
+def test_brief_tracks_direct_dependencies(tmp_path):
+    workspace(tmp_path)
+    parent = execute('research_create', tmp_path, {'goal': 'Root'})
+    child = execute('research_create', tmp_path, {'goal': 'Dependency'})
+    execute('research_update', tmp_path, {'node_id': parent['node']['id'], 'note': 'Bind dependency',
+        'add_relations': [{'kind': 'requires', 'target': child['node']['id']}], 'read_basis': parent['read_basis']})
+    params = {'view': 'brief', 'focus_node_ids': [parent['node']['id']], 'limit': 2048}
+    first = execute('research_read', tmp_path, params)
+    execute('research_result', tmp_path, {'node_id': child['node']['id'], 'conclusion': 'Dependency result'})
+    second = execute('research_read', tmp_path, params)
+    assert first['state_digest'] != second['state_digest']
+
+
+def test_brief_tracks_candidates_that_do_not_fit_in_context(tmp_path):
+    from research_agent.research.brief_selection import build as select
+    workspace(tmp_path)
+    children = [execute('research_create', tmp_path, {'goal': f'Dependency {i}'}) for i in range(12)]
+    parent = execute('research_create', tmp_path, {'goal': 'Root',
+        'relations': [{'kind': 'requires', 'target': child['node']['id']} for child in children]})
+    focus = [parent['node']['id']]
+    selection = select(tmp_path, max_bytes=4096, focus_node_ids=focus)
+    included = {node['id'] for node in selection['nodes']}
+    omitted = next(child for child in children if child['node']['id'] not in included)
+    assert selection['bounds']['omitted']['nodes'] > 0
+    first = build_review(tmp_path, max_bytes=4096, focus_node_ids=focus)
+    execute('research_update', tmp_path, {'node_id': omitted['node']['id'], 'note': 'New evidence',
+        'progress': 'Changed omitted dependency', 'read_basis': omitted['read_basis']})
+    second = build_review(tmp_path, max_bytes=4096, focus_node_ids=focus)
+    assert first['state_digest'] != second['state_digest']
+
+
+def test_incomplete_projection_is_not_a_model_review_state(tmp_path):
+    workspace(tmp_path)
+    brief = build_review(tmp_path, projection={'pending': 1})
+    assert brief['projection_status'] == 'incomplete'
+    assert 'review_status' not in brief and 'trigger' not in brief
+    with pytest.raises(Exception):
+        execute('research_read', tmp_path, {'view': 'review'})
+    with pytest.raises(Exception):
+        execute('research_read', tmp_path, {'view': 'brief', 'trigger': 'new_evidence'})

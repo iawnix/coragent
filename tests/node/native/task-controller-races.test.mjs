@@ -8,7 +8,7 @@ import { createModels, fauxProvider, fauxAssistantMessage } from "@earendil-work
 import { TODO_CONTEXT as context } from "@earendil-works/chord/context";
 import { pinnedPiSource } from "./test-environment.mjs";
 import { createInputAdmission } from "../../../apps/agent/host/admission/input.mjs";
-import { createMonitorAdmission } from "../../../apps/agent/host/admission/monitor.mjs";
+import { createJobAdmission } from "../../../apps/agent/host/admission/jobs.mjs";
 import { createTaskController } from "../../../apps/agent/tasks/controller.mjs";
 import { createMonitorService } from "../../../apps/agent/tasks/service.mjs";
 
@@ -29,7 +29,7 @@ async function fixture(t) {
         const record = await (await harness.submission(id, ctx)).status(ctx);
         const origin = await admission.origin(record, ctx);
         if (origin.producer === "task_controller") { await beforeAutomatic(); await controller.validateConsumption(record, origin, ctx); }
-        if (origin.producer === "monitor") { await beforeAutomatic(); await monitor.validateConsumption(record, origin, api, ctx); }
+        if (origin.producer === "job_manager") { await beforeAutomatic(); await monitor.validateConsumption(record, origin, api, ctx); }
       }
       requests++;
     },
@@ -60,7 +60,7 @@ async function fixture(t) {
     }
     if (method === "artifact_read") return artifacts.get(params.artifact_id);
     if (method === "research_read") return { ref: params.ref };
-    if (method === "job_monitor_assess") {
+    if (method === "job_manager_assess") {
       await beforeAssess();
       const task = await controller.current(context);
       return { admitted: true, obsolete: false, event_id: params.event_id, delivery_token: "event-fact",
@@ -70,7 +70,7 @@ async function fixture(t) {
   } };
   function openController() {
     controller = createTaskController({ harness, conversation, admission, LiveDoc, InboxDoc, kernel, workspaceId: "workspace", sessionId: "session", context });
-    monitor = createMonitorAdmission({ admission, kernel, sessionId: "session", wakeMessage: event => `Job event ${event.event_id}`, producerToken: "fixture-token", taskController: controller });
+    monitor = createJobAdmission({ admission, kernel, sessionId: "session", wakeMessage: event => `Job event ${event.event_id}`, producerToken: "fixture-token", taskController: controller });
   }
   openController();
   t.after(async () => { await controller.close(); await harness.close(context); });

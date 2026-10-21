@@ -4,9 +4,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
-  deliverMonitorEvent,
-  parseMonitorArguments,
-} from "../../../apps/agent/host/monitor/worker.mjs";
+  deliverJobEvent,
+  parseJobWorkerArguments,
+} from "../../../apps/agent/host/jobs/worker.mjs";
 import { create_workspace_initializer } from "../../../apps/agent/host/workspace.mjs";
 
 async function fixture(t) {
@@ -44,8 +44,8 @@ test("monitor only wakes the owning session and never sends mail", async (t) => 
     async sendWake(params) { wakes.push(params); return { accepted: true }; },
     async sendNotification() { notifications++; },
   };
-  assert.deepEqual(await deliverMonitorEvent(dependencies), []);
-  assert.deepEqual(await deliverMonitorEvent(dependencies), []);
+  assert.deepEqual(await deliverJobEvent(dependencies), []);
+  assert.deepEqual(await deliverJobEvent(dependencies), []);
   assert.equal(wakes.length, 1);
   assert.equal(notifications, 0);
   assert.equal(wakes[0].session_id, "existing-session");
@@ -56,7 +56,7 @@ test("monitor only wakes the owning session and never sends mail", async (t) => 
 
 test("an offline session leaves wake retryable", async (t) => {
   const state = await fixture(t);
-  const errors = await deliverMonitorEvent({ ...state,
+  const errors = await deliverJobEvent({ ...state,
     async sendWake() { throw Object.assign(new Error("session offline"), { code: "session_offline", retryable: true }); },
     async sendNotification() {},
   });
@@ -67,7 +67,7 @@ test("an offline session leaves wake retryable", async (t) => {
 
 test("busy wake remains undelivered and retryable without a research-state token", async (t) => {
   const state = await fixture(t);
-  const errors = await deliverMonitorEvent({ ...state,
+  const errors = await deliverJobEvent({ ...state,
     sendWake: async () => ({ accepted: false, error: { code: "busy" } }),
   });
   assert.deepEqual(errors, []);
@@ -76,7 +76,7 @@ test("busy wake remains undelivered and retryable without a research-state token
 
 test("an uncertain Host wake remains retryable", async (t) => {
   const state = await fixture(t);
-  const errors = await deliverMonitorEvent({ ...state,
+  const errors = await deliverJobEvent({ ...state,
     async sendWake() { return { accepted: true, state: "uncertain" }; },
     async sendNotification() {},
   });
@@ -85,16 +85,16 @@ test("an uncertain Host wake remains retryable", async (t) => {
 });
 
 test("managed monitor options require a Host endpoint", () => {
-  assert.deepEqual(parseMonitorArguments(["--workspace-root", "/workspaces", "--host-socket", "/state/host.sock", "--state-root", "/state", "--interval-ms=1000", "--once"]), {
+  assert.deepEqual(parseJobWorkerArguments(["--workspace-root", "/workspaces", "--host-socket", "/state/host.sock", "--state-root", "/state", "--interval-ms=1000", "--once"]), {
     workspaceRoot: "/workspaces", hostSocket: "/state/host.sock", stateRoot: "/state", intervalMs: 1000, once: true,
   });
-  assert.throws(() => parseMonitorArguments(["--workspace-root", "/workspaces"]), /host-socket/);
+  assert.throws(() => parseJobWorkerArguments(["--workspace-root", "/workspaces"]), /host-socket/);
 });
 
 test("Pi admission alone does not acknowledge a wake before consumption", async t => {
   const state = await fixture(t);
-  assert.deepEqual(await deliverMonitorEvent({ ...state, sendWake: async () => ({ accepted: true, pending: true }) }), []);
+  assert.deepEqual(await deliverJobEvent({ ...state, sendWake: async () => ({ accepted: true, pending: true }) }), []);
   assert.deepEqual(state.receipts, [{ channel: "wake", delivered: false }]);
-  assert.deepEqual(await deliverMonitorEvent({ ...state, sendWake: async () => ({ accepted: true, consumed: true }) }), []);
+  assert.deepEqual(await deliverJobEvent({ ...state, sendWake: async () => ({ accepted: true, consumed: true }) }), []);
   assert.equal(state.completed.has("wake"), true);
 });

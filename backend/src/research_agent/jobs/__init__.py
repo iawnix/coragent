@@ -16,10 +16,10 @@ from .platform import ExecutionPlatform
 from .local import LocalProcessPlatform
 from .external import ExternalJobPlatform
 from .config import load_job_config, platforms_from_config
-from .runtime import JobRuntime
+from .manager import JobManager
 
 __all__ = [
-    "ExecutionPlatform", "JobOutput", "JobReceipt", "JobRuntime", "JobSpec",
+    "ExecutionPlatform", "JobOutput", "JobReceipt", "JobManager", "JobSpec",
     "JobState", "JobStatus", "ExternalJobPlatform", "LocalProcessPlatform",
     "load_job_config", "platforms_from_config",
 ]

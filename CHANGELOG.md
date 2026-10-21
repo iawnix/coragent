@@ -5,6 +5,17 @@ This file records user-visible changes. Current architecture is documented in
 
 ## Unreleased
 
+- Consolidate job execution, background tracking and event delivery under Job Manager.
+  Monitor names the management interface; Task Controller owns continuation policy.
+  Execution records distinguish authenticated producer from execution reason.
+- Replace the research Review lifecycle with research-brief/1. Refresh context when
+  scoped facts change, independently of input producer. Track projection completeness
+  and optional model synthesis separately; remove review_pending.
+- Breaking contracts: coragent-host/3, coragent-user-task/3 and
+  chemical-research-report-input/2, with execution-observation/2 for Job observations. Retired input producers and Review interfaces are
+  rejected without compatibility aliases. Upgrade clients and explicitly bind retained
+  research records in a new session for older Tasks.
+
 - Remove optional model icon font installation, bundled font assets and launcher
   activation. Terminal icons use existing fonts; previously installed fonts are untouched.
 

@@ -50,8 +50,8 @@ export function createHostMonitor({ sessionBackend, workspace, stateRoot }) {
     const result = await sessionBackend.monitor(method, params);
     if (method !== "monitor/health") return result;
     const [worker, supervisor] = await Promise.all([
-      readHealth(join(stateRoot, "monitor-health.json")),
-      readHealth(join(stateRoot, "monitor-supervisor.json")),
+      readHealth(join(stateRoot, "job-manager-health.json")),
+      readHealth(join(stateRoot, "job-manager-supervisor.json")),
     ]);
     return { ...result, host_worker_health: worker, supervisor_health: supervisor };
   };

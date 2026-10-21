@@ -71,21 +71,23 @@ def resolve_source_submission_ids(root, submission_ids, session_id=None):
 
 
 def read(root, *, ref=None, offset=0, limit=16000, session_id=None, event_ids=(), entry_node_ids=(), focus_node_ids=(), field=None,
-         view=None, waited_job_ids=(), trigger='context_refresh', source_submission_ids=None):
+         view=None, waited_job_ids=(), source_submission_ids=None):
     from .job_state import project_events
-    from .job_monitor import assess
+    from .job_manager import assess
     with TransactionCoordinator(root).locked():
         workspace(root)
         errors = project_events(root)
         current = jobs(root)
-        if view == 'review':
+        if view not in (None, 'brief'):
+            raise ValueError('research_view_invalid: use brief')
+        if view == 'brief':
             if ref or field or offset:
                 raise ValueError('review_view_requires_snapshot')
-            from research_agent.research.review import build
+            from research_agent.research.brief import build
             events = [assess(root, event_id, session_id)['event'] for event_id in event_ids]
             return build(root, max_bytes=max(2048, limit), session_id=session_id, entry_node_ids=entry_node_ids,
                          focus_node_ids=focus_node_ids, events=events, jobs=current, waited_job_ids=waited_job_ids,
-                         projection={'pending': len(errors)}, trigger=trigger,
+                         projection={'pending': len(errors)},
                          source_bindings=_source_bindings(root, source_submission_ids, session_id))
         if ref:
             return retrieval.read(root, ref=ref, offset=offset, limit=limit, session_id=session_id, jobs=current, field=field)

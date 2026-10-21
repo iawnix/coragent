@@ -1765,7 +1765,7 @@
       "type": "object",
       "properties": {
         "schema_version": {
-          "const": "execution-observation/1"
+          "const": "execution-observation/2"
         },
         "observation_id": {
           "type": "string"
@@ -1784,7 +1784,7 @@
           "type": "string"
         },
         "source": {
-          "const": "job_runtime"
+          "const": "job_manager"
         },
         "state": {
           "anyOf": [
@@ -2225,19 +2225,19 @@
       ],
       "additionalProperties": false
     },
-    "ResearchReview": {
+    "ResearchBrief": {
       "type": "object",
       "properties": {
         "schema_version": {
-          "const": "research-review/1"
+          "const": "research-brief/1"
         },
-        "review_id": {
+        "brief_id": {
           "type": "string"
         },
         "state_digest": {
           "type": "string"
         },
-        "review_digest": {
+        "brief_digest": {
           "type": "string"
         },
         "status": {
@@ -2245,21 +2245,6 @@
             "attention",
             "uncertain",
             "oriented"
-          ]
-        },
-        "review_status": {
-          "enum": [
-            "current",
-            "pending",
-            "stale",
-            "running",
-            "failed"
-          ]
-        },
-        "trigger": {
-          "enum": [
-            "new_evidence",
-            "context_refresh"
           ]
         },
         "scope": {
@@ -2273,10 +2258,17 @@
           "items": {
             "type": "object",
             "properties": {
-              "submission_id": {"type": "string"},
-              "research_ref": {"type": "string"}
+              "submission_id": {
+                "type": "string"
+              },
+              "research_ref": {
+                "type": "string"
+              }
             },
-            "required": ["submission_id", "research_ref"],
+            "required": [
+              "submission_id",
+              "research_ref"
+            ],
             "additionalProperties": false
           }
         },
@@ -2330,16 +2322,20 @@
         },
         "guidance": {
           "type": "string"
+        },
+        "projection_status": {
+          "enum": [
+            "complete",
+            "incomplete"
+          ]
         }
       },
       "required": [
         "schema_version",
-        "review_id",
+        "brief_id",
         "state_digest",
-        "review_digest",
+        "brief_digest",
         "status",
-        "review_status",
-        "trigger",
         "scope",
         "user_sources",
         "coverage",
@@ -2350,7 +2346,8 @@
         "follow_up",
         "source_refs",
         "read_more",
-        "guidance"
+        "guidance",
+        "projection_status"
       ],
       "additionalProperties": false
     }
@@ -2365,7 +2362,7 @@
           "$ref": "results.json#/definitions/ResearchRead"
         },
         {
-          "$ref": "results.json#/definitions/ResearchReview"
+          "$ref": "results.json#/definitions/ResearchBrief"
         }
       ]
     },
@@ -2453,7 +2450,7 @@
     "job_resolve_prepared": {
       "$ref": "results.json#/definitions/PreparedRequest"
     },
-    "job_monitor_assess": {
+    "job_manager_assess": {
       "$ref": "results.json#/definitions/MonitorAssessment"
     },
     "artifact_create": {

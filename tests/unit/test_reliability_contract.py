@@ -9,7 +9,7 @@ from tests.unit.test_job_recovery import workspace
 from research_agent.application.api import execute
 from research_agent.application.execution import dispatch, _receipt
 from research_agent.application.job_state import execution, observe_execution
-from research_agent.application.job_monitor import command, assess
+from research_agent.application.job_manager import command, assess
 from research_agent.application.memory_context import read
 from research_agent.research.nodes import create, update
 from research_agent.foundation.transactions import TransactionCoordinator

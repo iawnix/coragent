@@ -4,9 +4,9 @@ import { validateId, cleanRequest } from "./validation.mjs";
 
 const SESSION_EVENT_HISTORY_LIMIT = 256;
 const SESSION_EVENT_HISTORY_BYTES = MAX_FRAME_BYTES / 4;
-const MONITOR_EVENT_ID = /^event_[1-9][0-9]*$/u;
+const JOB_EVENT_ID = /^event_[1-9][0-9]*$/u;
 
-export function createHostSessions({ sessionBackend, workspace, deduplicate, clients, epoch, monitorToken }) {
+export function createHostSessions({ sessionBackend, workspace, deduplicate, clients, epoch, jobToken }) {
   const live = new Map();
   // Sequence identity survives reconnecting the same backend within a Host epoch.
   const sessionSequences = new Map();
@@ -113,13 +113,13 @@ export function createHostSessions({ sessionBackend, workspace, deduplicate, cli
       await workspace(params.workspace_id);
       return deduplicate(method, params.request_id, cleanRequest(params), () => sessionBackend.removeSession(params.workspace_id, params.session_id));
     }
-    if (method === "input/send" || method === "internal/monitor-wake") {
-      const internal = method === "internal/monitor-wake";
+    if (method === "input/send" || method === "internal/job-event") {
+      const internal = method === "internal/job-event";
       if (internal) {
-        const expected = Buffer.from(monitorToken || "");
+        const expected = Buffer.from(jobToken || "");
         const actual = Buffer.from(typeof params.token === "string" ? params.token : "");
         if (!expected.length || actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
-          throw protocolError("internal_producer_required", "Monitor admission requires the supervised producer identity");
+          throw protocolError("internal_producer_required", "Job event admission requires the supervised producer identity");
         }
       } else if (params.source !== undefined && !["phone", "terminal", "user"].includes(params.source)) {
         throw protocolError("invalid_input_source", "External clients cannot declare an internal producer");
@@ -129,12 +129,12 @@ export function createHostSessions({ sessionBackend, workspace, deduplicate, cli
       validateId(params.client_message_id, "client_message_id");
       if (!internal && (typeof params.text !== "string" || params.text.length === 0 || params.text.length > 1_000_000)) throw protocolError("invalid_input", "Input must contain text within the size limit");
       if (internal && (!Array.isArray(params.event_ids) || !params.event_ids.length || params.event_ids.length > 256
-        || params.event_ids.some(id => typeof id !== "string" || !MONITOR_EVENT_ID.test(id)))) {
-        throw protocolError("invalid_monitor_events", "Monitor requires structured event_ids");
+        || params.event_ids.some(id => typeof id !== "string" || !JOB_EVENT_ID.test(id)))) {
+        throw protocolError("invalid_job_events", "Job Manager requires structured event_ids");
       }
       if (internal ? params.mode !== "next_run" : params.mode !== undefined && !["auto", "follow_up", "steer"].includes(params.mode)) throw protocolError("invalid_input", "Unsupported input mode");
       const payload = { workspace_id: params.workspace_id, session_id: params.session_id, client_message_id: params.client_message_id,
-        ...(internal ? { event_ids: params.event_ids } : { text: params.text }), mode: params.mode || "auto", source: internal ? "monitor" : "user" };
+        ...(internal ? { event_ids: params.event_ids } : { text: params.text }), mode: params.mode || "auto", source: internal ? "job_manager" : "user" };
       return sessionBackend.sendInput(payload);
     }
     if (method === "input/status") {

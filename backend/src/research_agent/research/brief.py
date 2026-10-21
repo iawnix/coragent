@@ -1,6 +1,6 @@
-"""A bounded, deterministic review of the current research state.
+"""A bounded, deterministic brief of the current research state.
 
-Research Review is a disposable context projection.  It is deliberately
+Research Brief is a disposable context projection.  It is deliberately
 domain neutral: scientific interpretation belongs to the agent and domain
 skills, while this module reports what is present, missing, contradictory, or
 still running in the canonical research records.
@@ -10,8 +10,8 @@ from __future__ import annotations
 import json
 
 from . import relations
-from .review_selection import build as build_selection
-from .records import digest, journal
+from .brief_selection import build as build_selection
+from .records import digest
 from .results import get_result, publication_order
 
 
@@ -29,30 +29,32 @@ def _text(value, limit=320):
     return encoded[:limit].decode("utf-8", errors="ignore")
 
 
-def _state_digest(graph, index, jobs, events):
-    """Digest facts that can change the review, without embedding their text."""
+def _state_digest(graph, selection, jobs, projection, source_bindings):
+    """Track scoped facts, including omitted records; unrelated activity is irrelevant."""
+    basis = selection['_basis']
+    nodes = set(basis['node_ids'])
+    job_ids = set(basis['job_ids'])
     state = {
-        "sequence": index["sequence"],
+        "selection": selection['scope'],
+        "sources": source_bindings,
+        "projection": projection,
         "nodes": [
-            {k: node.get(k) for k in ("id", "revision", "status", "assessment_ref")}
+            node
             for node in sorted(graph["nodes"].values(), key=lambda item: item["id"])
+            if node['id'] in nodes
         ],
         "results": [
-            {k: result.get(k) for k in ("id", "node_id", "supersedes", "content_digest")}
+            result
             for result in sorted(graph["results"].values(), key=lambda item: item["id"])
+            if result.get('node_id') in nodes
         ],
-        "relations": [
-            {k: edge.get(k) for k in ("id", "source", "kind", "target", "active")}
-            for edge in sorted(graph["relations"].values(), key=lambda item: item["id"])
-            if edge.get("active")
-        ],
+        "relations": basis['relations'],
+        "diagnostics": basis['diagnostics'],
+        "notices": basis['notices'],
         "jobs": [
             {k: job.get(k) for k in ("job_id", "node_id", "state", "collection_state", "error", "execution_conflict", "latest_result_receipt_ref")}
             for job in sorted(jobs, key=lambda item: item.get("job_id", ""))
-        ],
-        "events": [
-            {k: event.get(k) for k in ("event_id", "job_id", "node_id", "state", "status_digest")}
-            for event in sorted(events, key=lambda item: item.get("event_id", ""))
+            if job.get('node_id') in nodes or job.get('job_id') in job_ids
         ],
     }
     return "sha256:" + digest(state)
@@ -66,18 +68,16 @@ def _source(ref, kind, summary, **extra):
 
 def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
           focus_node_ids=(), events=(), jobs=(), waited_job_ids=(), projection=None,
-          trigger="context_refresh", source_bindings=()):
+          source_bindings=()):
     if not 2048 <= max_bytes <= 32000:
-        raise ValueError("review_budget_invalid: use 2048..32000 bytes")
-    if trigger not in {"context_refresh", "new_evidence"}:
-        raise ValueError("review_trigger_invalid: use context_refresh or new_evidence")
+        raise ValueError("brief_budget_invalid: use 2048..32000 bytes")
 
-    graph, index = relations.graph(root), journal(root)
+    graph = relations.graph(root)
     selection = build_selection(root, max_bytes=min(12000, max_bytes), session_id=session_id,
                               entry_node_ids=entry_node_ids, focus_node_ids=focus_node_ids,
                               events=events, jobs=jobs, waited_job_ids=waited_job_ids,
                               projection=projection)
-    state_digest = _state_digest(graph, index, jobs, events)
+    state_digest = _state_digest(graph, selection, jobs, projection, source_bindings)
     selected = {node["id"] for node in selection.get("nodes", [])}
     selected_jobs = {job["job_id"] for job in selection.get("jobs", [])}
     findings, contradictions, uncertainties, limitations, follow_up = [], [], [], [], []
@@ -103,7 +103,7 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
             if assessment.get("limitations"):
                 limitations.append(_source(node["assessment_ref"], "result_limitation", assessment["limitations"]))
 
-    # A review cites every published Result attached to the selected Nodes,
+    # A brief cites every published Result attached to the selected Nodes,
     # including preliminary results that were not selected as assessments.
     # The result body remains available through research_read; only its bounded
     # summary is projected here.
@@ -147,21 +147,21 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
 
     omitted = selection.get("bounds", {}).get("omitted", {})
     if any(value for key, value in omitted.items() if key in {"nodes", "jobs", "relations", "diagnostics"}):
-        limitations.append(_source("research-review", "bounded_view", "Some scoped records were omitted; read current records before deciding."))
+        limitations.append(_source("research-brief", "bounded_view", "Some scoped records were omitted; read current records before deciding."))
     if projection and projection.get("pending"):
         limitations.append(_source("runtime-projection", "pending_projection", "Runtime Job events still need reconciliation."))
 
     status = "attention" if contradictions else "uncertain" if uncertainties else "oriented"
-    review = {
-        "schema_version": "research-review/1",
-        "review_id": "review_" + state_digest.removeprefix("sha256:"),
+    brief = {
+        "schema_version": "research-brief/1",
+        "brief_id": "brief_" + state_digest.removeprefix("sha256:"),
         "state_digest": state_digest,
         "status": status,
         "scope": {"selection": selection.get("scope", {}).get("selection", "unbound"),
                   "entry_node_ids": list(entry_node_ids), "focus_node_ids": list(focus_node_ids)},
         "user_sources": list(source_bindings),
-        "coverage": {"research_sequence": index["sequence"], "nodes": len(selected),
-                     "jobs": len(selected_jobs), "results": len(graph["results"]),
+        "coverage": {"nodes": len(selected),
+                     "jobs": len(selected_jobs), "results": sum(r.get('node_id') in selected for r in graph['results'].values()),
                      "events": len(events), "omitted": omitted},
         "findings": findings,
         "contradictions": contradictions,
@@ -170,21 +170,19 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         "follow_up": follow_up,
         "source_refs": list(dict.fromkeys(source_refs)),
         "read_more": {"research": {"tool": "research_read"}, "jobs": {"tool": "job_status"}},
-        "guidance": "This is a derived review of recorded evidence. It does not certify scientific validity, authorize writes, schedule a run, or declare completion.",
+        "guidance": "This is a derived brief of recorded evidence. It does not certify scientific validity, authorize writes, schedule a run, or declare completion.",
+        "projection_status": "incomplete" if projection and projection.get('pending') else "complete",
     }
-    pending_trigger = trigger == "new_evidence"
-    review["trigger"] = trigger if pending_trigger else ("new_evidence" if projection and projection.get("pending") else "context_refresh")
-    review["review_status"] = "pending" if pending_trigger or (projection and projection.get("pending")) else "current"
-    review["review_digest"] = "sha256:" + digest({key: value for key, value in review.items() if key != "review_digest"})
-    if _size(review) > max_bytes:
+    brief["brief_digest"] = "sha256:" + digest({key: value for key, value in brief.items() if key != "brief_digest"})
+    if _size(brief) > max_bytes:
         # Keep the report useful under a tight transport budget.  Counts and
         # source references remain explicit when prose findings are truncated.
         for key in ("findings", "uncertainties", "limitations"):
-            while review[key] and _size(review) > max_bytes:
-                review[key].pop()
-        if _size(review) > max_bytes:
-            review["follow_up"] = review["follow_up"][:4]
-        if _size(review) > max_bytes:
-            raise ValueError("review_budget_too_small")
-        review["review_digest"] = "sha256:" + digest({key: value for key, value in review.items() if key != "review_digest"})
-    return review
+            while brief[key] and _size(brief) > max_bytes:
+                brief[key].pop()
+        if _size(brief) > max_bytes:
+            brief["follow_up"] = brief["follow_up"][:4]
+        if _size(brief) > max_bytes:
+            raise ValueError("brief_budget_too_small")
+        brief["brief_digest"] = "sha256:" + digest({key: value for key, value in brief.items() if key != "brief_digest"})
+    return brief

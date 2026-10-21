@@ -1,4 +1,4 @@
-"""Internal selection of bounded facts for the canonical Research Review."""
+"""Internal selection of bounded facts for the canonical Research Brief."""
 import json
 import re
 
@@ -210,5 +210,10 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         for item in diagnostics:
             add('diagnostics', {'code': item['code'], 'node_ids': item['node_ids'][:3], 'node_count': len(item['node_ids'])})
     if size(view) > max_bytes:
-        raise ValueError('review_selection_budget_too_small')
+        raise ValueError('brief_selection_budget_too_small')
+    # Internal dependency set, including candidates omitted by the byte budget.
+    # It is consumed by the brief builder, never included in model context.
+    view['_basis'] = {'node_ids': sorted(reasons), 'job_ids': sorted({j['job_id'] for j in candidates}),
+                      'relations': edges, 'diagnostics': diagnostics,
+                      'notices': [(ref, notices) for ref, (_, notices) in sorted(assessments.items())]}
     return view

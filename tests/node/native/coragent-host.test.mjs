@@ -120,7 +120,7 @@ test("Host requires the Native Pi Harness backend", async () => {
 });
 
 test("public input cannot impersonate an internal producer", async t => {
-  const { client, backend } = await fixture(t, 0, { monitorToken: 'private-monitor-token' });
+  const { client, backend } = await fixture(t, 0, { jobToken: 'private-monitor-token' });
   t.after(() => client.close());
   const received = [];
   backend.sendInput = async value => { received.push(value); return { accepted: true }; };
@@ -129,16 +129,16 @@ test("public input cannot impersonate an internal producer", async t => {
     await assert.rejects(client.request('input/send', { ...input, source }), { code: 'invalid_input_source' });
   }
   for (const token of [undefined, 'wrong']) {
-    await assert.rejects(client.request('internal/monitor-wake', { ...input, token }), { code: 'internal_producer_required' });
+    await assert.rejects(client.request('internal/job-event', { ...input, token }), { code: 'internal_producer_required' });
   }
   for (const mode of [undefined, 'auto', 'follow_up', 'steer']) {
-    await assert.rejects(client.request('internal/monitor-wake', { ...input, token: 'private-monitor-token',
+    await assert.rejects(client.request('internal/job-event', { ...input, token: 'private-monitor-token',
       event_ids: ['event_1'], mode }), { code: 'invalid_input' });
   }
   await assert.rejects(client.request('input/send', { ...input, mode: 'next_run' }), { code: 'invalid_input' });
   await client.request('input/send', { ...input, source: 'phone' });
-  await client.request('internal/monitor-wake', { ...input, token: 'private-monitor-token', mode: 'next_run', event_ids: ['event_1'], request_id: 'request-internal', client_message_id: 'message-internal' });
-  assert.deepEqual(received.map(value => value.source), ['user', 'monitor']);
+  await client.request('internal/job-event', { ...input, token: 'private-monitor-token', mode: 'next_run', event_ids: ['event_1'], request_id: 'request-internal', client_message_id: 'message-internal' });
+  assert.deepEqual(received.map(value => value.source), ['user', 'job_manager']);
   assert.equal(received.some(value => 'token' in value), false);
   await assert.rejects(client.request('turn/interrupt', { ...TARGET, request_id: 'interrupt-without-target' }), { code: 'invalid_identifier' });
 });
@@ -151,7 +151,7 @@ test("Native Host exposes only Harness session capabilities and rejects legacy b
   assert.ok(hello.capabilities.includes("session/create"));
   await assert.rejects(env.client.request("initialize", { protocol: "research-agent-host/2" }), { code: "protocol_mismatch" });
   await assert.rejects(env.client.request("initialize", {}), { code: "protocol_mismatch" });
-  await assert.rejects(env.client.request("initialize", { protocol: "coragent-host/1" }), { code: "protocol_mismatch" });
+  await assert.rejects(env.client.request("initialize", { protocol: "coragent-host/2" }), { code: "protocol_mismatch" });
   await assert.rejects(env.client.request("session.list", TARGET), { code: "method_not_found" });
   await assert.rejects(env.client.request("bridge/hello", {}), { code: "method_not_found" });
   await assert.rejects(env.client.request("bridge/event", {}), { code: "method_not_found" });
@@ -320,7 +320,7 @@ test("Host relays real Job Monitor events and rejects old or mismatched identiti
   }
   const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
-  await promisify(execFile)(process.env.CORAGENT_PYTHON, [new URL("../../../apps/agent-cli/monitor.py", import.meta.url).pathname, "tick", "--root", root], { env: executionEnv });
+  await promisify(execFile)(process.env.CORAGENT_PYTHON, [new URL("../../../apps/agent-cli/job_manager.py", import.meta.url).pathname, "tick", "--root", root], { env: executionEnv });
   for (let poll = 0; poll < 100 && notifications.length === 0; poll++) await new Promise(resolve => setTimeout(resolve, 20));
   assert.equal(notifications.length, 1, "current binding.json and event_* must be scanned");
   const event = notifications[0];
@@ -474,7 +474,7 @@ test("Monitor forwards queries without input admission and propagates authoritat
   await assert.rejects(client.request("monitor/tasks", { ...TARGET, limit: 101 }), { code: "invalid_params" });
   await assert.rejects(client.request("monitor/task/resume", { ...TARGET, user_task_id: "task-1", request_id: "resume-1", expected_revision: 1 }), { code: "task_revision_conflict" });
   const health = { state: "running" };
-  await writeFile(join(root, "state", "monitor-health.json"), JSON.stringify(health));
+  await writeFile(join(root, "state", "job-manager-health.json"), JSON.stringify(health));
   const result = await client.request("monitor/health", TARGET);
   assert.deepEqual(result.host_worker_health, health);
   assert.equal(result.supervisor_health, null);

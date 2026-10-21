@@ -120,7 +120,7 @@ def test_normal_runtime_docs_expose_only_current_contracts() -> None:
     forbidden = [
         "ts-research-state/4",
         "ts-workspace/4",
-        "ts-research-review/1",
+        "ts-research-brief/1",
         "research_acts.json",
         "start_act",
         "complete_act",
@@ -232,7 +232,7 @@ def test_focused_skills_have_bilingual_entrypoints_and_route_their_references() 
 def test_compute_reference_describes_the_generic_job_runtime() -> None:
     compute = (ORCHESTRATION_ROOT / "references" / "jobs-and-artifacts.md").read_text(encoding="utf-8")
 
-    assert "Job Runtime" in compute
+    assert "Job Manager" in compute
     assert "job_start" in compute
 
 

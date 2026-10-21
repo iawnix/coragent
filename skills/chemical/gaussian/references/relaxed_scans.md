@@ -1,6 +1,6 @@
 # Two-dimensional relaxed torsion scans
 
-A missing scan recipe does not imply the solver cannot scan. Use an explicit Gaussian input or a task script submitted through Job Runtime, with the configured Gaussian binding. Check the selected method's constraint syntax before scaling up.
+A missing scan recipe does not imply the solver cannot scan. Use an explicit Gaussian input or a task script submitted through Job Manager, with the configured Gaussian binding. Check the selected method's constraint syntax before scaling up.
 
 1. Define phi and psi as ordered, one-based atom quadruples in a retained structure; verify the atom order, charge and multiplicity. Record periodic angle conventions and avoid duplicate -180/180 endpoints.
 2. Choose the grid and budget before submission: points per axis, methods, optimization limit and retry limit. Validate a small subset, including a boundary point, first.

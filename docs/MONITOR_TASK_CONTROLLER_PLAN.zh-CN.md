@@ -17,7 +17,7 @@ Pi durable 能恢复未完成的执行，但一次正常回答结束后，不会
 | 对象/组件 | 所有权与职责 |
 | --- | --- |
 | 用户任务 / User Task | 保存委托目标、用户来源、交付条件、进展和控制状态；身份为 `user_task_id` |
-| 计算作业 / Job | Job Runtime 保存派发、执行、取消、收集和回执；身份为 `job_id` |
+| 计算作业 / Job | Job Manager 保存派发、执行、取消、收集和回执；身份为 `job_id` |
 | Pi 内部 Task | Pi 保存模型生成、工具执行等运行状态；诊断身份为 `pi_task_id` |
 | Agent Server | 包含 Host、Pi SessionWorker 和后台 Job monitoring 的整体服务 |
 | Host | 认证、工作区准入、API 路由、客户端绑定、恢复发现；不保存第二份用户任务状态 |
@@ -39,7 +39,7 @@ flowchart TB
         Host --> Worker
         JM --> Host
     end
-    Pi --> Jobs["Job Runtime"]
+    Pi --> Jobs["Job Manager"]
     JM --> Jobs
     Pi --> Memory["Research Memory"]
 ```
@@ -97,7 +97,7 @@ flowchart TB
 | 停止回复 / 聊天 Esc | 打断指定 run | 同时暂停任务 | 保留运行与观察 |
 | 恢复任务 | 核对状态后执行 | 用户明确重新开放 | 读取已有事实，不重复派发 |
 | 取消任务 | 请求停止当前工作 | 永久结束当前委托 | 必须选择保留或请求取消 |
-| 取消单个 Job | 不直接替代任务控制 | 不隐式暂停/恢复任务 | 按 Job Runtime 回执确认 |
+| 取消单个 Job | 不直接替代任务控制 | 不隐式暂停/恢复任务 | 按 Job Manager 回执确认 |
 | 退出客户端 | 不变 | 不变 | 不变 |
 
 控制请求带稳定 `request_id` 和当前 `expected_revision`。用户任务状态与回执由 Worker 同一个事务保存，Host 不另写文件回执。
@@ -134,11 +134,11 @@ Task Controller 使用 Pi commit 通知和默认 30 秒周期进行核对：
 
 请求前的 `GenerationTask.beforeRequest` 注入用户任务投影，随后复用已有研究上下文投影。投影区分原始目标和实际用户 submission、当前任务控制状态、内部事件来源；原始要求不会被最新一句“可以的”覆盖。
 
-UserTask 唯一 schema 为 `coragent-user-task/2`，保存 `research.entry_node_ids` 和 `research.focus_node_ids`；`task_update` 的 `set_research` 完整替换这两份列表。请求前把完整引用传入唯一 `research-snapshot/3`，在预算内保留结构与计划。Node/Result 核心模型不变，不新增 PlanStep 或研究调度器。旧 Task 文档不迁移、不补兼容默认值。
+UserTask 唯一 schema 为 `coragent-user-task/3`，保存 `research.entry_node_ids` 和 `research.focus_node_ids`；`task_update` 的 `set_research` 完整替换这两份列表。请求前把完整引用传入唯一 `research-snapshot/3`，在预算内保留结构与计划。Node/Result 核心模型不变，不新增 PlanStep 或研究调度器。旧 Task 文档不迁移、不补兼容默认值。
 
 任务请求投影按 JSON 序列化字节限制字段与集合长度，保留原始来源和最近修订的摘录。省略项带计数和明确读取要求；完整事实通过 `task_read` 获取，截断不放宽授权或完成条件。
 
-工具适配层从可信任务上下文绑定 `user_task_id`，模型不能通过 `job_start` 参数选择别人的任务。Node/revision 的科学归属仍由研究工具表达，两个身份不混用。Job Runtime 通用执行内核不因此依赖研究模型。
+工具适配层从可信任务上下文绑定 `user_task_id`，模型不能通过 `job_start` 参数选择别人的任务。Node/revision 的科学归属仍由研究工具表达，两个身份不混用。Job Manager 通用执行内核不因此依赖研究模型。
 
 新 Job 的关联不可变。旧无任务关联 Job 保持原意图摘要；不通过改写旧 intent 强行归属。
 
@@ -177,13 +177,13 @@ Host、浏览器和终端共用 `apps/agent/contracts/monitor.mjs` 的方法目�
 - `monitor/jobs`、`monitor/job/read`、`monitor/job/cancel`。
 - `monitor/runs`、`monitor/run/read`、`monitor/health`。
 
-沿用 `coragent-host/2`，不新增第二种 RPC envelope。Worker 只有 `coragent.monitor.handle({method, params}, context)` 这个服务入口，method 与 snake_case 参数不再翻译成另一套业务协议。
+沿用 `coragent-host/3`，不新增第二种 RPC envelope。Worker 只有 `coragent.monitor.handle({method, params}, context)` 这个服务入口，method 与 snake_case 参数不再翻译成另一套业务协议。
 
 旧公共 `monitor/list`、`monitor/status`、`monitor/enable`、`monitor/disable` 已移除，无别名、无自动回退。Job monitoring 的底层观察/投递 CLI 是内部执行适配，不提供第二套用户任务暂停/恢复开关。
 
 请求与 DTO 见 [完整 Monitor API 合同](../contracts/monitor/README.md)。沿用现有 `session/event`、`monitor/event`、cursor 和 epoch；通知是刷新提示，重连读取快照，不创建第二份持久重放日志。
 
-聚合结果来自不同事实源，不声称跨 Pi 与 Job Runtime 原子一致。历史 run 索引仅覆盖已记录执行；未索引的旧记录不从当前活跃 taskGraph 伪造。工具详情展示结构化状态和错误，不展示隐式思维或默认导出完整工具载荷。
+聚合结果来自不同事实源，不声称跨 Pi 与 Job Manager 原子一致。历史 run 索引仅覆盖已记录执行；未索引的旧记录不从当前活跃 taskGraph 伪造。工具详情展示结构化状态和错误，不展示隐式思维或默认导出完整工具载荷。
 
 ## 11. 恢复发现、升级与关闭
 

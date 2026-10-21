@@ -60,7 +60,7 @@ def check() -> list[str]:
     required = (
         ROOT / "backend" / "src" / "research_agent" / "foundation" / "io.py",
         ROOT / "backend" / "src" / "research_agent" / "research" / "nodes.py",
-        ROOT / "backend" / "src" / "research_agent" / "jobs" / "runtime.py",
+        ROOT / "backend" / "src" / "research_agent" / "jobs" / "manager.py",
         ROOT / "backend" / "src" / "research_agent" / "bootstrap" / "launcher.py",
     )
     for path in required:

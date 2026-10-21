@@ -62,10 +62,10 @@
           },
           "source_submission_ids": {
             "$ref": "shared.json#/tools/research_create/properties/source_submission_ids",
-            "description": "Current task submission IDs used only to expose their exact Research Memory user_* bindings in the review context."
+            "description": "Current task submission IDs used only to expose their exact Research Memory user_* bindings in the research brief."
           },
           "view": {
-            "const": "review",
+            "const": "brief",
             "description": "Internal bounded research-state brief; it does not authorize writes or schedule work."
           },
           "waited_job_ids": {
@@ -74,14 +74,6 @@
               "type": "string"
             },
             "description": "Internal task waits to retain even outside research focus."
-          },
-          "trigger": {
-            "type": "string",
-            "enum": [
-              "context_refresh",
-              "new_evidence"
-            ],
-            "description": "Internal Review refresh reason. It never authorizes writes or schedules work."
           }
         },
         "required": [],

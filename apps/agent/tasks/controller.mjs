@@ -9,7 +9,7 @@ import shared from "../../../contracts/commands/shared.json" with { type: "json"
 export const UserTasks = defineDoc({ kind: "coragent.user-tasks", version: 1,
   scope: "conversation", history: "latest", fork: "initial",
   initial: () => ({ current: null, ids: [], cancellation_tasks: [], job_cancellations: [], automatic_suppressed: false, user_epoch: 0, latest_user_submission_id: null }) });
-export const UserTask = defineDocFamily({ kind: "coragent.user-task", version: 2, family: true,
+export const UserTask = defineDocFamily({ kind: "coragent.user-task", version: 3, family: true,
   scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
 const ControlReceipt = defineDocFamily({ kind: "coragent.task-control-receipt", version: 1, family: true,
   scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
@@ -32,22 +32,24 @@ export const taskError = (code, message) => Object.assign(new Error(message), { 
 const requireValue = (ok, code, message) => { if (!ok) throw taskError(code, message); };
 const stamp = () => new Date().toISOString();
 const researchSchema = shared.tools.task_update.properties.research;
-const reviewStatuses = new Set(["current", "pending", "stale", "running", "failed"]);
 const blockKinds = new Set(shared.tools.task_update.properties.block_kind.enum);
-const reviewProjection = data => {
-  requireValue(data && data.schema_version === "research-review/1", "research_review_invalid", "Research Review projection schema is unsupported");
-  requireValue(reviewStatuses.has(data.review_status), "research_review_invalid", "Research Review lifecycle status is invalid");
-  for (const key of ["review_id", "state_digest", "review_digest"])
-    requireValue(data[key] === null || typeof data[key] === "string", "research_review_invalid", `Research Review ${key} must be text or null`);
-  requireValue(data.review_status === "failed" || (data.review_id && data.state_digest),
-    "research_review_invalid", "A usable Research Review requires review and state digests");
-  requireValue(typeof data.status === "string" && data.status.length > 0, "research_review_invalid", "Research Review status is required");
-  return { current_review_ref: data.review_id ?? null, last_reviewed_state_digest: data.state_digest ?? null,
-    review_digest: data.review_digest ?? null, review_status: data.review_status,
-    trigger: typeof data.trigger === "string" ? data.trigger : null, updated_at: stamp() };
+const contextProjection = data => {
+  requireValue(data?.schema_version === "research-context/1", "research_context_invalid", "Unsupported research context schema");
+  requireValue(["complete", "incomplete"].includes(data.projection_status)
+    && ["not_requested", "ready", "failed"].includes(data.synthesis_status), "research_context_invalid", "Invalid context status");
+  requireValue(["available", "unavailable"].includes(data.availability), "research_context_invalid", "Invalid context availability");
+  for (const key of ["brief_id", "state_digest", "brief_digest"])
+    requireValue(data[key] === null || typeof data[key] === "string", "research_context_invalid", `Invalid ${key}`);
+  requireValue(data.availability === "unavailable" || (data.brief_id && data.state_digest && data.brief_digest),
+    "research_context_invalid", "Available context requires identities");
+  requireValue(["initial", "scope_changed", "facts_changed", "retry"].includes(data.refresh_reason),
+    "research_context_invalid", "Invalid context refresh reason");
+  return { brief_id: data.brief_id, state_digest: data.state_digest, brief_digest: data.brief_digest,
+    availability: data.availability, projection_status: data.projection_status, synthesis_status: data.synthesis_status,
+    refresh_reason: data.refresh_reason, updated_at: stamp() };
 };
 const taskRecord = task => {
-  if (task) requireValue(task.schema_version === "coragent-user-task/2", "task_schema_unsupported", "User tasks require coragent-user-task/2");
+  if (task) requireValue(task.schema_version === "coragent-user-task/3", "task_schema_unsupported", "User tasks require coragent-user-task/3");
   return task;
 };
 const resultIdentity = ref => `result:${ref}`;
@@ -305,7 +307,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           task.completion_submission_id = id; task.completion_control_epoch = task.control_epoch;
         }
       }
-      if (producer === "monitor") task.event_inputs.push({ submission_id: id, request_id: requestId, event_ids: identity.event_ids });
+      if (producer === "job_manager") task.event_inputs.push({ submission_id: id, request_id: requestId, event_ids: identity.event_ids });
       // The Pi submission is referenced, never copied into a second lifecycle.
     },
   };
@@ -429,7 +431,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       return settleJobCancellation(request_id, ctx);
     },
     assertExecutionAllowed: (record, origin, ctx) => conversation.commit(tx => assertExecution(tx, record, origin), ctx),
-    async prepareMonitor(events, ctx) {
+    async prepareJobEvents(events, ctx) {
       const task = await getCurrent(ctx);
       const eligible = events.filter(event => task && !terminal.has(task.state)
         ? event.event.user_task_id === task.user_task_id
@@ -483,15 +485,15 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     },
     /** Persist only the derived Review pointer used by Monitor. Review facts
      * remain in the research store and do not advance the user-task revision. */
-    async recordResearchReview(data, ctx, expectedTaskId = null) {
-      const pointer = reviewProjection(data);
+    async recordResearchContext(data, ctx, expectedTaskId = null) {
+      const pointer = contextProjection(data);
       return conversation.commit(async tx => {
         const { task } = await currentTx(tx);
         if (!task || terminal.has(task.state) || expectedTaskId && task.user_task_id !== expectedTaskId) return null;
-        const previous = task.research_review;
-        const same = previous && ["current_review_ref", "last_reviewed_state_digest", "review_digest", "review_status", "trigger"]
+        const previous = task.research_context;
+        const same = previous && ["brief_id", "state_digest", "brief_digest", "availability", "projection_status", "synthesis_status", "refresh_reason"]
           .every(key => previous[key] === pointer[key]);
-        if (!same) task.research_review = pointer;
+        if (!same) task.research_context = pointer;
         return copy(task);
       }, ctx);
     },
@@ -515,7 +517,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         requireValue(!existing || terminal.has(existing.state), "task_already_exists", "This conversation already has a nonterminal user task; update it");
         const { identifier: id } = await kernel.execute_command("research_allocate_task", { session_id: sessionId, request_id: requestId });
         const task = await tx.doc(UserTask, conversation.id, id, null);
-        Object.assign(task, { schema_version: "coragent-user-task/2", user_task_id: id,
+        Object.assign(task, { schema_version: "coragent-user-task/3", user_task_id: id,
           workspace_id: workspaceId, session_id: sessionId, conversation_id: conversation.id,
           title: params.title, objective: params.objective, sources, criteria: params.criteria,
           execution_target: selection.target, execution_selection: selection, requirements_revision: 1,
@@ -523,7 +525,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           next_action: params.next_action || "Read the current requirements and perform the first concrete evidence-producing action.",
           state: "active", reason: null, revision: 1, control_epoch: 1, wait: null,
           progress: null, progress_version: 0, completion: null, completion_outcome: null, completion_stop_basis: null, execution_recovery: null, block_details: null,
-          research: { entry_node_ids: [], focus_node_ids: [] }, research_review: null, progress_identities: [],
+          research: { entry_node_ids: [], focus_node_ids: [] }, research_context: null, progress_identities: [],
           event_inputs: [],
           continuation: { sequence: 0, reservation: null, no_progress: 0 }, audit: [],
           created_at: stamp(), updated_at: stamp() });
@@ -661,15 +663,12 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       if (!basis || !["active", "waiting"].includes(basis.state)) return;
       const substantive = new Set(["research_result", "artifact_create", "artifact_register", "job_start", "job_status", "job_collect", "job_reconcile", "job_cancel"]);
       const observations = [], refs = [], identities = [];
-      let reviewPending = false;
       for (const entry of entries) for (const message of entry.model || []) {
         if (message.role !== "toolResult" || message.isError || !substantive.has(message.toolName)) continue;
         const result = message.details.result;
-        if (message.toolName === "research_result") { refs.push(result.result.id); identities.push(resultIdentity(result.result.id)); reviewPending = true; }
-        else if (message.toolName.startsWith("artifact_")) { refs.push(result.artifact_id); identities.push(artifactIdentity(result)); reviewPending = true; }
+        if (message.toolName === "research_result") { refs.push(result.result.id); identities.push(resultIdentity(result.result.id)); }
+        else if (message.toolName.startsWith("artifact_")) { refs.push(result.artifact_id); identities.push(artifactIdentity(result)); }
         else if (result.accepted !== false) observations.push(result);
-        if (message.toolName === "job_collect" || message.toolName === "job_reconcile"
-          || message.toolName === "job_status" && jobFinished.has(result.state)) reviewPending = true;
       }
       // Successful tool receipts already attest immutable products. Only Job
       // ownership needs a read; queries of historical Jobs remain valid tools.
@@ -685,7 +684,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         if (!recordProgress(task, [...new Set(identities)])) return;
         await recordUserRecoveryProgress(tx, task);
         task.progress = { summary: "Recorded new research evidence or execution milestone",
-          evidence_refs: [...new Set(refs)], at: stamp(), review_pending: reviewPending };
+          evidence_refs: [...new Set(refs)], at: stamp() };
         changed(task, "tool_progress", "runtime", task.progress.summary);
       }, ctx);
     },
@@ -757,8 +756,8 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     async validateConsumption(record, origin, ctx, consumptionBasis = origin.admission_basis) {
       const inherited = origin.producer === "task_controller" ? origin.admission_basis.event_inputs : [];
       const inheritedEvents = inherited?.length ? await Promise.all(inherited.flatMap(input => input.event_ids).map(event_id =>
-        kernel.execute_command("job_monitor_assess", { event_id, session_id: sessionId }))) : [];
-      requireValue(inheritedEvents.every(event => event.obsolete || event.admitted), "monitor_paused", "Deferred event delivery is paused");
+        kernel.execute_command("job_manager_assess", { event_id, session_id: sessionId }))) : [];
+      requireValue(inheritedEvents.every(event => event.obsolete || event.admitted), "job_events_paused", "Deferred event delivery is paused");
       await admission.recordConsumption(record, consumptionBasis, ctx, tx => assertExecution(tx, record, origin));
       for (const input of inherited || []) {
         await admission.recordSuccessorConsumption(await admission.status(input.request_id, ctx), record.id,
@@ -772,7 +771,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         }, ctx);
       }
     },
-    async completeMonitorConsumption(record, ctx) {
+    async completeJobEventConsumption(record, ctx) {
       await conversation.commit(async tx => {
         const { task } = await currentTx(tx);
         if (task) task.event_inputs = task.event_inputs.filter(input => input.submission_id !== record.id);
@@ -870,6 +869,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       const requestId = `task:${task.user_task_id}:continue:${task.continuation.sequence + 1}`;
       try {
         await admission.submitInternal({ requestId, producer: "task_controller", whenBusy: "reject",
+          reason: task.state === "completing" ? "final_response_retry" : task.execution_recovery ? "execution_retry" : "task_continue",
           identity: { user_task_id: task.user_task_id, request_id: requestId },
           basis: { control_epoch: task.control_epoch, revision: task.revision, event_inputs: task.event_inputs },
           content: task.state === "completing"

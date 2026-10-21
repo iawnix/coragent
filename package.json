@@ -4,7 +4,7 @@
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
-  "description": "Pi package for research questions, immutable results and memory, generic Job Runtime, and artifact evidence.",
+  "description": "Pi package for research questions, immutable results and memory, generic Job Manager, and artifact evidence.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/iawnix/coragent.git"

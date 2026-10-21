@@ -21,7 +21,7 @@ and follow-up calculations; it does not construct a complete mechanism study.
 xTB/CREST and ASE NEB may suit exploration, but distinguish scientific suitability
 from an available execution path. The bundled xTB runner supports opt/SP only;
 CREST, NEB and external crossing tools need a verified installed command or
-concrete script through generic Job Runtime. Check shared runners and installed
+concrete script through generic Job Manager. Check shared runners and installed
 tools before declaring a capability unavailable. Choose their order from the research question.
 
 Record the method choice and falsifiable purpose in the Researchresearch conclusion. If a

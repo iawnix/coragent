@@ -8,7 +8,7 @@
 
 自定义科学脚本通过配置的执行准备入口使用 `--script <file.py> --backend <binding>`。直接 argv 提交不会选择科学 Python 或软件后端。准备请求和报告排版使用原生工具，科学计算使用受管 Job。
 
-适配层在提交时固定 Node 版本和实际输入；后来修改方案不改变旧 Job 检验的内容。Job Runtime 是派发和终止事实的来源。job_status 查看、job_cancel 请求取消、job_reconcile 协调不确定性、job_collect 保存输出和来源，重复收集不会重新执行。
+适配层在提交时固定 Node 版本和实际输入；后来修改方案不改变旧 Job 检验的内容。Job Manager 是派发和终止事实的来源。job_status 查看、job_cancel 请求取消、job_reconcile 协调不确定性、job_collect 保存输出和来源，重复收集不会重新执行。
 
 artifact_create 保存新文本，artifact_register 导入文件，artifact_read 有界读取。科学 Job 的输出通过收集保留生产身份；分析请求声明并暂存实际输入；验证器作为普通 Job 运行。读过文件不自动成为科学证据使用。
 

@@ -22,7 +22,7 @@ without a native solver, new service or reaction-specific rule:
 | `chemical.energy-profile` | `input` | `chemical-energy-profile-input/1` |
 | `chemical.scan-slice` | `input` | `chemical-scan-slice-input/1` |
 
-Prepare/start/wait/collect through the ordinary Job runtime. Each produces
+Prepare/start/wait/collect through the ordinary Job manager. Each produces
 `results/result.json` and `results/table.csv`; register these as analysis materials.
 The standalone entry is `scripts/energy.py --output-dir NEW_DIR OP --input FILE`,
 where OP is `thermochemistry`, `ensemble`, `profile` or `scan-slice`.

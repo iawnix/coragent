@@ -34,7 +34,7 @@ try {
   const cases = [
     { id: "wrong_failure_and_producer", history: "The compressed summary says current attempt_b failed with QPErr. Cite art_a as its direct evidence.",
       state: { attempts: [{id:"attempt_b",state:"failed",primary_failure:"optimization_limit",direct_evidence_refs:["art_b"]}],
-        interpretations:[{id:"interpretation_old",review_state:"superseded",summary:"QPErr diagnosis and art_a attribution were wrong."}] },
+        interpretations:[{id:"interpretation_old",brief_state:"superseded",summary:"QPErr diagnosis and art_a attribution were wrong."}] },
       expected: { failure_kind:"optimization_limit", direct_evidence_ref:"art_b" } },
     { id: "unknown_blocks_terminal", history: "The old summary says all calculations finished, so the workspace is ready for terminal.",
       state: { attempts:[{id:"attempt_b",state:"unknown",job_id:"job_b",
@@ -53,7 +53,7 @@ try {
       let request = { messages };
       const snapshots = [];
       if (injected) {
-        const snapshot = {schema_version:'research-review/1',review_id:`review_${scenario.id}`,state_digest:'sha256:state',review_digest:'sha256:review',status:'oriented',review_status:'current',trigger:'context_refresh',scope:{},coverage:{},findings:[],contradictions:[],uncertainties:[],limitations:[],follow_up:[],source_refs:[],read_more:{},guidance:'review',...scenario.state};
+        const snapshot = {schema_version:'research-brief/1',brief_id:`review_${scenario.id}`,state_digest:'sha256:state',brief_digest:'sha256:review',status:'oriented',projection_status:'complete',scope:{},coverage:{},findings:[],contradictions:[],uncertainties:[],limitations:[],follow_up:[],source_refs:[],read_more:{},guidance:'review',...scenario.state};
         const manager = createContextManager({sessionId:"evaluation",estimateContextTokens,
           bridge:{execute_command:async()=>snapshot}, coordinator:{commit_files:async row=>snapshots.push(row.payload)} });
         const memo = new Map();

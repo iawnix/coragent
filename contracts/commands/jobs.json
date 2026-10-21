@@ -442,7 +442,7 @@
       }
     },
     {
-      "id": "job_monitor_assess",
+      "id": "job_manager_assess",
       "domain": "job",
       "effect": "read",
       "schema": {
@@ -471,7 +471,7 @@
         }
       ],
       "result": {
-        "$ref": "results.json#/commands/job_monitor_assess"
+        "$ref": "results.json#/commands/job_manager_assess"
       }
     },
     {

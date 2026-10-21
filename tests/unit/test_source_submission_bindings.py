@@ -21,7 +21,7 @@ def test_create_resolves_submission_id_without_guessing_research_ref(tmp_path):
     assert created["node"]["source_refs"] == [source["source_ref"]]
 
     review = execute("research_read", tmp_path, {
-        "session_id": "session-1", "view": "review",
+        "session_id": "session-1", "view": "brief",
         "source_submission_ids": ["11"],
     })
     assert review["user_sources"] == [{
