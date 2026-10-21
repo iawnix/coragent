@@ -345,7 +345,7 @@ def prepare(value, args, package, python):
         profile = value['profiles'][row['profile']]
         files = {name: base64.b64encode(resource(Path(profile['root']), name).read_bytes()).decode()
                  for name in profile['resources'] if name == profile['lock'] or name.endswith('.requirements.txt')}
-        target = value['settings']['environments'][row['target']]
+        target = value['settings']['targets'][row['target']]
         request = {'store': row['store'], 'binding': row['binding'], 'files': files,
                    'profile': {key: profile[key] for key in ('lock', 'platform')},
                    'owner': digest(os.fsencode(root))[:16], 'offline': bool(getattr(args, 'job_offline', False))}
@@ -362,7 +362,7 @@ def prepare(value, args, package, python):
     # Candidate Jobs read the candidate resolver; publication uses the final
     # installation path and is checked again before any service activation.
     for name in value['resolver_bindings']:
-        target = candidate['environments'][name]
+        target = candidate['targets'][name]
         if target['kind'] == 'local':
             target['backends']['structure']['environment']['CORAGENT_NAME_RESOLVER_CONFIG'] = str(resolver)
     config = stage / 'job.toml'
@@ -404,7 +404,7 @@ def verify_publication(value, python):
     if (app_paths(root).resolver_config).read_text() != value['resolver']:
         raise RuntimeError('published resolver configuration changed')
     stage, package = Path(value['stage']), Path(value['package_root'])
-    targets = [name for name in value['targets'] if value['settings']['environments'][name]['kind'] == 'local']
+    targets = [name for name in value['targets'] if value['settings']['targets'][name]['kind'] == 'local']
     report = stage / 'published-readiness.json'
     command = [python, '-B', str(package / 'scripts/_job_acceptance.py'), '--config', str(app_paths(root).job_config),
                '--package-root', str(package), '--directory', str(stage / 'published-jobs'), '--report', str(report),

@@ -1,7 +1,6 @@
 """Installation plans and ordinary Job acceptance use deterministic local inputs."""
 
 from research_agent.foundation.layout import paths as app_paths
-import copy
 import importlib.util
 import json
 import os
@@ -109,29 +108,22 @@ def test_bootstrap_validation_works_without_site_packages(tmp_path):
 
 @pytest.mark.skipif(importlib.util.find_spec('numpy') is None, reason='fixture environment lacks NumPy for structure acceptance')
 def test_candidate_and_published_config_work_inside_real_jobs(tmp_path):
-    from scripts._job_acceptance import accept
     config = tomllib.loads(Path(os.environ['CORAGENT_JOB_CONFIG']).read_text())
     local = config['execution']['targets']['local']
     local['bindings'] = {'structure': local['bindings']['structure']}
+    local['bindings']['structure'].pop('environment', None)
     source = tmp_path/'job.toml'
     source.write_bytes(jobs.toml_bytes({'execution': {'default_target':'local','targets':{'local':local}}}))
     args = options(tmp_path, '--job-config', str(source))
-    plan = jobs.plan(args)
-    stage = tmp_path/'candidate'
-    stage.mkdir()
-    resolver = stage/'resolver.toml'
-    resolver.write_text(plan['resolver'])
-    candidate = copy.deepcopy(plan['settings'])
-    candidate['targets']['local']['backends']['structure']['environment']['CORAGENT_NAME_RESOLVER_CONFIG'] = str(resolver)
-    staged = stage/'job.toml'
-    staged.write_bytes(jobs.toml_bytes(candidate))
-    report = accept(staged, ROOT, stage/'jobs', ['local'], 20)
+    plan = jobs.prepare(jobs.plan(args), args, ROOT, sys.executable)
+    report = plan['readiness']
     assert report['targets']['local']['status'] == 'execution_verified', report
     assert len(report['targets']['local']['jobs']) == 2
     assert report['external_services'] == 'not_checked'
-    plan['readiness'] = report
     jobs.publish(plan)
-    result = accept(app_paths(Path(args.install_root)).job_config, ROOT, stage/'published', ['local'], 20, bindings_only=True)
+    jobs.verify_publication(plan, sys.executable)
+    record = json.loads((app_paths(Path(args.install_root)).state/jobs.RECORD).read_text())
+    result = record['publication']
     assert result['targets']['local']['status'] == 'execution_verified', result
 
 

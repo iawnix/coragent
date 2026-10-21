@@ -15,11 +15,12 @@ import pytest
 from scripts.build_package import build_package
 from scripts import _job_install as jobs
 from research_agent.foundation.layout import paths
+from tests.unit.conftest import execution_target_fixture
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_public_package_install_accepts_jobs_and_preserves_external_environment(tmp_path):
+def test_public_package_install_accepts_jobs_and_preserves_external_environment(tmp_path, execution_target_fixture):
     if importlib.util.find_spec('setuptools') is None:
         pytest.skip('local test environment lacks setuptools build backend')
     built = build_package(output_dir=tmp_path/'package', agent_manifest_path=None, allow_dirty=True, include_web=False)
