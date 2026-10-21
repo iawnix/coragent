@@ -1,9 +1,13 @@
 import catalog from "./command-catalog.json" with { type: "json" };
 import { Value } from "../pi/typebox.mjs";
 
-if (catalog.schema_version !== "coragent-command-catalog/1" || !Array.isArray(catalog.commands)) {
+if (catalog.schema_version !== "coragent-command-catalog/2" || !Array.isArray(catalog.commands)) {
   throw new Error("invalid CoRAgent command catalog");
 }
+
+const commandNames = catalog.commands.map(item => item.id);
+if (commandNames.some(name => typeof name !== "string" || !/^[a-z][a-z0-9_]*$/u.test(name))
+    || new Set(commandNames).size !== commandNames.length) throw new Error("invalid or duplicate command identity");
 
 export const COMMAND_DEFINITIONS = Object.freeze(Object.fromEntries(catalog.commands.map(
   ({ id, domain, effect, required, allowed, schema, result }) => [id, Object.freeze({
@@ -37,7 +41,7 @@ export function createCommandService(transport) {
 }
 
 export function validateCommandInvocation(command, params = {}) {
-  const definition = COMMAND_DEFINITIONS[command];
+  const definition = typeof command === "string" && Object.hasOwn(COMMAND_DEFINITIONS, command) ? COMMAND_DEFINITIONS[command] : undefined;
   if (!definition) throw new Error(`unsupported CoRAgent command: ${command}`);
   if (!params || typeof params !== "object" || Array.isArray(params)) {
     throw new Error(`${command} parameters must be an object`);
@@ -110,8 +114,8 @@ export function slashCompletions(name, prefix = "") {
 
 function parseResearchSlash(tokens, usage) {
   const action = tokens[0] || "read";
-  if (action === "read" && tokens.length <= 2) return validateCommandInvocation("research.read", tokens[1] ? {ref: tokens[1]} : {});
-  if (action === "search") return validateCommandInvocation("research.search", {query: tokens.slice(1).join(" ")});
+  if (action === "read" && tokens.length <= 2) return validateCommandInvocation("research_read", tokens[1] ? {ref: tokens[1]} : {});
+  if (action === "search") return validateCommandInvocation("research_search", {query: tokens.slice(1).join(" ")});
 
   throw usageError(usage);
 }

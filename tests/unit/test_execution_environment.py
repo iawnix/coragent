@@ -148,19 +148,19 @@ def test_submission_rejects_drift_before_attempt_but_replay_returns_original_rec
     original = receipt.read_bytes()
     receipt.write_bytes(original + b'\n')
     with pytest.raises(ValueError, match='execution_environment_changed'):
-        execute('job.start', root, params)
+        execute('job_start', root, params)
     assert not list((root/'operations/executions').glob('*.json'))
     assert not (root / 'runs/jobs').exists()
     receipt.write_bytes(original)
-    started = execute('job.start', root, params)
+    started = execute('job_start', root, params)
     for _ in range(250):
-        status = execute('job.status', root, {'job_id': started['job_id']})
+        status = execute('job_status', root, {'job_id': started['job_id']})
         if status['state'] in {'succeeded', 'failed'}:
             break
         time.sleep(.02)
     assert status['state'] == 'succeeded'
     receipt.unlink()
-    replay = execute('job.start', root, params)
+    replay = execute('job_start', root, params)
     assert replay['job_id'] == started['job_id']
     assert len(list((root/'operations/executions').glob('*.json'))) == 1
 
@@ -182,7 +182,7 @@ def test_target_probe_does_not_hold_state_lock(tmp_path, monkeypatch):
         with TransactionCoordinator(root).locked():
             return read(root)['workspace_id']
     with ThreadPoolExecutor(max_workers=2) as pool:
-        submit = pool.submit(execute, 'job.start', root, {**prepared})
+        submit = pool.submit(execute, 'job_start', root, {**prepared})
         try:
             assert entered.wait(5)
             assert pool.submit(read_while_probing).result(timeout=3)
@@ -190,7 +190,7 @@ def test_target_probe_does_not_hold_state_lock(tmp_path, monkeypatch):
             release.set()
         started = submit.result(timeout=15)
     for _ in range(250):
-        status = execute('job.status', root, {'job_id': started['job_id']})
+        status = execute('job_status', root, {'job_id': started['job_id']})
         if status['state'] in {'succeeded', 'failed'}:
             break
         time.sleep(.02)

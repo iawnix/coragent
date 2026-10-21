@@ -7,7 +7,7 @@ const requireAssessment = (ok, message) => {
 
 export async function verifyAssessment(kernel, task, item, verifyEvidence, ctx) {
   requireAssessment(/^art_[1-9][0-9]*$/.test(item.assessment_ref || ""), "Each criterion needs a fixed JSON assessment Artifact");
-  const artifact = await kernel.execute_command("artifact.read", { artifact_id: item.assessment_ref, limit: 100000 });
+  const artifact = await kernel.execute_command("artifact_read", { artifact_id: item.assessment_ref, limit: 100000 });
   requireAssessment(!artifact.next_offset, "Assessment exceeds 100000 bytes; keep checks concise and reference supporting Artifacts");
   let assessment;
   try { assessment = JSON.parse(artifact.content); } catch { requireAssessment(false, "Assessment must be task-assessment/1 JSON"); }

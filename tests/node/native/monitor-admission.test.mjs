@@ -35,7 +35,7 @@ async function setup(t, { validate = false } = {}) {
   monitor = createMonitorAdmission({ admission, wakeMessage, sessionId: "s", producerToken: token,
     kernel: {
       async execute_command(command, params) {
-        assert.equal(command, "job.monitor_assess");
+        assert.equal(command, "job_monitor_assess");
         assert.equal(params.session_id, "s");
         state.assessments++;
         await state.wait();

@@ -213,7 +213,7 @@ export async function createCoRAgentHarness(databasePath, options) {
         env.provide(CoRAgentClientQueries, createClientQueries({ workspaceId, sessionId, commandBridge, promptManifest,
           readTelemetry: async (context) => {
             const { estimateContext } = await loadPi("compaction", sourceRoot);
-            const [view, agent, research] = await Promise.all([conversation.context(context), conversation.agent(context), commandBridge.execute_command("research.read", {})]);
+            const [view, agent, research] = await Promise.all([conversation.context(context), conversation.agent(context), commandBridge.execute_command("research_read", {})]);
             const model = agent.model && modelRuntime.getModel(agent.model.provider, agent.model.modelId);
             // Reuse Pi's compaction-aware request estimate. It is not an exact tokenizer count.
             const contextWindow = model?.contextWindow || null;

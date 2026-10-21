@@ -16,15 +16,15 @@ def test_task_ownership_survives_job_submission_and_read_only_pagination(tmp_pat
                           'session_id': 'session_owner', 'user_task_id': task,
                           'command': [sys.executable, '-c', 'pass # ' + suffix]})
     before = {p: p.read_bytes() for p in (tmp_path / 'operations').rglob('*.json')}
-    first = execute('job.list', tmp_path, {'session_id': 'session_owner', 'limit': 1})
+    first = execute('job_list', tmp_path, {'session_id': 'session_owner', 'limit': 1})
     assert first['jobs'][0]['user_task_id'] == 'task_1'
     assert first['next_cursor'] == 'job_1'
-    second = execute('job.list', tmp_path, {'session_id': 'session_owner', 'cursor': first['next_cursor']})
+    second = execute('job_list', tmp_path, {'session_id': 'session_owner', 'cursor': first['next_cursor']})
     assert [row['job_id'] for row in second['jobs']] == ['job_2']
     assert second['next_cursor'] is None
-    selected = execute('job.list', tmp_path, {'user_task_id': 'task_1'})
+    selected = execute('job_list', tmp_path, {'user_task_id': 'task_1'})
     assert [row['job_id'] for row in selected['jobs']] == ['job_1']
-    assert execute('job.list', tmp_path, {'session_id': 'session_other'})['jobs'] == []
+    assert execute('job_list', tmp_path, {'session_id': 'session_other'})['jobs'] == []
     assert {p: p.read_bytes() for p in before} == before
     bindings = command(tmp_path, 'list', {})['monitors']
     assert {row['job_id']: row['user_task_id'] for row in bindings} == {

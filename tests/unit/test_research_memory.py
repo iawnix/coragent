@@ -139,12 +139,12 @@ def test_unicode_pagination_and_bounded_snapshot(tmp_path):
 
 def test_artifact_file_identity_and_old_protocol_rejected(tmp_path):
     workspace(tmp_path)
-    node = execute('research.create', tmp_path, {'goal': 'Report'})['node']
-    material = execute('artifact.create', tmp_path, {'name': 'analysis.txt', 'content': 'Preliminary'})
-    result = execute('research.result', tmp_path, {'node_id': node['id'], 'conclusion': 'Report prepared',
+    node = execute('research_create', tmp_path, {'goal': 'Report'})['node']
+    material = execute('artifact_create', tmp_path, {'name': 'analysis.txt', 'content': 'Preliminary'})
+    result = execute('research_result', tmp_path, {'node_id': node['id'], 'conclusion': 'Report prepared',
                      'files': [{'name': 'analysis.txt', 'artifact_ref': material['artifact_id']}]})
     assert result['result']['files'][0]['artifact_ref'] == material['artifact_id']
-    for command, params in [('research.change', {}), ('research.update', {'content': 'old'}), ('research.create', {'goal': 'x', 'origin': 'runtime'})]:
+    for command, params in [('research.change', {}), ('research_update', {'content': 'old'}), ('research_create', {'goal': 'x', 'origin': 'runtime'})]:
         with pytest.raises(ValueError):
             execute(command, tmp_path, params)
 
@@ -290,7 +290,7 @@ def test_result_retains_job_fact_original_proposal_revision(tmp_path):
     fact = records.record_event(tmp_path, {'kind': 'job', 'title': 'Completed old calculation', 'node_id': node_id,
                  'node_revision': 1, 'data': {'metadata': {'research_binding': {'node_id': node_id, 'node_revision': 1}}}})
     changed = nodes.update(tmp_path, {'node_id': node_id, 'note': 'Revised proposal', 'proposal': 'New proposal', 'read_basis': initial['read_basis']})
-    result = execute('research.result', tmp_path, {'node_id': node_id, 'conclusion': 'Old test observed', 'evidence_refs': [fact['ref']], 'read_basis': changed['read_basis']})['result']
+    result = execute('research_result', tmp_path, {'node_id': node_id, 'conclusion': 'Old test observed', 'evidence_refs': [fact['ref']], 'read_basis': changed['read_basis']})['result']
     assert result['authored_node_revision'] == 2
     assert result['basis_refs'] == [{'ref': fact['ref'], 'node_id': node_id, 'node_revision': 1}]
 
@@ -302,8 +302,8 @@ def test_generated_view_failure_reports_saved_result_without_republication(tmp_p
         raise ValueError('view_path_symlink')
     monkeypatch.setattr(views, 'render', render_failure)
     request = {'node_id': node['id'], 'conclusion': 'Preserved despite view failure', 'request_id': 'publication-view-failure'}
-    first = execute('research.result', tmp_path, request)
-    second = execute('research.result', tmp_path, request)
+    first = execute('research_result', tmp_path, request)
+    second = execute('research_result', tmp_path, request)
     assert first['result_saved'] and first['view_error'] == 'view_path_symlink'
     assert first['result']['id'] == second['result']['id']
     assert len(relations.graph(tmp_path)['results']) == 1
@@ -312,10 +312,10 @@ def test_generated_view_failure_reports_saved_result_without_republication(tmp_p
 def test_result_search_distinguishes_product_from_publication_history(tmp_path):
     workspace(tmp_path)
     node = create(tmp_path)['node']
-    saved = execute('research.result', tmp_path, {'node_id': node['id'], 'conclusion': 'One distinct research product'})['result']
-    products = execute('research.search', tmp_path, {'kind': 'result'})
+    saved = execute('research_result', tmp_path, {'node_id': node['id'], 'conclusion': 'One distinct research product'})['result']
+    products = execute('research_search', tmp_path, {'kind': 'result'})
     assert products['total'] == 1
     assert products['records'][0]['ref'] == saved['id']
-    history = execute('research.search', tmp_path, {'kind': 'result_published'})
+    history = execute('research_search', tmp_path, {'kind': 'result_published'})
     assert history['total'] == 1
     assert records.record(tmp_path, history['records'][0]['ref'])['data']['result_id'] == saved['id']

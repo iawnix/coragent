@@ -35,3 +35,9 @@ Cancelling Jobs or closing Nodes does not itself stop the task. Confirm the pers
 `execution_recovery` tracks failed agent execution separately from scientific blockers. Inspect its state and existing Job/delivery receipts before choosing the next action. Reconcile completed or uncertain external work; do not repeat it merely because a run or Memory update failed. Explain attention-required execution failures; a new instruction resolving the problem can use `refine`, or the user can explicitly resume through Monitor.
 
 For final-response recovery, reuse saved completion evidence and receipts. Limit work to read-only checks and the final response; do not launch new calculations or resend external messages. If completion evidence is invalidated and the controller returns the task to active, reassess the affected criteria using [acceptance](acceptance.md).
+
+## Progress and research association
+
+Use `task_update action=progress` to record adopted fixed Results/Artifacts or current-task Jobs and the next action. Notes alone are not substantive scientific progress, and collection receipts cannot directly serve as task progress references. `progress` does not resume paused or blocked work. New requirements or resolved blockers use `refine` with actual new user submissions.
+
+Use `action=set_research` with complete `entry_node_ids` and `focus_node_ids` arrays to set task navigation. Both arrays are replaced; an empty array clears that list. Use research-memory for problem decomposition and relations. Always use the current Task revision, which is separate from Node revision. See [acceptance](acceptance.md) for completion and partial delivery, and [target selection](execution-targets.md) for execution correction.

@@ -7,15 +7,15 @@ type SameKeys = Assert<keyof CommandResults extends CommandId ? CommandId extend
 
 export async function checkCommandResultTypes(bridge: RuntimeBridge) {
   const service = createCommandService({ execute: async () => ({}) });
-  const material = await service.execute("artifact.create", "/fixture", { content: "fixture" });
+  const material = await service.execute("artifact_create", "/fixture", { content: "fixture" });
   const bytes: number = material.size_bytes;
   // @ts-expect-error Artifact byte length cannot be used as text.
   const wrongBytes: string = material.size_bytes;
-  const created = await bridge.execute_command("research.create", { goal: "fixture" });
+  const created = await bridge.execute_command("research_create", { goal: "fixture" });
   const revision: number = created.node.revision;
   // @ts-expect-error Research creation does not return a Job receipt.
   created.job_id;
-  const read = await bridge.execute_command("research.read");
+  const read = await bridge.execute_command("research_read");
   if (read.schema_version === "research-snapshot/3") {
     const sequence: number = read.sequence;
     void sequence;
@@ -26,7 +26,7 @@ export async function checkCommandResultTypes(bridge: RuntimeBridge) {
     const review: string = read.review_id;
     void review;
   }
-  const start = await bridge.execute_command("job.start", { command: ["/bin/true"] });
+  const start = await bridge.execute_command("job_start", { command: ["/bin/true"] });
   if ("submitted_at" in start) {
     const platform: string = start.platform;
     void platform;

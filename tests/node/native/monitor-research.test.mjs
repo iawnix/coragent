@@ -43,7 +43,7 @@ test('Monitor task research uses the canonical read without mutating focus or ad
     controller: { async read(params) { reads.push(params); return task; } },
     kernel: { async execute_command(command, params) {
       calls.push([command, params]);
-      return command === 'research.read' ? snapshot : { jobs: [{ job_id: 'job_a' }], next_cursor: null };
+      return command === 'research_read' ? snapshot : { jobs: [{ job_id: 'job_a' }], next_cursor: null };
     } },
   });
   const rpc = [];
@@ -63,9 +63,9 @@ test('Monitor task research uses the canonical read without mutating focus or ad
   }
   assert.deepEqual(rpc, ['monitor/task/read', 'monitor/task/read']);
   assert.equal(reads.length, 2);
-  assert.deepEqual(calls, Array.from({ length: 2 }, () => [['research.read', {
+  assert.deepEqual(calls, Array.from({ length: 2 }, () => [['research_read', {
     session_id: 's', entry_node_ids: ['node_1', 'node_2'], focus_node_ids: ['node_3'], limit: 16000,
-  }], ['job.list', { session_id: 's', limit: 100 }]]).flat());
+  }], ['job_list', { session_id: 's', limit: 100 }]]).flat());
   assert.deepEqual(task, original);
 });
 
@@ -115,7 +115,7 @@ test('research snapshot errors surface through the existing Monitor error envelo
 test('Monitor overview omits internal records and duplicate review and policy fields', async () => {
   const service = createMonitorService({ workspaceId: 'w', sessionId: 's',
     controller: { async current() { return task; }, health() { return { automatic_continuation_enabled: false }; } },
-    kernel: { async execute_command(command) { return command === 'job.list' ? { jobs: [], next_cursor: null } : {}; } },
+    kernel: { async execute_command(command) { return command === 'job_list' ? { jobs: [], next_cursor: null } : {}; } },
     harness: { async snapshot() { return null; } }, conversation: { id: 'c' }, LiveDoc: {} });
   const response = await service.handle({ method: 'monitor/overview', params: {} });
   assert.equal(response.error, null);
@@ -160,8 +160,8 @@ test('shared research keeps external Jobs visible without offering unusable sess
     controller: { async read() { return task; } },
     kernel: { async execute_command(command, params) {
       calls.push([command, params]);
-      if (command === 'research.read') return shared;
-      assert.equal(command, 'job.list');
+      if (command === 'research_read') return shared;
+      assert.equal(command, 'job_list');
       assert.equal(params.session_id, 's');
       return params.cursor
         ? { jobs: [{ job_id: 'job_a', session_id: 's' }], next_cursor: null }
@@ -199,7 +199,7 @@ test('Monitor summaries are bounded and task pages preserve control revisions wi
   const service = createMonitorService({ workspaceId: 'w', sessionId: 's',
     controller: { async list(_ctx, params) { assert.equal(params.cursor, 'page2'); return { items: [full], next_cursor: 'page3' }; },
       async read() { return full; } },
-    kernel: { async execute_command(command) { return command === 'research.read' ? snapshot : { jobs: [], next_cursor: null }; } },
+    kernel: { async execute_command(command) { return command === 'research_read' ? snapshot : { jobs: [], next_cursor: null }; } },
   });
   const page = await service.handle({ method: 'monitor/tasks', params: { cursor: 'page2' } });
   assert.equal(page.error, null);
@@ -222,7 +222,7 @@ test('Monitor overview counts every scoped job page and previews only active wor
       controller: { async current() { return current; }, health() { return {}; } },
       harness: { async snapshot() { return null; } }, conversation: { id: 'c' }, LiveDoc: {},
       kernel: { async execute_command(command, params) {
-        assert.equal(command, 'job.list');
+        assert.equal(command, 'job_list');
         calls.push(params);
         return { jobs: pages[params.cursor ? 1 : 0], next_cursor: params.cursor ? null : 'page2' };
       } },

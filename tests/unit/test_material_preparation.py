@@ -165,26 +165,26 @@ def test_material_executor_runs_staged_code_and_collects_reusable_geometry(tmp_p
     from tests.unit.test_job_recovery import workspace
     root = tmp_path / 'workspace'
     workspace(root)
-    node = execute('research.create', root, {'goal': 'Preserve the supplied complex for later calculation'})['node']
+    node = execute('research_create', root, {'goal': 'Preserve the supplied complex for later calculation'})['node']
     source = root / 'material-input.json'
     source.write_text(json.dumps(request(arrangement='complex')))
     prepared = prepare(Path(os.environ['CORAGENT_JOB_CONFIG']), 'local', 'chemical.material', '1', {'material': source})
     assert not list((root / 'operations/executions').glob('*.json'))
-    job = execute('job.start', root, {**prepared, 'node_id': node['id']})
+    job = execute('job_start', root, {**prepared, 'node_id': node['id']})
     try:
         for _ in range(300):
-            status = execute('job.status', root, {'job_id': job['job_id']})
+            status = execute('job_status', root, {'job_id': job['job_id']})
             if status['state'] in {'succeeded', 'failed'}:
                 break
             time.sleep(.01)
         assert status['state'] == 'succeeded'
-        collected = execute('job.collect', root, {'job_id': job['job_id']})
+        collected = execute('job_collect', root, {'job_id': job['job_id']})
         assert collected['output_validation']['complete']
         assert (Path(job['cwd']) / 'results/geometry.xyz').read_bytes() == COMPLEX.encode()
         geometry = next(a for a in collected['artifacts'] if a['provenance']['source_path'].endswith('/geometry.xyz'))
-        published = execute('research.result', root, {'node_id': node['id'],
+        published = execute('research_result', root, {'node_id': node['id'],
             'conclusion': 'Preserved supplied geometry; no optimization or state verification performed.',
             'files': [{'name': 'complex.xyz', 'artifact_ref': geometry['artifact_id']}]})
         assert published['result_saved']
     finally:
-        execute('job.cancel', root, {'job_id': job['job_id']})
+        execute('job_cancel', root, {'job_id': job['job_id']})

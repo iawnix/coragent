@@ -333,18 +333,18 @@ def test_registered_tools_through_real_jobs(tmp_path,monkeypatch,operation):
     config=tmp_path/'job.toml';config.write_text(text);monkeypatch.setenv('CORAGENT_JOB_CONFIG',str(config))
     source=root/'input.json';source.write_text(json.dumps(spec))
     prepared=prepare(config,'local','chemical.'+operation,'2' if operation.startswith('neb-') else '1',{'input':source})
-    node=execute('research.create',root,{'goal':'ASE and analysis operation fixture'})['node']
-    receipt=execute('job.start',root,{**prepared,'node_id':node['id']})
+    node=execute('research_create',root,{'goal':'ASE and analysis operation fixture'})['node']
+    receipt=execute('job_start',root,{**prepared,'node_id':node['id']})
     try:
         for _ in range(1500):
-            status=execute('job.status',root,{'job_id':receipt['job_id']})
+            status=execute('job_status',root,{'job_id':receipt['job_id']})
             if status['state'] in ('succeeded','failed'):break
             time.sleep(.01)
         assert status['state']=='succeeded'
-        assert execute('job.collect',root,{'job_id':receipt['job_id']})['output_validation']['complete']
+        assert execute('job_collect',root,{'job_id':receipt['job_id']})['output_validation']['complete']
         result=json.loads((Path(receipt['cwd'])/'results/result.json').read_text())
         if operation.startswith('neb-'):assert result['status']=='converged' and result['engine']['name']=='ASE'
-    finally:execute('job.cancel',root,{'job_id':receipt['job_id']})
+    finally:execute('job_cancel',root,{'job_id':receipt['job_id']})
 
 
 def test_prepared_path_lock_is_dependency_complete_and_runs_real_ase(tmp_path):

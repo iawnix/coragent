@@ -63,21 +63,21 @@ def test_verified_native_prerequisites_do_not_execute_program_but_prepared_job_d
     root = tmp_path / 'workspace'; workspace(root)
     data = root / 'input.txt'; data.write_text('Synthetic material; no scientific verdict\n')
     prepared = prepare(config, 'local', 'external.copy', '3', {'data': data})
-    receipt = execute('job.start', root, prepared)
+    receipt = execute('job_start', root, prepared)
     try:
         for _ in range(200):
-            observed = execute('job.status', root, {'job_id': receipt['job_id']})
+            observed = execute('job_status', root, {'job_id': receipt['job_id']})
             if observed['state'] in {'succeeded', 'failed'}:
                 break
             time.sleep(.01)
         assert observed['state'] == 'succeeded'
         assert marker.exists()
-        collected = execute('job.collect', root, {'job_id': receipt['job_id']})
+        collected = execute('job_collect', root, {'job_id': receipt['job_id']})
         assert collected['output_validation']['complete']
         assert (Path(receipt['cwd']) / 'result.txt').read_text() == data.read_text()
         assert 'scientific_verdict' not in collected, 'execution/collection does not synthesize a scientific result'
     finally:
-        execute('job.cancel', root, {'job_id': receipt['job_id']})
+        execute('job_cancel', root, {'job_id': receipt['job_id']})
 
 
 @pytest.mark.parametrize('change', ['configuration', 'executable_bytes', 'executable_deleted'])
@@ -96,7 +96,7 @@ def test_prepared_availability_evidence_cannot_authorize_a_stale_binding(tmp_pat
         program.unlink()
         expected = 'environment_executable_missing'
     with pytest.raises(ValueError, match=expected):
-        execute('job.start', root, prepared)
+        execute('job_start', root, prepared)
     assert not marker.exists()
     assert not list((root / 'operations/executions').glob('*.json'))
 
@@ -144,7 +144,7 @@ def test_target_probe_does_not_claim_that_the_configured_software_is_installed(t
     config, program, _, args = native_fixture(tmp_path, monkeypatch)
     program.unlink()
     root = tmp_path / 'workspace'; workspace(root)
-    target = execute('job.probe', root, {'execution_target': 'local'})
+    target = execute('job_probe', root, {'execution_target': 'local'})
     assert target['cwd_exists'] and target['inputs_present']
     assert 'executable' not in target
     status, software = run_cli(*args)

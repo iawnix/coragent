@@ -57,7 +57,7 @@ export function createContextManager({ bridge, coordinator, sessionId, estimateC
           waited_job_ids: task?.wait?.job_ids || [] };
         if (event_ids.length) request.event_ids = event_ids;
         if (trigger !== "context_refresh") request.trigger = trigger;
-        decision = await bridge.execute_command("research.read", request);
+        decision = await bridge.execute_command("research_read", request);
         if (decision?.schema_version !== "research-review/1") throw new Error("Invalid research context projection");
         if (Buffer.byteLength(JSON.stringify(decision)) > limit) throw new Error("Research context projection exceeds its byte budget");
         if (synthesizeReview && decision.schema_version === "research-review/1"

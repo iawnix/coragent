@@ -30,7 +30,7 @@ Executor preparation should omit `--target` in a domain Skill. For an active tas
   --output prepared/request.json
 ```
 
-Before submission, the prepared request target must match the task target. A TRI receipt must contain `driver = "external"` and a non-empty `scheduler_id`; a receipt without scheduler identity does not prove TRI submission.
+Before submission, the prepared request target must match the task target. Verify submission receipts using the selected scheduler’s [integration guidance](../../batch-schedulers/SKILL.md).
 
 ## Source-bound selection and correction
 

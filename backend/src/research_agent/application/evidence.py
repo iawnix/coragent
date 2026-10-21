@@ -35,7 +35,7 @@ def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
 def _dispatch(root, request):
     operation, params = request["operation"], request["params"]
     from .api import validate_command_params
-    validate_command_params("artifact." + operation, params, transport_fields=("root", "workspace_root"))
+    validate_command_params("artifact_" + operation, params, transport_fields=("root", "workspace_root"))
     root = _root(params); store = _store(root)
     supplied = params.get("artifact_id")
     if operation in {"create", "register"}:

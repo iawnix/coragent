@@ -30,3 +30,5 @@ Review 是导航投影：`state_digest` 和 `review_digest` 标明它看到的�
 1. 恢复 Review 和当前任务；2. 读取焦点 Node 与证据；3. 由领域 Skill 选择下一项计算或分析；4. 执行后记录变化；5. 发布 Result 或修订计划，同时保留竞争分支和未决问题。
 
 发布 Result 时，用 `observation` 记录观察、`conclusion` 记录结论、`evidence_refs` 关联来源记录。恢复研究时，沿这些引用读取支持结论的证据。
+
+发布或修订结论、选择输入与支持引用时，读取[证据与结论](references/evidence.zh-CN.md)。

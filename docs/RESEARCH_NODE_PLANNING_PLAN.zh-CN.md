@@ -180,7 +180,7 @@ Task 控制“还需不需要继续”，Agent 根据证据判断“具体做什
 | 层 | 增量 | 继续保持 |
 | --- | --- | --- |
 | `task_read`、Task Monitor DTO | 返回同一组研究引用 | 不展开独立 PlanStep，不复制研究状态 |
-| 内部 `research.read` 概览参数 | 增加可选 `entry_node_ids`，复用已有 `focus_node_ids` | 模型工具 `research_read` 继续使用已有 `ref/field/offset/limit`，不另开公开概览参数 |
+| 内部 `research_read` 概览参数 | 增加可选 `entry_node_ids`，复用已有 `focus_node_ids` | 模型工具 `research_read` 继续使用已有 `ref/field/offset/limit`，不另开公开概览参数 |
 | `research-snapshot` | 增加有界结构投影、关系摘录、入口/焦点标识及省略信息 | 原始研究记录为唯一事实源，投影可重建 |
 | `beforeRequest` | 从当前 Task 传递入口/焦点，并结合实际事件 | 每次模型请求前注入，不写进对话历史 |
 | Monitor 展示 | 任务详情用现有研究读边界按 Task 引用取得同类投影 | 一个 Monitor 协议、一个图投影实现 |

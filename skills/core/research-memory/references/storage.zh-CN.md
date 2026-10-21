@@ -15,3 +15,5 @@ Node 身份稳定，工作目录位于 `research/nodes/<node_id>/`。不可变 R
 ## 上下文与修订
 
 `research_context` 是记录当时的观察；`runtime_control` 提供当前任务控制状态和真实用户 submission ID。即使用 user 角色承载，两者也不是新用户指令。上下文可能省略对象或截断字段；用 `research_read`/`research_search` 读取当前记录，续接内容截断时用 `task_read`。替换 Node 字段前完整读取；上下文与压缩摘要不构成读取回执。发生过期读取冲突时重新读取并合并。纠正 Result 使用 `supersedes`，随后复核受影响的结论和报告。关闭 Node 不等于科学验证通过或任务完成。
+
+搜索使用 `kind`：例如 `research_search({"kind":"result"})` 查找已发布结果，`{"kind":"result_published"}` 查找发布记录。没有汇总所有记录的 `kind="record"`；需要按来源筛选时省略 kind，使用 origin=user/runtime/agent。`research_read({"ref":"<node_id>","field":"subjects"})` 读取节点的研究对象。read 分页按 Unicode 字符，search 分页按条目，artifact_read 分页按字节。

@@ -144,7 +144,7 @@ def test_repeated_reference_submissions_reuse_the_same_real_job(tmp_path):
     params = {"prepared_ref": ref}
     def launch(_):
         try:
-            return execute("job.start", tmp_path, params)
+            return execute("job_start", tmp_path, params)
         except JobSubmissionError:
             # A competing dispatcher may not yet have committed its receipt.
             # The caller must reconcile that identity, never submit new work.
@@ -152,7 +152,7 @@ def test_repeated_reference_submissions_reuse_the_same_real_job(tmp_path):
     with ThreadPoolExecutor(max_workers=2) as pool:
         outcomes = list(pool.map(launch, range(2)))
     first = next(result for result in outcomes if result is not None)
-    assert execute("job.start", tmp_path, params)["job_id"] == first["job_id"]
+    assert execute("job_start", tmp_path, params)["job_id"] == first["job_id"]
     # Collect waits for this very small fixture Job to finish; no solver or
     # long-lived service is involved.
     import time
@@ -198,7 +198,7 @@ def test_file_submission_rejection_does_not_register_or_stage(tmp_path, change, 
     params = {"request_file": str(path), "request_sha256": hashlib.sha256(path.read_bytes()).hexdigest(), **change}
     before = read(tmp_path)
     with pytest.raises(ValueError, match=error):
-        execute("job.start", tmp_path, params)
+        execute("job_start", tmp_path, params)
     assert read(tmp_path) == before
     assert not list((tmp_path / "operations/references/records").glob("*.json"))
     assert not list((tmp_path / "operations/jobs").glob("*.json"))
@@ -228,16 +228,16 @@ def test_file_submission_freezes_one_read_and_replays_without_execution(tmp_path
         return value
 
     monkeypatch.setattr(references, "read_prepared_file", read_and_replace)
-    first = execute("job.start", tmp_path, params)
+    first = execute("job_start", tmp_path, params)
     assert len(reads) == 1
     assert first["prepared_ref"] == "prepared_1"
     frozen = resolve_prepared_job(tmp_path, {"prepared_ref": "prepared_1"})
     assert frozen["command"] == json.loads(encoded)["command"]
     path.write_bytes(encoded)
-    replay = execute("job.start", tmp_path, params)
+    replay = execute("job_start", tmp_path, params)
     assert replay["prepared_ref"] == "prepared_1"
     assert replay["job_id"] == first["job_id"]
-    assert execute("job.start", tmp_path, {"prepared_ref": "prepared_1"})["job_id"] == first["job_id"]
+    assert execute("job_start", tmp_path, {"prepared_ref": "prepared_1"})["job_id"] == first["job_id"]
     for _ in range(200):
         status = execute_job("status", {"root": str(tmp_path), "job_id": first["job_id"]})
         if status["state"] in {"succeeded", "failed"}:
@@ -267,9 +267,9 @@ def test_file_reference_and_attempt_recover_in_the_same_dispatch_transaction(tmp
 
     monkeypatch.setattr(transactions, "_atomic_json", fail_index)
     with pytest.raises(OSError, match="index failure"):
-        execute("job.start", tmp_path, params)
+        execute("job_start", tmp_path, params)
     monkeypatch.setattr(transactions, "_atomic_json", original)
-    replay = execute("job.start", tmp_path, params)
+    replay = execute("job_start", tmp_path, params)
     assert replay["state"] == "unknown"
     assert not marker.exists()
     assert resolve_prepared_job(tmp_path, {"prepared_ref": "prepared_1"})["work_id"] == "work_one"

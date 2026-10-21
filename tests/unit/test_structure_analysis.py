@@ -248,7 +248,7 @@ def test_analysis_jobs_execute_staged_dependencies_and_collect(tmp_path, executo
     from research_agent.application.executors import prepare
     from tests.unit.test_job_recovery import workspace
     root = tmp_path / 'workspace'; workspace(root)
-    node = execute('research.create', root, {'goal': 'Independent deterministic structure analysis'})['node']
+    node = execute('research_create', root, {'goal': 'Independent deterministic structure analysis'})['node']
     if executor == 'chemical.reorder-tensors':
         value = tensors()
         inputs = {'tensors': root / 'tensors.json', 'order': root / 'order.json'}
@@ -260,16 +260,16 @@ def test_analysis_jobs_execute_staged_dependencies_and_collect(tmp_path, executo
         inputs = {'left': root / 'left.json', 'right': root / 'right.json'}
     arguments = ['--mode', 'identity', '--max-candidates', '1'] if executor == 'chemical.map-candidates' else ['--rmsd-threshold', '0.05'] if executor == 'chemical.conformer-compare' else []
     prepared = prepare(Path(os.environ['CORAGENT_JOB_CONFIG']), 'local', executor, '1', inputs, arguments)
-    job = execute('job.start', root, {**prepared, 'node_id': node['id']})
+    job = execute('job_start', root, {**prepared, 'node_id': node['id']})
     try:
         for _ in range(300):
-            status = execute('job.status', root, {'job_id': job['job_id']})
+            status = execute('job_status', root, {'job_id': job['job_id']})
             if status['state'] in {'succeeded', 'failed'}: break
             time.sleep(.01)
         assert status['state'] == 'succeeded'
-        collected = execute('job.collect', root, {'job_id': job['job_id']})
+        collected = execute('job_collect', root, {'job_id': job['job_id']})
         assert collected['output_validation']['complete']
         result = json.loads((Path(job['cwd']) / 'results/result.json').read_text())
         assert result['schema_version'] == expected
     finally:
-        execute('job.cancel', root, {'job_id': job['job_id']})
+        execute('job_cancel', root, {'job_id': job['job_id']})

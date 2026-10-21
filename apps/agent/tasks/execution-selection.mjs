@@ -14,7 +14,7 @@ export async function resolveTaskSelection(kernel, params, sources, previous = n
     if (!intent || !anchor || !intent.source_text.toLowerCase().includes(anchor.toLowerCase()))
       throw Object.assign(new Error("Correcting a target requires the original explicit target/scheduler instruction"), { code: "execution_correction_invalid" });
   }
-  const selection = await kernel.execute_command("job.resolve_target", {
+  const selection = await kernel.execute_command("job_resolve_target", {
     ...(params.execution_target ? { target: params.execution_target } : {}),
     ...(intent?.scheduler ? { scheduler: intent.scheduler } : {}),
     ...(intent?.location ? { location: intent.location } : {}),

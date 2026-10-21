@@ -208,7 +208,7 @@ def _receipt(root: Path, params: dict[str, Any]):
 
 def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
     from .api import validate_command_params
-    validate_command_params("job." + operation, params, transport_fields=("root", "workspace_root"))
+    validate_command_params("job_" + operation, params, transport_fields=("root", "workspace_root"))
     root = _root(params)
     if operation == "list":
         from .job_state import list_executions
@@ -379,6 +379,7 @@ def _admit_start(root, params):
                 raise ValueError("request_id_reused: existing Job " + old["job_id"])
     # A prepared/committing transaction may outlive the caller. Recover its
     # durable decision before inspecting or removing any staged input.
+    # Persisted request identity is independent of the command routing name.
     intent_request_id = (request_id or f"job.start:{job_id}") + ":intent"
     coordinator = TransactionCoordinator(root)
     transaction = coordinator.get(intent_request_id)

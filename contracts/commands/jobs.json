@@ -2,7 +2,7 @@
   "schema_version": "coragent-command-source/1",
   "commands": [
     {
-      "id": "job.targets",
+      "id": "job_targets",
       "domain": "runtime",
       "schema": {
         "type": "object",
@@ -18,7 +18,7 @@
       }
     },
     {
-      "id": "job.resolve_target",
+      "id": "job_resolve_target",
       "domain": "runtime",
       "schema": {
         "type": "object",
@@ -54,7 +54,7 @@
       }
     },
     {
-      "id": "job.start",
+      "id": "job_start",
       "domain": "runtime",
       "schema": {
         "type": "object",
@@ -148,7 +148,7 @@
             }
           },
           "repeat": {
-            "$ref": "shared.json#/tools/jobStart/properties/repeat"
+            "$ref": "shared.json#/tools/job_start/properties/repeat"
           },
           "prepared_ref": {
             "type": "string"
@@ -176,7 +176,7 @@
             "pattern": "^task_[1-9][0-9]*$"
           },
           "submission": {
-            "$ref": "shared.json#/tools/jobStart/properties/submission"
+            "$ref": "shared.json#/tools/job_start/properties/submission"
           },
           "required_target": {
             "type": "string",
@@ -197,11 +197,11 @@
         {}
       ],
       "result": {
-        "$ref": "results.json#/commands/job.start"
+        "$ref": "results.json#/commands/job_start"
       }
     },
     {
-      "id": "job.status",
+      "id": "job_status",
       "domain": "runtime",
       "schema": {
         "type": "object",
@@ -220,11 +220,11 @@
         {}
       ],
       "result": {
-        "$ref": "results.json#/commands/job.status"
+        "$ref": "results.json#/commands/job_status"
       }
     },
     {
-      "id": "job.collect",
+      "id": "job_collect",
       "domain": "runtime",
       "schema": {
         "type": "object",
@@ -243,11 +243,11 @@
         {}
       ],
       "result": {
-        "$ref": "results.json#/commands/job.collect"
+        "$ref": "results.json#/commands/job_collect"
       }
     },
     {
-      "id": "job.cancel",
+      "id": "job_cancel",
       "domain": "runtime",
       "schema": {
         "type": "object",
@@ -266,11 +266,11 @@
         {}
       ],
       "result": {
-        "$ref": "results.json#/commands/job.cancel"
+        "$ref": "results.json#/commands/job_cancel"
       }
     },
     {
-      "id": "job.probe",
+      "id": "job_probe",
       "domain": "runtime",
       "schema": {
         "type": "object",
@@ -356,11 +356,11 @@
         {}
       ],
       "result": {
-        "$ref": "results.json#/commands/job.probe"
+        "$ref": "results.json#/commands/job_probe"
       }
     },
     {
-      "id": "job.reconcile",
+      "id": "job_reconcile",
       "domain": "runtime",
       "schema": {
         "type": "object",
@@ -379,11 +379,11 @@
         {}
       ],
       "result": {
-        "$ref": "results.json#/commands/job.reconcile"
+        "$ref": "results.json#/commands/job_reconcile"
       }
     },
     {
-      "id": "job.prepare",
+      "id": "job_prepare",
       "domain": "job",
       "effect": "write",
       "schema": {
@@ -404,11 +404,11 @@
         }
       ],
       "result": {
-        "$ref": "results.json#/commands/job.prepare"
+        "$ref": "results.json#/commands/job_prepare"
       }
     },
     {
-      "id": "job.resolve_prepared",
+      "id": "job_resolve_prepared",
       "domain": "job",
       "effect": "read",
       "schema": {
@@ -424,7 +424,7 @@
             ]
           },
           "repeat": {
-            "$ref": "shared.json#/tools/jobStart/properties/repeat"
+            "$ref": "shared.json#/tools/job_start/properties/repeat"
           }
         },
         "required": [
@@ -438,11 +438,11 @@
         }
       ],
       "result": {
-        "$ref": "results.json#/commands/job.resolve_prepared"
+        "$ref": "results.json#/commands/job_resolve_prepared"
       }
     },
     {
-      "id": "job.monitor_assess",
+      "id": "job_monitor_assess",
       "domain": "job",
       "effect": "read",
       "schema": {
@@ -471,11 +471,11 @@
         }
       ],
       "result": {
-        "$ref": "results.json#/commands/job.monitor_assess"
+        "$ref": "results.json#/commands/job_monitor_assess"
       }
     },
     {
-      "id": "job.list",
+      "id": "job_list",
       "domain": "runtime",
       "effect": "read",
       "schema": {
@@ -503,7 +503,7 @@
         "additionalProperties": false
       },
       "result": {
-        "$ref": "results.json#/commands/job.list"
+        "$ref": "results.json#/commands/job_list"
       },
       "examples": [
         {},

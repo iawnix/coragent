@@ -18,9 +18,9 @@ description: 开始或恢复持续研究任务、选择执行目标、管理 Job
 
 ## 执行与记录
 
-准备、提交、收集、证据引用与文件位置遵循 [Job 与材料工作流](references/tools.zh-CN.md)。控制辅助程序使用 `CORAGENT_PYTHON`；科学准备使用 `CORAGENT_JOB_CONFIG`，并继承任务固定目标。不要把科学依赖安装到控制环境。
+准备、提交、收集与文件位置遵循 [Job 与材料工作流](references/jobs-and-artifacts.zh-CN.md)。控制辅助程序使用 `CORAGENT_PYTHON`；科学准备使用 `CORAGENT_JOB_CONFIG`，并继承任务固定目标。不要把科学依赖安装到控制环境。
 
-文件准备放在返回的 Node `work_dir` 或 `research/work`，报告放在 `reports/`。研究 Job 关联目标 `node_id`。发布结论前检查原始输出和领域科学判据。同一问题的重试与扫描留在同一 Node；结果可独立解释的问题按需拆分。
+文件准备放在返回的 Node `work_dir` 或 `research/work`，报告放在 `reports/`。研究 Job 关联目标 `node_id`。发布结论前检查原始输出和领域科学判据。研究问题的拆分与结论记录遵循 research-memory。
 
 通过 `task_update progress` 记录实质变化与下一步。计划、笔记和新建 Node 不算实质科学进展。不确定提交重试前检查回执。Job 运行期间继续可独立推进的工作。
 
@@ -32,4 +32,4 @@ description: 开始或恢复持续研究任务、选择执行目标、管理 Job
 
 申请完成前读取[任务验收与交付](references/acceptance.zh-CN.md)。以固定证据逐项评估当前条件；完整与部分交付有不同要求。报告或失败候选不能代替用户要求的工作。使用适用的领域 Skill 组装交付物。已获授权的邮件交付使用 [email Skill](../email/SKILL.zh-CN.md)，并保留回执。
 
-通过 [Skill 资源](references/skills.zh-CN.md)定位已安装能力，通过[公开工具合同](references/public_contract.zh-CN.md)查看接口索引。参数与前置条件以可调用工具 schema 为准。
+通过 [Skill 资源](references/skills.zh-CN.md)定位已安装能力。参数与前置条件以可调用工具 schema 为准。

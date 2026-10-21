@@ -1,7 +1,7 @@
 {
   "schema_version": "coragent-command-schemas/1",
   "tools": {
-    "state": {
+    "research_read": {
       "type": "object",
       "properties": {
         "root": {
@@ -82,7 +82,7 @@
         }
       ]
     },
-    "search": {
+    "research_search": {
       "type": "object",
       "properties": {
         "root": {
@@ -139,7 +139,7 @@
       },
       "additionalProperties": false
     },
-    "create": {
+    "research_create": {
       "type": "object",
       "required": [
         "goal"
@@ -270,7 +270,7 @@
       },
       "additionalProperties": false
     },
-    "update": {
+    "research_update": {
       "type": "object",
       "required": [
         "node_id",
@@ -408,7 +408,7 @@
       },
       "additionalProperties": false
     },
-    "result": {
+    "research_result": {
       "type": "object",
       "required": [
         "node_id",
@@ -556,7 +556,7 @@
       },
       "additionalProperties": false
     },
-    "jobStart": {
+    "job_start": {
       "type": "object",
       "required": [
         "node_id"
@@ -834,7 +834,7 @@
         }
       ]
     },
-    "jobStatus": {
+    "job_status": {
       "type": "object",
       "properties": {
         "job_id": {
@@ -867,7 +867,7 @@
         }
       ]
     },
-    "jobCollect": {
+    "job_collect": {
       "type": "object",
       "properties": {
         "job_id": {
@@ -900,7 +900,7 @@
         }
       ]
     },
-    "jobCancel": {
+    "job_cancel": {
       "type": "object",
       "properties": {
         "job_id": {
@@ -933,7 +933,7 @@
         }
       ]
     },
-    "jobProbe": {
+    "job_probe": {
       "type": "object",
       "properties": {
         "execution_target": {
@@ -948,7 +948,7 @@
       },
       "additionalProperties": false
     },
-    "jobReconcile": {
+    "job_reconcile": {
       "type": "object",
       "properties": {
         "job_id": {
@@ -981,7 +981,7 @@
         }
       ]
     },
-    "artifactRegister": {
+    "artifact_register": {
       "type": "object",
       "required": [
         "path"
@@ -1010,7 +1010,7 @@
       },
       "additionalProperties": false
     },
-    "artifactCreate": {
+    "artifact_create": {
       "type": "object",
       "required": [
         "content",
@@ -1039,7 +1039,7 @@
       },
       "additionalProperties": false
     },
-    "artifactRead": {
+    "artifact_read": {
       "type": "object",
       "properties": {
         "artifact_id": {
@@ -1069,7 +1069,7 @@
         "artifact_id"
       ]
     },
-    "taskBegin": {
+    "task_begin": {
       "type": "object",
       "properties": {
         "title": {
@@ -1186,12 +1186,12 @@
       ],
       "additionalProperties": false
     },
-    "taskRead": {
+    "task_read": {
       "type": "object",
       "properties": {},
       "additionalProperties": false
     },
-    "taskUpdate": {
+    "task_update": {
       "type": "object",
       "properties": {
         "expected_revision": {

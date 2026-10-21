@@ -51,7 +51,7 @@ def test_external_native_executor_runs_without_core_changes_or_python_binding(tm
     root = tmp_path / "workspace"
     root.mkdir()
     workspace(root)
-    node = execute('research.create', root, {'goal':'Inspect the fixture output'})['node']
+    node = execute('research_create', root, {'goal':'Inspect the fixture output'})['node']
     config = tmp_path / "job.toml"
     binding(config)
     source = root / "data.txt"
@@ -62,25 +62,25 @@ def test_external_native_executor_runs_without_core_changes_or_python_binding(tm
     assert not list((root/"operations/executions").glob("*.json"))
     path = root / "request.json"
     path.write_text(json.dumps(request))
-    receipt = execute("job.start", root, {"node_id":node['id'], "request_file": str(path),
+    receipt = execute("job_start", root, {"node_id":node['id'], "request_file": str(path),
         "request_sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
     for _ in range(200):
-        status = execute("job.status", root, {"job_id": receipt["job_id"]})
+        status = execute("job_status", root, {"job_id": receipt["job_id"]})
         if status["state"] in {"succeeded", "failed"}:
             break
         time.sleep(.01)
     assert status["state"] == "succeeded"
-    collected = execute("job.collect", root, {"job_id": receipt["job_id"]})
+    collected = execute("job_collect", root, {"job_id": receipt["job_id"]})
     assert collected["output_validation"]["complete"]
     assert (Path(receipt["cwd"]) / "result.txt").read_text() == source.read_text()
     assert execution(root, receipt["job_id"])["metadata"]["executor"] == {"id": "external.copy", "version": "3"}
     artifact = next(item for item in collected['artifacts']
                     if item['provenance']['source_path'].endswith('/result.txt'))
-    content = execute('artifact.read', root, {'artifact_id':artifact['artifact_id']})
+    content = execute('artifact_read', root, {'artifact_id':artifact['artifact_id']})
     assert content['content'] == source.read_text()
     record = collected['result_receipt']
     assert record['collection_state'] == 'complete'
-    published = execute('research.result', root, {'node_id':node['id'],
+    published = execute('research_result', root, {'node_id':node['id'],
         'conclusion':'The deterministic fixture copied the declared input.',
         'evidence_refs':[receipt['job_id'], record['receipt_id']],
         'files':[{'name':'result.txt', 'artifact_ref':artifact['artifact_id']}]})
@@ -171,10 +171,10 @@ def test_task_specific_script_uses_explicit_binding_and_pinned_dependencies(tmp_
     workspace(root)
     path = root / "request.json"
     path.write_text(json.dumps(request))
-    receipt = execute("job.start", root, {"request_file": str(path),
+    receipt = execute("job_start", root, {"request_file": str(path),
         "request_sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
     for _ in range(200):
-        status = execute("job.status", root, {"job_id": receipt["job_id"]})
+        status = execute("job_status", root, {"job_id": receipt["job_id"]})
         if status["state"] in {"succeeded", "failed"}:
             break
         time.sleep(.01)
@@ -185,7 +185,7 @@ def test_task_specific_script_uses_explicit_binding_and_pinned_dependencies(tmp_
     assert output.exists() == write_output
     if write_output:
         assert json.loads(output.read_text()) == expected
-    assert execute("job.collect", root, {"job_id": receipt["job_id"]})["output_validation"]["complete"] == write_output
+    assert execute("job_collect", root, {"job_id": receipt["job_id"]})["output_validation"]["complete"] == write_output
 
 
 def test_validator_on_remote_default_uses_remote_python_and_selected_resources(tmp_path, monkeypatch, mock_environment_probe):
@@ -264,15 +264,15 @@ def test_structure_generation_collects_every_output_with_binding_and_attempt(tmp
     request = prepare(os.environ["CORAGENT_JOB_CONFIG"], "local", "chemical." + kind.removeprefix("generic-"), "1", inputs, arguments, input_artifact_ids=refs)
     path = tmp_path / "request.json"
     path.write_text(json.dumps(request))
-    receipt = execute("job.start", tmp_path, {"request_file": str(path),
+    receipt = execute("job_start", tmp_path, {"request_file": str(path),
         "request_sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
     for _ in range(400):
-        status = execute("job.status", tmp_path, {"job_id": receipt["job_id"]})
+        status = execute("job_status", tmp_path, {"job_id": receipt["job_id"]})
         if status["state"] in {"succeeded", "failed"}:
             break
         time.sleep(.01)
     assert status["state"] == "succeeded", (Path(receipt["cwd"]) / "logs/stderr.log").read_text()
-    collected = execute("job.collect", tmp_path, {"job_id": receipt["job_id"]})
+    collected = execute("job_collect", tmp_path, {"job_id": receipt["job_id"]})
     assert collected["output_validation"]["complete"]
     artifact = next(row for row in collected["artifacts"] if row["provenance"]["source_path"].endswith(expected))
     assert artifact["provenance"]["job_id"] == receipt["job_id"]
@@ -413,22 +413,22 @@ def test_installed_resolver_is_used_by_an_isolated_name_resolution_job(tmp_path,
             workspace(work)
             path = work / 'request.json'
             path.write_text(json.dumps(request))
-            receipt = execute('job.start', work, {'request_file': str(path),
+            receipt = execute('job_start', work, {'request_file': str(path),
                 'request_sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
             try:
                 for _ in range(250):
-                    status = execute('job.status', work, {'job_id': receipt['job_id']})
+                    status = execute('job_status', work, {'job_id': receipt['job_id']})
                     if status['state'] in {'succeeded', 'failed'}:
                         break
                     time.sleep(.02)
                 assert status['state'] == 'succeeded'
-                assert execute('job.collect', work, {'job_id': receipt['job_id']})['output_validation']['complete']
+                assert execute('job_collect', work, {'job_id': receipt['job_id']})['output_validation']['complete']
                 result = json.loads((Path(receipt['cwd'])/'results/resolve.json').read_text())
                 assert result['data']['status'] == 'resolved'
                 assert result['data']['candidates'][0]['formula'] == 'C2H6O'
                 assert requests == ['/opsin/ethanol.json']
             finally:
-                execute('job.cancel', work, {'job_id': receipt['job_id']})
+                execute('job_cancel', work, {'job_id': receipt['job_id']})
         finally:
             server.shutdown()
             thread.join(timeout=5)
@@ -445,20 +445,20 @@ def test_name_lookup_fallback_candidates_and_geometry_run_as_managed_jobs(tmp_pa
         request = prepare(config, 'local', executor, '1', inputs, arguments)
         path = tmp_path / (executor + '.request.json')
         path.write_text(json.dumps(request))
-        receipt = execute('job.start', tmp_path, {'request_file': str(path),
+        receipt = execute('job_start', tmp_path, {'request_file': str(path),
             'request_sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
         try:
             for _ in range(250):
-                status = execute('job.status', tmp_path, {'job_id': receipt['job_id']})
+                status = execute('job_status', tmp_path, {'job_id': receipt['job_id']})
                 if status['state'] in {'succeeded', 'failed'}:
                     break
                 time.sleep(.02)
             assert status['state'] == 'succeeded'
-            collected = execute('job.collect', tmp_path, {'job_id': receipt['job_id']})
+            collected = execute('job_collect', tmp_path, {'job_id': receipt['job_id']})
             assert collected['output_validation']['complete']
             return request, receipt, collected
         finally:
-            execute('job.cancel', tmp_path, {'job_id': receipt['job_id']})
+            execute('job_cancel', tmp_path, {'job_id': receipt['job_id']})
 
     # The fixture has no resolver binding; the isolated Job reports a next step.
     _, lookup, _ = run('chemical.resolve', {}, ['--name', 'ethanol'])

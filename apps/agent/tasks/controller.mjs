@@ -31,9 +31,9 @@ const copy = value => JSON.parse(JSON.stringify(value));
 export const taskError = (code, message) => Object.assign(new Error(message), { code });
 const requireValue = (ok, code, message) => { if (!ok) throw taskError(code, message); };
 const stamp = () => new Date().toISOString();
-const researchSchema = shared.tools.taskUpdate.properties.research;
+const researchSchema = shared.tools.task_update.properties.research;
 const reviewStatuses = new Set(["current", "pending", "stale", "running", "failed"]);
-const blockKinds = new Set(shared.tools.taskUpdate.properties.block_kind.enum);
+const blockKinds = new Set(shared.tools.task_update.properties.block_kind.enum);
 const reviewProjection = data => {
   requireValue(data && data.schema_version === "research-review/1", "research_review_invalid", "Research Review projection schema is unsupported");
   requireValue(reviewStatuses.has(data.review_status), "research_review_invalid", "Research Review lifecycle status is invalid");
@@ -104,7 +104,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     }
     // The workspace-bound Memory reader validates each Node against its manifest.
     await Promise.all([...new Set([...research.entry_node_ids, ...research.focus_node_ids])].map(async ref => {
-      const read = await kernel.execute_command("research.read", { ref, field: "status", limit: 1024 });
+      const read = await kernel.execute_command("research_read", { ref, field: "status", limit: 1024 });
       requireValue(read.node_id === ref, "task_research_invalid", "Research reference must resolve to a Node in this workspace");
     }));
   };
@@ -117,15 +117,15 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       ctx?.abortSignal?.throwIfAborted();
       if (/^art_[1-9][0-9]*$/.test(ref)) {
         const selector = { artifact_id: ref };
-        const artifact = await kernel.execute_command("artifact.read", { ...selector, limit: 1 });
+        const artifact = await kernel.execute_command("artifact_read", { ...selector, limit: 1 });
         return [artifactIdentity(artifact)];
       }
       if (ref.startsWith("job_")) {
         const job = jobs.find(item => item.job_id === ref);
         requireValue(job, "task_evidence_invalid", "Job evidence must belong to this task");
-        return jobIdentities(job, await kernel.execute_command("job.status", { job_id: ref }));
+        return jobIdentities(job, await kernel.execute_command("job_status", { job_id: ref }));
       }
-      const read = await kernel.execute_command("research.read", { ref, limit: 1 });
+      const read = await kernel.execute_command("research_read", { ref, limit: 1 });
       requireValue(read.ref === ref, "task_evidence_invalid", "Evidence reference did not resolve");
       if (ref.startsWith("result_")) {
         requireValue(!current || !(read.review_notice_count || read.review_notices?.length),
@@ -150,7 +150,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
   async function ownedJobs(userTaskId) {
     const jobs = []; let cursor;
     do {
-      const page = await kernel.execute_command("job.list", { session_id: sessionId, user_task_id: userTaskId, limit: 100, ...(cursor ? { cursor } : {}) });
+      const page = await kernel.execute_command("job_list", { session_id: sessionId, user_task_id: userTaskId, limit: 100, ...(cursor ? { cursor } : {}) });
       jobs.push(...page.jobs); cursor = page.next_cursor;
     } while (cursor);
     return jobs;
@@ -184,7 +184,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     for (const jobId of [...task.cancel_jobs.pending, ...task.cancel_jobs.uncertain]) {
       const observing = task.cancel_jobs.uncertain.includes(jobId);
       let result, error;
-      try { result = await kernel.execute_command(observing ? "job.status" : "job.cancel", { job_id: jobId }); }
+      try { result = await kernel.execute_command(observing ? "job_status" : "job_cancel", { job_id: jobId }); }
       catch (failure) { error = { code: failure.code || "job_cancellation_failed", message: failure.message }; }
       await conversation.commit(async tx => {
         const current = await tx.doc(UserTask, conversation.id, task.user_task_id, null);
@@ -209,7 +209,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
   async function settleJobCancellation(requestId, ctx) {
     const intent = await harness.snapshot(ControlReceipt, conversation.id, hash(requestId), ctx);
     if (intent.result) return intent.result;
-    const result = { job: await kernel.execute_command("job.cancel", { job_id: intent.job_id }) };
+    const result = { job: await kernel.execute_command("job_cancel", { job_id: intent.job_id }) };
     await conversation.commit(async tx => {
       const stored = await tx.doc(ControlReceipt, conversation.id, hash(requestId), null);
       stored.result = result;
@@ -345,7 +345,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     if (basis?.state !== "waiting") return basis;
     let statuses;
     try {
-      statuses = await Promise.all(basis.wait.job_ids.map(job_id => kernel.execute_command("job.status", { job_id })));
+      statuses = await Promise.all(basis.wait.job_ids.map(job_id => kernel.execute_command("job_status", { job_id })));
     } catch (error) {
       ctx?.abortSignal?.throwIfAborted();
       // Status refresh must not prevent a user from reading or correcting a waiting task.
@@ -436,7 +436,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         : !task && !event.event.user_task_id);
       if (!eligible.length) return { events: [], basis: {} };
       if (task?.state === "waiting") {
-        const statuses = await Promise.all(task.wait.job_ids.map(job_id => kernel.execute_command("job.status", { job_id })));
+        const statuses = await Promise.all(task.wait.job_ids.map(job_id => kernel.execute_command("job_status", { job_id })));
         const ready = task.wait.mode === "any" ? statuses.some(job => jobFinished.has(job.state)) : statuses.every(job => jobFinished.has(job.state));
         if (!ready) return { events: [], basis: {}, deferred: {
           code: "task_waiting",
@@ -513,7 +513,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       return conversation.commit(tx => receipt(tx, requestId, params, async () => {
         const { index, task: existing } = await currentTx(tx);
         requireValue(!existing || terminal.has(existing.state), "task_already_exists", "This conversation already has a nonterminal user task; update it");
-        const { identifier: id } = await kernel.execute_command("research.allocate_task", { session_id: sessionId, request_id: requestId });
+        const { identifier: id } = await kernel.execute_command("research_allocate_task", { session_id: sessionId, request_id: requestId });
         const task = await tx.doc(UserTask, conversation.id, id, null);
         Object.assign(task, { schema_version: "coragent-user-task/2", user_task_id: id,
           workspace_id: workspaceId, session_id: sessionId, conversation_id: conversation.id,
@@ -757,7 +757,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     async validateConsumption(record, origin, ctx, consumptionBasis = origin.admission_basis) {
       const inherited = origin.producer === "task_controller" ? origin.admission_basis.event_inputs : [];
       const inheritedEvents = inherited?.length ? await Promise.all(inherited.flatMap(input => input.event_ids).map(event_id =>
-        kernel.execute_command("job.monitor_assess", { event_id, session_id: sessionId }))) : [];
+        kernel.execute_command("job_monitor_assess", { event_id, session_id: sessionId }))) : [];
       requireValue(inheritedEvents.every(event => event.obsolete || event.admitted), "monitor_paused", "Deferred event delivery is paused");
       await admission.recordConsumption(record, consumptionBasis, ctx, tx => assertExecution(tx, record, origin));
       for (const input of inherited || []) {

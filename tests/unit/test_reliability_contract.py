@@ -55,7 +55,7 @@ def test_collection_versions_and_material_provenance(tmp_path):
     assert newer['result_receipt']['receipt_id']!=first['result_receipt']['receipt_id']
     assert execution(tmp_path,job['job_id'])['latest_result_receipt_ref']==newer['result_receipt']['receipt_id']
     with pytest.raises(ValueError):
-        execute('artifact.create',tmp_path,{'content':'fake','name':'result','job_id':job['job_id']})
+        execute('artifact_create',tmp_path,{'content':'fake','name':'result','job_id':job['job_id']})
 
 
 def test_terminal_conflict_is_preserved_until_reconciled(tmp_path):
@@ -104,6 +104,6 @@ def test_collection_commit_recovers_as_one_transaction(tmp_path,monkeypatch):
     assert not read(tmp_path)['uncollected_jobs']
 
 
-@pytest.mark.parametrize('command,params',[('research.change',{}),('job.start',{'attempt_id':'attempt_1'}),('job.status',{'attempt_id':'attempt_1'}),('artifact.link',{})])
+@pytest.mark.parametrize('command,params',[('research.change',{}),('job_start',{'attempt_id':'attempt_1'}),('job_status',{'attempt_id':'attempt_1'}),('artifact.link',{})])
 def test_retired_interfaces_rejected(tmp_path,command,params):
     with pytest.raises(ValueError):execute(command,tmp_path,params)

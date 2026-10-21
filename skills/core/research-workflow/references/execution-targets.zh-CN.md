@@ -31,7 +31,7 @@
   --output prepared/request.json
 ```
 
-提交前必须检查 prepared request 的 target 与任务 target 相同。TRI 的成功回执必须包含 `driver = "external"` 和非空 `scheduler_id`；没有调度器身份的回执不能证明任务进入 TRI。
+提交前必须检查 prepared request 的 target 与任务 target 相同。按所选调度器的[接入说明](../../batch-schedulers/SKILL.zh-CN.md)核实提交回执。
 
 ## 原文绑定、继承与纠错
 

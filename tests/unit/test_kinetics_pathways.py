@@ -197,16 +197,16 @@ def test_kinetics_and_pathway_jobs(tmp_path,operation,factory):
     from tests.unit.test_job_recovery import workspace
     root=tmp_path/'work';workspace(root);path=root/'input.json';path.write_text(json.dumps(factory()))
     request=prepare(Path(os.environ['CORAGENT_JOB_CONFIG']),'local','chemical.'+operation,'1',{'input':path})
-    node=execute('research.create',root,{'goal':'Independent kinetic/pathway fixture'})['node']
-    receipt=execute('job.start',root,{**request,'node_id':node['id']})
+    node=execute('research_create',root,{'goal':'Independent kinetic/pathway fixture'})['node']
+    receipt=execute('job_start',root,{**request,'node_id':node['id']})
     try:
         for _ in range(600):
-            status=execute('job.status',root,{'job_id':receipt['job_id']})
+            status=execute('job_status',root,{'job_id':receipt['job_id']})
             if status['state'] in ('succeeded','failed'):break
             time.sleep(.01)
         assert status['state']=='succeeded'
-        assert execute('job.collect',root,{'job_id':receipt['job_id']})['output_validation']['complete']
-    finally:execute('job.cancel',root,{'job_id':receipt['job_id']})
+        assert execute('job_collect',root,{'job_id':receipt['job_id']})['output_validation']['complete']
+    finally:execute('job_cancel',root,{'job_id':receipt['job_id']})
 
 
 def test_pathway_recomputes_bound_mode_and_irc_evidence():

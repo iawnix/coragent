@@ -8,7 +8,7 @@ second research vocabulary of their own.
 from __future__ import annotations
 
 import json
-import hashlib
+import re
 from importlib.resources import files
 from pathlib import Path
 from typing import Any
@@ -19,8 +19,13 @@ from jsonschema import Draft202012Validator
 
 def _load_command_catalog() -> dict[str, Any]:
     value = json.loads(files("research_agent.application").joinpath("command_catalog.json").read_text(encoding="utf-8"))
-    if value.get("schema_version") != "coragent-command-catalog/1" or not isinstance(value.get("commands"), list):
+    if value.get("schema_version") != "coragent-command-catalog/2" or not isinstance(value.get("commands"), list):
         raise RuntimeError("invalid CoRAgent command catalog")
+    identities = [item.get("id") if isinstance(item, dict) else None for item in value["commands"]]
+    if any(not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", name) for name in identities):
+        raise RuntimeError("invalid command identity")
+    if len(set(identities)) != len(identities):
+        raise RuntimeError("duplicate command identity")
     return value
 
 
@@ -54,7 +59,7 @@ def _json_text(value: Any) -> str:
 
 def validate_command_params(command: str, value: dict[str, Any], *, transport_fields: tuple[str, ...] = ()) -> None:
     """Reject retired/unknown fields using the catalog shared with JS transports."""
-    if command not in COMMANDS:
+    if not isinstance(command, str) or command not in COMMANDS:
         raise CommandError(f"unsupported command: {command}")
     if not isinstance(value, dict):
         raise CommandError("command params must be an object")
@@ -74,50 +79,114 @@ def validate_command_params(command: str, value: dict[str, Any], *, transport_fi
         raise CommandError(f"schema_field_invalid: {command} {location} violates {error.validator}")
 
 
+def _research_read(root, value):
+    from .memory_context import read
+    return read(root, **value)
+
+
+def _research_search(root, value):
+    from research_agent.research.retrieval import search
+    return search(root, **value)
+
+
+def _research_source(root, value):
+    from research_agent.research.records import record_source
+    return record_source(root, value)
+
+
+def _research_observe(root, value):
+    from research_agent.research.basis import observe
+    return observe(root, value)
+
+
+def _research_allocate_task(root, value):
+    from research_agent.research.operational_ids import allocate_id
+    return {"identifier": allocate_id(root, "task", [value["session_id"], value["request_id"]])}
+
+
+def _mutation(operation):
+    def invoke(root, value):
+        from research_agent.research import nodes, results, views
+        from research_agent.foundation.transactions import TransactionCoordinator
+        from . import memory_context
+        handlers = {"research_create": nodes.create, "research_update": nodes.update, "research_result": results.publish}
+        with TransactionCoordinator(root).locked():
+            request = dict(value)
+            if operation == "research_create" and request.get("source_submission_ids"):
+                resolved = memory_context.resolve_source_submission_ids(
+                    root, request["source_submission_ids"], request.get("session_id"))
+                request["source_refs"] = list(dict.fromkeys([*(request.get("source_refs") or []), *resolved]))
+            reply = handlers[operation](root, {**request, "_reference_details": memory_context.reference_details(root, request)})
+            try:
+                views.render(root)
+            except (OSError, ValueError) as exc:
+                reply = {**reply, "view_error": str(exc)}
+            return reply
+    return invoke
+
+
+def _job(operation):
+    def invoke(root, value):
+        from .execution import dispatch
+        return dispatch(operation, {**value, "workspace_root": str(root)})
+    return invoke
+
+
+def _artifact(operation):
+    def invoke(root, value):
+        from .evidence import dispatch
+        return dispatch(operation, {**value, "workspace_root": str(root)})
+    return invoke
+
+
+def _job_prepare(root, value):
+    from .references import prepare_job
+    return prepare_job(root, value)
+
+
+def _job_resolve_prepared(root, value):
+    from .references import resolve_prepared_job
+    return resolve_prepared_job(root, value)
+
+
+def _job_monitor_assess(root, value):
+    from .job_monitor import assess
+    return assess(root, **value)
+
+
+# Command identity is shared by tools, transports and this dispatch table.
+# Local handler operations are implementation details, never accepted aliases.
+COMMAND_HANDLERS = {
+    "research_read": _research_read,
+    "research_search": _research_search,
+    "research_create": _mutation("research_create"),
+    "research_update": _mutation("research_update"),
+    "research_result": _mutation("research_result"),
+    "research_source": _research_source,
+    "research_observe": _research_observe,
+    "research_allocate_task": _research_allocate_task,
+    "job_start": _job("start"),
+    "job_status": _job("status"),
+    "job_collect": _job("collect"),
+    "job_cancel": _job("cancel"),
+    "job_probe": _job("probe"),
+    "job_reconcile": _job("reconcile"),
+    "job_targets": _job("targets"),
+    "job_resolve_target": _job("resolve_target"),
+    "job_list": _job("list"),
+    "job_prepare": _job_prepare,
+    "job_resolve_prepared": _job_resolve_prepared,
+    "job_monitor_assess": _job_monitor_assess,
+    "artifact_create": _artifact("create"),
+    "artifact_register": _artifact("register"),
+    "artifact_read": _artifact("read"),
+}
+if COMMAND_HANDLERS.keys() != COMMAND_DEFINITIONS.keys():
+    raise RuntimeError("command handlers do not match the installed command catalog")
+
+
 def execute(command: str, root: str | Path, params: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Execute a research, execution, or material command."""
+    """Execute one canonical command. Retired dotted names are not aliases."""
     value = params if params is not None else {}
     validate_command_params(command, value)
-    if command.startswith("research."):
-        from research_agent.research import records, nodes, results, retrieval, basis, views
-        from . import memory_context
-        if command == "research.allocate_task":
-            from research_agent.research.operational_ids import allocate_id
-            return {"identifier": allocate_id(root, "task", [value["session_id"], value["request_id"]])}
-        if command == "research.read":
-            return memory_context.read(root, **value)
-        if command == "research.search":
-            return retrieval.search(root, **value)
-        if command == "research.source":
-            return records.record_source(root, value)
-        if command == "research.observe":
-            return basis.observe(root, value)
-        mutations = {"research.create": nodes.create, "research.update": nodes.update, "research.result": results.publish}
-        if command in mutations:
-            from research_agent.foundation.transactions import TransactionCoordinator
-            with TransactionCoordinator(root).locked():
-                request = dict(value)
-                if command == "research.create" and request.get("source_submission_ids"):
-                    resolved = memory_context.resolve_source_submission_ids(
-                        root, request["source_submission_ids"], request.get("session_id"))
-                    request["source_refs"] = list(dict.fromkeys([*(request.get("source_refs") or []), *resolved]))
-                reply = mutations[command](root, {**request, "_reference_details": memory_context.reference_details(root, request)})
-                try:
-                    views.render(root)
-                except (OSError, ValueError) as exc:
-                    reply = {**reply, "view_error": str(exc)}
-                return reply
-        raise CommandError("unsupported research command")
-    if command == "job.monitor_assess":
-        from .job_monitor import assess
-        return assess(root, **value)
-    if command.startswith("job."):
-        if command in {"job.prepare", "job.resolve_prepared"}:
-            from research_agent.application.references import prepare_job, resolve_prepared_job
-            return (prepare_job if command == "job.prepare" else resolve_prepared_job)(root, value)
-        from research_agent.application.execution import dispatch
-        return dispatch(command.removeprefix("job."), {**value, "workspace_root": str(root)})
-    if command.startswith("artifact."):
-        from research_agent.application.evidence import dispatch
-        return dispatch(command.removeprefix("artifact."), {**value, "workspace_root": str(root)})
-    raise CommandError(f"unsupported command family: {command}")
+    return COMMAND_HANDLERS[command](root, value)

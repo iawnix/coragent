@@ -24,29 +24,29 @@ def research_workspace(tmp_path, monkeypatch):
 
 
 def run_attempt(root, request):
-    receipt = execute('job.start', root, request)
+    receipt = execute('job_start', root, request)
     terminal = {'succeeded', 'failed', 'timed_out', 'cancelled'}
     try:
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
-            status = execute('job.status', root, {'job_id': receipt['job_id']})
+            status = execute('job_status', root, {'job_id': receipt['job_id']})
             if status['state'] in terminal:
                 break
             time.sleep(.02)
         else:
             pytest.fail('Local deterministic attempt did not finish')
-        collected = execute('job.collect', root, {'job_id': receipt['job_id']})
+        collected = execute('job_collect', root, {'job_id': receipt['job_id']})
         return receipt, collected
     finally:
-        status = execute('job.status', root, {'job_id': receipt['job_id']})
+        status = execute('job_status', root, {'job_id': receipt['job_id']})
         if status['state'] not in terminal:
-            execute('job.cancel', root, {'job_id': receipt['job_id']})
+            execute('job_cancel', root, {'job_id': receipt['job_id']})
         wait_reaped(SimpleNamespace(**receipt))
 
 
 def test_repaired_job_dedup_and_late_failure_cannot_replace_selected_evidence(research_workspace):
     root = research_workspace
-    created = execute('research.create', root, {'goal': 'Evaluate the repaired geometry', 'plan': 'Run, inspect outputs, then interpret.'})
+    created = execute('research_create', root, {'goal': 'Evaluate the repaired geometry', 'plan': 'Run, inspect outputs, then interpret.'})
     node_id = created['node']['id']
     source = root / 'geometry.txt'
     source.write_text('invalid geometry')
@@ -60,7 +60,7 @@ def test_repaired_job_dedup_and_late_failure_cannot_replace_selected_evidence(re
     failed, failure = run_attempt(root, {**request, 'request_id': 'failed-attempt'})
     assert failure['status']['state'] == 'failed'
     failed_receipt = failure['result_receipt']['receipt_id']
-    initial = execute('research.result', root, {'node_id': node_id, 'conclusion': 'This input failed before an energy was available; the pathway is unresolved.',
+    initial = execute('research_result', root, {'node_id': node_id, 'conclusion': 'This input failed before an energy was available; the pathway is unresolved.',
         'evidence_refs': [failed['job_id'], failed_receipt], 'as_assessment': True, 'read_basis': created['read_basis']})
     old = initial['result']
 
@@ -79,13 +79,13 @@ def test_repaired_job_dedup_and_late_failure_cannot_replace_selected_evidence(re
     assert intents[0]['execution_fingerprint'] != intents[1]['execution_fingerprint']
     assert all(intent['node_id'] == node_id for intent in intents)
 
-    duplicate = execute('job.start', root, {**request, 'request_id': 'duplicate-attempt'})
+    duplicate = execute('job_start', root, {**request, 'request_id': 'duplicate-attempt'})
     assert duplicate['accepted'] is False and duplicate['code'] == 'duplicate_execution'
     assert duplicate['job_id'] == repaired['job_id'], 'Duplicate points to the successful repaired input, never the earlier failure'
     assert not (root / 'operations/jobs/job_3.json').exists()
-    assert execute('job.collect', root, {'job_id': duplicate['job_id']})['result_receipt']['receipt_id'] == repaired_receipt
+    assert execute('job_collect', root, {'job_id': duplicate['job_id']})['result_receipt']['receipt_id'] == repaired_receipt
 
-    corrected = execute('research.result', root, {'node_id': node_id,
+    corrected = execute('research_result', root, {'node_id': node_id,
         'observation': 'The repaired attempt exited zero and produced an energy of -40.125 hartree.',
         'conclusion': 'The repaired geometry produced the requested energy; reaction connectivity remains unverified.',
         'limitations': 'No transition-state or connectivity validation was performed.',
@@ -99,12 +99,12 @@ def test_repaired_job_dedup_and_late_failure_cannot_replace_selected_evidence(re
     assert nodes.get_node(root, node_id) == stable_node
     assert execution(root, repaired['job_id'])['state'] == 'succeeded'
     assert results.get_result(root, old['id']) == old
-    snapshot = execute('research.read', root, {'focus_node_ids': [node_id]})
+    snapshot = execute('research_read', root, {'focus_node_ids': [node_id]})
     assert snapshot['nodes'][0]['assessment_ref'] == corrected['result']['id']
     assert snapshot['nodes'][0]['status'] == 'open'
-    assert any(notice['code'] == 'result_superseded' for notice in execute('research.read', root, {'ref': old['id']})['review_notices'])
+    assert any(notice['code'] == 'result_superseded' for notice in execute('research_read', root, {'ref': old['id']})['review_notices'])
 
-    stale = execute('research.result', root, {'node_id': node_id,
+    stale = execute('research_result', root, {'node_id': node_id,
         'conclusion': 'An earlier draft describes only the first failure.', 'evidence_refs': [failed_receipt],
         'as_assessment': True, 'read_basis': initial['read_basis']})
     assert stale['result_saved'] and not stale['assessment_selected']
@@ -115,14 +115,14 @@ def test_repaired_job_dedup_and_late_failure_cannot_replace_selected_evidence(re
     assert conflict == {'code': 'job_terminal_conflict', 'confirmed_state': 'succeeded', 'observed_state': 'failed', 'recovery': 'job_reconcile'}
     assert execution(root, repaired['job_id'])['state'] == 'succeeded'
     assert execution(root, repaired['job_id'])['execution_conflict'] == conflict
-    assert execute('job.reconcile', root, {'job_id': repaired['job_id']})['state'] == 'succeeded'
+    assert execute('job_reconcile', root, {'job_id': repaired['job_id']})['state'] == 'succeeded'
     assert execution(root, repaired['job_id'])['execution_conflict'] is None
     assert nodes.get_node(root, node_id)['assessment_ref'] == corrected['result']['id']
 
 
 def test_recent_results_follow_publication_sequence_not_lexical_id_or_clock(research_workspace, monkeypatch):
     root = research_workspace
-    initial = execute('research.create', root, {'goal': 'Correct an earlier failed interpretation'})
+    initial = execute('research_create', root, {'goal': 'Correct an earlier failed interpretation'})
     node_id = initial['node']['id']
     from research_agent.research.operational_ids import allocate_id
     for _ in range(8):
@@ -130,15 +130,15 @@ def test_recent_results_follow_publication_sequence_not_lexical_id_or_clock(rese
     monkeypatch.setattr(results, 'now', lambda: '2026-10-10T00:00:00+00:00')
     published = []
     for conclusion in ('Old failure', 'Second inconclusive attempt', 'Corrected positive observation'):
-        published.append(execute('research.result', root, {'node_id': node_id, 'conclusion': conclusion})['result'])
+        published.append(execute('research_result', root, {'node_id': node_id, 'conclusion': conclusion})['result'])
     assert list(relations.graph(root)['results']) == sorted(item['id'] for item in published)
-    snapshot = execute('research.read', root, {'focus_node_ids': [node_id]})
+    snapshot = execute('research_read', root, {'focus_node_ids': [node_id]})
     assert [item['id'] for item in snapshot['nodes'][0]['recent_results']] == [item['id'] for item in published[-2:]]
-    detail = execute('research.read', root, {'ref': node_id})
+    detail = execute('research_read', root, {'ref': node_id})
     assert [item['id'] for item in detail['results']] == [item['id'] for item in published]
     assert detail['node']['assessment_ref'] is None, 'Recency never selects an assessment'
     markdown = views.documents(root)[f'research/nodes/{node_id}/README.md']
     assert markdown.index('Old failure') < markdown.index('Second inconclusive attempt') < markdown.index('Corrected positive observation')
     doctor.rebuild(root)
-    rebuilt = execute('research.read', root, {'focus_node_ids': [node_id]})
+    rebuilt = execute('research_read', root, {'focus_node_ids': [node_id]})
     assert [item['id'] for item in rebuilt['nodes'][0]['recent_results']] == [item['id'] for item in published[-2:]]

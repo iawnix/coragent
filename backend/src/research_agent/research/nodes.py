@@ -72,6 +72,7 @@ def work_dir(root, node_id):
     return str(Path(root).resolve() / 'research/nodes' / node_id / 'work')
 
 
+# Durable receipt identity; not a callable command name. Keep existing digests stable.
 @workspace_transaction('research.create')
 def create(root, request):
     root = workspace(root)
@@ -100,6 +101,7 @@ def create(root, request):
     return response(root, node, request, ref=log['ref'])
 
 
+# Durable receipt identity; not a callable command name. Keep existing digests stable.
 @workspace_transaction('research.update')
 def update(root, request):
     root = workspace(root)

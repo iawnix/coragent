@@ -92,19 +92,19 @@ def test_failed_artifact_publication_cannot_rebind_leftover_payload(tmp_path, mo
             raise OSError('publication interrupted')
         patch.setattr(registry, 'register_manifest', reject)
         with pytest.raises(OSError, match='publication interrupted'):
-            execute('artifact.create', tmp_path, {'name': 'first', 'content': 'retained bytes'})
-    other = execute('artifact.create', tmp_path, {'name': 'second', 'content': 'different bytes'})
-    recovered = execute('artifact.create', tmp_path, {'name': 'first', 'content': 'retained bytes'})
+            execute('artifact_create', tmp_path, {'name': 'first', 'content': 'retained bytes'})
+    other = execute('artifact_create', tmp_path, {'name': 'second', 'content': 'different bytes'})
+    recovered = execute('artifact_create', tmp_path, {'name': 'first', 'content': 'retained bytes'})
     assert recovered['artifact_id'] == 'art_1'
     assert other['artifact_id'] == 'art_2'
-    assert execute('artifact.read', tmp_path, {'artifact_id': 'art_1'})['content'] == 'retained bytes'
+    assert execute('artifact_read', tmp_path, {'artifact_id': 'art_1'})['content'] == 'retained bytes'
 
 
 def test_task_allocation_is_shared_across_sessions_and_replays(tmp_path):
     from research_agent.application.api import execute
     workspace(tmp_path)
     def begin(session):
-        return execute('research.allocate_task', tmp_path, {'session_id': session, 'request_id': 'same-request'})
+        return execute('research_allocate_task', tmp_path, {'session_id': session, 'request_id': 'same-request'})
     assert begin('first') == {'identifier': 'task_1'}
     assert begin('second') == {'identifier': 'task_2'}
     assert begin('first') == {'identifier': 'task_1'}

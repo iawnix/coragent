@@ -267,20 +267,20 @@ def test_electronic_and_crossing_jobs(tmp_path,monkeypatch,operation):
         s['settings'].pop('threads'); s['settings'].pop('memory_mb')
         submission = {'resources': {'cpus': 12, 'memory_mb': 16384}}
     path=root/'input.json';path.write_text(json.dumps(s));request=prepare(config_path,'local','chemical.'+operation,'2' if operation=='neb-gaussian' else '1',{'input':path}, submission=submission)
-    node=execute('research.create',root,{'goal':'Bound electronic/crossing fixture'})['node'];receipt=execute('job.start',root,{**request,'node_id':node['id']})
+    node=execute('research_create',root,{'goal':'Bound electronic/crossing fixture'})['node'];receipt=execute('job_start',root,{**request,'node_id':node['id']})
     try:
         for _ in range(600):
-            status=execute('job.status',root,{'job_id':receipt['job_id']})
+            status=execute('job_status',root,{'job_id':receipt['job_id']})
             if status['state'] in ('succeeded','failed'):break
             time.sleep(.01)
         assert status['state']=='succeeded'
-        assert execute('job.collect',root,{'job_id':receipt['job_id']})['output_validation']['complete']
+        assert execute('job_collect',root,{'job_id':receipt['job_id']})['output_validation']['complete']
         if operation == 'electronic-gaussian':
             result = json.loads((Path(receipt['cwd']) / 'results/result.json').read_text())
             assert result['settings']['threads'] == 12
             assert result['settings']['memory_mb'] == 14745
             assert json.loads(path.read_text()) == s
-    finally:execute('job.cancel',root,{'job_id':receipt['job_id']})
+    finally:execute('job_cancel',root,{'job_id':receipt['job_id']})
 
 
 def test_density_overlap_is_invariant_under_ao_basis_rotation():

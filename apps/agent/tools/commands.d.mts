@@ -2,7 +2,7 @@
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
 export interface CommandParameters {
-  "research.read": {
+  "research_read": {
     "ref"?: string | null;
     "offset"?: number;
     "limit"?: number;
@@ -16,7 +16,7 @@ export interface CommandParameters {
     "waited_job_ids"?: Array<string>;
     "trigger"?: "context_refresh" | "new_evidence";
   };
-  "research.search": {
+  "research_search": {
     "query"?: string;
     "origin"?: "user" | "runtime" | "agent" | null;
     "node_id"?: string | null;
@@ -26,7 +26,7 @@ export interface CommandParameters {
     "limit"?: number;
     "session_id"?: string | null;
   };
-  "research.create": {
+  "research_create": {
     "goal": string;
     "title"?: string;
     "proposal"?: string | null;
@@ -44,7 +44,7 @@ export interface CommandParameters {
     "read_basis"?: string | null;
     "subjects"?: Record<string, string>;
   };
-  "research.update": {
+  "research_update": {
     "node_id": string;
     "note": string;
     "goal"?: string;
@@ -65,7 +65,7 @@ export interface CommandParameters {
     "read_basis"?: string | null;
     "subjects"?: Record<string, string>;
   };
-  "research.result": {
+  "research_result": {
     "node_id": string;
     "conclusion": string;
     "summary"?: string;
@@ -87,27 +87,27 @@ export interface CommandParameters {
     "check_refs"?: Array<string>;
     "progress"?: string;
   };
-  "research.source": {
+  "research_source": {
     "session_id": string | null;
     "message_id": string;
     "text": string;
   };
-  "research.observe": {
+  "research_observe": {
     "session_id"?: string | null;
     "read_basis": string | null;
   };
-  "research.allocate_task": {
+  "research_allocate_task": {
     "session_id": string;
     "request_id": string;
   };
-  "job.targets": Record<string, never>;
-  "job.resolve_target": {
+  "job_targets": Record<string, never>;
+  "job_resolve_target": {
     "target"?: string;
     "scheduler"?: string;
     "location"?: string;
     "source_text"?: string;
   };
-  "job.start": {
+  "job_start": {
     "request_id"?: string;
     "command"?: Array<string>;
     "cwd"?: string | null;
@@ -148,19 +148,19 @@ export interface CommandParameters {
     "required_target"?: string;
     "required_route_digest"?: string;
   };
-  "job.status": {
+  "job_status": {
     "job_id"?: string;
     "event_id"?: string;
   };
-  "job.collect": {
+  "job_collect": {
     "job_id"?: string;
     "event_id"?: string;
   };
-  "job.cancel": {
+  "job_cancel": {
     "job_id"?: string;
     "event_id"?: string;
   };
-  "job.probe": {
+  "job_probe": {
     "job_id"?: string;
     "request_id"?: string;
     "command"?: Array<string>;
@@ -175,14 +175,14 @@ export interface CommandParameters {
     "work_id"?: string;
     "execution_target"?: string;
   };
-  "job.reconcile": {
+  "job_reconcile": {
     "job_id"?: string;
     "event_id"?: string;
   };
-  "job.prepare": {
+  "job_prepare": {
     "request_file": string;
   };
-  "job.resolve_prepared": {
+  "job_resolve_prepared": {
     "prepared_ref": string;
     "timeout_seconds"?: number | null;
     "repeat"?: {
@@ -191,30 +191,30 @@ export interface CommandParameters {
       "budget": string;
     };
   };
-  "job.monitor_assess": {
+  "job_monitor_assess": {
     "event_id": string;
     "session_id": string | null;
   };
-  "job.list": {
+  "job_list": {
     "session_id"?: string;
     "user_task_id"?: string;
     "limit"?: number;
     "cursor"?: string;
   };
-  "artifact.register": {
+  "artifact_register": {
     "path"?: string;
     "job_id"?: string;
     "sha256"?: string;
     "media_type"?: string;
   };
-  "artifact.create": {
+  "artifact_create": {
     "content"?: string | Array<number>;
     "name"?: string | null;
     "job_id"?: string;
     "sha256"?: string;
     "media_type"?: string;
   };
-  "artifact.read": {
+  "artifact_read": {
     "artifact_id": string;
     "offset"?: number;
     "limit"?: number;
@@ -222,7 +222,7 @@ export interface CommandParameters {
 }
 
 export interface CommandResults {
-  "research.read": {
+  "research_read": {
     "schema_version": "research-snapshot/3";
     "workspace_id": string;
     "sequence": number;
@@ -429,7 +429,7 @@ export interface CommandResults {
     "read_more": Record<string, JsonValue>;
     "guidance": string;
   };
-  "research.search": {
+  "research_search": {
     "schema_version": "research-search/2";
     "records": Array<{
       "ref": string;
@@ -448,7 +448,7 @@ export interface CommandResults {
     "next_offset": number | null;
     "index_sequence": number;
   };
-  "research.create": {
+  "research_create": {
     "accepted": true;
     "node": {
       "schema_version": "research-node/1";
@@ -487,7 +487,7 @@ export interface CommandResults {
     "ref": string;
     "work_dir"?: string;
   };
-  "research.update": {
+  "research_update": {
     "accepted": true;
     "node": {
       "schema_version": "research-node/1";
@@ -526,7 +526,7 @@ export interface CommandResults {
     "ref": string;
     "work_dir"?: string;
   };
-  "research.result": {
+  "research_result": {
     "accepted": true;
     "node": {
       "schema_version": "research-node/1";
@@ -599,19 +599,19 @@ export interface CommandResults {
     "conflict": string | null;
     "work_dir"?: string;
   };
-  "research.source": {
+  "research_source": {
     "source_ref": string;
     "recorded": true;
   };
-  "research.observe": {
+  "research_observe": {
     "recorded": true;
   };
-  "research.allocate_task": {
+  "research_allocate_task": {
     "identifier": string;
   };
-  "job.targets": Record<string, unknown>;
-  "job.resolve_target": Record<string, unknown>;
-  "job.start": {
+  "job_targets": Record<string, unknown>;
+  "job_resolve_target": Record<string, unknown>;
+  "job_start": {
     "job_id": string;
     "platform": string;
     "submitted_at": string;
@@ -635,7 +635,7 @@ export interface CommandResults {
     "execution_fingerprint": string;
     "recovery": string;
   };
-  "job.status": {
+  "job_status": {
     "job_id": string;
     "state": "created" | "submitted" | "running" | "queued" | "held" | "succeeded" | "failed" | "timed_out" | "cancelled" | "unknown" | "collected";
     "platform": string;
@@ -653,7 +653,7 @@ export interface CommandResults {
     "diagnostics"?: Record<string, JsonValue>;
     "execution_conflict"?: JsonValue;
   };
-  "job.collect": {
+  "job_collect": {
     "job_id": string;
     "status": {
       "job_id": string;
@@ -732,7 +732,7 @@ export interface CommandResults {
     };
     "execution_conflict"?: JsonValue;
   };
-  "job.cancel": {
+  "job_cancel": {
     "job_id": string;
     "state": "created" | "submitted" | "running" | "queued" | "held" | "succeeded" | "failed" | "timed_out" | "cancelled" | "unknown" | "collected";
     "platform": string;
@@ -750,7 +750,7 @@ export interface CommandResults {
     "diagnostics"?: Record<string, JsonValue>;
     "execution_conflict"?: JsonValue;
   };
-  "job.probe": {
+  "job_probe": {
     "platform": string;
     "cwd_exists": boolean;
     "inputs_present": boolean;
@@ -771,7 +771,7 @@ export interface CommandResults {
     "available": false;
     "reason": string;
   };
-  "job.reconcile": {
+  "job_reconcile": {
     "job_id": string;
     "state": "created" | "submitted" | "running" | "queued" | "held" | "succeeded" | "failed" | "timed_out" | "cancelled" | "unknown" | "collected";
     "platform": string;
@@ -789,13 +789,13 @@ export interface CommandResults {
     "diagnostics"?: Record<string, JsonValue>;
     "execution_conflict"?: JsonValue;
   };
-  "job.prepare": {
+  "job_prepare": {
     "prepared_ref": string;
     "request_id": string;
     "work_id": string;
     "request_sha256": string;
   };
-  "job.resolve_prepared": {
+  "job_resolve_prepared": {
     "job_id"?: string;
     "request_id": string;
     "command": Array<string>;
@@ -829,7 +829,7 @@ export interface CommandResults {
     "request_sha256"?: string | null;
     "node_id"?: string;
   };
-  "job.monitor_assess": {
+  "job_monitor_assess": {
     "event_id": string;
     "event": {
       "event_id": string;
@@ -846,7 +846,7 @@ export interface CommandResults {
     "reason": "already_delivered" | "attention_required" | "paused";
     "delivery_token": string;
   };
-  "job.list": {
+  "job_list": {
     "jobs": Array<{
       "job_id": string;
       "session_id": string | null;
@@ -857,7 +857,7 @@ export interface CommandResults {
     }>;
     "next_cursor": string | null;
   };
-  "artifact.register": {
+  "artifact_register": {
     "artifact_id": string;
     "location": string;
     "sha256": string;
@@ -872,7 +872,7 @@ export interface CommandResults {
       "derivation_executed"?: boolean;
     };
   };
-  "artifact.create": {
+  "artifact_create": {
     "artifact_id": string;
     "location": string;
     "sha256": string;
@@ -887,7 +887,7 @@ export interface CommandResults {
       "derivation_executed"?: boolean;
     };
   };
-  "artifact.read": {
+  "artifact_read": {
     "artifact_id": string;
     "location": string;
     "sha256": string;

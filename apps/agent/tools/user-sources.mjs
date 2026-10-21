@@ -33,7 +33,7 @@ export async function recordUserSources({ harness, admission, monitorAdmission, 
     }
     const text = userEntryText(entry);
     if (!text.trim()) continue;
-    await bridge.execute_command("research.source", { session_id: sessionId, message_id: String(record.id), text });
+    await bridge.execute_command("research_source", { session_id: sessionId, message_id: String(record.id), text });
     recordedIds.add(id);
   }
   return { event_ids: [...eventIds] };

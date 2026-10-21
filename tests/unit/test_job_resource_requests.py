@@ -57,14 +57,14 @@ def test_explicit_allocation_reaches_tri_and_gaussian_without_changing_defaults(
     path = root / 'request.json'
     path.write_text(json.dumps(prepared))
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    receipt = execute('job.start', root, {'request_file': str(path), 'request_sha256': digest})
+    receipt = execute('job_start', root, {'request_file': str(path), 'request_sha256': digest})
     try:
         arguments = tasks(state)[0]['arguments']
         assert arguments[arguments.index('--cpu') + 1] == '12'
         assert arguments[arguments.index('--mem') + 1] == '16384M'
         assert arguments[arguments.index('--timeout') + 1] == '600'
         finish(state)
-        result = execute('job.collect', root, {'job_id': receipt['job_id']})
+        result = execute('job_collect', root, {'job_id': receipt['job_id']})
         assert result['status']['state'] == 'succeeded', (Path(receipt['cwd']) / 'logs/stderr.log').read_text()
         output = Path(receipt['cwd']) / 'results/sp'
         assert (output / 'observed.threads').read_text() == '12'
@@ -77,12 +77,12 @@ def test_explicit_allocation_reaches_tri_and_gaussian_without_changing_defaults(
         prepared['metadata']['resources']['cpus'] = 16
         path.write_text(json.dumps(prepared))
         with pytest.raises(ValueError, match='prepared_request_changed'):
-            execute('job.start', root, {'request_file': str(path), 'request_sha256': digest})
+            execute('job_start', root, {'request_file': str(path), 'request_sha256': digest})
         with pytest.raises(ValueError, match='prepared_override_forbidden'):
-            execute('job.start', root, {'request_file': str(path), 'request_sha256': digest,
+            execute('job_start', root, {'request_file': str(path), 'request_sha256': digest,
                                        'submission': {'resources': {'cpus': 16}}})
     finally:
-        execute('job.cancel', root, {'job_id': receipt['job_id']})
+        execute('job_cancel', root, {'job_id': receipt['job_id']})
 
 
 def test_default_backend_and_partial_job_resources_share_one_resolver(tmp_path, mock_environment_probe):
@@ -232,15 +232,15 @@ def test_raw_job_uses_the_same_public_submission_field(tmp_path, queue):
     configured(tmp_path, external=target)
     root = tmp_path / 'work'
     workspace(root)
-    receipt = execute('job.start', root, {'request_id': 'resource-test', 'command': ['/bin/true'],
+    receipt = execute('job_start', root, {'request_id': 'resource-test', 'command': ['/bin/true'],
         'submission': {'resources': {'cpus': 12, 'memory_mb': 8192}}})
     try:
         args = tasks(state)[0]['arguments']
         assert args[args.index('--cpu') + 1] == '12'
         finish(state)
-        assert execute('job.status', root, {'job_id': receipt['job_id']})['state'] == 'succeeded'
+        assert execute('job_status', root, {'job_id': receipt['job_id']})['state'] == 'succeeded'
     finally:
-        execute('job.cancel', root, {'job_id': receipt['job_id']})
+        execute('job_cancel', root, {'job_id': receipt['job_id']})
 
 
 @pytest.mark.parametrize('resource', [{'cpus': 0}, {'cpus': True}, {'memory_mb': -1}, {'gpus': 1}, {'walltime': '00:00:00'}])

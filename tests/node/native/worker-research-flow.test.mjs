@@ -54,6 +54,7 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     const call = (name, args) => ({ name, arguments: args });
     const steps = [
       ...["skills/core/research-memory/SKILL.md", "skills/core/research-workflow/SKILL.md",
+        "skills/core/research-memory/references/evidence.md", "skills/core/research-workflow/references/jobs-and-artifacts.md",
         "skills/chemical/method-selection/SKILL.md", "skills/chemical/cf22d/SKILL.md",
         "skills/chemical/cf22d/references/cf22d_workflow.md", "skills/chemical/_shared/science.py",
         "skills/chemical/reaction-investigation/references/pathway_execution.md",
@@ -169,7 +170,13 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     assert.ok(monitorDelivered, JSON.stringify({ requests: requests.length, failure: read.snapshot.runtime_error,
       lastResult: read.snapshot.last_result }));
     assert.equal(requests.length, steps.length, JSON.stringify(read.snapshot.failure));
+    const resident = await readFile(join(packageRoot, "prompts/coragent.md"), "utf8");
+    const evidenceGuide = await readFile(join(packageRoot, "skills/core/research-memory/references/evidence.md"), "utf8");
+    const firstSystem = requests[0].messages.filter(message => message.role === "system").map(message => String(message.content)).join("\n");
+    assert.ok(firstSystem.includes(resident.trim()), "resident object semantics reach the first provider request");
+    assert.equal(JSON.stringify(requests[0].messages).includes(evidenceGuide.trim()), false, "reference bodies are not preloaded");
     const toolResults = requests.at(-1).messages.filter(message => message.role === "tool");
+    assert.ok(toolResults.some(result => String(result.content).includes(evidenceGuide.trim())), "evidence guidance reaches the model after an explicit read");
     assert.equal(toolResults.length, steps.filter(step => typeof step !== "string").length);
     for (const result of toolResults) assert.doesNotMatch(String(result.content), /Tool call blocked|^research_decision_required|^operation references unknown/);
     assert.equal(await readFile(join(workspace, "工具 verification.txt"), "utf8"), "verified native tools\n");

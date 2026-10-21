@@ -248,8 +248,8 @@ The active preview includes only running or queued jobs, with at most five entri
 `active_omitted` counts additional active jobs. Fetch full pages using
 `monitor/jobs` with the same task scope. These reads are not atomic across pages.
 
-`Job` is the existing Job observation/receipt DTO returned by `job.list`,
-`job.status`, and `job.cancel`, with immutable `session_id` and `user_task_id`
+`Job` is the existing Job observation/receipt DTO returned by `job_list`,
+`job_status`, and `job_cancel`, with immutable `session_id` and `user_task_id`
 association on listed observations. It is not a separately maintained Monitor
 Job lifecycle. Missing collection or scientific-analysis evidence must not be
 presented as successful analysis merely because execution succeeded.
@@ -263,9 +263,9 @@ structured execution summaries, not model reasoning or secret tool arguments.
 ## Research in task details
 
 `monitor/task/read` returns the complete UserTask plus the same bounded
-`research-snapshot/3` returned by the internal `research.read` command. The
+`research-snapshot/3` returned by the internal `research_read` command. The
 required `session_job_ids` lists snapshot Jobs also present in the session-scoped
-`job.list` pages. Only those Jobs get executable `/monitor job` links. Jobs from
+`job_list` pages. Only those Jobs get executable `/monitor job` links. Jobs from
 shared research outside the current session remain visible with an explicit
 `Outside this session` label; Memory does not supply their owning session IDs.
 This list is a read-time scope projection, not stored Job ownership. The

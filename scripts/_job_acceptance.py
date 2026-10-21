@@ -39,17 +39,17 @@ def run_job(root, request, timeout):
     path = root / (request['request_id'] + '.json')
     raw = (json.dumps(request) + '\n').encode()
     write_private(path, raw)
-    receipt = execute('job.start', root, {'request_file': str(path), 'request_sha256': hashlib.sha256(raw).hexdigest()})
+    receipt = execute('job_start', root, {'request_file': str(path), 'request_sha256': hashlib.sha256(raw).hexdigest()})
     deadline = time.monotonic() + timeout
     terminal, collected_outputs = False, False
     try:
         while time.monotonic() < deadline:
-            status = execute('job.status', root, {'job_id': receipt['job_id']})
+            status = execute('job_status', root, {'job_id': receipt['job_id']})
             if status['state'] in TERMINAL:
                 terminal = True
                 if status['state'] != 'succeeded':
                     raise AcceptanceJobError('acceptance_job_' + status['state'], receipt, status)
-                collected = execute('job.collect', root, {'job_id': receipt['job_id']})
+                collected = execute('job_collect', root, {'job_id': receipt['job_id']})
                 collected_outputs = True
                 if not collected['output_validation']['complete']:
                     raise AcceptanceJobError('acceptance_outputs_incomplete', receipt, status)
@@ -61,10 +61,10 @@ def run_job(root, request, timeout):
         raise RuntimeError('acceptance_queue_or_execution_timeout')
     finally:
         if not terminal:
-            execute('job.cancel', root, {'job_id': receipt['job_id']})
+            execute('job_cancel', root, {'job_id': receipt['job_id']})
             cleanup = time.monotonic() + min(30, timeout)
             while time.monotonic() < cleanup:
-                if execute('job.status', root, {'job_id': receipt['job_id']})['state'] in TERMINAL:
+                if execute('job_status', root, {'job_id': receipt['job_id']})['state'] in TERMINAL:
                     terminal = True
                     break
                 time.sleep(.2)
@@ -73,7 +73,7 @@ def run_job(root, request, timeout):
         if (terminal and receipt.get('metadata', {}).get('remote_dir')
                 and receipt['metadata'].get('file_mode', 'staged') != 'shared'):
             if not collected_outputs:
-                execute('job.collect', root, {'job_id': receipt['job_id']})
+                execute('job_collect', root, {'job_id': receipt['job_id']})
             from research_agent.jobs import platforms_from_config
             settings = load_job_config(os.environ['CORAGENT_JOB_CONFIG'])
             target = configured_targets(settings)[request['execution_target']]

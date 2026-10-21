@@ -266,20 +266,20 @@ def test_registered_job_collects_candidates_or_rejection_evidence(tmp_path, coll
     spec=request()
     if collapse: spec['edit_hypotheses'][0]['operations'][0]['values']=[.2]
     source=root/'edits.json';source.write_text(json.dumps(spec))
-    node=execute('research.create',root,{'goal':'Deterministic reactive geometry fixture'})['node']
+    node=execute('research_create',root,{'goal':'Deterministic reactive geometry fixture'})['node']
     request_file=prepare(os.environ['CORAGENT_JOB_CONFIG'],'local','chemical.reactive-geometry','1',{'input':source})
-    receipt=execute('job.start',root,{**request_file,'node_id':node['id']})
+    receipt=execute('job_start',root,{**request_file,'node_id':node['id']})
     try:
         deadline=time.monotonic()+20
         while time.monotonic()<deadline:
-            state=execute('job.status',root,{'job_id':receipt['job_id']})['state']
+            state=execute('job_status',root,{'job_id':receipt['job_id']})['state']
             if state in {'succeeded','failed','cancelled'}:break
             time.sleep(.05)
         assert state==('failed' if collapse else 'succeeded')
-        collected=execute('job.collect',root,{'job_id':receipt['job_id']})
+        collected=execute('job_collect',root,{'job_id':receipt['job_id']})
         assert collected['output_validation']['complete']
         result=next(a for a in collected['artifacts'] if a['provenance']['source_path'].endswith('/result.json'))
         data=json.loads(Path(result['location']).read_text())
         assert data['status']==('no_candidates' if collapse else 'candidates_generated')
         assert any(a['provenance']['source_path'].endswith('/geometry.xyz') for a in collected['artifacts'])
-    finally:execute('job.cancel',root,{'job_id':receipt['job_id']})
+    finally:execute('job_cancel',root,{'job_id':receipt['job_id']})

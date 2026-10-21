@@ -364,7 +364,7 @@ def test_independent_checks_execute_and_collect_through_real_jobs(tmp_path, exec
     from research_agent.application.executors import prepare
     from tests.unit.test_job_recovery import workspace
     root = tmp_path / 'workspace'; workspace(root)
-    node = execute('research.create', root, {'goal': 'Reaction-independent evidence checks'})['node']
+    node = execute('research_create', root, {'goal': 'Reaction-independent evidence checks'})['node']
     m, e, paths, targets = study()
     source = root / 'material.json'; source.write_text(json.dumps(m['value']))
     disk = read_material(source)
@@ -382,16 +382,16 @@ def test_independent_checks_execute_and_collect_through_real_jobs(tmp_path, exec
     if executor == 'chemical.gaussian-evidence':
         inputs['evidence'].write_text(gaussian_log()); args = ['--constraints', 'none']
     prepared = prepare(Path(os.environ['CORAGENT_JOB_CONFIG']), 'local', executor, '1', inputs, args)
-    job = execute('job.start', root, {**prepared, 'node_id': node['id']})
+    job = execute('job_start', root, {**prepared, 'node_id': node['id']})
     try:
         for _ in range(300):
-            status = execute('job.status', root, {'job_id': job['job_id']})
+            status = execute('job_status', root, {'job_id': job['job_id']})
             if status['state'] in {'succeeded', 'failed'}: break
             time.sleep(.01)
         assert status['state'] == 'succeeded'
-        assert execute('job.collect', root, {'job_id': job['job_id']})['output_validation']['complete']
+        assert execute('job_collect', root, {'job_id': job['job_id']})['output_validation']['complete']
         result = json.loads((Path(job['cwd']) / 'results/result.json').read_text())
         if executor == 'chemical.gaussian-evidence': assert result['schema_version'] == 'chemical-stationary-evidence/1'
         else: assert result['verdict'] == 'pass'
     finally:
-        execute('job.cancel', root, {'job_id': job['job_id']})
+        execute('job_cancel', root, {'job_id': job['job_id']})

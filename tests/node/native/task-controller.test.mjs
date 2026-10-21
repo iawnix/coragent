@@ -43,23 +43,23 @@ async function fixture(t, storage = new MemoryStorage(), controllerOptions = {},
   const jobStates = new Map(), calls = [], artifacts = new Map();
   const allocatedTasks = new Map();
   const kernel = { execute_command: async (command, params) => {
-    if (command === "research.allocate_task") {
+    if (command === "research_allocate_task") {
       const key = JSON.stringify([params.session_id, params.request_id]);
       if (!allocatedTasks.has(key)) allocatedTasks.set(key, `task_${allocatedTasks.size + 1}`);
       return { identifier: allocatedTasks.get(key) };
     }
-    if (command === "job.resolve_target") return { target: params.target || "local", scheduler: params.target === "cluster_a" ? "slurm" : "none",
+    if (command === "job_resolve_target") return { target: params.target || "local", scheduler: params.target === "cluster_a" ? "slurm" : "none",
       location: params.target === "cluster_a" ? "cluster" : "controller", route_digest: "sha256:" + "a".repeat(64), selection_mode: params.target ? "explicit" : "default" };
-    if (command === "job.targets") return { default_target: "local", targets: {
+    if (command === "job_targets") return { default_target: "local", targets: {
       local: { scheduler: "none", location: "controller", aliases: [] },
       cluster_a: { scheduler: "slurm", location: "cluster", aliases: [] },
     } };
     calls.push({ command, params });
-    if (command === "job.list") return { jobs: [...jobStates].map(([job_id, state]) => ({ job_id, state })), next_cursor: null };
-    if (command === "job.status") return { job_id: params.job_id, state: jobStates.get(params.job_id) };
-    if (command === "job.cancel") { jobStates.set(params.job_id, "cancelled"); return { job_id: params.job_id, state: "cancelled" }; }
-    if (command === "research.read") { if (params.ref === "missing") throw new Error("unknown evidence"); return { ref: params.ref, node_id: params.ref }; }
-    if (command === "artifact.read") return { artifact_id: params.artifact_id,
+    if (command === "job_list") return { jobs: [...jobStates].map(([job_id, state]) => ({ job_id, state })), next_cursor: null };
+    if (command === "job_status") return { job_id: params.job_id, state: jobStates.get(params.job_id) };
+    if (command === "job_cancel") { jobStates.set(params.job_id, "cancelled"); return { job_id: params.job_id, state: "cancelled" }; }
+    if (command === "research_read") { if (params.ref === "missing") throw new Error("unknown evidence"); return { ref: params.ref, node_id: params.ref }; }
+    if (command === "artifact_read") return { artifact_id: params.artifact_id,
       ...(typeof artifacts.get(params.artifact_id) === "object" ? artifacts.get(params.artifact_id) : { sha256: artifacts.get(params.artifact_id) }) };
     throw new Error(`Unexpected test command ${command}`);
   } };
@@ -268,7 +268,7 @@ test("research binding has one bounded write path, preserves task control and al
   await assert.rejects(controller.update({ action: "progress", expected_revision: task.revision, research, evidence_refs: ["result_1"] }, "wrong-action", context), { code: "task_research_invalid" });
   const original = kernel.execute_command;
   kernel.execute_command = async (method, params) => {
-    if (method === "research.read" && params.ref === nodeId(404)) throw new Error("Node not found in this workspace");
+    if (method === "research_read" && params.ref === nodeId(404)) throw new Error("Node not found in this workspace");
     return original(method, params);
   };
   await assert.rejects(controller.update({ action: "set_research", expected_revision: task.revision,
@@ -278,7 +278,7 @@ test("research binding has one bounded write path, preserves task control and al
   const next = await controller.begin({ title: "Reuse", objective: "A different question", source_submission_ids: [task.sources[0].submission_id], criteria: [{ id: "answer", description: "Answer" }] }, "next", context);
   await controller.update({ action: "set_research", expected_revision: next.revision, research }, "bind-shared", context);
   assert.deepEqual((await controller.read({ user_task_id: task.user_task_id }, context)).research, research);
-  assert.ok(calls.filter(call => call.command === "research.read").every(call => call.params.field === "status"));
+  assert.ok(calls.filter(call => call.command === "research_read").every(call => call.params.field === "status"));
 });
 
 test("fixed evidence is counted once across tools, reference combinations, content aliases and restart", async t => {
@@ -338,7 +338,7 @@ test("canonical Artifact IDs deduplicate progress and support completion", async
   artifacts.set(artifactId, digest); artifacts.set("art_1", "sha256:" + digest);
   let task = await controller.current(context);
   task = await controller.update({ action: "progress", expected_revision: task.revision, evidence_refs: [artifactId] }, "canonical-artifact", context);
-  assert.deepEqual(calls.at(-1), { command: "artifact.read", params: { artifact_id: artifactId, limit: 1 } });
+  assert.deepEqual(calls.at(-1), { command: "artifact_read", params: { artifact_id: artifactId, limit: 1 } });
   task = await controller.update({ action: "progress", expected_revision: task.revision, evidence_refs: ["art_1", artifactId] }, "both-artifact-selectors", context);
   await controller.observeToolResults(observed("artifact_register", { artifact_id: artifactId, sha256: digest }), context);
   assert.deepEqual((await controller.current(context)).progress_identities, [`artifact:${digest}`]);
@@ -355,8 +355,8 @@ test("canonical Artifact IDs deduplicate progress and support completion", async
   } finally { finish(); }
   await conversation.waitForIdle(context); await controller.reconcile();
   assert.equal((await controller.current(context)).state, "completed");
-  assert.ok(calls.some(call => call.command === "artifact.read" && call.params.artifact_id === "art_1"));
-  assert.ok(!calls.some(call => call.command === "research.read" && call.params.ref === artifactId));
+  assert.ok(calls.some(call => call.command === "artifact_read" && call.params.artifact_id === "art_1"));
+  assert.ok(!calls.some(call => call.command === "research_read" && call.params.ref === artifactId));
 });
 
 test("new planning records and changing evidence combinations cannot hide an idle research loop", async t => {
@@ -397,7 +397,7 @@ test("Job progress recognizes real milestones once, not status polls or reconcil
   await controller.observeToolResults(observed("job_collect", { job_id: "job_1", status: { state: "failed" }, result_receipt: { collection_state: "partial" } }), context);
   assert.equal((await controller.current(context)).progress_version, 2);
   const original = kernel.execute_command;
-  kernel.execute_command = async (method, params) => method === "job.list"
+  kernel.execute_command = async (method, params) => method === "job_list"
     ? { jobs: [{ job_id: "job_1", state: "failed", collection_state: "complete", latest_result_receipt_ref: "job_result_fixed" }], next_cursor: null }
     : original(method, params);
   await controller.observeToolResults(observed("job_collect", { job_id: "job_1", status: { state: "failed" }, result_receipt: { collection_state: "complete" } }), context);
@@ -428,7 +428,7 @@ test("automatic evidence observation cannot overwrite pause or reset progress af
   const task = await begin();
   let entered, finish;
   const ready = new Promise(resolve => { entered = resolve; });
-  kernel.execute_command = async method => { assert.equal(method, "job.list"); entered(); await new Promise(resolve => { finish = resolve; }); return { jobs: [{ job_id: "job_racing", state: "running" }], next_cursor: null }; };
+  kernel.execute_command = async method => { assert.equal(method, "job_list"); entered(); await new Promise(resolve => { finish = resolve; }); return { jobs: [{ job_id: "job_racing", state: "running" }], next_cursor: null }; };
   const observing = controller.observeToolResults(observed("job_start", { job_id: "job_racing", submitted_at: "2026-10-10" }), context);
   await ready;
   await controller.control({ user_task_id: task.user_task_id, expected_revision: task.revision, action: "pause", request_id: "pause-progress" }, context);
@@ -444,7 +444,7 @@ test("automatic observation skips historical Jobs while crediting current eviden
   await begin();
   let ownershipReads = 0;
   kernel.execute_command = async method => {
-    assert.equal(method, "job.list", "persisted Result and Artifact successes must not trigger another payload read");
+    assert.equal(method, "job_list", "persisted Result and Artifact successes must not trigger another payload read");
     ownershipReads += 1;
     return { jobs: [{ job_id: "job_current", state: "running" }], next_cursor: null };
   };
@@ -510,7 +510,7 @@ test("a negative theoretical Result completes a zero-Job task only after the fin
   const { controller, conversation, faux, begin, kernel, calls, assess } = await fixture(t);
   await begin(); let finish, entered;
   const original = kernel.execute_command;
-  kernel.execute_command = async (method, params) => method === "research.read"
+  kernel.execute_command = async (method, params) => method === "research_read"
     ? { ref: params.ref, result: { id: params.ref, observation: "Derived counterexample", conclusion: "The proposed statement does not hold" } }
     : original(method, params);
   const ready = new Promise(resolve => { entered = resolve; });
@@ -522,7 +522,7 @@ test("a negative theoretical Result completes a zero-Job task only after the fin
   assert.equal(task.state, "completing");
   finish(); await conversation.waitForIdle(context); await controller.reconcile();
   assert.equal((await controller.current(context)).state, "completed");
-  assert.equal(calls.some(call => call.command === "job.start"), false);
+  assert.equal(calls.some(call => call.command === "job_start"), false);
 });
 
 test("task sources reject internal continuations and Monitor queries never resume work", async t => {
@@ -601,7 +601,7 @@ test("read-only task listing never retries a pending cancellation; reconciliatio
   const { controller, kernel } = await fixture(t);
   let attempts = 0;
   kernel.execute_command = async command => {
-    assert.equal(command, "job.cancel"); attempts += 1;
+    assert.equal(command, "job_cancel"); attempts += 1;
     if (attempts === 1) throw new Error("temporary runtime disconnect");
     return { job_id: "job_1", state: "cancelled" };
   };
@@ -651,7 +651,7 @@ test("pause wins while completed waits are being observed", async t => {
   let entered, finish;
   const ready = new Promise(resolve => { entered = resolve; });
   const execute = kernel.execute_command;
-  kernel.execute_command = async (command, params) => command === "job.status"
+  kernel.execute_command = async (command, params) => command === "job_status"
     ? new Promise(resolve => { entered(); finish = () => resolve({ job_id: "job_1", state: "succeeded" }); })
     : execute(command, params);
   const binding = controller.binding(context);
@@ -731,7 +731,7 @@ test("transient wait status failure preserves user access and can recover", asyn
     wait: { job_ids: ["job_1"], mode: "all" } }, "wait-unavailable", context);
   const execute = kernel.execute_command;
   kernel.execute_command = async (command, params) => {
-    if (command === "job.status") throw new Error("Fixture status service unavailable");
+    if (command === "job_status") throw new Error("Fixture status service unavailable");
     return execute(command, params);
   };
   assert.equal((await controller.current(context)).state, "waiting");
@@ -1018,7 +1018,7 @@ test("task cancellation commits before unavailable Job discovery, and retries cl
   const execute = env.kernel.execute_command;
   let unavailable = true;
   env.kernel.execute_command = async (command, params) => {
-    if (command === "job.list") {
+    if (command === "job_list") {
       assert.equal((await env.controller.current(context)).state, "cancelled", "scheduling must stop before external Job discovery");
       if (unavailable) throw new Error("deterministic disconnected Job backend");
     }
@@ -1054,7 +1054,7 @@ for (const source of ["automatic", "historical"]) test(`internal runs cannot con
       expected_revision: task.revision, source_submission_ids: [id] }, "invalid-control", context),
     { code: source === "automatic" ? "task_source_invalid" : "task_control_source_invalid" });
     assert.equal((await env.controller.current(context)).state, "active");
-    assert.equal(env.calls.some(call => call.command === "job.cancel"), false);
+    assert.equal(env.calls.some(call => call.command === "job_cancel"), false);
   } finally { finish(); }
   await env.conversation.waitForIdle(context);
 });
@@ -1084,10 +1084,10 @@ test("a stop tool cannot reuse a superseded user instruction, and its own receip
   }]);
   await env.admission.submitUser({ requestId: "final-stop", content: "现在停止研究并取消计算" }, context);
   await env.conversation.waitForIdle(context);
-  const count = env.calls.filter(call => call.command === "job.cancel").length;
+  const count = env.calls.filter(call => call.command === "job_cancel").length;
   const replayed = await env.controller.update(request, "stable-stop", context);
   assert.equal(replayed.task.state, applied.task.state);
-  assert.equal(env.calls.filter(call => call.command === "job.cancel").length, count);
+  assert.equal(env.calls.filter(call => call.command === "job_cancel").length, count);
   await assert.rejects(env.controller.update({ ...request, control: "resume", jobs: undefined }, "stable-stop", context), { code: "request_id_reused" });
 });
 
@@ -1184,7 +1184,7 @@ for (const mutation of ["stale_result", "artifact_changed"]) test(`completion re
       completion_outcome: "full", completion: [item] }, "propose", context);
     if (mutation === "stale_result") {
       const original = kernel.execute_command;
-      kernel.execute_command = async (method, params) => method === "research.read"
+      kernel.execute_command = async (method, params) => method === "research_read"
         ? { ref: params.ref, review_notice_count: 1 } : original(method, params);
     } else artifacts.get(item.assessment_ref).sha256 = "b".repeat(64);
   } finally { finish(); }

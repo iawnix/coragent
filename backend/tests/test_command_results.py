@@ -40,74 +40,74 @@ def test_all_command_results_match_actual_api_replies(command_workspace):
         covered.add(command_id)
         return value
 
-    call('research.allocate_task', session_id='fixture', request_id='task-begin')
-    source = call('research.source', session_id='fixture', message_id='question', text='Investigate a local result')
-    created = call('research.create', goal='Investigate', session_id='fixture', source_refs=[source['source_ref']])
+    call('research_allocate_task', session_id='fixture', request_id='task-begin')
+    source = call('research_source', session_id='fixture', message_id='question', text='Investigate a local result')
+    created = call('research_create', goal='Investigate', session_id='fixture', source_refs=[source['source_ref']])
     node = created['node']['id']
-    call('research.observe', session_id='fixture', read_basis=created['read_basis'])
-    call('research.update', node_id=node, note='Progress recorded', session_id='fixture',
+    call('research_observe', session_id='fixture', read_basis=created['read_basis'])
+    call('research_update', node_id=node, note='Progress recorded', session_id='fixture',
          progress='Prepared local test', read_basis=created['read_basis'])
-    call('research.result', node_id=node, conclusion='Observed a deterministic result', session_id='fixture')
-    call('research.search', query='Investigate')
-    call('research.read', session_id='fixture')
-    call('research.read', ref=node, session_id='fixture')
-    call('research.read', ref=node, field='goal', session_id='fixture')
-    call('research.read', ref=node, limit=10, session_id='fixture')
-    material = call('artifact.create', name='fixture.txt', content='fixture evidence')
-    call('artifact.read', artifact_id=material['artifact_id'])
+    call('research_result', node_id=node, conclusion='Observed a deterministic result', session_id='fixture')
+    call('research_search', query='Investigate')
+    call('research_read', session_id='fixture')
+    call('research_read', ref=node, session_id='fixture')
+    call('research_read', ref=node, field='goal', session_id='fixture')
+    call('research_read', ref=node, limit=10, session_id='fixture')
+    material = call('artifact_create', name='fixture.txt', content='fixture evidence')
+    call('artifact_read', artifact_id=material['artifact_id'])
     (root / 'input.txt').write_text('local fixture')
-    call('artifact.register', path='input.txt')
+    call('artifact_register', path='input.txt')
     request = {'request_id': 'fixture-preparation', 'command': [sys.executable, '-c', 'pass'],
                'inputs': [{'source': 'input.txt', 'destination': 'input.txt'}]}
     (root / 'prepared.json').write_text(json.dumps(request))
-    prepared = call('job.prepare', request_file='prepared.json')
-    call('job.resolve_prepared', prepared_ref=prepared['prepared_ref'])
-    call('job.probe', job_id='job_999', command=[sys.executable, '-c', 'pass'])
-    call('job.targets')
-    call('job.resolve_target')
-    job = call('job.start', request_id='contract', node_id=node, session_id='fixture',
+    prepared = call('job_prepare', request_file='prepared.json')
+    call('job_resolve_prepared', prepared_ref=prepared['prepared_ref'])
+    call('job_probe', job_id='job_999', command=[sys.executable, '-c', 'pass'])
+    call('job_targets')
+    call('job_resolve_target')
+    job = call('job_start', request_id='contract', node_id=node, session_id='fixture',
                command=[sys.executable, '-c', "print('local contract fixture')"])
     try:
         deadline = time.monotonic() + 10
         while True:
-            status = call('job.status', job_id=job['job_id'])
+            status = call('job_status', job_id=job['job_id'])
             if status['state'] in {'succeeded', 'failed', 'timed_out', 'cancelled'}:
                 break
             assert time.monotonic() < deadline, 'local fixture did not finish'
             time.sleep(.02)
-        call('job.reconcile', job_id=job['job_id'])
-        call('job.cancel', job_id=job['job_id'])
-        call('job.collect', job_id=job['job_id'])
-        jobs = call('job.list', session_id='fixture', limit=1)
+        call('job_reconcile', job_id=job['job_id'])
+        call('job_cancel', job_id=job['job_id'])
+        call('job_collect', job_id=job['job_id'])
+        jobs = call('job_list', session_id='fixture', limit=1)
         assert jobs['jobs'][0]['job_id'] == job['job_id']
         job_monitor.command(root, 'tick', {})
         event = job_monitor.command(root, 'pending', {})['deliveries'][0]['event_id']
-        call('job.monitor_assess', event_id=event, session_id='fixture')
+        call('job_monitor_assess', event_id=event, session_id='fixture')
     finally:
-        execute('job.cancel', root, {'job_id': job['job_id']})
+        execute('job_cancel', root, {'job_id': job['job_id']})
     assert covered == set(COMMAND_DEFINITIONS)
 
 
 def test_read_result_discriminant_and_required_fields(command_workspace):
     root = command_workspace
-    snapshot = execute('research.read', root)
-    validator = Draft202012Validator(COMMAND_DEFINITIONS['research.read']['result'])
+    snapshot = execute('research_read', root)
+    validator = Draft202012Validator(COMMAND_DEFINITIONS['research_read']['result'])
     assert validator.is_valid(snapshot)
     assert not validator.is_valid({**snapshot, 'sequence': 'invalid'})
     assert not validator.is_valid({**snapshot, 'schema_version': 'research-read/2'})
-    mutation = execute('research.create', root, {'goal': 'Contract mutation'})
-    validator = Draft202012Validator(COMMAND_DEFINITIONS['research.create']['result'])
+    mutation = execute('research_create', root, {'goal': 'Contract mutation'})
+    validator = Draft202012Validator(COMMAND_DEFINITIONS['research_create']['result'])
     assert not validator.is_valid({key: value for key, value in mutation.items() if key != 'node'})
     assert not validator.is_valid({**mutation, 'node': {**mutation['node'], 'revision': 'invalid'}})
 
 
 def test_result_schemas_cover_non_success_variants():
-    checked('job.start', {'job_id': 'job_fixture', 'state': 'unknown', 'error': 'dispatch uncertain'})
-    checked('job.start', {'job_id': 'job_fixture', 'accepted': False, 'code': 'duplicate_execution',
+    checked('job_start', {'job_id': 'job_fixture', 'state': 'unknown', 'error': 'dispatch uncertain'})
+    checked('job_start', {'job_id': 'job_fixture', 'accepted': False, 'code': 'duplicate_execution',
                           'execution_fingerprint': 'fixture-digest', 'recovery': 'Reuse existing job'})
-    checked('job.status', {'job_id': 'job_fixture', 'platform': 'local', 'state': 'unknown', 'error': 'No receipt'})
-    checked('job.probe', {'platform': 'unconfigured', 'available': False, 'reason': 'No adapter'})
-    checked('job.probe', {'platform': 'remote', 'available': False, 'ssh_host': 'fixture.invalid',
+    checked('job_status', {'job_id': 'job_fixture', 'platform': 'local', 'state': 'unknown', 'error': 'No receipt'})
+    checked('job_probe', {'platform': 'unconfigured', 'available': False, 'reason': 'No adapter'})
+    checked('job_probe', {'platform': 'remote', 'available': False, 'ssh_host': 'fixture.invalid',
                           'scheduler': 'torque', 'remote_root': '/fixture', 'cwd_exists': True,
                           'inputs_present': True, 'missing_inputs': [], 'error': 'Unreachable'})
 

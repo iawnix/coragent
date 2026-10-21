@@ -1,7 +1,7 @@
 """Prepare installed execution descriptors without running science or writing State.
 
 The manifest owns method-specific argv, inputs, outputs and the pure CLI parser.
-The Job configuration owns target commands and interpreters. Only job.start may
+The Job configuration owns target commands and interpreters. Only job_start may
 turn the resulting reviewed file into a prepared reference and an Attempt.
 """
 from __future__ import annotations

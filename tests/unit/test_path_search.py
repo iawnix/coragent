@@ -360,21 +360,21 @@ def test_registered_path_operations_through_jobs(tmp_path,monkeypatch,operation)
         spec.update(reactant=molecule(center=True),product=molecule(3.,permutation=[1,0],center=True))
     source=root/'input.json';source.write_text(json.dumps(spec))
     prepared=prepare(config,'local','chemical.'+operation,'2' if operation=='neb-xtb' else '1',{'input':source})
-    node=execute('research.create',root,{'goal':'Independent path operation fixture'})['node']
-    receipt=execute('job.start',root,{**prepared,'node_id':node['id']})
+    node=execute('research_create',root,{'goal':'Independent path operation fixture'})['node']
+    receipt=execute('job_start',root,{**prepared,'node_id':node['id']})
     try:
         for _ in range(600):
-            status=execute('job.status',root,{'job_id':receipt['job_id']})
+            status=execute('job_status',root,{'job_id':receipt['job_id']})
             if status['state'] in ('succeeded','failed'):break
             time.sleep(.01)
         # This monotonic synthetic path has nonzero climbing force. With no
         # optimizer steps it must remain limited, while retaining collectable evidence.
         assert status['state']==('failed' if operation=='neb-xtb' else 'succeeded')
-        assert execute('job.collect',root,{'job_id':receipt['job_id']})['output_validation']['complete']
+        assert execute('job_collect',root,{'job_id':receipt['job_id']})['output_validation']['complete']
         result=json.loads((Path(receipt['cwd'])/'results/result.json').read_text())
         if operation=='neb-xtb':assert result['status']=='step_limit' and not result['candidate']['validated_ts']
         if operation=='qst-prepare':assert result['kind']=='QST3'
-    finally:execute('job.cancel',root,{'job_id':receipt['job_id']})
+    finally:execute('job_cancel',root,{'job_id':receipt['job_id']})
 
 
 @pytest.mark.parametrize('backend', ['xtb', 'gaussian'])

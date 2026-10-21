@@ -218,20 +218,20 @@ def test_registered_pipeline_stages_collects_and_exports_refinement(tmp_path, mo
     text = text.replace('command = \"xtb\"', 'command = '+json.dumps(str(native)))
     text += '[execution.targets.local.bindings.xtb.python]\n' + ''.join(k+' = '+json.dumps(v)+'\n' for k,v in binding.items())
     config = tmp_path / 'job.toml'; config.write_text(text); monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(config))
-    node = execute('research.create', root, {'goal': 'Independent conformer and complex preparation'})['node']
+    node = execute('research_create', root, {'goal': 'Independent conformer and complex preparation'})['node']
     source = root / 'material.json'; source.write_text(json.dumps(water()['value']))
     def job(executor, inputs, args=()):
         prepared = prepare(config, 'local', executor, '1', inputs, list(args))
-        receipt = execute('job.start', root, {**prepared, 'node_id': node['id']})
+        receipt = execute('job_start', root, {**prepared, 'node_id': node['id']})
         try:
             for _ in range(500):
-                status = execute('job.status', root, {'job_id': receipt['job_id']})
+                status = execute('job_status', root, {'job_id': receipt['job_id']})
                 if status['state'] in {'succeeded', 'failed'}: break
                 time.sleep(.01)
             assert status['state'] == 'succeeded'
-            assert execute('job.collect', root, {'job_id': receipt['job_id']})['output_validation']['complete']
+            assert execute('job_collect', root, {'job_id': receipt['job_id']})['output_validation']['complete']
             return Path(receipt['cwd']) / 'results'
-        finally: execute('job.cancel', root, {'job_id': receipt['job_id']})
+        finally: execute('job_cancel', root, {'job_id': receipt['job_id']})
     native_out = job('chemical.crest', {'material': source}, ['--timeout', '2'])
     imported = job('chemical.crest-ensemble', {'material': source, 'run': native_out / 'result.json'})
     selected = job('chemical.ensemble-select', {'ensemble': imported / 'result.json'})

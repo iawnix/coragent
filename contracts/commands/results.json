@@ -1591,7 +1591,7 @@
           }
         },
         "repeat": {
-          "$ref": "shared.json#/tools/jobStart/properties/repeat"
+          "$ref": "shared.json#/tools/job_start/properties/repeat"
         },
         "prepared_ref": {
           "type": "string"
@@ -2356,7 +2356,7 @@
     }
   },
   "commands": {
-    "research.read": {
+    "research_read": {
       "anyOf": [
         {
           "$ref": "results.json#/definitions/ResearchSnapshot"
@@ -2369,19 +2369,19 @@
         }
       ]
     },
-    "research.search": {
+    "research_search": {
       "$ref": "results.json#/definitions/ResearchSearch"
     },
-    "research.create": {
+    "research_create": {
       "$ref": "results.json#/definitions/ResearchMutation"
     },
-    "research.update": {
+    "research_update": {
       "$ref": "results.json#/definitions/ResearchMutation"
     },
-    "research.result": {
+    "research_result": {
       "$ref": "results.json#/definitions/ResearchPublication"
     },
-    "research.source": {
+    "research_source": {
       "type": "object",
       "properties": {
         "source_ref": {
@@ -2397,7 +2397,7 @@
       ],
       "additionalProperties": false
     },
-    "research.observe": {
+    "research_observe": {
       "type": "object",
       "properties": {
         "recorded": {
@@ -2409,7 +2409,7 @@
       ],
       "additionalProperties": false
     },
-    "job.start": {
+    "job_start": {
       "anyOf": [
         {
           "$ref": "results.json#/definitions/JobReceipt"
@@ -2422,19 +2422,19 @@
         }
       ]
     },
-    "job.status": {
+    "job_status": {
       "$ref": "results.json#/definitions/JobStatus"
     },
-    "job.cancel": {
+    "job_cancel": {
       "$ref": "results.json#/definitions/JobStatus"
     },
-    "job.reconcile": {
+    "job_reconcile": {
       "$ref": "results.json#/definitions/JobStatus"
     },
-    "job.collect": {
+    "job_collect": {
       "$ref": "results.json#/definitions/JobCollection"
     },
-    "job.probe": {
+    "job_probe": {
       "anyOf": [
         {
           "$ref": "results.json#/definitions/JobLocalProbe"
@@ -2447,25 +2447,25 @@
         }
       ]
     },
-    "job.prepare": {
+    "job_prepare": {
       "$ref": "results.json#/definitions/PreparedRegistration"
     },
-    "job.resolve_prepared": {
+    "job_resolve_prepared": {
       "$ref": "results.json#/definitions/PreparedRequest"
     },
-    "job.monitor_assess": {
+    "job_monitor_assess": {
       "$ref": "results.json#/definitions/MonitorAssessment"
     },
-    "artifact.create": {
+    "artifact_create": {
       "$ref": "results.json#/definitions/ArtifactWrite"
     },
-    "artifact.register": {
+    "artifact_register": {
       "$ref": "results.json#/definitions/ArtifactWrite"
     },
-    "artifact.read": {
+    "artifact_read": {
       "$ref": "results.json#/definitions/ArtifactRead"
     },
-    "job.list": {
+    "job_list": {
       "type": "object",
       "properties": {
         "jobs": {

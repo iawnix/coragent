@@ -1,5 +1,12 @@
 # 将 TRI 接入 CoRAgent Job
 
+## 内容
+
+- [Handler 环境](#handler-环境)
+- [资源与状态处理](#资源与状态处理)
+- [提交与诊断](#提交与诊断)
+- [按计算节点和后端验收](#按计算节点和后端验收)
+
 将随附的 [tri.py](../scripts/tri.py) 配置为通用外部目标的 handler。
 提交主机需要 Python 3 和原生 `tri_sub`、`tri_stat`、`tri_del`。
 脚本从 stdin 读取一个 JSON 请求，向 stdout 输出一个统一 JSON 响应，支持
@@ -54,6 +61,8 @@ JSON
 传输与输出回收。共享检查由通用执行层负责，TRI 协议和处理器无需改变。
 
 ## 提交与诊断
+
+TRI 成功提交回执必须包含 `driver="external"` 和非空 `scheduler_id`；本机 handler 成功运行不证明任务进入了 TRI 队列。
 
 原生 `invalid_request` 明确拒绝会保存为失败 Job，标记
 `action_outcome=not_submitted`。响应丢失、`request_id_reused` 和

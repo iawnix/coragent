@@ -3,7 +3,7 @@ import type { ToolParameters } from "./parameters.mjs";
 
 export type PublicToolKey = keyof ToolParameters;
 
-export const PUBLIC_TOOL_NAMES: Readonly<Record<PublicToolKey, string>>;
+export const PUBLIC_TOOL_NAMES: readonly PublicToolKey[];
 export const PUBLIC_TOOL_EXECUTION: Readonly<Record<string, string>>;
 export const PUBLIC_TOOL_METADATA: Readonly<Record<string, {
   readonly authority: string;
@@ -35,33 +35,33 @@ type ToolContract<P, N extends string = string> = {
 };
 
 export interface PublicToolContracts {
-  readonly taskBegin: ToolContract<ToolParameters["taskBegin"]>;
-  readonly taskRead: ToolContract<ToolParameters["taskRead"]>;
-  readonly taskUpdate: ToolContract<ToolParameters["taskUpdate"]>;
-  readonly state: ToolContract<StateToolParams>;
-  readonly search: ToolContract<ToolParameters["search"]>;
-  readonly create: ToolContract<ToolParameters["create"]>;
-  readonly update: ToolContract<ToolParameters["update"]>;
-  readonly result: ToolContract<ToolParameters["result"]>;
-  readonly jobStart: ToolContract<JobStartToolParams>;
-  readonly jobStatus: ToolContract<JobStatusToolParams>;
-  readonly jobCollect: ToolContract<JobCollectToolParams>;
-  readonly jobCancel: ToolContract<JobCancelToolParams>;
-  readonly jobProbe: ToolContract<JobProbeToolParams>;
-  readonly jobReconcile: ToolContract<JobReconcileToolParams>;
-  readonly artifactRegister: ToolContract<ArtifactRegisterToolParams>;
-  readonly artifactCreate: ToolContract<ArtifactCreateToolParams>;
-  readonly artifactRead: ToolContract<ArtifactReadToolParams>;
+  readonly task_begin: ToolContract<ToolParameters["task_begin"]>;
+  readonly task_read: ToolContract<ToolParameters["task_read"]>;
+  readonly task_update: ToolContract<ToolParameters["task_update"]>;
+  readonly research_read: ToolContract<ResearchReadToolParams>;
+  readonly research_search: ToolContract<ToolParameters["research_search"]>;
+  readonly research_create: ToolContract<ToolParameters["research_create"]>;
+  readonly research_update: ToolContract<ToolParameters["research_update"]>;
+  readonly research_result: ToolContract<ToolParameters["research_result"]>;
+  readonly job_start: ToolContract<JobStartToolParams>;
+  readonly job_status: ToolContract<JobStatusToolParams>;
+  readonly job_collect: ToolContract<JobCollectToolParams>;
+  readonly job_cancel: ToolContract<JobCancelToolParams>;
+  readonly job_probe: ToolContract<JobProbeToolParams>;
+  readonly job_reconcile: ToolContract<JobReconcileToolParams>;
+  readonly artifact_register: ToolContract<ArtifactRegisterToolParams>;
+  readonly artifact_create: ToolContract<ArtifactCreateToolParams>;
+  readonly artifact_read: ToolContract<ArtifactReadToolParams>;
 }
 
 export function createPublicToolContracts(Type: any): PublicToolContracts;
-export type StateToolParams = ToolParameters["state"];
-export type JobStartToolParams = ToolParameters["jobStart"];
-export type JobStatusToolParams = ToolParameters["jobStatus"];
-export type JobCollectToolParams = ToolParameters["jobCollect"];
-export type JobCancelToolParams = ToolParameters["jobCancel"];
-export type JobProbeToolParams = ToolParameters["jobProbe"];
-export type JobReconcileToolParams = ToolParameters["jobReconcile"];
-export type ArtifactRegisterToolParams = ToolParameters["artifactRegister"];
-export type ArtifactCreateToolParams = ToolParameters["artifactCreate"];
-export type ArtifactReadToolParams = ToolParameters["artifactRead"];
+export type ResearchReadToolParams = ToolParameters["research_read"];
+export type JobStartToolParams = ToolParameters["job_start"];
+export type JobStatusToolParams = ToolParameters["job_status"];
+export type JobCollectToolParams = ToolParameters["job_collect"];
+export type JobCancelToolParams = ToolParameters["job_cancel"];
+export type JobProbeToolParams = ToolParameters["job_probe"];
+export type JobReconcileToolParams = ToolParameters["job_reconcile"];
+export type ArtifactRegisterToolParams = ToolParameters["artifact_register"];
+export type ArtifactCreateToolParams = ToolParameters["artifact_create"];
+export type ArtifactReadToolParams = ToolParameters["artifact_read"];

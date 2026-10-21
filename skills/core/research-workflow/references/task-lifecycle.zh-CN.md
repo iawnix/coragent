@@ -35,3 +35,9 @@ Job 运行期间继续独立的已授权工作。遵循 `job_status` 返回的�
 `execution_recovery` 单独记录 Agent 执行故障，与科学阻塞分开。决定下一步前检查恢复状态和已有 Job/交付回执。核实已完成或不确定的外部工作；不能因运行或 Memory 更新失败而重复执行。说明需要处理的执行故障；新指令解决问题时可用 `refine`，用户也可通过 Monitor 显式恢复。
 
 最终回复恢复沿用已保存的完成证据和回执。只做只读核实与最终回复，不启动新计算或重复发送外部消息。如果完成证据失效且控制器将任务返回活跃状态，按[验收流程](acceptance.zh-CN.md)重新评估受影响条件。
+
+## 登记进展与关联研究
+
+通过 `task_update action=progress` 记录已采用的固定 Result/Artifact 或当前任务 Job，以及下一项行动；笔记本身不是实质科学进展，收集回执不能直接充当任务进展引用。`progress` 不恢复暂停或阻塞任务。需要新要求或解除阻塞时，`refine` 引用实际新用户提交。
+
+用 `action=set_research` 设置任务入口和焦点，完整提供 `entry_node_ids` 与 `focus_node_ids`；数组整体替换，空数组清空相应列表。研究关系与问题拆分见 research-memory。始终使用 Task 的当前 revision；Node revision 属于另一个对象。完成与部分交付见[验收说明](acceptance.zh-CN.md)，执行目标纠错见[目标选择](execution-targets.zh-CN.md)。

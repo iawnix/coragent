@@ -1,7 +1,7 @@
 import { TOOL_CONTRACTS, toolResult } from "../tools/shared.mjs";
 
 export function createTaskTools(getController) {
-  return [["taskBegin", "begin"], ["taskRead", "current"], ["taskUpdate", "update"]].map(([key, method]) => ({
+  return [["task_begin", "begin"], ["task_read", "current"], ["task_update", "update"]].map(([key, method]) => ({
     ...TOOL_CONTRACTS[key],
     async execute(params, api, context) {
       context.abortSignal?.throwIfAborted();

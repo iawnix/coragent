@@ -13,7 +13,7 @@ export function createMonitorAdmission({ admission, kernel, sessionId, wakeMessa
     }
   }
   const assess = async id => {
-    const result = await kernel.execute_command("job.monitor_assess", { event_id: id, session_id: sessionId });
+    const result = await kernel.execute_command("job_monitor_assess", { event_id: id, session_id: sessionId });
     if (typeof result?.admitted !== "boolean" || !result.delivery_token) {
       throw fail("invalid_monitor_assessment", "Invalid Monitor assessment");
     }

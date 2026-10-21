@@ -30,6 +30,7 @@ def _receipt(root, token, session_id):
     return value
 
 
+# Durable receipt identity; not a callable command name. Keep existing digests stable.
 @workspace_transaction('research.observe')
 def observe(root, request):
     session = request.get('session_id')

@@ -310,11 +310,11 @@ test("Host relays real Job Monitor events and rejects old or mismatched identiti
   const notifications = [];
   env.client.on("notification", event => { if (event.method === "monitor/event") notifications.push(event.params.event); });
   await env.client.request("monitor/overview", TARGET);
-  const job = await bridge.execute_command("job.start", { request_id: "monitor-fixture", session_id: "session-a",
+  const job = await bridge.execute_command("job_start", { request_id: "monitor-fixture", session_id: "session-a",
     command: [process.env.CORAGENT_PYTHON, "-c", "print('monitor fixture')"], timeout_seconds: 5 });
-  t.after(() => bridge.execute_command("job.cancel", { job_id: job.job_id }).catch(() => {}));
+  t.after(() => bridge.execute_command("job_cancel", { job_id: job.job_id }).catch(() => {}));
   for (let poll = 0; poll < 100; poll++) {
-    const status = await bridge.execute_command("job.status", { job_id: job.job_id });
+    const status = await bridge.execute_command("job_status", { job_id: job.job_id });
     if (status.state === "succeeded") break;
     await new Promise(resolve => setTimeout(resolve, 20));
   }

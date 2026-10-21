@@ -42,7 +42,7 @@ test("worker queries bind identity and admit only read-only research arguments",
   assert.deepEqual(await queries.research("read note_123"), {
     workspace_id: "remote", session_id: "one", result: { root: "/remote/workspace" },
   });
-  assert.deepEqual(calls, [["research.read", { ref: "note_123" }]]);
+  assert.deepEqual(calls, [["research_read", { ref: "note_123" }]]);
   for (const input of ["change x", "storage bootstrap", "summary --root /local", { root: "/local" }]) {
     assert.ok((await queries.research(input)).error);
   }

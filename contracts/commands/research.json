@@ -2,7 +2,7 @@
   "schema_version": "coragent-command-source/1",
   "commands": [
     {
-      "id": "research.read",
+      "id": "research_read",
       "domain": "research",
       "effect": "read",
       "schema": {
@@ -11,7 +11,7 @@
           "ref": {
             "anyOf": [
               {
-                "$ref": "shared.json#/tools/state/properties/ref"
+                "$ref": "shared.json#/tools/research_read/properties/ref"
               },
               {
                 "type": "null"
@@ -19,10 +19,10 @@
             ]
           },
           "offset": {
-            "$ref": "shared.json#/tools/state/properties/offset"
+            "$ref": "shared.json#/tools/research_read/properties/offset"
           },
           "limit": {
-            "$ref": "shared.json#/tools/state/properties/limit"
+            "$ref": "shared.json#/tools/research_read/properties/limit"
           },
           "session_id": {
             "type": [
@@ -45,7 +45,7 @@
           "field": {
             "anyOf": [
               {
-                "$ref": "shared.json#/tools/state/properties/field"
+                "$ref": "shared.json#/tools/research_read/properties/field"
               },
               {
                 "type": "null"
@@ -61,7 +61,7 @@
             "description": "Internal task navigation roots. Does not authorize or schedule research work."
           },
           "source_submission_ids": {
-            "$ref": "shared.json#/tools/create/properties/source_submission_ids",
+            "$ref": "shared.json#/tools/research_create/properties/source_submission_ids",
             "description": "Current task submission IDs used only to expose their exact Research Memory user_* bindings in the review context."
           },
           "view": {
@@ -91,23 +91,23 @@
         {}
       ],
       "result": {
-        "$ref": "results.json#/commands/research.read"
+        "$ref": "results.json#/commands/research_read"
       }
     },
     {
-      "id": "research.search",
+      "id": "research_search",
       "domain": "research",
       "effect": "read",
       "schema": {
         "type": "object",
         "properties": {
           "query": {
-            "$ref": "shared.json#/tools/search/properties/query"
+            "$ref": "shared.json#/tools/research_search/properties/query"
           },
           "origin": {
             "anyOf": [
               {
-                "$ref": "shared.json#/tools/search/properties/origin"
+                "$ref": "shared.json#/tools/research_search/properties/origin"
               },
               {
                 "type": "null"
@@ -117,7 +117,7 @@
           "node_id": {
             "anyOf": [
               {
-                "$ref": "shared.json#/tools/search/properties/node_id"
+                "$ref": "shared.json#/tools/research_search/properties/node_id"
               },
               {
                 "type": "null"
@@ -127,7 +127,7 @@
           "kind": {
             "anyOf": [
               {
-                "$ref": "shared.json#/tools/search/properties/kind"
+                "$ref": "shared.json#/tools/research_search/properties/kind"
               },
               {
                 "type": "null"
@@ -135,13 +135,13 @@
             ]
           },
           "after_sequence": {
-            "$ref": "shared.json#/tools/search/properties/after_sequence"
+            "$ref": "shared.json#/tools/research_search/properties/after_sequence"
           },
           "offset": {
-            "$ref": "shared.json#/tools/search/properties/offset"
+            "$ref": "shared.json#/tools/research_search/properties/offset"
           },
           "limit": {
-            "$ref": "shared.json#/tools/search/properties/limit"
+            "$ref": "shared.json#/tools/research_search/properties/limit"
           },
           "session_id": {
             "type": [
@@ -157,26 +157,26 @@
         {}
       ],
       "result": {
-        "$ref": "results.json#/commands/research.search"
+        "$ref": "results.json#/commands/research_search"
       }
     },
     {
-      "id": "research.create",
+      "id": "research_create",
       "domain": "research",
       "effect": "write",
       "schema": {
         "type": "object",
         "properties": {
           "goal": {
-            "$ref": "shared.json#/tools/create/properties/goal"
+            "$ref": "shared.json#/tools/research_create/properties/goal"
           },
           "title": {
-            "$ref": "shared.json#/tools/create/properties/title"
+            "$ref": "shared.json#/tools/research_create/properties/title"
           },
           "proposal": {
             "anyOf": [
               {
-                "$ref": "shared.json#/tools/create/properties/proposal"
+                "$ref": "shared.json#/tools/research_create/properties/proposal"
               },
               {
                 "type": "null"
@@ -186,7 +186,7 @@
           "plan": {
             "anyOf": [
               {
-                "$ref": "shared.json#/tools/create/properties/plan"
+                "$ref": "shared.json#/tools/research_create/properties/plan"
               },
               {
                 "type": "null"
@@ -194,16 +194,16 @@
             ]
           },
           "source_refs": {
-            "$ref": "shared.json#/tools/create/properties/source_refs"
+            "$ref": "shared.json#/tools/research_create/properties/source_refs"
           },
           "source_submission_ids": {
-            "$ref": "shared.json#/tools/create/properties/source_submission_ids"
+            "$ref": "shared.json#/tools/research_create/properties/source_submission_ids"
           },
           "input_refs": {
-            "$ref": "shared.json#/tools/create/properties/input_refs"
+            "$ref": "shared.json#/tools/research_create/properties/input_refs"
           },
           "relations": {
-            "$ref": "shared.json#/tools/create/properties/relations"
+            "$ref": "shared.json#/tools/research_create/properties/relations"
           },
           "session_id": {
             "type": [
@@ -221,7 +221,7 @@
             ]
           },
           "subjects": {
-            "$ref": "shared.json#/tools/create/properties/subjects"
+            "$ref": "shared.json#/tools/research_create/properties/subjects"
           }
         },
         "required": [
@@ -235,32 +235,32 @@
         }
       ],
       "result": {
-        "$ref": "results.json#/commands/research.create"
+        "$ref": "results.json#/commands/research_create"
       }
     },
     {
-      "id": "research.update",
+      "id": "research_update",
       "domain": "research",
       "effect": "write",
       "schema": {
         "type": "object",
         "properties": {
           "node_id": {
-            "$ref": "shared.json#/tools/update/properties/node_id"
+            "$ref": "shared.json#/tools/research_update/properties/node_id"
           },
           "note": {
-            "$ref": "shared.json#/tools/update/properties/note"
+            "$ref": "shared.json#/tools/research_update/properties/note"
           },
           "goal": {
-            "$ref": "shared.json#/tools/create/properties/goal"
+            "$ref": "shared.json#/tools/research_create/properties/goal"
           },
           "title": {
-            "$ref": "shared.json#/tools/create/properties/title"
+            "$ref": "shared.json#/tools/research_create/properties/title"
           },
           "proposal": {
             "anyOf": [
               {
-                "$ref": "shared.json#/tools/update/properties/proposal"
+                "$ref": "shared.json#/tools/research_update/properties/proposal"
               },
               {
                 "type": "null"
@@ -270,7 +270,7 @@
           "plan": {
             "anyOf": [
               {
-                "$ref": "shared.json#/tools/update/properties/plan"
+                "$ref": "shared.json#/tools/research_update/properties/plan"
               },
               {
                 "type": "null"
@@ -280,7 +280,7 @@
           "progress": {
             "anyOf": [
               {
-                "$ref": "shared.json#/tools/update/properties/progress"
+                "$ref": "shared.json#/tools/research_update/properties/progress"
               },
               {
                 "type": "null"
@@ -288,12 +288,12 @@
             ]
           },
           "status": {
-            "$ref": "shared.json#/tools/update/properties/status"
+            "$ref": "shared.json#/tools/research_update/properties/status"
           },
           "assessment_ref": {
             "anyOf": [
               {
-                "$ref": "shared.json#/tools/update/properties/assessment_ref"
+                "$ref": "shared.json#/tools/research_update/properties/assessment_ref"
               },
               {
                 "type": "null"
@@ -301,10 +301,10 @@
             ]
           },
           "add_relations": {
-            "$ref": "shared.json#/tools/update/properties/add_relations"
+            "$ref": "shared.json#/tools/research_update/properties/add_relations"
           },
           "remove_relations": {
-            "$ref": "shared.json#/tools/update/properties/remove_relations"
+            "$ref": "shared.json#/tools/research_update/properties/remove_relations"
           },
           "session_id": {
             "type": [
@@ -322,7 +322,7 @@
             ]
           },
           "subjects": {
-            "$ref": "shared.json#/tools/update/properties/subjects"
+            "$ref": "shared.json#/tools/research_update/properties/subjects"
           }
         },
         "required": [
@@ -338,29 +338,29 @@
         }
       ],
       "result": {
-        "$ref": "results.json#/commands/research.update"
+        "$ref": "results.json#/commands/research_update"
       }
     },
     {
-      "id": "research.result",
+      "id": "research_result",
       "domain": "research",
       "effect": "write",
       "schema": {
         "type": "object",
         "properties": {
           "node_id": {
-            "$ref": "shared.json#/tools/result/properties/node_id"
+            "$ref": "shared.json#/tools/research_result/properties/node_id"
           },
           "conclusion": {
-            "$ref": "shared.json#/tools/result/properties/conclusion"
+            "$ref": "shared.json#/tools/research_result/properties/conclusion"
           },
           "summary": {
-            "$ref": "shared.json#/tools/result/properties/summary"
+            "$ref": "shared.json#/tools/research_result/properties/summary"
           },
           "observation": {
             "anyOf": [
               {
-                "$ref": "shared.json#/tools/result/properties/observation"
+                "$ref": "shared.json#/tools/research_result/properties/observation"
               },
               {
                 "type": "null"
@@ -370,7 +370,7 @@
           "limitations": {
             "anyOf": [
               {
-                "$ref": "shared.json#/tools/result/properties/limitations"
+                "$ref": "shared.json#/tools/research_result/properties/limitations"
               },
               {
                 "type": "null"
@@ -378,18 +378,18 @@
             ]
           },
           "inputs": {
-            "$ref": "shared.json#/tools/result/properties/inputs"
+            "$ref": "shared.json#/tools/research_result/properties/inputs"
           },
           "evidence_refs": {
-            "$ref": "shared.json#/tools/result/properties/evidence_refs"
+            "$ref": "shared.json#/tools/research_result/properties/evidence_refs"
           },
           "files": {
-            "$ref": "shared.json#/tools/result/properties/files"
+            "$ref": "shared.json#/tools/research_result/properties/files"
           },
           "supersedes": {
             "anyOf": [
               {
-                "$ref": "shared.json#/tools/result/properties/supersedes"
+                "$ref": "shared.json#/tools/research_result/properties/supersedes"
               },
               {
                 "type": "null"
@@ -397,7 +397,7 @@
             ]
           },
           "as_assessment": {
-            "$ref": "shared.json#/tools/result/properties/as_assessment"
+            "$ref": "shared.json#/tools/research_result/properties/as_assessment"
           },
           "session_id": {
             "type": [
@@ -415,13 +415,13 @@
             ]
           },
           "subjects": {
-            "$ref": "shared.json#/tools/result/properties/subjects"
+            "$ref": "shared.json#/tools/research_result/properties/subjects"
           },
           "check_refs": {
-            "$ref": "shared.json#/tools/result/properties/check_refs"
+            "$ref": "shared.json#/tools/research_result/properties/check_refs"
           },
           "progress": {
-            "$ref": "shared.json#/tools/result/properties/progress"
+            "$ref": "shared.json#/tools/research_result/properties/progress"
           }
         },
         "required": [
@@ -437,11 +437,11 @@
         }
       ],
       "result": {
-        "$ref": "results.json#/commands/research.result"
+        "$ref": "results.json#/commands/research_result"
       }
     },
     {
-      "id": "research.source",
+      "id": "research_source",
       "domain": "research",
       "effect": "write",
       "schema": {
@@ -475,11 +475,11 @@
         }
       ],
       "result": {
-        "$ref": "results.json#/commands/research.source"
+        "$ref": "results.json#/commands/research_source"
       }
     },
     {
-      "id": "research.observe",
+      "id": "research_observe",
       "domain": "research",
       "effect": "write",
       "schema": {
@@ -509,11 +509,11 @@
         }
       ],
       "result": {
-        "$ref": "results.json#/commands/research.observe"
+        "$ref": "results.json#/commands/research_observe"
       }
     },
     {
-      "id": "research.allocate_task",
+      "id": "research_allocate_task",
       "domain": "research",
       "effect": "write",
       "schema": {

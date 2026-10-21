@@ -2,7 +2,7 @@
   "schema_version": "coragent-command-source/1",
   "commands": [
     {
-      "id": "artifact.register",
+      "id": "artifact_register",
       "domain": "runtime",
       "schema": {
         "type": "object",
@@ -27,11 +27,11 @@
         {}
       ],
       "result": {
-        "$ref": "results.json#/commands/artifact.register"
+        "$ref": "results.json#/commands/artifact_register"
       }
     },
     {
-      "id": "artifact.create",
+      "id": "artifact_create",
       "domain": "runtime",
       "schema": {
         "type": "object",
@@ -74,11 +74,11 @@
         {}
       ],
       "result": {
-        "$ref": "results.json#/commands/artifact.create"
+        "$ref": "results.json#/commands/artifact_create"
       }
     },
     {
-      "id": "artifact.read",
+      "id": "artifact_read",
       "domain": "runtime",
       "schema": {
         "type": "object",
@@ -105,7 +105,7 @@
         }
       ],
       "result": {
-        "$ref": "results.json#/commands/artifact.read"
+        "$ref": "results.json#/commands/artifact_read"
       }
     }
   ]

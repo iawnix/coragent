@@ -11,26 +11,26 @@ export function createResearchTools({ commandBridge, getResearchTaskId = async (
     signal?.throwIfAborted();
     return commandBridge.execute_command(command, params);
   } });
-  return [["state", "read"], ["search", "search"], ["create", "create"], ["update", "update"], ["result", "result"]].map(([key, operation]) => ({
-    ...TOOL_CONTRACTS[key],
+  return ["research_read", "research_search", "research_create", "research_update", "research_result"].map((name) => ({
+    ...TOOL_CONTRACTS[name],
     outputLimits: RESEARCH_OUTPUT_LIMITS,
     async execute(params, api, context) {
       const root = boundWorkspaceRoot(params, api.coragent);
       const {root: _root, ...request} = params;
-      const writing = ["create", "update", "result"].includes(operation);
-      if (operation !== "search") request.session_id = api.coragent?.session_id;
+      const writing = ["research_create", "research_update", "research_result"].includes(name);
+      if (name !== "research_search") request.session_id = api.coragent?.session_id;
       if (writing) {
-        requireNativeWrites(`research_${operation}`, api.coragent);
+        requireNativeWrites(name, api.coragent);
         request.request_id = `${api.coragent.session_id}:${api.coragent.operation_id}:${api.callId}`;
       }
-      const taskId = operation === "create" ? await getResearchTaskId(context) : null;
-      let result = await commands.execute(`research.${operation}`, root, request, context?.abortSignal);
-      if (operation === "create" && result?.node?.id && taskId) {
+      const taskId = name === "research_create" ? await getResearchTaskId(context) : null;
+      let result = await commands.execute(name, root, request, context?.abortSignal);
+      if (name === "research_create" && result?.node?.id && taskId) {
         const binding = await bindResearchNode(result.node.id, context, taskId);
         if (binding) result = { ...result, task_research_binding: binding };
       }
-      const visible = researchToolView(result, operation, params);
-      if (visible.complete && result?.read_basis) await commands.execute("research.observe", root, { session_id: request.session_id, read_basis: result.read_basis }, context?.abortSignal);
+      const visible = researchToolView(result, name, params);
+      if (visible.complete && result?.read_basis) await commands.execute("research_observe", root, { session_id: request.session_id, read_basis: result.read_basis }, context?.abortSignal);
       if (!writing) recordJobLookup(root);
       return toolResult(visible.value, visible.text);
     },
@@ -40,12 +40,12 @@ export function createResearchTools({ commandBridge, getResearchTaskId = async (
 // Pi bounds explicit tool text after execute. Compact JSON avoids line-limit
 // truncation; oversized replies keep commit outcomes and offer smaller reads.
 // Their omitted Node fields must never advance the session's read receipt.
-function researchToolView(result, operation, params) {
+function researchToolView(result, name, params) {
   const text = JSON.stringify(result);
   if (Buffer.byteLength(text) <= RESEARCH_OUTPUT_LIMITS.maxBytes) return {value: result, text, complete: true};
   const read = [];
-  if (operation === "read" || operation === "search") {
-    read.push({tool: `research_${operation}`, ...params, limit: Math.max(1, Math.min(operation === "search" ? 5 : 2000, Math.floor((params.limit || 16000) / 2)))});
+  if (name === "research_read" || name === "research_search") {
+    read.push({tool: name, ...params, limit: Math.max(1, Math.min(name === "research_search" ? 5 : 2000, Math.floor((params.limit || 16000) / 2)))});
   } else {
     for (const ref of new Set([result.node?.id, result.result?.id, result.ref].filter(Boolean))) {
       read.push({tool: "research_read", ref, limit: 2000});

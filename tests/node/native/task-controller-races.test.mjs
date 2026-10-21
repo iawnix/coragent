@@ -39,28 +39,28 @@ async function fixture(t) {
   admission = createInputAdmission({ harness, conversation, LiveDoc, InboxDoc, admitSubmission });
   const allocatedTasks = new Map();
   const kernel = { execute_command: async (method, params) => {
-    if (method === "research.allocate_task") {
+    if (method === "research_allocate_task") {
       const key = JSON.stringify([params.session_id, params.request_id]);
       if (!allocatedTasks.has(key)) allocatedTasks.set(key, `task_${allocatedTasks.size + 1}`);
       return { identifier: allocatedTasks.get(key) };
     }
-    if (method === "job.resolve_target") return { target: params.target || "local", scheduler: params.target === "cluster_a" ? "slurm" : "none",
+    if (method === "job_resolve_target") return { target: params.target || "local", scheduler: params.target === "cluster_a" ? "slurm" : "none",
       location: params.target === "cluster_a" ? "cluster" : "controller", route_digest: "sha256:" + "a".repeat(64), selection_mode: params.target ? "explicit" : "default" };
-    if (method === "job.targets") return { default_target: "local", targets: {
+    if (method === "job_targets") return { default_target: "local", targets: {
       local: { scheduler: "none", location: "controller", aliases: [] },
     } };
-    if (method === "job.list") return { jobs: [...jobs].map(([job_id, state]) => ({ job_id, state })), next_cursor: null };
-    if (method === "job.status") return { job_id: params.job_id, state: jobs.get(params.job_id) };
-    if (method === "job.cancel") {
+    if (method === "job_list") return { jobs: [...jobs].map(([job_id, state]) => ({ job_id, state })), next_cursor: null };
+    if (method === "job_status") return { job_id: params.job_id, state: jobs.get(params.job_id) };
+    if (method === "job_cancel") {
       if (failures.delete(params.job_id)) throw Object.assign(new Error("Fixture cancellation connection failed"), { code: "connection_lost" });
       cancellations.push(params.job_id);
       const state = cancelOutcomes.get(params.job_id) || "cancelled";
       jobs.set(params.job_id, state);
       return { job_id: params.job_id, state };
     }
-    if (method === "artifact.read") return artifacts.get(params.artifact_id);
-    if (method === "research.read") return { ref: params.ref };
-    if (method === "job.monitor_assess") {
+    if (method === "artifact_read") return artifacts.get(params.artifact_id);
+    if (method === "research_read") return { ref: params.ref };
+    if (method === "job_monitor_assess") {
       await beforeAssess();
       const task = await controller.current(context);
       return { admitted: true, obsolete: false, event_id: params.event_id, delivery_token: "event-fact",

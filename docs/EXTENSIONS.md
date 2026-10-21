@@ -50,6 +50,20 @@ Resource checks verify loaded bytes and deterministic tests verify injection and
 record behavior. They do not establish model compliance with every rule or replace
 actual spending limits and execution permissions.
 
+## Guidance ownership
+
+| Layer | Content |
+| --- | --- |
+| Resident prompt | Basic Task, Node, Job, Artifact and Result semantics and cross-task principles |
+| Tool descriptions and schemas | One operation, parameters, direct effects and critical preconditions |
+| research-memory | Problem organization, observations, evidence references, publication and correction |
+| research-workflow | Assignment scope, execution coordination, waits, user control, recovery and acceptance |
+| Scheduler and domain Skills | Platform integration/diagnosis, scientific methods, software and scientific checks |
+
+Tools are registered by the runtime independently of Skill reads. Model tools and backend commands share snake_case identities such as `research_read` and `job_start`; internal commands are not automatically exposed to the model. Terminal commands such as `/research read` are separate user interfaces. See the [model tool index](../contracts/commands/public-tools.md).
+
+Command catalogs use `coragent-command-catalog/2`; update callers and generated catalogs together. Dotted command names are rejected without aliases. Existing transaction operation labels and request IDs are immutable storage identities, not dispatch routes; preserving them retains receipt digests and idempotent recovery.
+
 ## What execution.json does
 
 Root `package.json.coragent.execution` points to

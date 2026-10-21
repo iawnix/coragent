@@ -101,7 +101,7 @@ def test_registered_comparison_runs_as_job_and_mismatch_remains_publishable(tmp_
     workspace(tmp_path)
     target = structure(tmp_path / 'target.json', 'CC1CCC=CC1')
     actual = structure(tmp_path / 'actual.json', 'CC1=CCCCC1')
-    refs = [execute('artifact.register', tmp_path, {'path': str(path)}) for path in (target, actual)]
+    refs = [execute('artifact_register', tmp_path, {'path': str(path)}) for path in (target, actual)]
     prepared = prepare(os.environ['CORAGENT_JOB_CONFIG'], 'local', 'chemical.compare', '1',
                        {'target': target, 'actual': actual}, input_artifact_ids=[r['artifact_id'] for r in refs])
     assert '.coragent/python_entrypoint.py' in prepared['command']
@@ -109,8 +109,8 @@ def test_registered_comparison_runs_as_job_and_mismatch_remains_publishable(tmp_
     collected = run_job(tmp_path, prepared)
     comparison = selected(collected, '/comparison.json')
     assert json.loads(Path(comparison['location']).read_text())['status'] == 'mismatch'
-    node = execute('research.create', tmp_path, {'goal': 'Compare', 'subjects': {'target': refs[0]['artifact_id']}})['node']
-    saved = execute('research.result', tmp_path, {'node_id': node['id'], 'conclusion': 'Calculated a different isomer',
+    node = execute('research_create', tmp_path, {'goal': 'Compare', 'subjects': {'target': refs[0]['artifact_id']}})['node']
+    saved = execute('research_result', tmp_path, {'node_id': node['id'], 'conclusion': 'Calculated a different isomer',
         'subjects': {'target': refs[0]['artifact_id'], 'calculated': refs[1]['artifact_id']},
         'check_refs': [comparison['artifact_id']]})
     assert saved['result_saved']

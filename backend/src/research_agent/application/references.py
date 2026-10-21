@@ -132,6 +132,7 @@ def register_prepared_payload(root, payload):
             "request_sha256": payload["request_sha256"]}
 
 
+# Durable receipt identity; not a callable command name. Keep existing digests stable.
 @workspace_transaction("job.prepare")
 def prepare_job(root, params=None):
     return register_prepared_payload(_workspace(root), read_prepared_file(root, params))

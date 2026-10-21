@@ -7,17 +7,17 @@ export function createJobTools({ commandBridge, getTaskBinding = async () => nul
   // result or change task scheduling in response to repeated reads.
   const observations = new Map();
   return [
-    ["jobStart", "start"], ["jobStatus", "status"], ["jobCollect", "collect"],
-    ["jobCancel", "cancel"], ["jobProbe", "probe"], ["jobReconcile", "reconcile"],
-  ].map(([key, operation]) => ({
-    ...TOOL_CONTRACTS[key],
+    "job_start", "job_status", "job_collect",
+    "job_cancel", "job_probe", "job_reconcile",
+  ].map((name) => ({
+    ...TOOL_CONTRACTS[name],
     async execute(params, api, context) {
       context?.abortSignal.throwIfAborted();
       const toolContext = api.coragent;
       const root = boundWorkspaceRoot(params, toolContext);
       const { root: _root, ...request } = params;
-      const taskBinding = operation === "start" ? await getTaskBinding(context) : null;
-      const invoke = () => commandBridge.execute_command(`job.${operation}`, operation === "start" ? {
+      const taskBinding = name === "job_start" ? await getTaskBinding(context) : null;
+      const invoke = () => commandBridge.execute_command(name, name === "job_start" ? {
         ...request,
         ...(!params.prepared_ref && !params.request_file ? { request_id: params.request_id || `${toolContext.operation_id}:${api.callId}` } : {}),
         session_id: toolContext.session_id,
@@ -25,9 +25,9 @@ export function createJobTools({ commandBridge, getTaskBinding = async () => nul
         ...(taskBinding?.execution_target ? { required_target: taskBinding.execution_target } : {}),
         ...(taskBinding?.route_digest ? { required_route_digest: taskBinding.route_digest } : {}),
       } : request);
-      const result = await (["status", "collect", "reconcile"].includes(operation)
-        ? withJobQueryRecovery(root, `job_${operation}`, params, invoke) : invoke());
-      if (operation === "status" && ["running", "queued", "held", "submitted", "created"].includes(result.state)) {
+      const result = await (["job_status", "job_collect", "job_reconcile"].includes(name)
+        ? withJobQueryRecovery(root, name, params, invoke) : invoke());
+      if (name === "job_status" && ["running", "queued", "held", "submitted", "created"].includes(result.state)) {
         const key = JSON.stringify([root, toolContext.session_id, result.job_id || params.job_id || params.event_id]);
         const previous = observations.get(key);
         const count = previous?.state === result.state ? previous.count + 1 : 0;
@@ -40,7 +40,7 @@ export function createJobTools({ commandBridge, getTaskBinding = async () => nul
         output.details.polling = polling;
         return output;
       }
-      if (operation === "status") observations.delete(JSON.stringify([root, toolContext.session_id, result.job_id || params.job_id || params.event_id]));
+      if (name === "job_status") observations.delete(JSON.stringify([root, toolContext.session_id, result.job_id || params.job_id || params.event_id]));
       return toolResult(result);
     },
   }));

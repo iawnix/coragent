@@ -70,6 +70,8 @@ protocol and helper do not change.
 
 ## Submission and diagnostics
 
+A successful TRI submission receipt must contain `driver="external"` and a non-empty `scheduler_id`; successful local handler execution alone does not prove admission to the TRI queue.
+
 An explicit native `invalid_request` is recorded as a failed Job with
 `action_outcome=not_submitted`. A lost response, `request_id_reused` or
 `external_id_conflict` remains ambiguous: reconcile the existing Job before

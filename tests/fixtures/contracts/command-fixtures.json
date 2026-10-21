@@ -2,35 +2,35 @@
   "schema_version": "coragent-command-fixtures/1",
   "cases": [
     {
-      "command": "research.read",
+      "command": "research_read",
       "params": {}
     },
     {
-      "command": "research.search",
+      "command": "research_search",
       "params": {}
     },
     {
-      "command": "research.create",
+      "command": "research_create",
       "params": {
         "goal": "Determine the reaction pathway"
       }
     },
     {
-      "command": "research.update",
+      "command": "research_update",
       "params": {
         "node_id": "node_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "note": "A new observation"
       }
     },
     {
-      "command": "research.result",
+      "command": "research_result",
       "params": {
         "node_id": "node_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "conclusion": "The calculation supports this candidate"
       }
     },
     {
-      "command": "research.source",
+      "command": "research_source",
       "params": {
         "session_id": "fixture-session",
         "message_id": "fixture-message",
@@ -38,90 +38,90 @@
       }
     },
     {
-      "command": "research.observe",
+      "command": "research_observe",
       "params": {
         "read_basis": "read_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       }
     },
     {
-      "command": "research.allocate_task",
+      "command": "research_allocate_task",
       "params": {
         "session_id": "session-test",
         "request_id": "begin-1"
       }
     },
     {
-      "command": "job.targets",
+      "command": "job_targets",
       "params": {}
     },
     {
-      "command": "job.resolve_target",
+      "command": "job_resolve_target",
       "params": {}
     },
     {
-      "command": "job.start",
+      "command": "job_start",
       "params": {}
     },
     {
-      "command": "job.status",
+      "command": "job_status",
       "params": {}
     },
     {
-      "command": "job.collect",
+      "command": "job_collect",
       "params": {}
     },
     {
-      "command": "job.cancel",
+      "command": "job_cancel",
       "params": {}
     },
     {
-      "command": "job.probe",
+      "command": "job_probe",
       "params": {}
     },
     {
-      "command": "job.reconcile",
+      "command": "job_reconcile",
       "params": {}
     },
     {
-      "command": "job.prepare",
+      "command": "job_prepare",
       "params": {
         "request_file": "prepared.json"
       }
     },
     {
-      "command": "job.resolve_prepared",
+      "command": "job_resolve_prepared",
       "params": {
         "prepared_ref": "prepared_1"
       }
     },
     {
-      "command": "job.monitor_assess",
+      "command": "job_monitor_assess",
       "params": {
         "event_id": "event_1",
         "session_id": "fixture-session"
       }
     },
     {
-      "command": "job.list",
+      "command": "job_list",
       "params": {}
     },
     {
-      "command": "job.list",
+      "command": "job_list",
       "params": {
         "session_id": "session_example",
         "limit": 20
       }
     },
     {
-      "command": "artifact.register",
+      "command": "artifact_register",
       "params": {}
     },
     {
-      "command": "artifact.create",
+      "command": "artifact_create",
       "params": {}
     },
     {
-      "command": "artifact.read",
+      "command": "artifact_read",
       "params": {
         "artifact_id": "art_1"
       }

@@ -252,20 +252,20 @@ def test_energy_executors_through_jobs(tmp_path,operation,spec_factory):
     source=root/'energy.json';source.write_text(json.dumps(spec_factory()))
     config=Path(os.environ['CORAGENT_JOB_CONFIG'])
     prepared=prepare(config,'local','chemical.'+operation,'1',{'input':source})
-    node=execute('research.create',root,{'goal':'Independent energy analysis fixture'})['node']
-    receipt=execute('job.start',root,{**prepared,'node_id':node['id']})
+    node=execute('research_create',root,{'goal':'Independent energy analysis fixture'})['node']
+    receipt=execute('job_start',root,{**prepared,'node_id':node['id']})
     try:
         for _ in range(600):
-            status=execute('job.status',root,{'job_id':receipt['job_id']})
+            status=execute('job_status',root,{'job_id':receipt['job_id']})
             if status['state'] in ('succeeded','failed'):break
             time.sleep(.01)
         assert status['state']=='succeeded'
-        assert execute('job.collect',root,{'job_id':receipt['job_id']})['output_validation']['complete']
+        assert execute('job_collect',root,{'job_id':receipt['job_id']})['output_validation']['complete']
         output=Path(receipt['cwd'])/'results'
         result=json.loads((output/'result.json').read_text())
         assert result['input_file_sha256'].startswith('sha256:')
         assert (output/'table.csv').read_text().strip()
-    finally:execute('job.cancel',root,{'job_id':receipt['job_id']})
+    finally:execute('job_cancel',root,{'job_id':receipt['job_id']})
 
 
 @pytest.mark.parametrize('atoms,geometry,freqs', [('He 0 0 0','atom',[]), ('H 0 0 0\nH 0 0 0.74','linear',[4000.])])

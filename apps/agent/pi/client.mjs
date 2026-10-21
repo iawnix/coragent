@@ -31,7 +31,7 @@ const [{ configureToolRenderers, configureMarkdownTransformers }, tuiComponents]
 // but they still need the same compact Skinn presentation in the remote client.
 configureToolRenderers(createCoRAgentToolRenderers(tuiComponents, [
   "monitor",
-  ...Object.values(PUBLIC_TOOL_NAMES),
+  ...PUBLIC_TOOL_NAMES,
   ...PI_BUILTIN_TOOL_NAMES,
 ]));
 configureMarkdownTransformers([enhanceMarkdown]);

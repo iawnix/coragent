@@ -177,7 +177,7 @@ def test_skill_routes_details_through_focused_references():
     assert len(text.splitlines()) < 100
     assert "references/storage.md" in text
     orchestration=(ORCHESTRATION_ROOT/"SKILL.md").read_text()
-    for ref in ["references/tools.md", "references/skills.md", "references/public_contract.md"]:
+    for ref in ["references/jobs-and-artifacts.md", "references/skills.md", "references/task-lifecycle.md"]:
         assert ref in orchestration
 
 
@@ -230,7 +230,7 @@ def test_focused_skills_have_bilingual_entrypoints_and_route_their_references() 
 
 
 def test_compute_reference_describes_the_generic_job_runtime() -> None:
-    compute = (ORCHESTRATION_ROOT / "references" / "tools.md").read_text(encoding="utf-8")
+    compute = (ORCHESTRATION_ROOT / "references" / "jobs-and-artifacts.md").read_text(encoding="utf-8")
 
     assert "Job Runtime" in compute
     assert "job_start" in compute

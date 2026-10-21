@@ -47,15 +47,15 @@ try {
         { type: "set_focus", claim_ids: ["claim_fixture"], node_ids: ["node_fixture"] },
         { type: "create_strategy_plan", id: "strategy_fixture", claim_id: "claim_fixture", node_id: "node_fixture", objective: "Read output", rationale: "Check marker", status: "active" },
       ] });
-      job = await bridge.execute_command("job.start", { job_id: `job_recovery_${run}`, node_id: "node_fixture", command: [process.env.CORAGENT_PYTHON, "-c", "print('evidence')"], timeout_seconds: 5 });
+      job = await bridge.execute_command("job_start", { job_id: `job_recovery_${run}`, node_id: "node_fixture", command: [process.env.CORAGENT_PYTHON, "-c", "print('evidence')"], timeout_seconds: 5 });
       let status;
       for (let poll = 0; poll < 100; poll++) {
-        status = await bridge.execute_command("job.status", { job_id: job.job_id });
+        status = await bridge.execute_command("job_status", { job_id: job.job_id });
         if (["succeeded", "failed", "timed_out"].includes(status.state)) break;
         await new Promise(resolve => setTimeout(resolve, 50));
       }
       assert.equal(status.state, "succeeded");
-      const collected = await bridge.execute_command("job.collect", { job_id: job.job_id });
+      const collected = await bridge.execute_command("job_collect", { job_id: job.job_id });
       const receipt = collected.result_receipt;
       const toolContext = { cwd: root, principal: "root_agent" };
       const tools = [createStateTool(), ...createResearchDecisionTools().filter(tool => tool.name === "research_interpretation")];
@@ -122,7 +122,7 @@ try {
         }
       }
     } finally {
-      if (job?.job_id) await bridge.execute_command("job.cancel", { job_id: job.job_id }).catch(() => {});
+      if (job?.job_id) await bridge.execute_command("job_cancel", { job_id: job.job_id }).catch(() => {});
       await bridge.close();
     }
     console.log(`recovery ${run + 1}: ${row.passed ? "pass" : "fail"}`);

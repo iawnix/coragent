@@ -70,6 +70,7 @@ def append_record(root, *, origin, kind, title, content, references=(), data=Non
     return value
 
 
+# Durable receipt identity; not a callable command name. Keep existing digests stable.
 @workspace_transaction('research.event')
 def record_event(root, request):
     root = workspace(root)
@@ -86,6 +87,7 @@ def record_event(root, request):
     return {'ref': value['ref'], 'sequence': value['sequence'], 'recorded': True}
 
 
+# Durable receipt identity; not a callable command name. Keep existing digests stable.
 @workspace_transaction('research.source')
 def record_source(root, request):
     root = workspace(root)

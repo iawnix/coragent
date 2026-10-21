@@ -39,6 +39,20 @@ Pi 从 Skill 目录的 `SKILL.md` 发现技能；当前这些入口使用英文�
 资源摘要检查能验证加载字节，确定性测试能验证注入与记录行为；这些检查不能证明模型会遵循所有准则，
 也不能替代实际费用限制或执行权限控制。
 
+## 说明的归属
+
+| 层 | 内容 |
+| --- | --- |
+| 常驻提示 | Task、Node、Job、Artifact、Result 的基础语义和跨任务原则 |
+| 工具描述与 schema | 单次操作、参数、直接副作用和关键前置条件 |
+| research-memory | 问题组织、观察、证据引用、结论发布与修订 |
+| research-workflow | 委托范围、执行协调、等待、用户控制、恢复与验收 |
+| 调度器和领域 Skill | 平台接入与诊断、科学方法、软件使用与科学检查 |
+
+工具由运行时独立注册，不依赖 Skill 正文是否读取。模型工具与后端命令使用同一 snake_case 名称，例如 `research_read` 和 `job_start`；内部专用命令不会自动暴露给模型。`/research read` 等终端命令是独立的用户入口。工具索引见[模型工具](../contracts/commands/public-tools.zh-CN.md)。
+
+命令目录使用 `coragent-command-catalog/2`，调用方与生成目录需同步更新；旧点号命令直接拒绝，不提供别名。既有事务 operation 标签和请求 ID 属于不可变存储身份，不参与命令分派；保留它们以维持回执摘要和幂等恢复。
+
 ## execution.json 的作用
 
 根 `package.json` 的 `coragent.execution` 指向 `skills/chemical/execution.json`。

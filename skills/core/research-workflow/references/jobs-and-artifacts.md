@@ -6,6 +6,8 @@ Keep originals in `inputs/`, preserve runtime-owned Job/Artifact files, and do n
 
 Prepare a domain request through its installed Skill. Submit the returned request_file and request_sha256 to job_start; use node_id for explicit research association. Other execution fields are pinned in the file. A direct argv command uses declared inputs, outputs and execution_target. No research object is required for preparation or diagnostics. Unassociated preparation and diagnostics remain available.
 
+For a custom scientific script, prepare with `--script <file.py> --backend <binding>` through the configured executor preparation entrypoint. Direct argv submission does not select a scientific Python or software backend. Preparation and report formatting use native tools; calculations use managed Jobs.
+
 The adapter fixes the Node revision and actual inputs at submission. Later plan changes cannot change what an earlier Job tested. Job Runtime remains the source of dispatch and terminal facts. job_status observes, job_cancel requests cancellation, job_reconcile resolves uncertainty, and job_collect preserves outputs and provenance without executing again.
 
 artifact_create stores new text, artifact_register imports a file, and artifact_read reads bounded bytes. Scientific Job outputs should be collected with their producer identity. Analysis requests declare and stage their actual inputs; validators run as ordinary Jobs. Reading a file does not establish scientific evidence usage.
@@ -22,46 +24,8 @@ Use artifact_create with name and actual text content for an authored report. Us
 
 Use research_update with node_id and note to explain what changed; use research_result with node_id and conclusion when there is a useful result to cite. Result files use registered artifact_ref values. Native work directories contain mutable drafts; a published result points to fixed materials. No research lifecycle transition is required before using a Job or native file tool.
 
-Choose reference fields by purpose, using exact returned IDs:
-
-| Field | Purpose and accepted references |
-| --- | --- |
-| research_create.source_refs | Original user requirements; user_* messages only. |
-| research_create.input_refs | Background citations; existing Nodes, Results, user messages, notes, runtime records, Jobs, collection receipts and verified Artifacts. |
-| research_result.inputs | Fixed materials actually used to derive the conclusion; existing Results and verified Artifacts only. Omit when none apply. |
-| research_result.evidence_refs | Supporting citations; the same reference types as Node input_refs, including user messages and execution records. A requirement citation is not scientific proof. |
-| research_result.files[].artifact_ref | Delivered file; a verified Artifact reference, never a mutable path, Job ID or receipt. |
-| research_result.check_refs | Scoped check evidence; verified Artifacts or collection receipts, not Job IDs. Inconclusive checks are allowed. |
-| subjects on create/update/result | Named roles mapped to existing Results or verified Artifacts only. |
-| research_update.assessment_ref | An existing Result or agent-authored note/record belonging to the same Node. |
-| research_result.supersedes | An older Result on the same Node being explicitly corrected. |
-
-For a candidate structure resolved from a user request, cite the structure Artifact and original user message in evidence_refs. Do not put the user message in inputs. For example (replace every example ID with its actual returned reference):
-
-```json
-{"node_id":"node_...","conclusion":"A candidate structure was resolved; the reaction mechanism remains undetermined.","evidence_refs":["art_...","user_..."]}
-```
-
-Search uses `kind`, for example `research_search({"kind":"result"})` for published Results or `{"kind":"result_published"}` for their publication records. There is no aggregate `kind="record"`; omit kind and use origin to filter user/runtime/agent records. `research_read({"ref":"<node_id>","field":"subjects"})` reads a Node's subjects. Read pagination counts Unicode characters, search pagination counts entries, and artifact_read pagination counts bytes.
-
-Research text limits count Unicode code points, not UTF-8 bytes: goal 8000, title 1000, proposal/plan/progress 16000, note/conclusion/observation 64000, summary 4000, limitations 32000, relation reason 4000, file name 1000 and file purpose 16000. Combining marks count separately. Output byte budgets still apply; read large results in pages.
-
-Task tools use actual user submission IDs represented as decimal strings, distinct from research user_* references. Read task_read for the current task revision; do not use a Node revision as expected_revision. task_update accepts only the selected action's fields (reason may accompany any action):
-
-| action | Required fields and meaning |
-| --- | --- |
-| refine | source_submission_ids from actual user requests; optionally replace objective, criteria or next_action. Scope changes or recovery from a blocker require a new user instruction; refine does not resume a paused task. |
-| progress | evidence_refs; cite adopted Results/Artifacts or Jobs owned by this task; optionally update next_action. Notes alone are not substantive progress. Collection receipt IDs are not accepted here. |
-| wait | wait with job_ids owned by this task and mode all/any. Unknown outcomes wake the task for reconciliation. |
-| block | block_kind, reason explaining the unmet prerequisite and why no independent authorized work remains, and resume_when. execution_failure, budget_exhausted, scientific_dead_end and resource_unavailable also require evidence_refs citing verified Results/Artifacts or Jobs owned by this task. missing_user_input is only for indispensable input unavailable from existing sources; optional preferences and unfinished analysis do not qualify. |
-| propose_completion | completion entries covering every criterion_id, each supported by a fixed Result or Artifact. Then deliver the final answer; this call alone does not finish delivery. |
-| set_research | research containing complete entry_node_ids and focus_node_ids arrays; replaces both, and [] clears a list. |
-| apply_user_control | control=pause/resume/cancel and source_submission_ids from actual current user input in runtime_control. cancel also requires jobs=keep/cancel according to user intent; inspect returned task state and cancellation receipts before acknowledging a stop. |
-
-The no-progress count is an advisory signal to reconsider the approach, not a fixed stopping threshold or a resource budget. Continue within the user's limits; register a blocker only when its concrete prerequisites and evidence meet the contract above.
-
 For intentional identical recalculation, prepare with a new work_id and submit repeat with the matching predecessor_job_id, reason and budget. Reusing an existing request identity reuses its Job; duplicate_execution normally means inspect/collect the returned Job. Validator Jobs require the registered validator_id/version and Artifacts in the count/order declared by their input roles; collected_output roles require the producer's current collected evidence. job_probe checks execution target infrastructure, not scientific software. job_reconcile recovers the existing execution state without resubmission. After job_cancel, inspect the returned state; unknown is not confirmation that execution stopped.
 
-For each computation, request resources during preparation with `--cpus` and `--job-memory-mb` before `--`. Configured values are defaults, not limits. Re-prepare to adjust a request; never edit pinned resources or classify a default as a hardware blocker. TRI owns availability and queueing. See [per-job resources](../../../../docs/EXTERNAL_JOBS.md#per-job-resources).
+For each computation, request resources during preparation with `--cpus` and `--job-memory-mb` before `--`. Configured values are defaults, not limits. Re-prepare to adjust a request; never edit pinned resources or classify a default as a hardware blocker. The selected execution runtime or scheduler owns availability and queueing. See [per-job resources](../../../../docs/EXTERNAL_JOBS.md#per-job-resources).
 
-`correct_execution` repairs a misread original target using an exact `execution_intent` source excerpt and `reason`; new user destination changes use `refine`. `propose_completion` requires `completion_outcome`, and each entry requires `criterion_id`, `status`, `assessment_ref`, `evidence_refs`. See [acceptance](acceptance.md) for the JSON assessment and partial stopping basis.
+For publication references and corrections, use [research evidence](../../research-memory/references/evidence.md); for task waits and cancellation, use [task lifecycle](task-lifecycle.md).

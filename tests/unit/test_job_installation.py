@@ -177,9 +177,9 @@ def test_acceptance_waits_for_cancellation_and_reports_pending_jobs(tmp_path, mo
     calls = []
     def execute(operation, *args):
         calls.append(operation)
-        if operation == 'job.start':
+        if operation == 'job_start':
             return {'job_id':'job_fixture'}
-        if operation == 'job.status':
+        if operation == 'job_status':
             return {'state':'queued'}
         return {}
     ticks = iter(range(100))
@@ -188,8 +188,8 @@ def test_acceptance_waits_for_cancellation_and_reports_pending_jobs(tmp_path, mo
     monkeypatch.setattr(acceptance.time, 'sleep', lambda _:None)
     with pytest.raises(RuntimeError, match='cancellation_pending'):
         acceptance.run_job(tmp_path, {'request_id':'request'}, 3)
-    assert calls.count('job.cancel') == 1
-    assert calls[-1] == 'job.status'
+    assert calls.count('job_cancel') == 1
+    assert calls[-1] == 'job_status'
 
 
 def test_target_provisioning_reuses_verified_environment_and_recovers_interrupted_prefix(tmp_path, monkeypatch):

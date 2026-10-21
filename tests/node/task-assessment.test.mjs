@@ -44,6 +44,6 @@ test("target intent must quote a real source and resolution is delegated once", 
   const sources = [{ submission_id: "24", text: "Use local (TRI queue) for this task" }];
   await assert.rejects(resolveTaskSelection(kernel, { execution_intent: { source_submission_id: "24", source_text: "use Slurm" } }, sources), /quote/);
   const selection = await resolveTaskSelection(kernel, { execution_intent: { source_submission_id: "24", source_text: "local (TRI queue)", scheduler: "tri" } }, sources);
-  assert.equal(calls.length, 1); assert.equal(calls[0][0], "job.resolve_target");
+  assert.equal(calls.length, 1); assert.equal(calls[0][0], "job_resolve_target");
   assert.equal(selection.version, 1); assert.equal(selection.sources[0].text, "local (TRI queue)");
 });

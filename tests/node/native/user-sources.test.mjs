@@ -21,7 +21,7 @@ test("only actual durable user entries become original task records", async () =
     bridge: { execute_command: async (...args) => calls.push(args) },
   };
   assert.deepEqual(await recordUserSources(options), {event_ids: ["event_1", "event_2"]});
-  assert.deepEqual(calls, [["research.source", { session_id: "session_1", message_id: "user", text: "Original user request" }]]);
+  assert.deepEqual(calls, [["research_source", { session_id: "session_1", message_id: "user", text: "Original user request" }]]);
   options.bridge.execute_command = async () => { throw new Error("bridge disconnected"); };
   await recordUserSources(options); // An already recorded source does not block diagnosis on later requests.
   options.inputIds = ["user"];

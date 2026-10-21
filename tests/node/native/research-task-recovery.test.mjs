@@ -38,7 +38,7 @@ test("Memory create survives before Task binding and both stores replay their or
   async function open() {
     bridge = create_python_runtime_bridge({ workspace_root: workspaceRoot, workspace_id: workspaceId });
     const commandBridge = { execute_command(command, params) {
-      if (command === "research.create") writes.push(params.request_id);
+      if (command === "research_create") writes.push(params.request_id);
       return bridge.execute_command(command, params);
     } };
     const trusted = createToolExecutionContext({ workspace_root: workspaceRoot, session_id: sessionId,
@@ -95,7 +95,7 @@ test("Memory create survives before Task binding and both stores replay their or
     const replayed = await replay(created);
     assert.equal(replayed.isError, undefined);
     assert.deepEqual(replayed.details.result, created.result.details.result);
-    let snapshot = await bridge.execute_command("research.read", { session_id: sessionId });
+    let snapshot = await bridge.execute_command("research_read", { session_id: sessionId });
     assert.deepEqual(snapshot.nodes.map(node => node.id), [nodeId], "replaying the committed create must not invent another root");
     const changed = await tools.find(tool => tool.name === "research_create").execute({ ...createParams, goal: "Different content" }, created.api, context);
     assert.equal(changed.isError, true, "the same operation identity cannot change its committed payload");
@@ -122,7 +122,7 @@ test("Memory create survives before Task binding and both stores replay their or
     assert.notEqual(independent.api.taskId, created.api.taskId);
     assert.equal(independent.api.callId, created.api.callId);
     assert.notEqual(independent.result.details.result.node.id, nodeId);
-    snapshot = await bridge.execute_command("research.read", { session_id: sessionId });
+    snapshot = await bridge.execute_command("research_read", { session_id: sessionId });
     assert.equal(snapshot.nodes.length, 2);
     assert.deepEqual((await controller.current(context)).research.entry_node_ids, [nodeId]);
   } finally {

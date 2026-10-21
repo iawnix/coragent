@@ -34,6 +34,7 @@ def publication_order(root, graph=None):
             for row in journal(root)['records'] if row['origin'] == 'agent' and row['kind'] == 'result_published']
 
 
+# Durable receipt identity; not a callable command name. Keep existing digests stable.
 @workspace_transaction('research.result')
 def publish(root, request):
     root = workspace(root)

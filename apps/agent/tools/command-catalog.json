@@ -1,8 +1,8 @@
 {
-  "schema_version": "coragent-command-catalog/1",
+  "schema_version": "coragent-command-catalog/2",
   "commands": [
     {
-      "id": "research.read",
+      "id": "research_read",
       "domain": "research",
       "effect": "read",
       "allowed": [
@@ -1285,7 +1285,7 @@
       }
     },
     {
-      "id": "research.search",
+      "id": "research_search",
       "domain": "research",
       "effect": "read",
       "allowed": [
@@ -1478,7 +1478,7 @@
       }
     },
     {
-      "id": "research.create",
+      "id": "research_create",
       "domain": "research",
       "effect": "write",
       "allowed": [
@@ -1873,7 +1873,7 @@
       }
     },
     {
-      "id": "research.update",
+      "id": "research_update",
       "domain": "research",
       "effect": "write",
       "allowed": [
@@ -2309,7 +2309,7 @@
       }
     },
     {
-      "id": "research.result",
+      "id": "research_result",
       "domain": "research",
       "effect": "write",
       "allowed": [
@@ -2946,7 +2946,7 @@
       }
     },
     {
-      "id": "research.source",
+      "id": "research_source",
       "domain": "research",
       "effect": "write",
       "allowed": [
@@ -3000,7 +3000,7 @@
       }
     },
     {
-      "id": "research.observe",
+      "id": "research_observe",
       "domain": "research",
       "effect": "write",
       "allowed": [
@@ -3045,7 +3045,7 @@
       }
     },
     {
-      "id": "research.allocate_task",
+      "id": "research_allocate_task",
       "domain": "research",
       "effect": "write",
       "allowed": [
@@ -3089,7 +3089,7 @@
       }
     },
     {
-      "id": "job.targets",
+      "id": "job_targets",
       "domain": "runtime",
       "allowed": [],
       "required": [],
@@ -3104,7 +3104,7 @@
       }
     },
     {
-      "id": "job.resolve_target",
+      "id": "job_resolve_target",
       "domain": "runtime",
       "allowed": [
         "target",
@@ -3144,7 +3144,7 @@
       }
     },
     {
-      "id": "job.start",
+      "id": "job_start",
       "domain": "runtime",
       "allowed": [
         "request_id",
@@ -3498,7 +3498,7 @@
       }
     },
     {
-      "id": "job.status",
+      "id": "job_status",
       "domain": "runtime",
       "allowed": [
         "job_id",
@@ -3639,7 +3639,7 @@
       }
     },
     {
-      "id": "job.collect",
+      "id": "job_collect",
       "domain": "runtime",
       "allowed": [
         "job_id",
@@ -4140,7 +4140,7 @@
       }
     },
     {
-      "id": "job.cancel",
+      "id": "job_cancel",
       "domain": "runtime",
       "allowed": [
         "job_id",
@@ -4281,7 +4281,7 @@
       }
     },
     {
-      "id": "job.probe",
+      "id": "job_probe",
       "domain": "runtime",
       "allowed": [
         "job_id",
@@ -4493,7 +4493,7 @@
       }
     },
     {
-      "id": "job.reconcile",
+      "id": "job_reconcile",
       "domain": "runtime",
       "allowed": [
         "job_id",
@@ -4634,7 +4634,7 @@
       }
     },
     {
-      "id": "job.prepare",
+      "id": "job_prepare",
       "domain": "job",
       "effect": "write",
       "allowed": [
@@ -4681,7 +4681,7 @@
       }
     },
     {
-      "id": "job.resolve_prepared",
+      "id": "job_resolve_prepared",
       "domain": "job",
       "effect": "read",
       "allowed": [
@@ -4902,7 +4902,7 @@
       }
     },
     {
-      "id": "job.monitor_assess",
+      "id": "job_monitor_assess",
       "domain": "job",
       "effect": "read",
       "allowed": [
@@ -5017,7 +5017,7 @@
       }
     },
     {
-      "id": "job.list",
+      "id": "job_list",
       "domain": "runtime",
       "effect": "read",
       "allowed": [
@@ -5109,7 +5109,7 @@
       }
     },
     {
-      "id": "artifact.register",
+      "id": "artifact_register",
       "domain": "runtime",
       "allowed": [
         "path",
@@ -5223,7 +5223,7 @@
       }
     },
     {
-      "id": "artifact.create",
+      "id": "artifact_create",
       "domain": "runtime",
       "allowed": [
         "content",
@@ -5356,7 +5356,7 @@
       }
     },
     {
-      "id": "artifact.read",
+      "id": "artifact_read",
       "domain": "runtime",
       "allowed": [
         "artifact_id",
