@@ -23,6 +23,13 @@ without rewriting the original Pi outcome or changing the fixed event batch.
 Provider failures preserve the original
 input and remain diagnosable. Monitor never marks scientific results complete.
 
+Admission distinguishes an accepted wake, a deferred wake, and a failed wake.
+When the owning Task Controller is waiting for Jobs, admission returns an
+accepted pending delivery with `deferred.code = "task_waiting"`; this is an
+expected synchronization result, so the Worker keeps the delivery pending and
+does not record a Monitor health error. Transport, authentication, observation,
+and uncertain Host failures remain retryable errors.
+
 Eligibility depends on the event, workspace/session and user-task binding, delivery
 receipt, and the current task control state. It does not read Research Memory versions, Node status, checkpoints or
 summaries. Closing a Node and failing a Memory projection cannot hide a Job

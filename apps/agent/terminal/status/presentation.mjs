@@ -27,7 +27,7 @@ export function activityStatus({ monitor, monitorError, sessionId, now = Date.no
   const updated = Date.parse(scoped?.updated_at);
   let symbol = '✓', color = 'muted', reason = '—', detail = null;
   if (monitorError) {
-    symbol = '×'; color = 'error'; detail = 'Connection lost. Reconnect to refresh Monitor.';
+    symbol = '×'; color = 'error'; detail = 'Monitor is unavailable. Reconnect to refresh the current snapshot.';
   } else if (!scoped) {
     symbol = '…'; detail = 'Waiting for a Monitor snapshot for this session.';
   } else if (!Number.isFinite(updated) || now - updated > 30_000) {

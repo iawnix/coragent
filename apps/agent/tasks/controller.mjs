@@ -438,7 +438,12 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       if (task?.state === "waiting") {
         const statuses = await Promise.all(task.wait.job_ids.map(job_id => kernel.execute_command("job.status", { job_id })));
         const ready = task.wait.mode === "any" ? statuses.some(job => jobFinished.has(job.state)) : statuses.every(job => jobFinished.has(job.state));
-        requireValue(ready, "task_waiting", "The task's explicit Job wait has not completed; events remain pending");
+        if (!ready) return { events: [], basis: {}, deferred: {
+          code: "task_waiting",
+          message: "The task's explicit Job wait has not completed; events remain pending",
+          job_ids: task.wait.job_ids,
+          mode: task.wait.mode,
+        } };
       }
       return { events: eligible, basis: task ? { task_revision: task.revision, control_epoch: task.control_epoch } : {} };
     },

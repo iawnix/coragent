@@ -100,7 +100,14 @@ test("an early Job event cannot consume an all-Jobs wait", async t => {
   const before = env.requests;
   const response = await env.monitor.admit({ requestId: "batch-wait", eventIds: ["event_1"], token: "fixture-token", mode: "next_run" }, context);
   await env.conversation.waitForIdle(context);
-  assert.equal(response.accepted, false);
+  assert.equal(response.accepted, true);
+  assert.equal(response.pending, true);
+  assert.deepEqual(response.deferred, {
+    code: "task_waiting",
+    message: "The task's explicit Job wait has not completed; events remain pending",
+    job_ids: ["job_a", "job_b"],
+    mode: "all",
+  });
   assert.equal((await env.controller.current(context)).state, "waiting");
   assert.equal(env.requests, before, "no model request until the complete wait predicate is satisfied");
 });

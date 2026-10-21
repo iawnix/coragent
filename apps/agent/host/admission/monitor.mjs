@@ -36,6 +36,7 @@ export function createMonitorAdmission({ admission, kernel, sessionId, wakeMessa
     if (record.status === "unanswered") {
       if (taskController) {
         const prepared = await taskController.prepareMonitor(await Promise.all(identity.event_ids.map(assess)), context);
+        if (prepared.deferred) return { ...accepted(record), pending: true, deferred: prepared.deferred };
         if (!prepared.events.length) return { accepted: true, skipped: true };
         return { ...accepted(record), pending: true };
       }
@@ -57,6 +58,7 @@ export function createMonitorAdmission({ admission, kernel, sessionId, wakeMessa
       }
       const prepared = taskController ? await taskController.prepareMonitor(events.filter(event => event.admitted), context)
         : { events: events.filter(event => event.admitted), basis: {} };
+      if (prepared.deferred) return { accepted: true, pending: true, deferred: prepared.deferred };
       const active = prepared.events;
       if (!active.length) return { accepted: true, skipped: true };
       const basis = { events: Object.fromEntries(events.map(event => [event.event_id, event.delivery_token])),

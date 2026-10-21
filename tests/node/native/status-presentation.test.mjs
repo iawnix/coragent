@@ -208,7 +208,7 @@ test('usage and monitor details stay separate while disconnection overrides cach
  assert.doesNotMatch(status.monitorDetails(),/tokens|Context/);
  status.update({monitorError:'offline'});
  assert.match(status.activity.render(80).join(''),/Monitor × · — · — jobs running/);
- assert.match(status.monitorDetails(),/Connection lost/);
+ assert.match(status.monitorDetails(),/Monitor is unavailable/);
  assert.doesNotMatch(status.monitorDetails(),/Working|Task: Research/);
  assert.match(status.monitorDetails(),/Connection: offline/);
  status.update({monitorError:null,monitor:snapshot({updated_at:new Date(Date.now()-31000).toISOString()})});

@@ -65,8 +65,10 @@ export async function createCoRAgentNativeClientFacet({ sourceRoot, session } = 
         }));
         redraw(); void refresh();
         if (session.subscribeMonitor) env.own(session.subscribeMonitor(() => { void refresh(); }, () => {
-          if (stopped || session.signal?.aborted) return;
-          status.update({monitorError:"Monitor unavailable"}); redraw();
+          // A notification connection can drop while the request connection is
+          // still healthy. Re-read the authoritative snapshot before showing an
+          // unavailable state; a transport blip must not overwrite a fresh view.
+          void refresh();
         }));
         env.own(() => { stopped = true; lifetime.abort(); clearTimeout(timer); ui.setFooter(undefined); ui.setActivity(undefined); ui.setCommandPresentation(undefined); });
         const show = (title, body, context, command, scope, mode) => ui.showDocument(document({ title, body, command, scope, mode }), context);
