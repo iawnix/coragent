@@ -1,54 +1,30 @@
 ---
 name: tri-operations
-description: Install and operate TRI task queues, configure server and compute-node services, manage resources, and diagnose queued, failed or lost tasks and CoRAgent integration.
+description: Deploy and maintain TRI queue servers and compute-node clients, configure connectivity and node capacity, and manage service health, database retention, backups and upgrades.
 ---
 
-# TRI operations
+# TRI infrastructure operations
 
 ## Script routing
 
-Use the [script routing map](../../docs/skill-script-routing.md#tri-operations) before invoking a bundled script. It identifies the supported entrypoint and interface; helper files under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details.
-
-**Entrypoint:** `skills/tri-operations/scripts/queue.py` (see the map for its stdin/subcommand contract).
+This Skill uses installed TRI and system service commands; see the [script routing map](../../docs/skill-script-routing.md#tri-operations). Job submission, resource translation, cancellation and recovery use [batch schedulers](../batch-schedulers/SKILL.md).
 
 [简体中文](SKILL.zh-CN.md)
 
-Use this Skill for TRI deployment, node/resource configuration, service maintenance and task troubleshooting. TRI consists of a persistent queue server, compute-node clients and command-line tools. It can run on one host or across hosts with shared job files.
+## Identify the installation
 
-## Choose the operation
+Locate `tri-server`, `tri-client` and `tri_node`, and record their build identity from installation metadata. Read `tri-client --help` and `tri_node --help` for installed options. The server entrypoint starts the service; inspect its service definition to identify it.
 
-- For installation, service configuration, capacity changes or upgrades, read [Service setup](references/service-setup.md).
-- For waiting, failed, lost or cancelled tasks, logs, retry identity and retention, read [Task diagnosis](references/task-diagnosis.md).
-- To connect CoRAgent to TRI on a login host or through SSH, read [CoRAgent Jobs](references/coragent-jobs.md).
-- For a CoRAgent Job, read its receipt to locate the execution target and TRI `scheduler_id`. Use [research-workflow](../research-workflow/SKILL.md) for Job submission, reconciliation and collection; use the TRI tools below to inspect the underlying scheduler.
+Identify the service owner and system/user service scope, socket/TCP endpoint, database path and registered nodes. Keep authentication tokens in their protected environment files. The CLI prefers an existing `TRI_SOCKET`, otherwise TCP through `TRI_SERVER_ADDR`.
 
-## Establish the actual installation
+## Deploy and maintain
 
-Locate binaries with `command -v tri_sub tri_stat tri_node tri-server tri-client`. Read `tri_sub --help`, `tri_stat --help` and `tri-client --help` for the installed options. Record the release/build identity from installation metadata. The server entrypoint starts the service directly, so inspect its service definition and release metadata to identify it.
+[Service setup](references/service-setup.md) covers server/client installation, service units, shared paths, resource advertisement, acceptance, backups, upgrades and history retention. A single-host installation runs both server and client; multiple compute hosts register unique node names with the same queue server.
 
-Identify the service owner, whether units are system or user services, the socket/TCP endpoint, database path and compute nodes. Read endpoint/path settings selectively; keep authentication tokens in their existing protected environment files. Native CLI calls use an existing `TRI_SOCKET` first, otherwise TCP through `TRI_SERVER_ADDR`.
+Use `tri_node --json` and `tri_node --check` to inspect registration, capacity, cgroups and the user manager. Inspect the identified server/client units and their journals. For connection failures, verify endpoint, ownership, service health and network connectivity. For protocol mismatch, compare server/CLI/client build identities. For an offline node, inspect its client service and heartbeat connection before changing advertised capacity.
 
-## Inspect the queue
+## Verify maintenance
 
-With the selected endpoint configured:
+After a service or capacity change, check node registration, existing attempts and the bounded diagnostic Job in the setup reference. A login-host check does not establish compute-node software readiness; use the [per-node acceptance procedure](../batch-schedulers/references/tri.md#verify-each-compute-node-and-backend) for that purpose.
 
-```bash
-tri_node --json
-tri_node --check
-tri_stat --json
-tri_ls --json
-```
-
-For a task, set `TRI_TASK_ID` to the numeric ID returned by TRI:
-
-```bash
-tri_stat --json "$TRI_TASK_ID"
-tri_log "$TRI_TASK_ID"
-tri_log --stderr "$TRI_TASK_ID"
-```
-
-`tri_top` gives an interactive queue view. Use native binaries for interactive maintenance. The bundled [queue.py](scripts/queue.py) supplies stable submission, observation, cancellation and recovery for background CoRAgent Jobs.
-
-## Complete the operation
-
-Apply the requested maintenance to the identified service or task, then repeat the relevant observation. Check node capabilities after configuration changes, and task state plus process/resource release after cancellation. For deployment acceptance, use the small diagnostic job in the setup reference. For CoRAgent backend coverage on multiple nodes, use the explicit per-node acceptance in [CoRAgent Jobs](references/coragent-jobs.md); a login-host probe does not verify the cluster. Report the affected target, observed cause, change and verification result. For CoRAgent work, reconcile and collect through the existing Job so its outputs retain their producer identity.
+Report affected services/nodes and verification results. Diagnose individual queued, failed, lost or cancelled Jobs through [TRI task diagnosis](../batch-schedulers/references/tri-diagnosis.md), preserving their execution identities during maintenance.

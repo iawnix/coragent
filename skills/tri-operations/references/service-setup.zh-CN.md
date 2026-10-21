@@ -62,4 +62,10 @@ tri_sub --json --name ops-check --request-id "$TRI_CHECK_ID" \
 
 升级前记录活跃任务及 attempt。使用 SQLite backup API 获取一致备份，或停服务端后离线备份并保留 SQLite 附属文件状态。同时保存配置与程序版本。每次请求会检查协议兼容性，因此协调服务端与客户端升级。重启后检查节点注册、已有 attempt 和诊断任务。回退时核对旧程序与数据库的兼容性；恢复历史数据库前需要核对快照之后启动的任务。
 
-CoRAgent 可以通过通用外部目标调用[随附的命令脚本](coragent-jobs.zh-CN.md)，选择本机或 SSH 连接。这支持在登录节点直接提交，无需安装特定调度器的 Python 插件。修改配置前核实安装的 CoRAgent 版本和选定目标，配置见[外部任务接入](../../../docs/EXTERNAL_JOBS.zh-CN.md)。
+CoRAgent Job 接入和逐节点软件验收见[批处理调度器](../../batch-schedulers/references/tri.zh-CN.md)。
+
+## 历史保留
+
+用户要求维护历史时，选择保留期限，先收集仍需使用的 Job 输出与回执。`tri_clean --json --older-than SECONDS` 删除较旧的终态记录，默认期限为 30 天。清理同时删除幂等回执，此后重试已清理请求可能生成新任务。保留窗口应覆盖工作流恢复和重试需求；`--all` 用于明确选定的全部终态历史删除。
+
+取消时核对 `cancel_confirmed` 和 `completion_reason`。即使已有 `finished_at` 且租约为空，租约到期仍不能证明进程停止；等待完成确认期间，资源仍应视为占用。

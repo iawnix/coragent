@@ -1,6 +1,6 @@
 # 将 TRI 接入 CoRAgent Job
 
-将随附的 [queue.py](../scripts/queue.py) 配置为通用外部目标的 handler。
+将随附的 [tri.py](../scripts/tri.py) 配置为通用外部目标的 handler。
 提交主机需要 Python 3 和原生 `tri_sub`、`tri_stat`、`tri_del`。
 脚本从 stdin 读取一个 JSON 请求，向 stdout 输出一个统一 JSON 响应，支持
 `probe`、`submit`、`status`、`cancel` 和 `recover`。
@@ -9,6 +9,8 @@ CoRAgent 与 TRI 位于同一登录节点时，使用 `driver="external"` 和
 `transport="local"`。`work_root` 指向与计算节点共享的持久目录，`handler`
 指定已安装 Python 和本脚本的绝对路径。完整配置见[目标配置与协议](../../../docs/EXTERNAL_JOBS.zh-CN.md)。
 研究计算继续通过 `job_start`、`job_status`、`job_reconcile` 和 `job_collect` 管理。
+
+原生任务状态、取消确认和日志检查见[TRI 任务诊断](tri-diagnosis.zh-CN.md)；服务端与节点部署见[TRI 运维](../../tri-operations/SKILL.zh-CN.md)。
 
 ## Handler 环境
 

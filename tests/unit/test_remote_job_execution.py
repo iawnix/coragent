@@ -44,7 +44,7 @@ def cluster(tmp_path, monkeypatch):
         local = [value.removeprefix('fixture:') for value in local]
         return original_capture(local, timeout=timeout)
     config = {'driver': 'external', 'transport': 'ssh', 'ssh_host': 'fixture', 'work_root': str(target),
-              'handler': [sys.executable, str(Path(__file__).resolve().parents[2] / 'skills/batch-schedulers/scripts/queue.py'), 'torque'],
+              'handler': [sys.executable, str(Path(__file__).resolve().parents[2] / 'skills/batch-schedulers/scripts/batch.py'), 'torque'],
               'allowed_queues': ['batch'], 'transfer_timeout_seconds': 900}
     # All runtime-created transports (including installation acceptance) use the simulation.
     original_init = SSHTransport.__init__

@@ -15,7 +15,7 @@ from research_agent.jobs.external import ExternalJobPlatform
 
 
 ROOT = Path(__file__).resolve().parents[2]
-HANDLER = ROOT / "skills/tri-operations/scripts/queue.py"
+HANDLER = ROOT / "skills/batch-schedulers/scripts/tri.py"
 
 
 @pytest.fixture

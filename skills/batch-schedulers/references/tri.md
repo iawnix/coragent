@@ -7,7 +7,7 @@
 - [Submission and diagnostics](#submission-and-diagnostics)
 - [Verify each compute node and backend](#verify-each-compute-node-and-backend)
 
-Use the bundled [queue.py](../scripts/queue.py) as the handler for a generic
+Use the bundled [tri.py](../scripts/tri.py) as the handler for a generic
 external target. It needs Python 3 and the native `tri_sub`, `tri_stat`, `tri_del`
 commands on the submission host. It reads one JSON request from stdin and writes
 one normalized JSON response to stdout. Supported actions are `probe`, `submit`,
@@ -19,6 +19,8 @@ nodes; set `handler` to the installed Python and this script's absolute path.
 See [target configuration and protocol](../../../docs/EXTERNAL_JOBS.md) for a full
 configuration. Research calculations continue through `job_start`, `job_status`,
 `job_reconcile` and `job_collect`.
+
+For native task states, cancellation confirmation and log inspection, read [TRI task diagnosis](tri-diagnosis.md). For server or node deployment, use [TRI operations](../../tri-operations/SKILL.md).
 
 ## Handler environment
 

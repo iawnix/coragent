@@ -16,11 +16,13 @@ CoRAgent 与队列命令都部署在登录节点时：
 default_target = "compute"
 
 [execution.targets.compute]
+scheduler = "tri"
+location = "cluster"
 driver = "external"
 transport = "local"
 cluster_name = "compute"
 work_root = "/absolute/shared/coragent-jobs"
-handler = ["/usr/bin/python3", "/absolute/coragent/skills/tri-operations/scripts/queue.py"]
+handler = ["/usr/bin/python3", "/absolute/coragent/skills/batch-schedulers/scripts/tri.py"]
 
 [execution.targets.compute.handler_environment]
 TRI_SOCKET = "/absolute/runtime/tri/server.sock"
@@ -40,7 +42,6 @@ memory_mb = 4096
 rsync 暂存和收集文件；本机目标在控制端 Job 目录与 `work_root` 之间复制。
 计算节点需要能以相同路径访问该目录，共享挂载由部署环境提供。
 本机进程使用内置 process/systemd 驱动，批处理队列使用外部脚本。
-Python 调度器插件加载机制已移除。
 
 `handler_environment` 配置提交命令的环境，与计算程序环境分开。
 凭据优先沿用已有受保护的服务/连接配置。Job 保存目标配置摘要；修改连接地址
@@ -53,11 +54,13 @@ Python 调度器插件加载机制已移除。
 
 ```toml
 [execution.targets.compute]
+scheduler = "tri"
+location = "cluster"
 driver = "external"
 transport = "local"
 file_mode = "shared"
 work_root = "/home/iaw/DATA/coragent/workspaces"
-handler = ["/usr/bin/python3", "/absolute/coragent/skills/tri-operations/scripts/queue.py"]
+handler = ["/usr/bin/python3", "/absolute/coragent/skills/batch-schedulers/scripts/tri.py"]
 ```
 
 将目标合并到 `config.toml`，补齐实际连接环境和计算软件绑定。PBS、Torque、Slurm
@@ -119,17 +122,13 @@ CoRAgent 按 argv 执行 `handler`，通过 stdin 发送一个 JSON 对象，接
 资源选择、作业脚本约定和原生命令用法写在 Skill 中。需要持续观察时，通过
 小型辅助程序转换成上述协议；辅助程序可以使用任何可执行语言。
 
-随附的 [TRI 脚本](../skills/tri-operations/scripts/queue.py) 调用 `tri_sub`、
+随附的 [TRI 脚本](../skills/batch-schedulers/scripts/tri.py) 调用 `tri_sub`、
 `tri_stat` 和 `tri_del`，通过 TRI 外部身份恢复任务。
-[使用说明](../skills/tri-operations/references/coragent-jobs.zh-CN.md) 提供命令路径覆盖和节点选择方法。
+[使用说明](../skills/batch-schedulers/references/tri.zh-CN.md) 提供命令路径覆盖和节点选择方法。
 
-随附的 [batch-schedulers](../skills/batch-schedulers/SKILL.zh-CN.md) 提供 PBS、Torque
-和 Slurm 命令脚本。[目标配置说明](../skills/batch-schedulers/references/targets.zh-CN.md)
+[batch-schedulers](../skills/batch-schedulers/SKILL.zh-CN.md) 统一维护 TRI handler
+与 PBS/Torque/Slurm handler。[目标配置说明](../skills/batch-schedulers/references/targets.zh-CN.md)
 涵盖命令、历史记账要求和持久提交恢复。调度器差异在脚本和相应文档中维护。
-
-原来的 `pbs`、`torque`、`slurm`、`tri` 及远程 `process` 驱动配置需改为
-`driver="external"`，并指定连接方式和脚本 argv。旧 Python 插件包、注册表和
-适配类接口已删除。已有任务先在旧安装中收集完成再迁移，旧回执不做转换。
 
 验证新辅助程序时覆盖排队、运行、成功、失败、超时、取消，以及控制端重启和
 提交响应丢失。检查从独立执行目录收集声明输出的过程。使用隔离队列或确定性

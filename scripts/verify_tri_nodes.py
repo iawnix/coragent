@@ -74,7 +74,7 @@ def main():
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--package-root', type=Path, required=True)
     parser.add_argument('--directory', type=Path, required=True, help='New private acceptance directory')
-    parser.add_argument('--target', required=True, help='Target using the TRI queue.py handler')
+    parser.add_argument('--target', required=True, help='Target using the batch-schedulers TRI handler (tri.py)')
     parser.add_argument('--nodes', type=json.loads, required=True, help='JSON array of exact TRI node names')
     parser.add_argument('--timeout', type=int, default=180)
     args = parser.parse_args()

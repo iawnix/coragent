@@ -73,17 +73,19 @@ reference，本地图用于确定入口，只有合同未说明的选项才用 e
 
 ## 非化学运维脚本
 
-以下三个路径相对于仓库根目录。
+以下路径相对于仓库根目录。
 
 ### batch-schedulers
 
-- `batch-schedulers`：`skills/batch-schedulers/scripts/queue.py`，首参数为 `pbs`、`torque` 或 `slurm`，stdin/stdout 为 JSON，支持 `probe`、`submit`、`status`、`cancel`、`recover`。
+- `batch-schedulers`：`skills/batch-schedulers/scripts/batch.py`，首参数为 `pbs`、`torque` 或 `slurm`，stdin/stdout 为 JSON，支持 `probe`、`submit`、`status`、`cancel`、`recover`。
+- `batch-schedulers`：`skills/batch-schedulers/scripts/tri.py`，不传调度器参数，stdin/stdout 为 external-Job JSON，支持同样的五个操作。
+
 ### email
 
 - `email`：`skills/email/scripts/email_cli.py`，子命令 `check`、`prepare`、`send`，仅授权后发送。
 ### tri-operations
 
-- `tri-operations`：`skills/tri-operations/scripts/queue.py`，stdin 为 external-Job JSON，输出稳定回执。
+无仓库内脚本；使用已安装的 TRI 服务端/客户端和系统服务命令。Job handler 归属 `batch-schedulers`。
 
 ## research-memory
 

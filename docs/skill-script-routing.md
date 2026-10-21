@@ -165,13 +165,14 @@ No bundled script; use runtime task and Job tools.
 
 ## Non-chemical operational scripts
 
-The following three paths are relative to the repository root.
+The following paths are relative to the repository root.
 
 ### batch-schedulers
 
 | Skill | Script | Interface |
 | --- | --- | --- |
-| `batch-schedulers` | `skills/batch-schedulers/scripts/queue.py` | first argument `pbs`, `torque`, or `slurm`; JSON request on stdin; `probe`, `submit`, `status`, `cancel`, `recover`; JSON receipt/status on stdout |
+| `batch-schedulers` | `skills/batch-schedulers/scripts/batch.py` | first argument `pbs`, `torque`, or `slurm`; JSON request on stdin; `probe`, `submit`, `status`, `cancel`, `recover`; JSON receipt/status on stdout |
+| `batch-schedulers` | `skills/batch-schedulers/scripts/tri.py` | no scheduler argument; external-Job JSON on stdin; `probe`, `submit`, `status`, `cancel`, `recover`; JSON receipt/status on stdout |
 
 ### email
 
@@ -179,7 +180,7 @@ The following three paths are relative to the repository root.
 
 ### tri-operations
 
-| `tri-operations` | `skills/tri-operations/scripts/queue.py` | external-Job JSON request on stdin; stable submit/status/cancel/recover receipts |
+No bundled script; use installed TRI server/client and system service commands. Job handlers belong to `batch-schedulers`.
 
 ### research-memory and research-workflow
 

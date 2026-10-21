@@ -1,43 +1,33 @@
 ---
 name: batch-schedulers
-description: 配置 PBS、Torque 和 Slurm 执行目标，选择批处理资源，使用原生命令提交任务，并诊断队列和记账结果。
+description: 配置 TRI、PBS、Torque 和 Slurm 执行目标，转换资源请求，诊断提交、排队、取消、记账和恢复。
 ---
 
-# PBS、Torque 与 Slurm 运维
+# 批处理调度器接入
 
 ## 脚本路由
 
-调用仓库脚本前先看[脚本路由地图](../../docs/skill-script-routing.zh-CN.md#batch-schedulers)。地图列出支持的入口和接口；`scripts/` 下的 helper 不是独立命令。不要通过读取源码发现调用方式。
+支持的入口和接口见[脚本路由地图](../../docs/skill-script-routing.zh-CN.md#batch-schedulers)。两个 handler 均只依赖 Python 标准库，从 stdin 读取 JSON 请求，向 stdout 返回 JSON 回执或状态。
 
-**入口：** `skills/batch-schedulers/scripts/queue.py`（stdin/子命令合同见脚本地图）。
+| 调度器 | 入口 | 说明 |
+| --- | --- | --- |
+| TRI | `skills/batch-schedulers/scripts/tri.py` | [TRI](references/tri.zh-CN.md) |
+| PBS | `skills/batch-schedulers/scripts/batch.py pbs` | [PBS](references/pbs.zh-CN.md) |
+| Torque | `skills/batch-schedulers/scripts/batch.py torque` | [Torque](references/torque.zh-CN.md) |
+| Slurm | `skills/batch-schedulers/scripts/batch.py slurm` | [Slurm](references/slurm.zh-CN.md) |
 
-连接已有批处理集群，或排查提交、排队、取消和已完成任务时使用本 Skill。
+所有 handler 通过相同外部 Job 协议实现 `probe`、`submit`、`status`、`cancel`、`recover`。安装配置用 `execution.targets.<name>.handler` 选择脚本，并声明匹配的 `scheduler`。科学 Skill 负责方法和软件后端；[research-workflow](../research-workflow/SKILL.zh-CN.md) 解析并固定执行目标。普通计算通过 `job_start`、`job_status`、`job_reconcile`、`job_cancel`、`job_collect` 管理。
 
-## 选择提交位置和资源
+## 配置提交位置和资源
 
-确认调度器类型、提交账户、队列/分区、共享工作目录和应用环境。CoRAgent 位于
-登录节点时选择本机连接，位于其它机器时选择 SSH。计算节点需要能访问提交脚本
-中的同一绝对工作路径和应用路径。
+确认提交账户、共享工作目录和软件路径。在提交主机上使用 `transport="local"`，从其它机器连接则使用 `transport="ssh"`；它决定 handler 在哪里运行，计算节点由调度器选择。[目标配置](references/targets.zh-CN.md) 说明配置结构和文件模式；原生命令与恢复证据按对应调度器说明配置。
 
-根据程序并行能力选择 CPU，根据实际工作集选择内存，根据代表性计算估计运行
-时限。调整请求前先检查队列限制和等待原因。PBS 使用 `select`，Torque 使用
-`nodes:ppn`，Slurm 使用 CPU、内存和 GPU 参数。
+根据程序并行能力申请 CPU，根据工作集申请内存，根据代表性计算估计时限。TRI 按节点和资源分配任务，无需 PBS/Slurm 式队列选择；PBS 使用 `select`，Torque 使用 `nodes:ppn`，Slurm 使用 CPU/内存/GPU 参数。调整请求前检查等待原因和站点限制。队列连接配置放在 `handler_environment`，计算程序环境放在所选软件后端绑定中。
 
-## 接入随附脚本
+## 观察与恢复
 
-[目标配置与恢复](references/targets.zh-CN.md) 提供完整配置及部署检查。
-[queue.py](scripts/queue.py) 仅依赖 Python 标准库，首个参数选择 `pbs`、`torque`
-或 `slurm`，从标准输入读取一条外部 Job 请求，在标准输出返回 JSON 回执或状态。
+从 Job 回执的目标和 `scheduler_id` 定位原生证据。区分提交接受、排队、运行、终态记账与输出收集。提交响应不确定时恢复原请求身份；一次查询未找到任务不能证明从未提交。取消后核实执行已经停止。
 
-脚本实现 `probe`、`submit`、`status`、`cancel`、`recover`，提交日志保存在执行
-目录的 `.coragent/` 下。CoRAgent 通过所选连接方式准备输入、保存 Job 回执并收集
-声明的输出。普通计算通过配置好的 Job 目标提交。
+失败时结合调度记账、`logs/scheduler.stdout`/`logs/scheduler.stderr` 和计算日志。[TRI 诊断](references/tri-diagnosis.zh-CN.md)及 [PBS/Torque/Slurm 命令](references/commands.zh-CN.md)说明原生证据。修改 handler 后，用确定性测试或已授权测试队列验证提交、终态记账、取消及响应丢失恢复。
 
-## 检查原始证据
-
-[调度命令与诊断](references/commands.zh-CN.md) 说明资源参数、原生查询和历史
-记录要求。排队时检查等待原因和资源限制；失败时结合记账退出码、调度器日志与
-计算日志；提交响应丢失时使用稳定请求身份协调原 Job。
-
-站点专有的资源参数在脚本中调整，并同步记录队列规则。部署修改时在测试队列
-检查提交、终态记账、取消及响应丢失后的恢复。
+TRI 服务端安装、客户端注册、容量配置、数据库维护和升级归属 [TRI 运维](../tri-operations/SKILL.zh-CN.md)。逐节点软件验收见 [TRI 接入](references/tri.zh-CN.md)。

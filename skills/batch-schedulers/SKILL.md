@@ -1,51 +1,33 @@
 ---
 name: batch-schedulers
-description: Configure PBS, Torque and Slurm execution targets, choose batch resources, submit through their native commands, and diagnose queue and accounting results.
+description: Configure TRI, PBS, Torque and Slurm execution targets, translate resource requests, and diagnose submission, queueing, cancellation, accounting and recovery.
 ---
 
-# PBS, Torque and Slurm operations
+# Batch scheduler integration
 
 ## Script routing
 
-Use the [script routing map](../../docs/skill-script-routing.md#batch-schedulers) before invoking a bundled script. It identifies the supported entrypoint and interface; helper files under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details.
+Use the [script routing map](../../docs/skill-script-routing.md#batch-schedulers) for supported entrypoints and interfaces. Both handlers use only Python's standard library; request JSON goes on stdin and receipt/status JSON comes from stdout.
 
-**Entrypoint:** `skills/batch-schedulers/scripts/queue.py` (see the map for its stdin/subcommand contract).
+| Scheduler | Entrypoint | Reference |
+| --- | --- | --- |
+| TRI | `skills/batch-schedulers/scripts/tri.py` | [TRI](references/tri.md) |
+| PBS | `skills/batch-schedulers/scripts/batch.py pbs` | [PBS](references/pbs.md) |
+| Torque | `skills/batch-schedulers/scripts/batch.py torque` | [Torque](references/torque.md) |
+| Slurm | `skills/batch-schedulers/scripts/batch.py slurm` | [Slurm](references/slurm.md) |
 
-Use this Skill when connecting CoRAgent to an existing batch cluster or diagnosing
-submission, queue waits, cancellation and completed jobs.
+All implement `probe`, `submit`, `status`, `cancel` and `recover` through the same external-Job protocol. The installation selects the handler with `execution.targets.<name>.handler` and declares the matching `scheduler` value. Scientific Skills choose methods and software backends; [research-workflow](../research-workflow/SKILL.md) resolves and pins the execution target. Ordinary calculations use `job_start`, `job_status`, `job_reconcile`, `job_cancel` and `job_collect`.
 
-## Select the submission host and resources
+## Configure the submission host and resources
 
-Identify the installed scheduler, submission account, queue/partition, shared work
-root and application environment. Use local transport when CoRAgent runs on the
-login host; use SSH when it runs elsewhere. Compute nodes need the same absolute
-work path and application paths as the submitted wrapper.
+Identify the submission account, shared work root and software paths. Use `transport="local"` on the submission host or `transport="ssh"` from another host; this selects where the handler runs. The scheduler chooses the compute node. See [target configuration](references/targets.md) for the configuration structure and file modes; follow the selected scheduler's reference for native commands and recovery evidence.
 
-Choose CPUs from the application's parallelism, memory from its working set, and
-walltime from a representative run. Check the queue's limits and current reason
-for waiting before changing the request. PBS uses `select`; Torque uses
-`nodes:ppn`; Slurm uses CPU, memory and GPU flags.
+Choose CPUs from program parallelism, memory from the working set and walltime from a representative calculation. TRI allocates nodes and resources without a PBS/Slurm queue selector. PBS uses `select`, Torque uses `nodes:ppn`, and Slurm uses CPU/memory/GPU flags. Inspect waiting reasons and site limits before adjusting resources. Keep scheduler connection settings in `handler_environment` and scientific program settings in the selected backend binding.
 
-## Connect the bundled script
+## Observe and recover
 
-[Target configuration and recovery](references/targets.md) gives complete
-configuration and deployment checks. The stdlib-only [queue.py](scripts/queue.py)
-accepts `pbs`, `torque` or `slurm` as its first argument, reads one external-Job
-request on stdin and emits its receipt/status as JSON on stdout.
+Use the Job receipt's target and `scheduler_id` to identify native evidence. Distinguish submission acceptance, queueing, execution, terminal accounting and collected outputs. An uncertain submit response requires recovery of the original request identity; absence from a transient query is not evidence that no job was submitted. Cancellation requires confirmation that execution stopped.
 
-It implements `probe`, `submit`, `status`, `cancel` and `recover`. Its submission
-journal lives under the execution directory's `.coragent/`. CoRAgent stages the
-wrapper, persists Job receipts and collects declared outputs through the selected
-transport. Invoke ordinary calculations through the configured Job target.
+For failures, combine scheduler accounting and `logs/scheduler.stdout`/`logs/scheduler.stderr` with calculation logs. [TRI diagnosis](references/tri-diagnosis.md) and [PBS/Torque/Slurm commands](references/commands.md) describe native evidence. Exercise submission, terminal accounting, cancellation and lost responses against deterministic fixtures or an authorized test queue when changing a handler.
 
-## Inspect native evidence
-
-Use [scheduler commands and diagnosis](references/commands.md) for resource
-syntax, native queries and history requirements. For a waiting Job, inspect the
-scheduler's reason and resource limits. For a failed Job, combine accounting exit
-status, scheduler logs and calculation logs. For a lost submission response,
-reconcile the recorded Job using its stable request identity.
-
-Adapt site-specific resource flags in the script alongside the site's documented
-queue policy. Exercise submission, terminal accounting, cancellation and lost
-responses against a test queue when deploying an adaptation.
+TRI server installation, client registration, capacity configuration, database maintenance and upgrades belong to [TRI operations](../tri-operations/SKILL.md). Per-node software acceptance belongs to the [TRI integration reference](references/tri.md#verify-each-compute-node-and-backend).

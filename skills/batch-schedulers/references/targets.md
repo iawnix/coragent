@@ -5,10 +5,12 @@
 default_target = "batch"
 
 [execution.targets.batch]
+scheduler = "pbs"
+location = "cluster"
 driver = "external"
 transport = "local"
 work_root = "/shared/coragent/jobs"
-handler = ["/usr/bin/python3", "/opt/coragent/skills/batch-schedulers/scripts/queue.py", "pbs"]
+handler = ["/usr/bin/python3", "/opt/coragent/skills/batch-schedulers/scripts/batch.py", "pbs"]
 command_timeout_seconds = 180
 allowed_queues = ["batch"]
 
@@ -23,10 +25,9 @@ walltime = "01:00:00"
 ```
 
 Replace paths and queue names with site values. Select `slurm` or `torque` in the
-handler argv as appropriate. For SSH, set `transport = "ssh"`, add `ssh_host`, and
+handler argv as appropriate, and set `scheduler` to the same value. For SSH, set `transport = "ssh"`, add `ssh_host`, and
 install the Skill scripts on that host. The handler runs on the submission host;
-the scheduler runs the staged wrapper on a compute node. A Python distribution
-plugin installation is unnecessary.
+the scheduler runs the staged wrapper on a compute node. The handler is distributed with the Skill.
 
 Override executable paths under `handler_environment` using `CORAGENT_QSUB`,
 `CORAGENT_QSTAT`, `CORAGENT_QDEL`, or `CORAGENT_SBATCH`, `CORAGENT_SQUEUE`,
@@ -50,9 +51,6 @@ that submission never happened; inspect the scheduler history before creating a
 replacement Job. Preserve the execution directory until collection and recovery
 are complete.
 
-Old Python scheduler plugin drivers and remote process drivers have been removed.
-Replace their configurations with external targets; migrate active work after
-collecting it through the old installation. Existing old receipts are not converted.
 The generic protocol is documented in [external Jobs](../../../docs/EXTERNAL_JOBS.md).
 
 For direct workspace execution, add `file_mode="shared"` and set `work_root` to

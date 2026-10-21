@@ -5,10 +5,12 @@
 default_target = "batch"
 
 [execution.targets.batch]
+scheduler = "pbs"
+location = "cluster"
 driver = "external"
 transport = "local"
 work_root = "/shared/coragent/jobs"
-handler = ["/usr/bin/python3", "/opt/coragent/skills/batch-schedulers/scripts/queue.py", "pbs"]
+handler = ["/usr/bin/python3", "/opt/coragent/skills/batch-schedulers/scripts/batch.py", "pbs"]
 command_timeout_seconds = 180
 allowed_queues = ["batch"]
 
@@ -22,7 +24,7 @@ memory_mb = 4096
 walltime = "01:00:00"
 ```
 
-路径和队列名称按现场配置替换；调度器参数可选择 `slurm` 或 `torque`。使用 SSH
+路径和队列名称按现场配置替换；调度器参数可选择 `slurm` 或 `torque`，同时将 `scheduler` 改为相同值。使用 SSH
 时将 `transport` 改为 `ssh`、添加 `ssh_host`，并在该主机部署 Skill 脚本。
 命令脚本运行在提交主机，调度器将已准备好的计算脚本分配给计算节点。接入所需
 文件随 Skill 提供。
@@ -44,8 +46,6 @@ PBS 模式读取 OpenPBS/PBS Pro 的 `qstat -x -f -F json`，包括保留的历�
 历史记录过期后，查不到任务不能证明从未提交成功；创建替代 Job 前需要检查
 调度历史。执行目录保留到输出收集和恢复结束。
 
-旧 Python 调度器插件驱动及远程 process 驱动已移除。将配置改为外部目标；
-已有任务先在旧安装中收集完成，再迁移。旧回执不做转换。
 通用协议见[外部任务接入](../../../docs/EXTERNAL_JOBS.zh-CN.md)。
 
 如需在工作区内直接执行，设置 `file_mode="shared"`，将 `work_root` 指向共享

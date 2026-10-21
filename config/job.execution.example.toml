@@ -22,15 +22,15 @@ work_root = "/shared/coragent/jobs"
 # For direct shared execution, set file_mode = "shared" and work_root to
 # the shared workspace parent, e.g. /home/iaw/DATA/coragent/workspaces.
 # Controller, submission host and compute nodes must see the same physical paths.
-handler = ["/usr/bin/python3", "/opt/coragent/skills/batch-schedulers/scripts/queue.py", "pbs"]
+handler = ["/usr/bin/python3", "/opt/coragent/skills/batch-schedulers/scripts/batch.py", "pbs"]
 connect_timeout_seconds = 15
 command_timeout_seconds = 180
 transfer_timeout_seconds = 3600
 
 # Use slurm or torque as the handler's final argument for those schedulers.
-# For TRI: scheduler = "tri" and handler = ["/usr/bin/python3", "/opt/coragent/skills/tri-operations/scripts/queue.py"]
+# For TRI: scheduler = "tri" and handler = ["/usr/bin/python3", "/opt/coragent/skills/batch-schedulers/scripts/tri.py"]
 # Configure TRI_SOCKET under handler_environment and omit submission.queue.
-# For Slurm: scheduler = "slurm" and use the batch-schedulers queue.py handler with final argument slurm.
+# For Slurm: scheduler = "slurm" and use the batch-schedulers batch.py handler with final argument slurm.
 
 [execution.targets.batch.bindings.xtb]
 command = "/opt/xtb/bin/xtb"

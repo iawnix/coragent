@@ -50,8 +50,8 @@ A cancellation record can appear before a running process exits: the client rece
 
 `tri_log ID` reads stdout, `tri_log --stderr ID` reads stderr, and `--follow` follows output interactively. Without separate output options, both streams go to `tri-<id>.out` in the job directory. `%j` in output/error options expands to the task ID; relative paths resolve against `--chdir`.
 
-## Scratch and retention
+## Scratch
 
 Tasks receive a node-local `TRI_SCRATCH`; `--scratch-cwd` starts the command there. The original directory is `TRI_JOB_CWD`. Stage inputs and the runnable script where the node can read them, and copy final outputs/checkpoints back to the persistent job directory before task exit. Client cleanup is best effort, so inspect residual scratch only after locating the task attempt and its final outputs.
 
-For requested history maintenance, select a retention window and collect the needed Job outputs/receipts first. `tri_clean --json --older-than SECONDS` removes old terminal records; the default window is 30 days. Cleanup also removes idempotency receipts, so retrying a cleaned request can create a new task. Choose the retention window to cover outstanding workflow recovery and retry needs; use `--all` only for an explicitly selected complete terminal-history removal.
+Queue database retention and service maintenance belong to [TRI operations](../../tri-operations/SKILL.md).

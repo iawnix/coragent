@@ -62,4 +62,8 @@ For development tests, set socket, server address, database, data, scratch, buil
 
 Record active tasks and attempts before an upgrade. Take a consistent SQLite backup using the SQLite backup API, or stop the server for an offline backup that preserves its SQLite sidecar state. Preserve configuration and binary versions. Coordinate server/client upgrades because every request checks protocol compatibility. After restart, check node registration, existing attempts and the diagnostic job. For rollback, check database compatibility with the previous binary; restoring a historical database requires reconciling tasks launched since that snapshot.
 
-CoRAgent can use the [bundled command handler](coragent-jobs.md) through an external target, with local or SSH transport. This supports direct submission on a login host without installing a scheduler-specific Python plugin. Check the installed CoRAgent version and selected target before changing configuration; see [external targets](../../../docs/EXTERNAL_JOBS.md).
+CoRAgent Job integration and per-node software acceptance are documented in [batch schedulers](../../batch-schedulers/references/tri.md).
+
+## History retention
+
+For requested history maintenance, select a retention window and collect the needed Job outputs/receipts first. `tri_clean --json --older-than SECONDS` removes old terminal records; the default window is 30 days. Cleanup also removes idempotency receipts, so retrying a cleaned request can create a new task. Choose the retention window to cover outstanding workflow recovery and retry needs; use `--all` only for an explicitly selected complete terminal-history removal.
