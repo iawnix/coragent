@@ -11,7 +11,7 @@ from research_agent.jobs.config_contract import job_config_schema, validate_job_
 from tests.unit.test_remote_job_execution import cluster
 
 ROOT = Path(__file__).resolve().parents[2]
-HANDLER = ROOT / 'skills/batch-schedulers/scripts/batch.py'
+HANDLER = ROOT / 'skills/core/batch-schedulers/scripts/batch.py'
 
 
 @pytest.fixture(params=['pbs', 'torque', 'slurm'])

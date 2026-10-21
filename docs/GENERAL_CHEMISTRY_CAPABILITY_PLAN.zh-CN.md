@@ -36,10 +36,10 @@
 
 基线依据：
 
-- `domains/chemical/skills/_shared/path_validation.py` 的鞍点模式检查固定读取 DA 的两条 `forming_bonds`。
-- `domains/chemical/skills/_shared/reaction_checks.py` 同时有通用映射检查和 DA 路径约束，调用者必须区分。
-- `domains/chemical/skills/gaussian/scripts/gaussian_io.py` 的通用电子能字段主要读取 `SCF Done`；不能泛化为激发态或所有后 HF 方法能量。
-- `domains/chemical/skills/_shared/chemical_identity.py` 比较图、电荷、同位素及指定立体化学，不提供完整构象或电子态比较。
+- `skills/chemical/_shared/path_validation.py` 的鞍点模式检查固定读取 DA 的两条 `forming_bonds`。
+- `skills/chemical/_shared/reaction_checks.py` 同时有通用映射检查和 DA 路径约束，调用者必须区分。
+- `skills/chemical/gaussian/scripts/gaussian_io.py` 的通用电子能字段主要读取 `SCF Done`；不能泛化为激发态或所有后 HF 方法能量。
+- `skills/chemical/_shared/chemical_identity.py` 比较图、电荷、同位素及指定立体化学，不提供完整构象或电子态比较。
 - CREST、NEB、energetics、QBICS 的 Skill 不等于均有内置执行器；CF22D 的频率和 RRHO 已存在，应复用。
 - `tests/unit/test_generic_path_preparation.py` 已覆盖非 DA 的输入准备；`test_chemical_path_execution.py` 中的合成日志仅证明解析与执行衔接，不证明真实反应搜索成功。
 
@@ -68,7 +68,7 @@
 
 区分三类事实：程序声称支持某任务；项目已实现相应准备/解析；目标环境已验证可运行。每项分别记录，不能用一个 `available=true` 替代。
 
-优先复用 `domains/chemical/execution.json` 和现有 environment check。只有现有 schema 无法表达必要事实时才扩展 `backend/src/research_agent/application/execution_schema.json`，不创建另一套竞争目录。
+优先复用 `skills/chemical/execution.json` 和现有 environment check。只有现有 schema 无法表达必要事实时才扩展 `backend/src/research_agent/application/execution_schema.json`，不创建另一套竞争目录。
 
 ## 4. 分阶段实施
 
@@ -84,7 +84,7 @@
 - 为 Gaussian 能量增加来源/类型判别。未实现的目标方法或电子态不能将参考 SCF 能量填成所请求的最终能量；保留原始日志和明确诊断。
 - 修正文档与实现漂移，包括 IRC Hessian 使用说明。解析失败、方法未支持和科学检查失败必须区分。
 
-主要范围：`domains/chemical/execution.json`、`skills/_shared/{reaction_checks,path_validation}.py`、Gaussian parser/input runner、validation/candidate-generation/method-selection 的中英文 Skill 与参考。此处 `skills/` 均指 `domains/chemical/skills/`。
+主要范围：`skills/chemical/execution.json`、`skills/chemical/_shared/{reaction_checks,path_validation}.py`、Gaussian parser/input runner、validation/candidate-generation/method-selection 的中英文 Skill 与参考。此处 `skills/` 均指 `skills/chemical/`。
 
 完成标准：非 DA 输入不会被默认按 DA 验收；已有 DA 回归语义不变；模拟激发态/相关方法输出不会误报 SCF 参考能为目标能量；能力矩阵的每项均有实现或缺口依据。
 
@@ -280,7 +280,7 @@
 
 2026-10-11，工作区实现，尚未提交。交付内容：
 
-- 增加随包的中英文[能力清单](../domains/chemical/skills/method-selection/references/capabilities.zh-CN.md)，逐项区分内置入口、外部/脚本途径、未验证范围及 DA 专用检查；方法选择、Gaussian、IRC 和 validation 的默认说明同步。
+- 增加随包的中英文[能力清单](../skills/chemical/method-selection/references/capabilities.zh-CN.md)，逐项区分内置入口、外部/脚本途径、未验证范围及 DA 专用检查；方法选择、Gaussian、IRC 和 validation 的默认说明同步。
 - DA 的有效范围内判据保持不变；修正非 DA、非支持多重度/同位素等范围诊断，返回 `inconclusive` / `not_assessed`，不将未适用的专用方法当作反应失败。旧结果不改写，未新增通用鞍点认证器。
 - Gaussian 引入 `energy_evidence` 与 `reference_scf_energy_hartree`，输出方法与 SCF 标签匹配且无已识别的未支持目标证据时才填入目标能量；TD/TDA、MP2/CCSD(T)、双杂化等不能直接复用参考 SCF。XYZ 与显式 GJF runner 均检查，`--validation none` 不能绕过。
 - 未支持的目标保留原始输出及解析材料；热化学日志总量保存在 `reported_thermochemical_totals`，IRC/扫描保留参考点，不把它们报告为目标方法的能量。
@@ -292,7 +292,7 @@
 
 ## 10. P1 基础 / 批次 B 实施记录
 
-2026-10-11，工作区实现，尚未提交。新增 `chemical.material@1` 独立 executor，使用现有 structure 后端、Job 与 Artifact，不新增模型工具或研究阶段门槛。详细合同及调用示例见[结构材料输入](../domains/chemical/skills/material-preparation/references/material_input.zh-CN.md)。
+2026-10-11，工作区实现，尚未提交。新增 `chemical.material@1` 独立 executor，使用现有 structure 后端、Job 与 Artifact，不新增模型工具或研究阶段门槛。详细合同及调用示例见[结构材料输入](../skills/chemical/material-preparation/references/material_input.zh-CN.md)。
 
 交付内容：
 
@@ -309,7 +309,7 @@
 
 ## 11. P1 / 批次 C 实施记录
 
-2026-10-11，工作区实现，尚未提交。新增三个独立 executor，复用 structure 后端的 RDKit/NumPy 与现有 Job/Artifact，不增加模型工具或固定研究阶段。详细合同与独立调用见[结构分析](../domains/chemical/skills/material-preparation/references/structure_analysis.zh-CN.md)。
+2026-10-11，工作区实现，尚未提交。新增三个独立 executor，复用 structure 后端的 RDKit/NumPy 与现有 Job/Artifact，不增加模型工具或固定研究阶段。详细合同与独立调用见[结构分析](../skills/chemical/material-preparation/references/structure_analysis.zh-CN.md)。
 
 - `chemical.map-candidates@1`：接受两份结构材料中的显式图，按元素、同位素、总电荷、显式 map 和用户固定对应生成有界候选。identity 模式保持分子图及已指定立体化学；reaction 模式以键级编辑代价排序，支持显式质子转移等非 DA 输入。保存歧义、搜索预算、候选截断与来源摘要，不把最小编辑当作真实机理或轨迹。
 - `chemical.conformer-compare@1`：对图允许的对应进行全原子纯旋转/平移 RMSD 比较，可加入距离、角度、周期二面角。复合物整体对齐，不分别移动片段；不允许反射拟合。覆盖不足时，匹配可凭具体候选成立，未找到匹配则保持未确定。几何与态声明分开，显式态冲突保留，未知态和相同激发态 root 都不认证波函数身份，也不自动合并材料。
@@ -322,7 +322,7 @@
 
 ## 12. P3 / 批次 D 实施记录
 
-2026-10-11，工作区实现，尚未提交。新增四个独立 executor，复用 structure、Job 与 Artifact；新检查不导入 DA 拓扑，不修改旧 DA 验证器/profile，不自动改变 Node 状态。合同及示例见[通用证据检查](../domains/chemical/skills/validation/references/general_checks.zh-CN.md)。
+2026-10-11，工作区实现，尚未提交。新增四个独立 executor，复用 structure、Job 与 Artifact；新检查不导入 DA 拓扑，不修改旧 DA 验证器/profile，不自动改变 Node 状态。合同及示例见[通用证据检查](../skills/chemical/validation/references/general_checks.zh-CN.md)。
 
 - `chemical.stationary-check@1`：独立检查极小点或一阶鞍点的几何/原子顺序/来源绑定、态声明、无约束单势能面范围、正常终止、数值优化判据和完整振动谱。按单原子、线性、非线性几何计算自由度，近线性/退化情况保持未确定。显著负频、小负频与近零模式全部保留，小负频不静默删除。鞍点要求非零虚频向量可用，模式化学归属另行检查。
 - `chemical.mode-check@1`：接受任意声明的距离、角度、二面角和加权组合，输出归一化模式的正负扰动几何、内部坐标响应及坐标梯度投影。整体翻转/缩放模式不改变判定；支持单坐标、显式质子转移、扭转等，不要求两条成键或等幅变化。缺模式、退化坐标、无关虚频和相互矛盾的方向不通过。
@@ -353,7 +353,7 @@
 
 ## 14. P2 路径候选 / 批次 F 实施记录
 
-本批新增五个独立入口，不要求反应名称或 DA 拓扑，复用现有 Job/Artifact 生命周期。输入合同、预算和示例见[材料路径操作](../domains/chemical/skills/candidate-generation/references/path_search.zh-CN.md)。
+本批新增五个独立入口，不要求反应名称或 DA 拓扑，复用现有 Job/Artifact 生命周期。输入合同、预算和示例见[材料路径操作](../skills/chemical/candidate-generation/references/path_search.zh-CN.md)。
 
 - `chemical.qst-prepare@1`：接受嵌入材料形式的反应物/产物及完整显式原子双射；QST3 另需猜测材料与独立对应。核对元素、已知电荷/多重度和 ground 态声明，按反应物顺序重排，生成 QST2/QST3 GJF 与置换/设置清单。保留原始坐标，不默认为端点优化或同一基元步骤认证；实际 Gaussian 执行复用 `chemical.gaussian-input`。
 - `chemical.scan-xtb@1`、`chemical.scan-gaussian@1`：显式距离/角度/二面角的一维/二维网格，最多 256 点，逐点从原始几何独立优化。xTB 使用原生附加约束势；为避免约束势能混入曲线，在优化后几何额外做无约束能量/梯度计算。Gaussian 使用 ModRedundant 冻结内坐标，并沿用 HF/DFT SCF 目标能量范围。逐点核对实际值、周期角度偏差、数值收敛与态回读；保留失败材料与原始文件摘要。
@@ -372,7 +372,7 @@
 
 本批增加四个独立分析入口，复用 structure Python、Job/Artifact 和既有材料合同。
 不限定反应类型，不要求完整 R/P，不新增原生求解器或服务。合同与公式见
-[能量执行参考](../domains/chemical/skills/energetics/references/energy_execution.zh-CN.md)。
+[能量执行参考](../skills/chemical/energetics/references/energy_execution.zh-CN.md)。
 
 - `chemical.thermochemistry@1`：复用 Gaussian 目标能量受支持的热校正字典、CF22D pyscf-thermo/1 或显式规范化校正，输出 E、ZPE、E+ZPE、H、G。缺失量保留 null，真实零值保留；核对来源温度、标准态及已有总量的一致性。CF22D 旧 entropy 字段单位不显式，本模块不消费、不猜测。
 - 高层级电子单点与低层级热项需显式 composite，保留双方模型/来源，核对图/原子对应、几何及态声明。图材料采用正旋转整体 RMSD；无图 TS 要求相同有序坐标与原子身份。H/G 修正相对 E，已经包含 ZPE；不再添加 ZPE，也不接受额外溶剂增量导致重复计数。
@@ -381,7 +381,7 @@
 - `chemical.ensemble-free-energy@1`：对同图/同位素/声明态且模型、条件一致的最多 64 个极小构象，用稳定对数配分和计算集合 G 与布居。要求简并度依据和采样覆盖声明；拒绝重复 ID、重复或无法确认不同的几何、缺失 G、混合模型/标准态。简并度不能重复计算已显式列出势阱、转动对称性或自旋多重度；不凭空输出集合 H/E。
 - `chemical.energy-profile@1`：接受热化学或集合输入作为物种，可计算反应能、正反活化能及相对共同参考的离散剖面。所有状态显式计量，核对元素/同位素/总电荷守恒，要求包含催化剂和旁观物种；缺量、未使用物种或混合模型/条件均拒绝。输出每个物种的多重度，但片段自旋耦合、表面连续性和基元步骤验证保留未评估。
 - `chemical.scan-slice@1`：导出终态一维/二维扫描的成功点，以最低成功点为参考；失败/待算点即使含能量也排除。核对行摘要、形状、已记录偏差和证据存在性。保留缺口，不插值成连续路径或自由能面；全部失败时保留空表与 null 参考。
-- 四个入口均输出 JSON 和 CSV，保留输入/来源摘要；已有结果目录不可覆盖。中英文 energetics/report Skill、执行参考、能力清单与完整资源闭包同步更新。报告须连同 JSON 条件与边界消费 CSV。
+- 四个入口均输出 JSON 和 CSV，保留输入/来源摘要；已有结果目录不可覆盖。中英文 energetics/chemical-report Skill、执行参考、能力清单与完整资源闭包同步更新。报告须连同 JSON 条件与边界消费 CSV。
 
 验证：新增 **54 项**确定性测试，全量 fast **849 项通过，0 失败、0 错误、0 跳过**；static、package、资源摘要及 diff 检查通过，全部测试运行清理审计通过。测试覆盖独立单位/1 atm→1 M 数值、计量 Δn 修正、组合与重复校正保护、缺失/零值、温度/态/模型/几何冲突、乱序与旋转、单原子/线性 RRHO、TS 负频排除、低频公式、构象简并配分/极端能量稳定性、集合到剖面组合、催化/旁观计量保护、扫描失败点排除、已有证据不可覆盖，以及四个真实本地 Job 的准备/执行/收集。未调用真实模型或原生化学求解器。
 
@@ -389,7 +389,7 @@
 
 ## 16. P5 多步路径与动力学 / 批次 H 实施记录
 
-2026-10-11，工作区实现，尚未提交。新增四个独立 executor，复用 structure、Job/Artifact 和 G 的能量材料。合同见[路径检查](../domains/chemical/skills/reaction-investigation/references/pathway_execution.zh-CN.md)与[动力学执行](../domains/chemical/skills/energetics/references/kinetics_execution.zh-CN.md)。
+2026-10-11，工作区实现，尚未提交。新增四个独立 executor，复用 structure、Job/Artifact 和 G 的能量材料。合同见[路径检查](../skills/chemical/reaction-investigation/references/pathway_execution.zh-CN.md)与[动力学执行](../skills/chemical/energetics/references/kinetics_execution.zh-CN.md)。
 
 - `chemical.pathway-check@1`：保存提供/假设/计算物种、可证伪假设、支持/冲突/未决观察、预算和未探索分支。支持 R-only、显式多步路线及共享中间体；按物种实例与本地原子 ID 的完整对应核对元素、同位素、电荷、计量及声明态连续性，报告缺步骤和未达到目标。可用确切端点材料重新执行 D 的模式/IRC 检查，不接受外部 pass 标签替代证据。
 - `chemical.tst@1`：根据明确 G 剖面计算一至三分子的 Eyring 速率常数，包含显式传输系数、浓度标准态前因子及可选初始通量。核对活性反应物、唯一活化复合物及不变旁观物种，拒绝仅电子能、负势垒和不相容来源；保留对数速率与原始证据引用，不自动认证基元步骤。
@@ -403,7 +403,7 @@
 
 ## 17. P6 电子态与 Gaussian 梯度 / 批次 I 实施记录
 
-新增 `chemical.electronic-gaussian@1`、`chemical.state-tracking@1`，并补齐 F 的 `chemical.gradient-gaussian@1`、`chemical.neb-gaussian@1`。复用可选 path 环境及 path_gaussian 绑定，不安装新求解器。合同见[电子态计算](../domains/chemical/skills/gaussian/references/electronic_states.zh-CN.md)与[路径操作](../domains/chemical/skills/candidate-generation/references/path_search.zh-CN.md)。
+新增 `chemical.electronic-gaussian@1`、`chemical.state-tracking@1`，并补齐 F 的 `chemical.gradient-gaussian@1`、`chemical.neb-gaussian@1`。复用可选 path 环境及 path_gaussian 绑定，不安装新求解器。合同见[电子态计算](../skills/chemical/gaussian/references/electronic_states.zh-CN.md)与[路径操作](../skills/chemical/candidate-generation/references/path_search.zh-CN.md)。
 
 - Gaussian 电子态适配支持气相、普通同位素质量、1–128 原子的指定自旋基态 HF/DFT，以及闭壳层单重态参考的单重 TDHF/TDDFT/TDA 单点与优化；允许的方法/泛函与 root 范围显式列出。生成 Force 或 Cartesian Opt，核对 Gaussian 16、route、态、数值优化判据、Input orientation 和原坐标轴力。
 - 激发态目标能量分别解析 `E(TD-HF/TD-DFT)` 与 `E(CIS/TDA)`，核对参考 SCF 加目标激发能；参考能单独保存，原有通用 parser 的类型保护不放宽。力转为 Cartesian dE/dR，完成符号和 Eh/bohr→Eh/Å 换算，保留 S² 检查及来源。超时清理进程组和每次计算的 scratch，失败保留原始日志。
@@ -414,7 +414,7 @@
 
 ## 18. P6 自旋表面交叉 / 批次 J 实施记录
 
-新增中英文 `surface-crossing` Skill 及 `chemical.mecp-gaussian@1`、`chemical.crossing-check@1`。未发现本机 QBICS/MECP 安装，因此选用可审查的内置 NumPy 局部算法与 I 的 Gaussian calculator，不虚构外部 CLI。合同见[交叉执行](../domains/chemical/skills/surface-crossing/references/crossing_execution.zh-CN.md)。
+新增中英文 `surface-crossing` Skill 及 `chemical.mecp-gaussian@1`、`chemical.crossing-check@1`。未发现本机 QBICS/MECP 安装，因此选用可审查的内置 NumPy 局部算法与 I 的 Gaussian calculator，不虚构外部 CLI。合同见[交叉执行](../skills/chemical/surface-crossing/references/crossing_execution.zh-CN.md)。
 
 - 搜索要求同一几何/原子顺序/电荷/气相 HF/DFT 模型上的两个不同自旋多重度表面。按投影平均能量梯度下降加一阶 Newton 能隙修正更新，限制逐原子位移、迭代、求值和时限；梯度差奇异时拒绝普通交叉缝处理，失败保留最后完整求值的表面对。
 - 独立检查分别报告能隙闭合、投影梯度驻点和交叉缝曲率。可选通过实际 calculator 的中心差分获得两个 Hessian，消耗同一求值预算并记录来源；使用 Lagrangian Hessian，移除平移、转动和缝法向后检查切空间本征值。负曲率失败，平坦模式未确定，缺 Hessian 不报告局部极小成立。
@@ -462,8 +462,8 @@ A–J 的约定模块开发及确定性验收完成，实现、测试和文档�
 提供局部纯旋转拟合/接触/内部坐标、轨迹与模式 GIF/XYZ/剖面、带来源与作者解释的图文报告。
 能量图复用既有物理量/条件/计量合同，几何阈值和报告生成均不自动认证 TS 或机制。
 
-合同和实际调用见 [ASE NEB](../domains/chemical/skills/candidate-generation/references/ase_neb_executor.zh-CN.md)、
-[搜索恢复](../domains/chemical/skills/method-selection/references/search_recovery.zh-CN.md)、
-[局部诊断](../domains/chemical/skills/material-preparation/references/local_diagnostics.zh-CN.md)、
-[轨迹与报告](../domains/chemical/skills/report/references/research_tools.zh-CN.md)。
+合同和实际调用见 [ASE NEB](../skills/chemical/candidate-generation/references/ase_neb_executor.zh-CN.md)、
+[搜索恢复](../skills/chemical/method-selection/references/search_recovery.zh-CN.md)、
+[局部诊断](../skills/chemical/material-preparation/references/local_diagnostics.zh-CN.md)、
+[轨迹与报告](../skills/chemical/chemical-report/references/research_tools.zh-CN.md)。
 验证采用真实 ASE/解析势与本地确定性原生替身；不等同于真实 Gaussian/xTB 反应基准。

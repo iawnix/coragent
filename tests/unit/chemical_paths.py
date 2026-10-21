@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-SKILLS = ROOT / "domains" / "chemical" / "skills"
+SKILLS = ROOT / "skills" / "chemical"
 _RELATIVE_PATHS = (
     "_shared",
     "material-preparation/scripts/materials",

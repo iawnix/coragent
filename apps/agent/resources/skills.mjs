@@ -36,7 +36,7 @@ export async function loadProductSkills({ packageRoot = installedRoot } = {}) {
   const skillRoots = manifest.pi.skills.map(value => ownedPath(packageRoot, value));
   const resourceFiles = [];
   for (const root of skillRoots) {
-    // Check ancestors as well as descendants so a replaced domains/ directory
+    // Check ancestors as well as descendants so a replaced grouping directory
     // cannot redirect the selected Skill tree outside the managed package.
     for (let parent = dirname(root); parent !== packageRoot; parent = dirname(parent)) {
       if ((await lstat(parent)).isSymbolicLink()) throw new Error("Managed resource parent must not be a symlink");

@@ -38,10 +38,8 @@ list methods. `user_task_id` names the user's work; `run_id` is Pi's first input
 submission identity for that run; `pi_task_id` names an internal execution Task.
 These identifiers are not interchangeable.
 
-Removed methods `monitor/list`, `monitor/status`, `monitor/enable`, and
-`monitor/disable` return `method_not_found`. CamelCase parameter aliases and
-`task_id` are not accepted. The native slash parser maps user commands to this
-same method set; queries never ask a model to interpret the command.
+Unknown methods return `method_not_found`. The native slash parser maps user
+commands to this same method set; queries never ask a model to interpret the command.
 
 ## Result shapes
 
@@ -64,8 +62,8 @@ type UserTask = {
   conversation_id: string;
   title: string;
   objective: string;
-  initial_plan?: string; // Required for new tasks; absent in older persisted tasks.
-  next_action?: string; // Absent in older tasks until the next plan update.
+  initial_plan?: string; // Initial plan, included when populated.
+  next_action?: string; // Current next action, included when populated.
   sources: { submission_id: string; entry_id: unknown; text: string }[];
   criteria: Criterion[];
   research: { entry_node_ids: string[]; focus_node_ids: string[] };
@@ -139,7 +137,7 @@ type TaskListItem = {
 };
 type TaskSummary = TaskListItem & {
   objective: string; // At most 1024 serialized UTF-8 bytes.
-  next_action: string | null; // 1024 bytes; legacy tasks may have none.
+  next_action: string | null; // Up to 1024 bytes; null when no next action applies.
   progress: { summary: string | null; at: string } | null; // Summary: 512 bytes.
   reason: string | null; // 512 bytes.
   resume_when: string | null; // 512 bytes.
@@ -216,10 +214,8 @@ type Health = {
 };
 ```
 
-Overview v2 replaces the v1 full task and job page with bounded summaries. The
-standalone `research_review`, `task_controller`, and `automatic_continuation_enabled`
-fields are removed from overview. Upgrade consumers with the server; v1 response
-aliases are not provided. Request methods and parameters are unchanged.
+Overview contains bounded task and Job summaries. Read task or Job detail endpoints
+for complete records; controller health belongs to the health response.
 
 Task lists retain only identity, revision, title, lifecycle state, update time,
 and truncation status. Overview adds the latest progress, next action, reason,
@@ -259,7 +255,7 @@ Job lifecycle. Missing collection or scientific-analysis evidence must not be
 presented as successful analysis merely because execution succeeded.
 
 A session without registered tasks returns no current task. This protocol requires
-UserTask v2 and Research Snapshot v3; old workspaces are not supported. Run indexes
+`coragent-user-task/2` and `research-snapshot/3`. Run indexes
 cover execution observed by the Task Controller; runs without an index are not
 invented from the active task graph. The diagnostic view presents
 structured execution summaries, not model reasoning or secret tool arguments.
@@ -302,7 +298,7 @@ or wake a model. Research changes use the existing research tools and the single
 `task_update set_research` binding action; there is no Monitor graph mutation or
 new slash command. The task revision and research sequence identify separate
 reads, not an atomic snapshot across Pi and Memory. Snapshot failures are surfaced
-through the normal error envelope, without a second or legacy read path.
+through the normal error envelope.
 
 ## Notifications and reconnect
 
@@ -315,6 +311,5 @@ object IDs. The browser gateway applies the same methods within its fixed,
 authenticated session and requires stable mutation identity.
 
 For execution event schemas and durable outbox semantics, see
-[Job monitoring v2](2/README.md). Canonical observation bindings omit `enabled`; legacy `enabled: true` is inert
-metadata. A stored false value requires explicit pause-intent migration and is
-never silently resumed. Task control has only the canonical Monitor entry point.
+[Job monitoring](jobs/README.md). Task Controller owns pause, resume and cancellation;
+observation bindings describe execution identity and routing.

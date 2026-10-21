@@ -8,7 +8,7 @@ from notify_lib import delivery
 
 
 def load_adapter():
-    path = Path(__file__).resolve().parents[2] / "domains/chemical/skills/report/scripts/email_delivery.py"
+    path = Path(__file__).resolve().parents[2] / "skills/chemical/chemical-report/scripts/email_delivery.py"
     spec = importlib.util.spec_from_file_location("report_email_delivery_fixture", path)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None

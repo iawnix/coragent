@@ -9,7 +9,7 @@ Chem = pytest.importorskip('rdkit.Chem')
 AllChem = pytest.importorskip('rdkit.Chem.AllChem')
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path[:0] = [str(ROOT / 'domains/chemical/skills/_shared'), str(ROOT / 'domains/chemical/skills/gaussian/scripts')]
+sys.path[:0] = [str(ROOT / 'skills/chemical/_shared'), str(ROOT / 'skills/chemical/gaussian/scripts')]
 from chemical_identity import identity, compare
 from path_validation import aligned_rmsd, topology
 from reaction_checks import reaction

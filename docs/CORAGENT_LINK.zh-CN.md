@@ -76,4 +76,4 @@ Host 和设备 token 都是随机 256-bit 值，Relay 只保存它们的 SHA-256
 层端到端加密；Relay 运营者可以观察转发的 `coragent-host/2` NDJSON，因此应使用可信基础设施
 或私有网络。
 
-线协议见 [`contracts/link/1/README.md`](../contracts/link/1/README.md)。
+线协议见 [`contracts/link/README.md`](../contracts/link/README.md)。

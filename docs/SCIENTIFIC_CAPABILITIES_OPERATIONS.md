@@ -2,7 +2,7 @@
 
 [简体中文](SCIENTIFIC_CAPABILITIES_OPERATIONS.zh-CN.md)
 
-`domains/chemical/execution.json` declares bundled convenience executors and validators. Skills explain method selection, scientific limitations and interpretation. Research Memory records original requirements, research questions and results; adding an executor does not require method-specific research fields.
+`skills/chemical/execution.json` declares bundled convenience executors and validators. Skills explain method selection, scientific limitations and interpretation. Research Memory records original requirements, research questions and results; adding an executor does not require method-specific research fields.
 
 These entries are not a workflow or a capability allowlist. The Agent can prepare
 native commands or task scripts and execute generic Jobs without registering a
@@ -62,12 +62,12 @@ Submission disables scheduler mail and automatic reruns; the research workflow o
 
 Job files live below `runs/jobs/<job_id>`. Collection registers declared files as Artifacts belonging to their producing Job, including all files in an explicitly declared recursive output directory. The Agent applies domain methods, records interpretation in the corresponding Node and publishes useful Results. Exit zero or a formatted report alone does not establish scientific success.
 
-The [current capability inventory](../domains/chemical/skills/method-selection/references/capabilities.md)
+The [current capability inventory](../skills/chemical/method-selection/references/capabilities.md)
 lists independent executors, their backends and scientific limits. Bundled modules cover:
 
 - Name/SMILES/XYZ materials, mapping candidates, tensor reordering and conformer comparison.
 - CF22D, xTB and Gaussian calculations; bounded CREST ensembles and rigid-fragment complex sampling.
-- [Reactive geometry editing](../domains/chemical/skills/reactive-geometry/SKILL.md): directed fragment placement, local edits and evidence-bound mode displacements; geometry screening only, followed by separate solver refinement.
+- [Reactive geometry editing](../skills/chemical/reactive-geometry/SKILL.md): directed fragment placement, local edits and evidence-bound mode displacements; geometry screening only, followed by separate solver refinement.
 - xTB/Gaussian relaxed scans, QST2/QST3 preparation, gradients and ASE NEB v2 candidate searches.
 - General stationary-point, mode and IRC checks; thermochemistry, conformer free energies and energy profiles.
 - Multistep pathway checks, conditional TST, common-precursor branching and mass-action networks.
@@ -75,18 +75,18 @@ lists independent executors, their backends and scientific limits. Bundled modul
 
 The xTB convenience wrapper still accepts `sp/opt/opt-sp`; bounded scans and NEB
 have separate executors. Frequencies and dynamics use native commands through
-generic Jobs. See the [xTB Skill](../domains/chemical/skills/xtb/SKILL.md).
+generic Jobs. See the [xTB Skill](../skills/chemical/xtb/SKILL.md).
 The optional `path` environment profile binds `path_xtb` / `path_gaussian` and
 uses path.lock with RDKit/NumPy, ASE and SciPy; it does not install native solvers or run a default scientific
-smoke calculation. See [environment setup](../domains/chemical/environments/README.md).
+smoke calculation. See [environment setup](../skills/chemical/environments/README.md).
 
 NEB uses ASE with Gaussian/xTB calculators through version-2 entries; the former NumPy implementation has been removed. QBICS remains an external, explicitly
 verified command/script route; the bundled crossing search uses Gaussian and a
 local NumPy algorithm. State tracking requires supplied AO density/overlap tensors;
 automatic extraction from Gaussian checkpoints is not implemented. Classical
 TS/IRC checks do not certify crossings or excited-state continuity. Use the
-[general checks](../domains/chemical/skills/validation/references/general_checks.md).
-See the [report Skill](../domains/chemical/skills/report/SKILL.md) for molecular images,
+[general checks](../skills/chemical/validation/references/general_checks.md).
+See the [chemical-report Skill](../skills/chemical/chemical-report/SKILL.md) for molecular images,
 data tables, energy plots, standalone trajectory/report Jobs and their evidence requirements. Local geometry diagnostics and practical search-recovery guidance are linked from the input and method-selection Skills.
 
 ## Validation

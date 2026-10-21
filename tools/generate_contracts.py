@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Generate command transports, model parameter types and review fixtures.
 
-Only contracts/commands is authored. Model schemas stay distinct from application
-commands: trusted session and receipt fields never become model parameters.
+Sources live in contracts/commands and contracts/monitor/jobs. Model schemas
+stay distinct from application commands: trusted session and receipt fields
+never become model parameters.
 """
 from __future__ import annotations
 
@@ -73,6 +74,8 @@ def ts_type(schema, depth=0):
 
 
 def outputs():
+    monitors = {name: json.loads((ROOT / f'contracts/monitor/jobs/{name}.schema.json').read_text())
+                for name in ('binding', 'event', 'delivery')}
     documents = {path.name: json.loads(path.read_text()) for path in SOURCE.glob('*.json')}
     if documents['results.json']['schema_version'] != 'coragent-command-results/1':
         raise ValueError('invalid command result schemas')
@@ -155,11 +158,12 @@ export function slashCompletions(name: string, prefix?: string): Array<{ value: 
              '| Command | Required parameters | Effect |', '| --- | --- | --- |']
     index.extend('| `' + item['id'] + '` | ' + ', '.join('`' + key + '`' for key in item['required']) + ' | ' + item.get('effect', '') + ' |' for item in commands)
     return {
+        ROOT / 'backend/src/research_agent/application/monitor_contracts.json': encoded(monitors),
         ROOT / 'backend/src/research_agent/application/command_catalog.json': encoded(catalog),
         ROOT / 'apps/agent/tools/command-catalog.json': encoded(catalog),
         ROOT / 'apps/agent/tools/parameters.d.mts': tool_types,
         ROOT / 'apps/agent/tools/commands.d.mts': command_types,
-        ROOT / 'contracts/generated/command-fixtures.json': encoded({'schema_version': 'coragent-command-fixtures/1', 'cases': examples}),
+        ROOT / 'tests/fixtures/contracts/command-fixtures.json': encoded({'schema_version': 'coragent-command-fixtures/1', 'cases': examples}),
         ROOT / 'contracts/commands/README.md': '\n'.join(index) + '\n',
     }
 

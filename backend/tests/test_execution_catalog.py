@@ -9,7 +9,7 @@ from research_agent.application import executors
 
 
 def _package(root):
-    domain = root / 'domains' / 'science'
+    domain = root / 'skills' / 'science'
     domain.mkdir(parents=True)
     script = domain / 'run.py'
     script.write_text('print("science")\n')
@@ -23,7 +23,7 @@ def _package(root):
                'executors': [descriptor], 'validators': [], 'acceptance_profiles': []}
     path = domain / 'execution.json'
     path.write_text(json.dumps(catalog))
-    (root / 'package.json').write_text(json.dumps({'coragent': {'execution': ['domains/science/execution.json']}}))
+    (root / 'package.json').write_text(json.dumps({'coragent': {'execution': ['skills/science/execution.json']}}))
     return path, catalog
 
 
@@ -32,7 +32,7 @@ def test_executor_works_without_a_skill_or_node(tmp_path, monkeypatch):
     monkeypatch.setenv('CORAGENT_PACKAGE_ROOT', str(tmp_path))
     monkeypatch.setenv('PATH', '')
     base, descriptor = executors.registered_executor('science.example', '1')
-    assert base == tmp_path / 'domains/science'
+    assert base == tmp_path / 'skills/science'
     assert descriptor == expected['executors'][0]
     assert not (base / 'skills').exists()
 

@@ -53,7 +53,7 @@ def test_model_schemas_do_not_accept_application_identity_fields():
 def test_generated_catalogs_and_examples_agree():
     node = json.loads((ROOT / 'apps/agent/tools/command-catalog.json').read_text())
     assert {row['id']: row for row in node['commands']} == COMMAND_DEFINITIONS
-    fixtures = json.loads((ROOT / 'contracts/generated/command-fixtures.json').read_text())
+    fixtures = json.loads((ROOT / 'tests/fixtures/contracts/command-fixtures.json').read_text())
     assert {case['command'] for case in fixtures['cases']} == set(COMMAND_DEFINITIONS)
     for case in fixtures['cases']:
         validate_command_params(case['command'], case['params'])

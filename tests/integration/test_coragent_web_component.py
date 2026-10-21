@@ -7,7 +7,9 @@ import sys
 import tarfile
 from pathlib import Path
 
+import pytest
 from jsonschema import Draft202012Validator
+from referencing import Registry, Resource
 
 from scripts._suite import WEB_COMPONENT_FILES, load_web_manifest
 from scripts.build_web import build_web
@@ -66,6 +68,8 @@ def test_web_component_archive_is_complete_and_validated(tmp_path: Path) -> None
 
     assert manifest["component"] == {"name": "coragent-web", "version": json.loads((ROOT / "package.json").read_text())["version"]}
     assert manifest["entrypoint"] == {"path": "bin/coragent-web"}
+    schema = json.loads((ROOT / "contracts/coragent-web/component-manifest.schema.json").read_text())
+    Draft202012Validator(schema).validate(manifest)
     with tarfile.open(Path(result["archive"]), "r:gz") as archive:
         files = {
             member.name.removeprefix("component/")
@@ -124,6 +128,34 @@ def test_web_component_protocol_schemas_validate_envelopes() -> None:
             "created_at_utc": "2026-09-11T00:00:00+00:00",
         }
     )
+
+
+@pytest.mark.parametrize("workspace_id,valid", [("study-1", True), ("a" * 80, True),
+    ("a" * 81, False), ("study\n", False), ("study/other", False)])
+def test_provider_schema_matches_live_request_validation(tmp_path, workspace_id, valid):
+    from research_agent.research.web import handle_request, ResearchWebError
+    schema = json.loads((ROOT / "contracts/coragent-web/provider-request.schema.json").read_text())
+    for query in (None, {f"key_{i}": "value" for i in range(17)}):
+        request = {"schema_version": "research-memory-provider/1", "request_id": "schema-check",
+            "operation": "catalog", "workspace_id": workspace_id, "query": query}
+        assert Draft202012Validator(schema).is_valid(request) is valid
+        if valid:
+            handle_request(tmp_path, request)
+        else:
+            with pytest.raises(ResearchWebError):
+                handle_request(tmp_path, request)
+
+
+def test_provider_schemas_validate_actual_success_and_error_envelopes():
+    from research_agent.research.web import provider_success_payload, provider_error_payload
+    contract_root = ROOT / "contracts/coragent-web"
+    schemas = [json.loads(path.read_text()) for path in contract_root.glob("*.schema.json")]
+    registry = Registry().with_resources((schema["$id"], Resource.from_contents(schema))
+                                         for schema in schemas if "$id" in schema)
+    schema = json.loads((contract_root / "provider-response.schema.json").read_text())
+    validator = Draft202012Validator(schema, registry=registry)
+    validator.validate(provider_success_payload("schema-check", {"workspaces": []}))
+    validator.validate(provider_error_payload("schema-check", ValueError("Invalid fixture request")))
 
 
 def test_provider_json_lines_does_not_reuse_a_previous_request_id(tmp_path: Path) -> None:

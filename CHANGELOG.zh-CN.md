@@ -17,7 +17,7 @@
   NumPy NEB、QST2/QST3 准备，以及不依赖反应名称的驻点/模式/IRC 检查。
 - 增加热化学与构象自由能、多步路径检查、条件 TST/竞争分支和质量作用动力学网络。
 - 增加有限范围的 Gaussian TD/TDA 计算、给定张量的态跟踪，以及不同自旋表面的局部
-  交叉搜索和独立数值检查。确定性验收不替代真实求解器科学基准，见[能力清单](domains/chemical/skills/method-selection/references/capabilities.zh-CN.md)。
+  交叉搜索和独立数值检查。确定性验收不替代真实求解器科学基准，见[能力清单](skills/chemical/method-selection/references/capabilities.zh-CN.md)。
 - 改进终端 slash 补全、焦点/草稿保留、字段语义配色、系统提示词渲染及 Monitor 的任务/连接状态展示。
 - 从受支持的 package surface 移除已退役的 ordinary-Pi runtime；Native Pi Harness 是唯一
   运行时入口。

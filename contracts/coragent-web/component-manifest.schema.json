@@ -4,54 +4,118 @@
   "title": "CoRAgent Web component release manifest",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "release_id", "component", "protocols", "entrypoint", "archive", "source", "created_at_utc"],
+  "required": [
+    "schema_version",
+    "release_id",
+    "component",
+    "protocols",
+    "entrypoint",
+    "archive",
+    "source",
+    "created_at_utc"
+  ],
   "properties": {
-    "schema_version": { "const": "coragent-web-component-release/1" },
-    "release_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$" },
+    "schema_version": {
+      "const": "coragent-web-component-release/1"
+    },
+    "release_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$"
+    },
     "component": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "version"],
+      "required": [
+        "name",
+        "version"
+      ],
       "properties": {
-        "name": { "const": "coragent-web" },
-        "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
+        "name": {
+          "const": "coragent-web"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-rc\\.(0|[1-9][0-9]*))?$"
+        }
       }
     },
     "protocols": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["provider", "snapshot", "theme"],
+      "required": [
+        "provider",
+        "snapshot",
+        "theme"
+      ],
       "properties": {
-        "provider": { "const": "research-memory-provider/1" },
-        "snapshot": { "const": "research-snapshot/3" },
-        "theme": { "const": "coragent-theme/1" }
+        "provider": {
+          "const": "research-memory-provider/1"
+        },
+        "snapshot": {
+          "const": "research-snapshot/3"
+        },
+        "theme": {
+          "const": "coragent-theme/1"
+        }
       }
     },
     "entrypoint": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path"],
-      "properties": { "path": { "const": "bin/coragent-web" } }
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "path": {
+          "const": "bin/coragent-web"
+        }
+      }
     },
     "archive": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["filename", "sha256", "size_bytes"],
+      "required": [
+        "filename",
+        "sha256",
+        "size_bytes"
+      ],
       "properties": {
-        "filename": { "type": "string", "pattern": "^coragent-web-component-[A-Za-z0-9][A-Za-z0-9._-]{0,159}\\.tgz$" },
-        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "size_bytes": { "type": "integer", "minimum": 1 }
+        "filename": {
+          "type": "string",
+          "pattern": "^coragent-web-component-[A-Za-z0-9][A-Za-z0-9._-]{0,159}\\.tgz$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     },
     "source": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["git_commit", "dirty"],
+      "required": [
+        "git_commit",
+        "dirty"
+      ],
       "properties": {
-        "git_commit": { "type": ["string", "null"] },
-        "dirty": { "type": "boolean" }
+        "git_commit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dirty": {
+          "type": "boolean"
+        }
       }
     },
-    "created_at_utc": { "type": "string", "minLength": 1 }
+    "created_at_utc": {
+      "type": "string",
+      "minLength": 1
+    }
   }
 }

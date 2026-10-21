@@ -9,7 +9,7 @@ import pytest
 np = pytest.importorskip('numpy')
 
 ROOT = __import__('pathlib').Path(__file__).resolve().parents[2]
-SKILLS = ROOT / 'domains' / 'chemical' / 'skills'
+SKILLS = ROOT / 'skills' / 'chemical'
 from tests.unit.chemical_paths import configure
 configure()
 
@@ -123,12 +123,12 @@ def test_run_writes_raw_xyz_digest_and_candidate_material(tmp_path):
 
 
 def test_executor_declared_closure_runs_without_source_tree(tmp_path):
-    descriptor = next(e for e in json.loads((SKILLS.parent / 'execution.json').read_text())['executors']
+    descriptor = next(e for e in json.loads((SKILLS / 'execution.json').read_text())['executors']
                       if e['id'] == 'chemical.reactive-pose')
     staged = tmp_path / 'stage'
     staged.mkdir()
     for path, expected in descriptor['resources'].items():
-        raw = (SKILLS.parent / path).read_bytes()
+        raw = (SKILLS / path).read_bytes()
         assert 'sha256:' + hashlib.sha256(raw).hexdigest() == expected
         target = staged / path
         target.parent.mkdir(parents=True, exist_ok=True)

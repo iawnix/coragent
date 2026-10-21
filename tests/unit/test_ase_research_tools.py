@@ -20,8 +20,8 @@ from tests.unit.test_path_search import Analytic, endpoints, fake_xtb, molecule,
 from tests.unit.test_electronic_crossing import config as gaussian_settings, fake_gaussian, h2
 from tests.unit.test_energetics import profile_input
 
-SKILLS = Path(__file__).resolve().parents[2] / 'domains/chemical/skills'
-sys.path.insert(0, str(SKILLS/'report/scripts'))
+SKILLS = Path(__file__).resolve().parents[2] / 'skills/chemical'
+sys.path.insert(0, str(SKILLS/'chemical-report/scripts'))
 from ase_neb import EvidenceCalculator, neb
 from ensemble_material import canonical, checked, xyz_text
 from local_diagnostics import local_diagnostics
@@ -45,7 +45,7 @@ def test_retired_neb_requests_cannot_fall_back_to_ase(identifier):
     base, entry=registered_executor(identifier, '2')
     assert entry['entry'].endswith('/ase_search.py')
     assert entry['cli'].endswith('/ase_cli.py')
-    assert not (base/'skills/candidate-generation/scripts/neb_engine.py').exists()
+    assert not (base/'candidate-generation/scripts/neb_engine.py').exists()
 
 
 @pytest.mark.parametrize('optimizer', ['FIRE','BFGS'])
@@ -348,7 +348,7 @@ def test_registered_tools_through_real_jobs(tmp_path,monkeypatch,operation):
 
 
 def test_prepared_path_lock_is_dependency_complete_and_runs_real_ase(tmp_path):
-    lock=SKILLS.parent/'environments/path.lock'
+    lock=SKILLS/'environments/path.lock'
     identity=hashlib.sha256(lock.read_bytes()).hexdigest()[:20]
     prefix=Path(os.environ['CORAGENT_TEST_ENV_ROOT'])/'deps/scientific/path'/identity
     assert (prefix/'.prepared.json').is_file(), 'Prepare the public path profile before tests'

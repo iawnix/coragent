@@ -13,7 +13,7 @@ def test_resources_are_complete_and_match_their_bytes():
     validate_resources(ROOT)
     inventory = json.loads((ROOT / "config/resources.json").read_text())["files"]
     assert "prompts/coragent.md" in inventory
-    for directory in ("skills", "domains", "prompts"):
+    for directory in ("skills", "prompts"):
         for path in (ROOT / directory).rglob("*"):
             if path.is_file() and "__pycache__" not in path.parts:
                 assert path.relative_to(ROOT).as_posix() in inventory

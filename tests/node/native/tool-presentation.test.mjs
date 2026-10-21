@@ -203,7 +203,7 @@ test("skill invocations keep attached failures inside one collapsible card", asy
   const { initTheme } = await fromSource("packages/coding-agent/src/modes/interactive/theme/theme.ts");
   initTheme("dark");
   const block = parseSkillBlock([
-    '<skill name="material-preparation" location="/package/domains/chemical/skills/material-preparation/SKILL.md">',
+    '<skill name="material-preparation" location="/package/skills/chemical/material-preparation/SKILL.md">',
     "# Material preparation",
     "</skill>",
     "",

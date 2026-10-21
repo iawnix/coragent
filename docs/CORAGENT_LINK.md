@@ -88,4 +88,4 @@ forwarded `coragent-host/2` NDJSON bytes, so use trusted infrastructure or a pri
 network.
 
 The wire contract is documented in
-[`contracts/link/1/README.md`](../contracts/link/1/README.md).
+[`contracts/link/README.md`](../contracts/link/README.md).

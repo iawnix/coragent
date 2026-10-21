@@ -17,17 +17,17 @@ TERMINAL = ROOT / "docs" / "TERMINAL.md"
 TERMINAL_ZH = ROOT / "docs" / "TERMINAL.zh-CN.md"
 INSTALLATION = ROOT / "docs" / "INSTALLATION.md"
 MAINTAINER = ROOT / "docs" / "MAINTAINER_GUIDE.md"
-SKILL_ROOT = ROOT / "skills" / "research-memory"
+SKILL_ROOT = ROOT / "skills" / "core" / "research-memory"
 SKILL = SKILL_ROOT / "SKILL.md"
 REFERENCES = SKILL_ROOT / "references"
-ORCHESTRATION_ROOT = ROOT / "skills" / "research-workflow"
+ORCHESTRATION_ROOT = ROOT / "skills" / "core" / "research-workflow"
 FOCUSED_SKILLS = {
     "research-workflow": ORCHESTRATION_ROOT,
-    **{name: ROOT / "domains" / "chemical" / "skills" / name for name in (
+    **{name: ROOT / "skills" / "chemical" / name for name in (
         "candidate-generation", "validation", "energetics", "method-selection",
         "cf22d", "xtb", "crest", "qbics", "gaussian", "reaction-investigation", "material-preparation",
     )},
-    "email": ROOT / "skills" / "email",
+    "email": ROOT / "skills" / "core" / "email",
 }
 
 
@@ -88,12 +88,7 @@ def test_public_document_set_covers_install_architecture_and_maintenance() -> No
 
 
 def test_public_markdown_relative_links_resolve_inside_the_package() -> None:
-    focused_files = [
-        path
-        for root in FOCUSED_SKILLS.values()
-        for path in (root / "SKILL.md", root / "SKILL.zh-CN.md", *sorted((root / "references").glob("*.md")))
-    ]
-    for path in {*PUBLIC_DOCS, *sorted((ROOT / "docs").rglob("*.md")), SKILL, SKILL_ROOT / "SKILL.zh-CN.md", *sorted(REFERENCES.glob("*.md")), *focused_files}:
+    for path in {*PUBLIC_DOCS, *sorted((ROOT / "docs").rglob("*.md")), *sorted((ROOT / "skills").rglob("*.md")), *sorted((ROOT / "contracts").rglob("*.md"))}:
         for raw_target in markdown_links(path.read_text(encoding="utf-8")):
             target = raw_target.strip().strip("<>")
             if target.startswith("#") or re.match(r"^[a-z][a-z0-9+.-]*:", target, re.IGNORECASE):

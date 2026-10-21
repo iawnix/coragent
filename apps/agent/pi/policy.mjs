@@ -1,6 +1,6 @@
 import { existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, isAbsolute, relative, resolve } from "node:path";
 
 // The retired ExtensionAPI path enforced this policy in its tool_call hook.
 // The Harness has no ExtensionAPI, so keep the security boundary as a small,
@@ -17,37 +17,6 @@ export function createPackageSourceReadGuard({
   const root = canonicalPath(packageRoot);
   const publicRoots = publicKnowledgeRoots.map(canonicalPath);
   const publicFiles = new Set(publicResourceFiles.map(canonicalPath));
-  function publicAlias(target) {
-    if (existsSync(target) || !isWithin(root, target)) return undefined;
-    // Models sometimes reconstruct the conventional <package>/skills/<name>
-    // path even when a domain Skill is registered from another tree. Treat
-    // that spelling as a read-only alias to the exact installed Skill root.
-    for (const publicRoot of publicRoots) {
-      const aliasRoot = join(root, "skills", basename(publicRoot));
-      if (!isWithin(aliasRoot, target)) continue;
-      const mapped = canonicalPath(join(publicRoot, relative(aliasRoot, target)));
-      if (existsSync(mapped) && (isWithin(publicRoot, mapped) || publicFiles.has(mapped))) return mapped;
-    }
-    return undefined;
-  }
-  function rewriteArguments(toolName, args) {
-    if (toolName === "job_start" && Array.isArray(args.command)) {
-      let changed = false;
-      const command = args.command.map(argument => {
-        if (typeof argument !== "string" || !isAbsolute(argument)) return argument;
-        const mapped = publicAlias(canonicalPath(argument));
-        if (!mapped) return argument;
-        changed = true;
-        return mapped;
-      });
-      return changed ? { ...args, command } : undefined;
-    }
-    if (!PACKAGE_READ_TOOLS.includes(toolName)) return undefined;
-    const rawPath = typeof args.path === "string" && args.path.trim() ? args.path.trim() : "";
-    const target = resolveToolPath(rawPath || cwd, cwd);
-    const mapped = publicAlias(target);
-    return mapped ? { ...args, path: mapped } : undefined;
-  }
   function missingResource(target) {
     if (!isWithin(root, target) || existsSync(target)) return undefined;
     const segments = target.split(/[\\/]/);
@@ -60,8 +29,6 @@ export function createPackageSourceReadGuard({
   return (event) => {
     if (!event) return undefined;
     const args = event.args && typeof event.args === "object" && !Array.isArray(event.args) ? event.args : {};
-    const rewritten = rewriteArguments(event.toolName, args);
-    if (rewritten) return { arguments: rewritten };
     // Reject a provably missing installed resource before allocating a Job.
     // Relative argv paths belong to staged Job inputs and are not package reads.
     if (event.toolName === "job_start" && Array.isArray(args.command)) {

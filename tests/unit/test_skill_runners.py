@@ -7,7 +7,7 @@ import sys
 import os
 import pytest
 
-SKILLS=Path(__file__).resolve().parents[2]/'domains/chemical/skills'
+SKILLS=Path(__file__).resolve().parents[2]/'skills/chemical'
 
 
 def test_xtb_failure_does_not_start_single_point(tmp_path):
@@ -50,7 +50,7 @@ def test_report_bash_preserves_source_digests_and_accepts_empty_output(tmp_path)
     source.write_text(json.dumps({'method':'fixture','validated':True,'steps':[{'task':'sp','energy_hartree':-1}]}))
     out = tmp_path/'results'; out.mkdir()
     run = subprocess.run(['bash', '-c', 'exec "$@"', 'report', sys.executable,
-                          str(SKILLS/'report/scripts/build.py'), '--result', f'local={source}',
+                          str(SKILLS/'chemical-report/scripts/build.py'), '--result', f'local={source}',
                           '--output-dir', str(out)], capture_output=True, text=True, timeout=30)
     assert run.returncode == 0, run.stderr
     report = json.loads((out/'report.json').read_text())
@@ -64,7 +64,7 @@ def test_report_refuses_to_overwrite_existing_output(tmp_path):
     source = tmp_path/'input.json'; source.write_text('{"validated":false}')
     out = tmp_path/'out'; out.mkdir()
     previous = out/'report.md'; previous.write_text('keep me')
-    run = subprocess.run([sys.executable, str(SKILLS/'report/scripts/build.py'), '--result', f'local={source}',
+    run = subprocess.run([sys.executable, str(SKILLS/'chemical-report/scripts/build.py'), '--result', f'local={source}',
                           '--output-dir', str(out)], capture_output=True, text=True)
     assert run.returncode != 0
     assert 'refusing to overwrite' in run.stderr
@@ -79,7 +79,7 @@ def test_report_reads_environment_from_job_identity_instead_of_method_label(tmp_
     (job/'receipt.json').write_text(json.dumps({'job_id': 'job_test', 'cwd': str(job)}))
     (job/'results/result.json').write_text(json.dumps({'method': 'GFN2-xTB', 'validated': True, 'steps': [{'task': 'sp', 'energy_hartree': -5}]}))
     out = tmp_path/'report'
-    run = subprocess.run([sys.executable, str(SKILLS/'report/scripts/build.py'), '--job', str(job), '--output-dir', str(out)], capture_output=True, text=True)
+    run = subprocess.run([sys.executable, str(SKILLS/'chemical-report/scripts/build.py'), '--job', str(job), '--output-dir', str(out)], capture_output=True, text=True)
     assert run.returncode == 0, run.stderr
     result = json.loads((out/'report.json').read_text())['results'][0]
     assert result['environment'] == 'local' and result['method'] == 'GFN2-xTB'
@@ -133,7 +133,7 @@ def test_doublet_runner_and_report_separate_numeric_checks_from_scientific_accep
     assert record['checks_passed'] is True and record['scientific_validation'] == 'not_assessed'
     assert 'validated' not in record and 'spin' not in record
     report = tmp_path/'report'
-    made = subprocess.run([sys.executable, str(SKILLS/'report/scripts/build.py'), '--result',
+    made = subprocess.run([sys.executable, str(SKILLS/'chemical-report/scripts/build.py'), '--result',
                            'local='+str(out/'result.json'), '--output-dir', str(report)], capture_output=True, text=True)
     assert made.returncode == 0, made.stderr
     rows = json.loads((report/'report.json').read_text())['results']

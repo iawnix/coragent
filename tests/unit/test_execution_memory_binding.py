@@ -43,9 +43,9 @@ def test_job_binds_one_node_revision_and_retries_do_not_rebind(tmp_path):
     assert event['session_id'] == 'original'
     import jsonschema
     from pathlib import Path
-    contract = Path(__file__).resolve().parents[2]/'contracts/monitor/2'
+    contract = Path(__file__).resolve().parents[2]/'contracts/monitor/jobs'
     binding = json.loads((tmp_path/'operations/monitors'/event['monitor_id']/'binding.json').read_text())
-    for name, value in [('monitor', binding), ('event', event), ('delivery', delivery)]:
+    for name, value in [('binding', binding), ('event', event), ('delivery', delivery)]:
         jsonschema.validate(value, json.loads((contract/(name+'.schema.json')).read_text()))
     other = create(tmp_path, {'goal':'A different question'})['node']
     with pytest.raises(ValueError, match='reused with different parameters'):

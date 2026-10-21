@@ -62,7 +62,7 @@ cd coragent
 - [文档索引](docs/README.zh-CN.md)
 - [Skill 目录与加载语言](skills/README.zh-CN.md)
 - [科学计算与远程执行](docs/SCIENTIFIC_CAPABILITIES_OPERATIONS.zh-CN.md)
-- [已实现的化学能力与范围](domains/chemical/skills/method-selection/references/capabilities.zh-CN.md)
+- [已实现的化学能力与范围](skills/chemical/method-selection/references/capabilities.zh-CN.md)
 - [模型兼容性](docs/MODEL_COMPATIBILITY.zh-CN.md)
 - [架构](docs/ARCHITECTURE.zh-CN.md)（[English](docs/ARCHITECTURE.md)）与[维护者指南](docs/MAINTAINER_GUIDE.zh-CN.md)（[English](docs/MAINTAINER_GUIDE.md)）
 

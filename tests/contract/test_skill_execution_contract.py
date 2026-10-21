@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-CHEMICAL_SKILLS = ROOT / "domains" / "chemical" / "skills"
+CHEMICAL_SKILLS = ROOT / "skills" / "chemical"
 
 
 def test_chemical_execution_skills_use_generic_job_runtime() -> None:
@@ -29,7 +29,7 @@ def test_chemical_execution_skills_use_generic_job_runtime() -> None:
 
 
 def test_job_runtime_contract_accepts_argv_without_scientific_registry() -> None:
-    text = (ROOT / "skills/research-workflow/references/tools.md").read_text(
+    text = (ROOT / "skills/core/research-workflow/references/tools.md").read_text(
         encoding="utf-8"
     )
     assert "argv command" in text

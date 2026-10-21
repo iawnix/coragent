@@ -7,7 +7,7 @@ import pytest
 pytest.importorskip('numpy')
 
 ROOT = Path(__file__).resolve().parents[2]
-SKILLS = ROOT / 'domains/chemical/skills'
+SKILLS = ROOT / 'skills/chemical'
 from tests.unit.chemical_paths import configure
 configure()
 

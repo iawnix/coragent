@@ -16,7 +16,7 @@ from gaussian_io import read_xyz
 
 irc_spec = importlib.util.spec_from_file_location(
     'chemical_irc_preparation',
-    Path(__file__).resolve().parents[2] / 'domains/chemical/skills/validation/scripts/irc_preparation.py',
+    Path(__file__).resolve().parents[2] / 'skills/chemical/validation/scripts/irc_preparation.py',
 )
 irc_helper = importlib.util.module_from_spec(irc_spec)
 irc_spec.loader.exec_module(irc_helper)

@@ -22,7 +22,7 @@ driver = "external"
 transport = "local"
 cluster_name = "compute"
 work_root = "/absolute/shared/coragent-jobs"
-handler = ["/usr/bin/python3", "/absolute/coragent/skills/batch-schedulers/scripts/tri.py"]
+handler = ["/usr/bin/python3", "/absolute/coragent/skills/core/batch-schedulers/scripts/tri.py"]
 
 [execution.targets.compute.handler_environment]
 TRI_SOCKET = "/absolute/runtime/tri/server.sock"
@@ -60,7 +60,7 @@ driver = "external"
 transport = "local"
 file_mode = "shared"
 work_root = "/home/iaw/DATA/coragent/workspaces"
-handler = ["/usr/bin/python3", "/absolute/coragent/skills/batch-schedulers/scripts/tri.py"]
+handler = ["/usr/bin/python3", "/absolute/coragent/skills/core/batch-schedulers/scripts/tri.py"]
 ```
 
 将目标合并到 `config.toml`，补齐实际连接环境和计算软件绑定。PBS、Torque、Slurm
@@ -122,12 +122,12 @@ CoRAgent 按 argv 执行 `handler`，通过 stdin 发送一个 JSON 对象，接
 资源选择、作业脚本约定和原生命令用法写在 Skill 中。需要持续观察时，通过
 小型辅助程序转换成上述协议；辅助程序可以使用任何可执行语言。
 
-随附的 [TRI 脚本](../skills/batch-schedulers/scripts/tri.py) 调用 `tri_sub`、
+随附的 [TRI 脚本](../skills/core/batch-schedulers/scripts/tri.py) 调用 `tri_sub`、
 `tri_stat` 和 `tri_del`，通过 TRI 外部身份恢复任务。
-[使用说明](../skills/batch-schedulers/references/tri.zh-CN.md) 提供命令路径覆盖和节点选择方法。
+[使用说明](../skills/core/batch-schedulers/references/tri.zh-CN.md) 提供命令路径覆盖和节点选择方法。
 
-[batch-schedulers](../skills/batch-schedulers/SKILL.zh-CN.md) 统一维护 TRI handler
-与 PBS/Torque/Slurm handler。[目标配置说明](../skills/batch-schedulers/references/targets.zh-CN.md)
+[batch-schedulers](../skills/core/batch-schedulers/SKILL.zh-CN.md) 统一维护 TRI handler
+与 PBS/Torque/Slurm handler。[目标配置说明](../skills/core/batch-schedulers/references/targets.zh-CN.md)
 涵盖命令、历史记账要求和持久提交恢复。调度器差异在脚本和相应文档中维护。
 
 验证新辅助程序时覆盖排队、运行、成功、失败、超时、取消，以及控制端重启和

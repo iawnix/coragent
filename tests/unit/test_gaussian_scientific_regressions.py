@@ -9,7 +9,7 @@ import sys
 import pytest
 pytest.importorskip('numpy')
 
-SKILLS = Path(__file__).resolve().parents[2] / 'domains/chemical/skills'
+SKILLS = Path(__file__).resolve().parents[2] / 'skills/chemical'
 sys.path[:0] = [str(SKILLS / 'gaussian/scripts'), str(SKILLS / '_shared')]
 from gaussian_io import parse_log
 

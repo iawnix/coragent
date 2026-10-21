@@ -2,7 +2,7 @@
 
 [English](SCIENTIFIC_CAPABILITIES_OPERATIONS.md)
 
-`domains/chemical/execution.json` 声明随包的便捷执行入口和验证器；Skill 说明方法选择、科学限制和解释。Research Memory 记录原始要求、研究问题与结果，新增执行入口不需要添加方法专用研究字段。
+`skills/chemical/execution.json` 声明随包的便捷执行入口和验证器；Skill 说明方法选择、科学限制和解释。Research Memory 记录原始要求、研究问题与结果，新增执行入口不需要添加方法专用研究字段。
 
 这些入口不是 workflow 或能力白名单。Agent 可以准备原生命令或任务脚本，使用通用 Job 执行，
 无需为每项计算登记新入口。目录字段与加载机制见 [Skill 与科学执行目录](EXTENSIONS.zh-CN.md)。
@@ -53,26 +53,26 @@ job.toml 所选后端提供程序、Python 绑定、激活脚本及资源默认�
 
 Job 文件位于 `runs/jobs/<job_id>`。收集把声明文件登记为生产 Job 的 Artifact；显式 recursive 输出目录中的文件逐个保留来源。Agent 结合领域方法解释证据，在对应 Node 中记事并按需发布 Result。退出码为零或报告已生成不足以证明科学成功。
 
-[当前能力清单](../domains/chemical/skills/method-selection/references/capabilities.zh-CN.md)
+[当前能力清单](../skills/chemical/method-selection/references/capabilities.zh-CN.md)
 列出可独立调用的执行器、后端和科学边界。随包模块覆盖：
 
 - 名称/SMILES/XYZ 材料、映射候选、张量重排与构象比较。
 - CF22D、xTB、Gaussian 计算，以及有界 CREST 构象集合和刚性片段复合物采样。
-- [反应构象编辑](../domains/chemical/skills/reactive-geometry/SKILL.zh-CN.md)：定向片段摆放、局部编辑和绑定证据的模式位移；先做几何筛选，再由独立求解器精修。
+- [反应构象编辑](../skills/chemical/reactive-geometry/SKILL.zh-CN.md)：定向片段摆放、局部编辑和绑定证据的模式位移；先做几何筛选，再由独立求解器精修。
 - xTB/Gaussian 弛豫扫描、QST2/QST3 准备、梯度与 ASE NEB v2 候选搜索。
 - 通用驻点、模式与 IRC 检查，以及热化学、构象自由能与能量剖面。
 - 多步路径检查、条件 TST、共同前体竞争分支与质量作用动力学网络。
 - 有限范围的 Gaussian 指定自旋基态和单重 TD/TDA 计算、给定张量的态跟踪、不同自旋表面的局部交叉搜索与检查。
 
 xTB 的便捷封装仍接受 `sp/opt/opt-sp`；有界扫描和 NEB 使用独立执行器。
-频率和分子动力学使用原生命令与通用 Job，详见 [xTB Skill](../domains/chemical/skills/xtb/SKILL.zh-CN.md)。
+频率和分子动力学使用原生命令与通用 Job，详见 [xTB Skill](../skills/chemical/xtb/SKILL.zh-CN.md)。
 可选 `path` 环境 profile 绑定 `path_xtb` / `path_gaussian`，使用含 RDKit/NumPy、ASE、SciPy 的 path.lock；
-不安装原生求解器，也不默认运行科学冒烟计算，见[环境配置](../domains/chemical/environments/README.zh-CN.md)。
+不安装原生求解器，也不默认运行科学冒烟计算，见[环境配置](../skills/chemical/environments/README.zh-CN.md)。
 
 NEB 统一使用 ASE 版本 2 接入 Gaussian/xTB calculator，旧 NumPy 实现已删除。QBICS 仍需明确核实外部命令或脚本；内置交叉搜索使用
 Gaussian 与本地 NumPy 算法。态跟踪需要提供 AO 密度/重叠张量，尚未实现从 Gaussian
-检查点自动提取。经典 TS/IRC 检查不认证跨态或激发态连续性。驻点、模式和端点证据使用[通用检查](../domains/chemical/skills/validation/references/general_checks.zh-CN.md)。
-局部诊断与搜索恢复指南分别见 material-preparation/method-selection。独立轨迹与报告 Job 包含分子图、数据表和能量曲线，做法与证据要求见[报告 Skill](../domains/chemical/skills/report/SKILL.zh-CN.md)。
+检查点自动提取。经典 TS/IRC 检查不认证跨态或激发态连续性。驻点、模式和端点证据使用[通用检查](../skills/chemical/validation/references/general_checks.zh-CN.md)。
+局部诊断与搜索恢复指南分别见 material-preparation/method-selection。独立轨迹与报告 Job 包含分子图、数据表和能量曲线，做法与证据要求见[报告 Skill](../skills/chemical/chemical-report/SKILL.zh-CN.md)。
 
 ## 验证
 

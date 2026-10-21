@@ -6,8 +6,8 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CATALOG = ROOT / 'domains/chemical/execution.json'
-REGISTRY = ROOT / 'domains/chemical/skills/method-selection/references/operation_backend_registry.md'
+CATALOG = ROOT / 'skills/chemical/execution.json'
+REGISTRY = ROOT / 'skills/chemical/method-selection/references/operation_backend_registry.md'
 
 def main() -> None:
     catalog = json.loads(CATALOG.read_text())

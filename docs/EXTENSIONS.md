@@ -9,7 +9,7 @@ capability list nor prescribe research steps.
 
 ## Skill discovery and language
 
-Root `package.json.pi.skills` declares `skills/` and `domains/chemical/skills/`.
+Root `package.json.pi.skills` declares `skills/core/` and `skills/chemical/`.
 `apps/agent/resources/skills.mjs` verifies release resources and invokes Pi's
 `loadSkills` with default discovery disabled. Pi discovers a skill through its
 `SKILL.md`, which is currently English. Names, descriptions, and paths support
@@ -22,6 +22,14 @@ read it when needed; response and report language follows the user's request.
 Maintain both languages together: fixing only the translation leaves the default
 instructions unchanged. See the [Skill catalog](../skills/README.md).
 
+
+## Resource groups
+
+`skills/core/` owns domain-independent task workflow, memory, scheduling and delivery. `skills/chemical/` owns chemistry methods, software adapters, scientific validation and chemical reports. Both use the same Skill loader; grouping changes neither instruction priority nor execution permissions. Core Skills do not require chemical Skills.
+
+The chemical group also owns `execution.json`, `environments/manifest.json` and `_shared/` script dependencies. These are executable/environment resources, not additional Skills. Catalog paths are relative to the catalog directory; environment lock/check paths are relative to the environment manifest. `coragent.environments` declares installation profiles independently of Skill discovery. Installed target bindings decide where and with which software a Job runs; a domain Skill never selects TRI, Slurm or direct execution.
+
+Each script-owning Skill links its local operation entrypoints and contracts. [The script index](skill-script-routing.md) provides navigation without duplicating those contracts.
 
 ## System prompt
 
@@ -45,7 +53,7 @@ actual spending limits and execution permissions.
 ## What execution.json does
 
 Root `package.json.coragent.execution` points to
-`domains/chemical/execution.json`. Python independently loads and validates it in
+`skills/chemical/execution.json`. Python independently loads and validates it in
 `backend/src/research_agent/application/execution_catalog.py`. It declares:
 
 - `executors`: convenience entry IDs/versions, scripts, argument templates, input roles, outputs, requirements, and resource digests.
@@ -76,5 +84,4 @@ python3 tools/lint_skills.py
 
 Add Skills under declared roots with matching English and Chinese entrypoints
 and references. Update the execution catalog when adding a reusable convenience
-executor. Core tool assembly belongs to `apps/agent/`; it does not use the retired
-extension-manifest, dynamic server allowlist, or provider registration flow.
+executor. Core tool assembly belongs to `apps/agent/`.

@@ -12,7 +12,7 @@ def test_email_cli_starts_in_a_fresh_interpreter(tmp_path):
     import subprocess
     import sys
 
-    script = Path(__file__).resolve().parents[2] / "skills/email/scripts/email_cli.py"
+    script = Path(__file__).resolve().parents[2] / "skills/core/email/scripts/email_cli.py"
     env = dict(os.environ)
     env.pop("PYTHONPATH", None)
     result = subprocess.run(

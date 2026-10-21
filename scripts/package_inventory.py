@@ -14,14 +14,14 @@ RETIRED_RUNTIME_PATHS = ("plugins/", "backend/src/research_agent/execution_plugi
     "backend/src/research_agent/jobs/registry.py", "backend/src/research_agent/jobs/scheduler.py",
     "backend/src/research_agent/jobs/process_scheduler.py", "backend/src/research_agent/jobs/remote.py",
     "apps/app-server/", "extensions/", "packages/agent-core/", "packages/agent-runtime/", "packages/runtime-bridge/", "packages/research-state/",
-    "domains/chemical/skills/candidate-generation/scripts/da/",
-    "domains/chemical/skills/candidate-generation/references/gaussian_path.md",
-    "domains/chemical/skills/candidate-generation/references/gaussian_path.zh-CN.md",
-    "domains/chemical/skills/validation/scripts/reaction_mapping.py",
-    "domains/chemical/skills/validation/scripts/gaussian_saddle.py",
-    "domains/chemical/skills/validation/scripts/gaussian_irc_connectivity.py")
-SKILL_ENTRIES = ["./skills", "./domains/chemical/skills"]
-SKILL_ENTRY_FILES = sorted(str(p.relative_to(ROOT)) for root in (ROOT / "skills", ROOT / "domains/chemical/skills") for p in root.rglob("SKILL.md"))
+    "skills/chemical/candidate-generation/scripts/da/",
+    "skills/chemical/candidate-generation/references/gaussian_path.md",
+    "skills/chemical/candidate-generation/references/gaussian_path.zh-CN.md",
+    "skills/chemical/validation/scripts/reaction_mapping.py",
+    "skills/chemical/validation/scripts/gaussian_saddle.py",
+    "skills/chemical/validation/scripts/gaussian_irc_connectivity.py")
+SKILL_ENTRIES = json.loads((ROOT / "package.json").read_text())["pi"]["skills"]
+SKILL_ENTRY_FILES = sorted(str(p.relative_to(ROOT)) for root in (ROOT / relative for relative in SKILL_ENTRIES) for p in root.rglob("SKILL.md"))
 FORBIDDEN_PARTS = {"local_debug", ".git", ".agents", "__pycache__", ".pytest_cache", "node_modules", "tests"}
 
 

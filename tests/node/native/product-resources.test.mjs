@@ -1,11 +1,46 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, writeFile, symlink, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, writeFile, symlink, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { TEST_ROOT } from "./test-environment.mjs";
 import { loadProductSkills } from "../../../apps/agent/resources/skills.mjs";
 import { createSystemPromptManifest } from "../../../apps/agent/pi/prompt.mjs";
+
+test("installed core works alone and chemical uses the same discovery without duplicate Skills", async t => {
+  const source = fileURLToPath(new URL("../../../", import.meta.url));
+  for (const groups of [["core"], ["core", "chemical"]]) {
+    const root = await mkdtemp(join(TEST_ROOT, "skill-groups-"));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    await mkdir(join(root, "skills"));
+    await mkdir(join(root, "config"));
+    for (const group of groups) await cp(join(source, "skills", group), join(root, "skills", group), { recursive: true });
+    await cp(join(source, "prompts"), join(root, "prompts"), { recursive: true });
+    const manifest = JSON.parse(await readFile(join(source, "package.json"), "utf8"));
+    manifest.pi.skills = groups.map(group => `./skills/${group}`);
+    await writeFile(join(root, "package.json"), JSON.stringify(manifest));
+    const inventory = JSON.parse(await readFile(join(source, "config/resources.json"), "utf8"));
+    inventory.files = Object.fromEntries(Object.entries(inventory.files).filter(([path]) =>
+      path.startsWith("prompts/") || groups.some(group => path.startsWith(`skills/${group}/`))));
+    await writeFile(join(root, "config/resources.json"), JSON.stringify(inventory));
+    const loaded = await loadProductSkills({ packageRoot: root });
+    const names = loaded.skills.map(skill => skill.name);
+    assert.equal(new Set(names).size, names.length);
+    for (const name of ["research-workflow", "research-memory", "batch-schedulers", "tri-operations", "email"]) {
+      assert.ok(names.includes(name));
+    }
+    assert.equal(names.includes("gaussian"), groups.includes("chemical"));
+    assert.equal(names.includes("chemical-report"), groups.includes("chemical"));
+    assert.equal(names.includes("report"), false);
+    assert.equal(names.includes("_shared"), false);
+    const prompt = createSystemPromptManifest({ native: { source: "product", text: await readFile(join(root, "prompts/coragent.md"), "utf8") },
+      skills: { source: root, items: loaded.skills } });
+    for (const skill of loaded.skills) assert.ok(prompt.effective.includes(skill.filePath));
+    const workflowBody = await readFile(join(root, "skills/core/research-workflow/SKILL.md"), "utf8");
+    assert.equal(prompt.effective.includes(workflowBody), false);
+  }
+});
 
 async function fixture(t) {
   const root = await mkdtemp(join(TEST_ROOT, "r-"));
@@ -58,7 +93,7 @@ test("managed Skill roots cannot escape or redirect through symlinks", async t =
 test("Skills remain independent of scientific execution catalog discovery", async t => {
   const root = await fixture(t);
   const manifest = JSON.parse(await readFile(join(root, "package.json")));
-  manifest.coragent = { execution: ["domains/missing/execution.json"] };
+  manifest.coragent = { execution: ["skills/missing/execution.json"] };
   await writeFile(join(root, "package.json"), JSON.stringify(manifest));
   assert.equal((await loadProductSkills({ packageRoot: root })).skills.length, 1);
 });

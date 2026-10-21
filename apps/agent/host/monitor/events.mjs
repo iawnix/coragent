@@ -1,6 +1,9 @@
 import { lstat, readFile, readdir, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { validate_workspace_manifest } from "../workspace.mjs";
+import bindingSchema from "../../../../contracts/monitor/jobs/binding.schema.json" with { type: "json" };
+import eventSchema from "../../../../contracts/monitor/jobs/event.schema.json" with { type: "json" };
+import { Value } from "../../pi/typebox.mjs";
 const MONITOR_ID = /^monitor_[1-9][0-9]*$/u;
 const MONITOR_EVENT_ID = /^event_[1-9][0-9]*$/u;
 
@@ -111,59 +114,16 @@ async function monitorWorkspaceIdentity(project) {
 }
 
 function validMonitorBinding(binding, monitorId, identity) {
-  return Boolean(binding && typeof binding === "object" && !Array.isArray(binding)
-    && binding.schema_version === "coragent-job-monitor/2"
+  return Value.Check(bindingSchema, binding)
     && binding.monitor_id === monitorId
-    && binding.workspace_id === identity.canonical
-    && typeof binding.job_id === "string" && /^job_[1-9][0-9]*$/u.test(binding.job_id)
-    && validResearchBinding(binding)
-    && validTaskBinding(binding)
-    && !Object.hasOwn(binding, "intent_id") && !Object.hasOwn(binding, "intent_digest")
-    && typeof binding.job_digest === "string" && /^sha256:[0-9a-f]{64}$/u.test(binding.job_digest)
-    && (binding.session_id === null || (typeof binding.session_id === "string" && binding.session_id.length > 0))
-    && ["none", "next_run"].includes(binding.wake_policy)
-    && binding.notify_policy === "none"
-    && (binding.enabled === undefined || binding.enabled === true)
-    && typeof binding.created_at === "string" && binding.created_at.length > 0);
+    && binding.workspace_id === identity.canonical;
 }
 
 function validMonitorEvent(event, eventId, monitorId, identity, binding) {
-  return Boolean(event && typeof event === "object" && !Array.isArray(event)
-    && event.schema_version === "coragent-job-monitor-event/2"
-    && validResearchBinding(event)
-    && validTaskBinding(event)
-    && event.node_id === binding.node_id && event.node_revision === binding.node_revision
-    && event.user_task_id === binding.user_task_id
-    && !Object.hasOwn(event, "intent_id") && !Object.hasOwn(event, "intent_digest")
+  return Value.Check(eventSchema, event)
     && event.event_id === eventId
     && event.monitor_id === monitorId
     && event.workspace_id === identity.canonical
-    && event.job_id === binding.job_id
-    && event.job_digest === binding.job_digest
-    && event.session_id === binding.session_id
-    && event.wake_policy === binding.wake_policy
-    && event.notify_policy === binding.notify_policy
-    && Number.isSafeInteger(event.sequence) && event.sequence > 0
-    && typeof event.status_digest === "string" && /^sha256:[0-9a-f]{64}$/u.test(event.status_digest)
-    && (typeof event.previous_state === "string" || event.previous_state === null)
-    && ["queued", "held", "running", "succeeded", "failed", "timed_out", "cancelled", "unknown"].includes(event.state)
-    && (typeof event.program_status === "string" || event.program_status === null)
-    && (typeof event.job_id === "string" || event.job_id === null)
-    && (Number.isSafeInteger(event.exit_status) || event.exit_status === null)
-    && (typeof event.error_class === "string" || event.error_class === null)
-    && (typeof event.error === "string" || event.error === null)
-    && typeof event.observed_at === "string" && event.observed_at.length > 0
-    && event.status && typeof event.status === "object" && !Array.isArray(event.status));
-}
-
-function validResearchBinding(value) {
-  if (Object.hasOwn(value, "attempt_id")) return false;
-  return (value.node_id === null && value.node_revision === null)
-    || (typeof value.node_id === "string" && /^node_[1-9][0-9]*$/u.test(value.node_id)
-      && Number.isSafeInteger(value.node_revision) && value.node_revision > 0);
-}
-
-function validTaskBinding(value) {
-  return value.user_task_id === undefined || value.user_task_id === null
-    || (typeof value.user_task_id === "string" && /^task_[1-9][0-9]*$/u.test(value.user_task_id));
+    && ["job_id", "job_digest", "node_id", "node_revision", "user_task_id", "session_id", "wake_policy", "notify_policy"]
+      .every(key => event[key] === binding[key]);
 }

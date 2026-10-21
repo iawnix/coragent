@@ -73,7 +73,7 @@ password_env = "CORAGENT_FIXTURE_PASSWORD"
         monkeypatch.setenv("CORAGENT_NOTIFICATION_CONFIG", str(config))
         monkeypatch.setenv("SSL_CERT_FILE", str(cert))
         monkeypatch.setenv("CORAGENT_FIXTURE_PASSWORD", "fixture-only")
-        script = Path(__file__).resolve().parents[2] / "domains/chemical/skills/report/scripts/email_delivery.py"
+        script = Path(__file__).resolve().parents[2] / "skills/chemical/chemical-report/scripts/email_delivery.py"
         calculation = dispatch("start", {"root": str(tmp_path), "request_id": "calculation",
             "command": [sys.executable, "-c", "import json;from pathlib import Path;Path('result.json').write_text(json.dumps({'method':'fixture','validated':True,'steps':[{'task':'sp','energy_hartree':-1}]}))"],
             "outputs": [{"path": "result.json", "required": True}]})
@@ -87,7 +87,7 @@ password_env = "CORAGENT_FIXTURE_PASSWORD"
             assert collected["status"]["state"] in {"succeeded", "collected"}
         finally:
             dispatch("cancel", {"root": str(tmp_path), "job_id": calculation["job_id"]})
-        builder = Path(__file__).resolve().parents[2] / "domains/chemical/skills/report/scripts/build.py"
+        builder = Path(__file__).resolve().parents[2] / "skills/chemical/chemical-report/scripts/build.py"
         output = tmp_path / "reports/comparison"
         subprocess.run(["bash", "-c", 'exec "$@"', "report", sys.executable, str(builder),
                         "--result", f"local={calculation['cwd']}/result.json", "--output-dir", str(output)], check=True, timeout=30)

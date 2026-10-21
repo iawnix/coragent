@@ -10,9 +10,9 @@
 | 安装、配置、升级与恢复 | [安装与运维](INSTALLATION.zh-CN.md) |
 | 安装目录、状态与受管环境 | [安装布局](APP_LAYOUT.zh-CN.md) |
 | Workspace、Node、Result、Agent Server 与 Monitor | [架构](ARCHITECTURE.zh-CN.md) |
-| 研究存储、工具与证据 | [Research Memory Skill](../skills/research-memory/SKILL.zh-CN.md)、[证据架构](RESEARCH_EVIDENCE_ARCHITECTURE.zh-CN.md) |
+| 研究存储、工具与证据 | [Research Memory Skill](../skills/core/research-memory/SKILL.zh-CN.md)、[证据架构](RESEARCH_EVIDENCE_ARCHITECTURE.zh-CN.md) |
 | 执行职责与材料来源 | [执行边界（英文）](ARCHITECTURE_BOUNDARIES.md)、[Artifact Store 与视图（英文）](ARTIFACT_PROVIDERS.md) |
-| 科学计算方法与执行 | [科学能力运维](SCIENTIFIC_CAPABILITIES_OPERATIONS.zh-CN.md)、[当前能力清单](../domains/chemical/skills/method-selection/references/capabilities.zh-CN.md) |
+| 科学计算方法与执行 | [科学能力运维](SCIENTIFIC_CAPABILITIES_OPERATIONS.zh-CN.md)、[当前能力清单](../skills/chemical/method-selection/references/capabilities.zh-CN.md) |
 | 通用化学模块、合同与实施范围 | [A–J 实施记录](GENERAL_CHEMISTRY_CAPABILITY_PLAN.zh-CN.md) |
 | 几何、Gaussian 与证据流的固定样例回归 | [领域科学回归](SCIENTIFIC_REGRESSIONS.zh-CN.md) |
 | 终端、Phone、浏览器 | [终端](TERMINAL.zh-CN.md)、[CoRAgent Link](CORAGENT_LINK.zh-CN.md) |

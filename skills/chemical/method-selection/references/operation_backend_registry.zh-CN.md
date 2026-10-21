@@ -1,0 +1,61 @@
+# 完整运行时注册表
+
+本交叉表覆盖当前 `execution.json` 中的全部 executor、validator 和 acceptance profile，每个注册记录只出现一次。
+
+| 注册 ID | 类型 | 所属 Skill | 后端 | 入口 | CLI |
+| --- | --- | --- | --- | --- | --- |
+| `chemical.branching` | `executor` | `energetics` | `structure` | `skills/chemical/energetics/scripts/energy.py` | `skills/chemical/energetics/scripts/energy_cli.py` |
+| `chemical.cf22d` | `executor` | `cf22d` | `pyscf` | `skills/chemical/cf22d/scripts/run.py` | `skills/chemical/cf22d/scripts/cli.py` |
+| `chemical.cf22d-doctor` | `executor` | `cf22d` | `pyscf` | `skills/chemical/cf22d/scripts/doctor.py` | `—` |
+| `chemical.compare` | `executor` | `material-preparation` | `structure` | `skills/chemical/material-preparation/scripts/reaction/prepare.py` | `skills/chemical/material-preparation/scripts/reaction/cli.py` |
+| `chemical.complex-sample` | `executor` | `crest` | `structure` | `skills/chemical/crest/scripts/ensemble.py` | `skills/chemical/crest/scripts/ensemble_cli.py` |
+| `chemical.conformer-compare` | `executor` | `material-preparation` | `structure` | `skills/chemical/material-preparation/scripts/geometry/analysis.py` | `skills/chemical/material-preparation/scripts/geometry/analysis_cli.py` |
+| `chemical.crest` | `executor` | `crest` | `crest` | `skills/chemical/crest/scripts/crest_run.py` | `skills/chemical/crest/scripts/crest_cli.py` |
+| `chemical.crest-ensemble` | `executor` | `crest` | `structure` | `skills/chemical/crest/scripts/ensemble.py` | `skills/chemical/crest/scripts/ensemble_cli.py` |
+| `chemical.crossing-check` | `executor` | `surface-crossing` | `structure` | `skills/chemical/surface-crossing/scripts/crossing.py` | `skills/chemical/surface-crossing/scripts/crossing_cli.py` |
+| `chemical.electronic-gaussian` | `executor` | `gaussian` | `path_gaussian` | `skills/chemical/gaussian/scripts/electronic.py` | `skills/chemical/gaussian/scripts/electronic_cli.py` |
+| `chemical.energy-profile` | `executor` | `energetics` | `structure` | `skills/chemical/energetics/scripts/energy.py` | `skills/chemical/energetics/scripts/energy_cli.py` |
+| `chemical.ensemble-free-energy` | `executor` | `energetics` | `structure` | `skills/chemical/energetics/scripts/energy.py` | `skills/chemical/energetics/scripts/energy_cli.py` |
+| `chemical.ensemble-select` | `executor` | `crest` | `structure` | `skills/chemical/crest/scripts/ensemble.py` | `skills/chemical/crest/scripts/ensemble_cli.py` |
+| `chemical.gaussian` | `executor` | `gaussian` | `gaussian` | `skills/chemical/gaussian/scripts/run.py` | `skills/chemical/gaussian/scripts/cli.py` |
+| `chemical.gaussian-evidence` | `executor` | `validation` | `structure` | `skills/chemical/validation/scripts/evidence_check.py` | `skills/chemical/validation/scripts/check_cli.py` |
+| `chemical.gaussian-input` | `executor` | `gaussian` | `gaussian` | `skills/chemical/gaussian/scripts/run.py` | `skills/chemical/gaussian/scripts/cli.py` |
+| `chemical.gaussian_frequency` | `validator` | `validation` | `validation` | `skills/chemical/validation/scripts/gaussian_frequency.py` | `—` |
+| `chemical.geometry-safety` | `executor` | `geometry-preflight` | `structure` | `skills/chemical/geometry-preflight/scripts/run.py` | `skills/chemical/geometry-preflight/scripts/cli.py` |
+| `chemical.gradient-gaussian` | `executor` | `candidate-generation` | `path_gaussian` | `skills/chemical/candidate-generation/scripts/backends/gaussian_path.py` | `skills/chemical/candidate-generation/scripts/search/search_cli.py` |
+| `chemical.gradient-xtb` | `executor` | `candidate-generation` | `path_xtb` | `skills/chemical/candidate-generation/scripts/search/search.py` | `skills/chemical/candidate-generation/scripts/search/search_cli.py` |
+| `chemical.inspect` | `executor` | `material-preparation` | `structure` | `skills/chemical/material-preparation/scripts/reaction/prepare.py` | `skills/chemical/material-preparation/scripts/reaction/cli.py` |
+| `chemical.irc-check` | `executor` | `validation` | `structure` | `skills/chemical/validation/scripts/evidence_check.py` | `skills/chemical/validation/scripts/check_cli.py` |
+| `chemical.kinetic-network` | `executor` | `energetics` | `structure` | `skills/chemical/energetics/scripts/energy.py` | `skills/chemical/energetics/scripts/energy_cli.py` |
+| `chemical.local-diagnostics` | `executor` | `material-preparation` | `structure` | `skills/chemical/material-preparation/scripts/diagnostics/diagnostics_job.py` | `skills/chemical/material-preparation/scripts/diagnostics/diagnostics_cli.py` |
+| `chemical.map-candidates` | `executor` | `material-preparation` | `structure` | `skills/chemical/material-preparation/scripts/geometry/analysis.py` | `skills/chemical/material-preparation/scripts/geometry/analysis_cli.py` |
+| `chemical.material` | `executor` | `material-preparation` | `structure` | `skills/chemical/material-preparation/scripts/materials/material.py` | `skills/chemical/material-preparation/scripts/materials/material_cli.py` |
+| `chemical.mecp-gaussian` | `executor` | `surface-crossing` | `path_gaussian` | `skills/chemical/surface-crossing/scripts/crossing.py` | `skills/chemical/surface-crossing/scripts/crossing_cli.py` |
+| `chemical.mode-check` | `executor` | `validation` | `structure` | `skills/chemical/validation/scripts/evidence_check.py` | `skills/chemical/validation/scripts/check_cli.py` |
+| `chemical.neb-gaussian` | `executor` | `candidate-generation` | `path_gaussian` | `skills/chemical/candidate-generation/scripts/neb/ase_search.py` | `skills/chemical/candidate-generation/scripts/neb/ase_cli.py` |
+| `chemical.neb-xtb` | `executor` | `candidate-generation` | `path_xtb` | `skills/chemical/candidate-generation/scripts/neb/ase_search.py` | `skills/chemical/candidate-generation/scripts/neb/ase_cli.py` |
+| `chemical.path-candidates` | `executor` | `candidate-generation` | `structure` | `skills/chemical/candidate-generation/scripts/path/prepare_path.py` | `skills/chemical/candidate-generation/scripts/path/cli.py` |
+| `chemical.path-irc` | `executor` | `validation` | `structure` | `skills/chemical/validation/scripts/irc_preparation.py` | `skills/chemical/validation/scripts/irc_preparation_cli.py` |
+| `chemical.pathway-check` | `executor` | `reaction-investigation` | `structure` | `skills/chemical/reaction-investigation/scripts/pathway_job.py` | `skills/chemical/reaction-investigation/scripts/pathway_cli.py` |
+| `chemical.qst-prepare` | `executor` | `candidate-generation` | `structure` | `skills/chemical/candidate-generation/scripts/search/search.py` | `skills/chemical/candidate-generation/scripts/search/search_cli.py` |
+| `chemical.search-recovery` | `executor` | `candidate-generation` | `structure` | `skills/chemical/candidate-generation/scripts/search/recovery.py` | `skills/chemical/candidate-generation/scripts/search/recovery_cli.py` |
+| `chemical.reaction` | `executor` | `material-preparation` | `structure` | `skills/chemical/material-preparation/scripts/reaction/prepare.py` | `skills/chemical/material-preparation/scripts/reaction/cli.py` |
+| `chemical.reactive-geometry` | `executor` | `reactive-geometry` | `structure` | `skills/chemical/reactive-geometry/scripts/reactive_geometry.py` | `skills/chemical/reactive-geometry/scripts/reactive_cli.py` |
+| `chemical.reactive-pose` | `executor` | `reactive-geometry` | `structure` | `skills/chemical/reactive-geometry/scripts/reactive_pose.py` | `skills/chemical/reactive-geometry/scripts/pose_cli.py` |
+| `chemical.reactive-sites` | `executor` | `reactive-geometry` | `structure` | `skills/chemical/reactive-geometry/scripts/reactive_sites.py` | `skills/chemical/reactive-geometry/scripts/reactive_sites_cli.py` |
+| `chemical.render` | `executor` | `chemical-report` | `render` | `skills/chemical/chemical-report/scripts/render.py` | `skills/chemical/chemical-report/scripts/render_cli.py` |
+| `chemical.reorder-tensors` | `executor` | `material-preparation` | `structure` | `skills/chemical/material-preparation/scripts/geometry/analysis.py` | `skills/chemical/material-preparation/scripts/geometry/analysis_cli.py` |
+| `chemical.research-report` | `executor` | `chemical-report` | `structure` | `skills/chemical/chemical-report/scripts/research_job.py` | `skills/chemical/chemical-report/scripts/research_cli.py` |
+| `chemical.resolve` | `executor` | `material-preparation` | `structure` | `skills/chemical/material-preparation/scripts/reaction/prepare.py` | `skills/chemical/material-preparation/scripts/reaction/cli.py` |
+| `chemical.resolve-candidates` | `executor` | `material-preparation` | `structure` | `skills/chemical/material-preparation/scripts/reaction/prepare.py` | `skills/chemical/material-preparation/scripts/reaction/cli.py` |
+| `chemical.scan-gaussian` | `executor` | `candidate-generation` | `path_gaussian` | `skills/chemical/candidate-generation/scripts/search/search.py` | `skills/chemical/candidate-generation/scripts/search/search_cli.py` |
+| `chemical.scan-slice` | `executor` | `energetics` | `structure` | `skills/chemical/energetics/scripts/energy.py` | `skills/chemical/energetics/scripts/energy_cli.py` |
+| `chemical.scan-xtb` | `executor` | `candidate-generation` | `path_xtb` | `skills/chemical/candidate-generation/scripts/search/search.py` | `skills/chemical/candidate-generation/scripts/search/search_cli.py` |
+| `chemical.seed` | `executor` | `material-preparation` | `structure` | `skills/chemical/material-preparation/scripts/reaction/prepare.py` | `skills/chemical/material-preparation/scripts/reaction/cli.py` |
+| `chemical.state-tracking` | `executor` | `gaussian` | `structure` | `skills/chemical/gaussian/scripts/electronic.py` | `skills/chemical/gaussian/scripts/electronic_cli.py` |
+| `chemical.stationary-check` | `executor` | `validation` | `structure` | `skills/chemical/validation/scripts/evidence_check.py` | `skills/chemical/validation/scripts/check_cli.py` |
+| `chemical.structure-cognition` | `executor` | `structure-assessment` | `structure` | `skills/chemical/structure-assessment/scripts/run.py` | `skills/chemical/structure-assessment/scripts/cli.py` |
+| `chemical.thermochemistry` | `executor` | `energetics` | `structure` | `skills/chemical/energetics/scripts/energy.py` | `skills/chemical/energetics/scripts/energy_cli.py` |
+| `chemical.trajectory` | `executor` | `chemical-report` | `structure` | `skills/chemical/chemical-report/scripts/research_job.py` | `skills/chemical/chemical-report/scripts/research_cli.py` |
+| `chemical.tst` | `executor` | `energetics` | `structure` | `skills/chemical/energetics/scripts/energy.py` | `skills/chemical/energetics/scripts/energy_cli.py` |
+| `chemical.xtb` | `executor` | `xtb` | `xtb` | `skills/chemical/xtb/scripts/run.py` | `skills/chemical/xtb/scripts/cli.py` |

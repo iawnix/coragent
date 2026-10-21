@@ -14,9 +14,9 @@ in Git history.
 | Install, configure, upgrade and recover | [Installation and Operations](INSTALLATION.md) |
 | Installation directories, state and managed environments | [Installation layout](APP_LAYOUT.md) |
 | Workspace, Node, Result, Agent Server and Monitor ownership | [Architecture](ARCHITECTURE.md) |
-| Research storage, tools and evidence | [Research Memory Skill](../skills/research-memory/SKILL.md), [Evidence architecture (Chinese)](RESEARCH_EVIDENCE_ARCHITECTURE.zh-CN.md) |
+| Research storage, tools and evidence | [Research Memory Skill](../skills/core/research-memory/SKILL.md), [Evidence architecture (Chinese)](RESEARCH_EVIDENCE_ARCHITECTURE.zh-CN.md) |
 | Execution ownership and material provenance | [Execution boundaries](ARCHITECTURE_BOUNDARIES.md), [Artifact Store and views](ARTIFACT_PROVIDERS.md) |
-| Scientific methods and execution | [Scientific operations](SCIENTIFIC_CAPABILITIES_OPERATIONS.md), [Current capability inventory](../domains/chemical/skills/method-selection/references/capabilities.md) |
+| Scientific methods and execution | [Scientific operations](SCIENTIFIC_CAPABILITIES_OPERATIONS.md), [Current capability inventory](../skills/chemical/method-selection/references/capabilities.md) |
 | General chemistry modules, contracts and implementation scope | [A–J implementation record (Chinese)](GENERAL_CHEMISTRY_CAPABILITY_PLAN.zh-CN.md) |
 | Deterministic geometry, Gaussian and evidence regressions | [Scientific regressions (Chinese)](SCIENTIFIC_REGRESSIONS.zh-CN.md) |
 | Terminal, Phone and browser | [Terminal](TERMINAL.md), [CoRAgent Link](CORAGENT_LINK.md) |

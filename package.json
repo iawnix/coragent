@@ -50,7 +50,6 @@
     "packages/link",
     "services/relay",
     "skills",
-    "domains",
     "prompts",
     "contracts",
     "config",
@@ -113,8 +112,8 @@
   },
   "pi": {
     "skills": [
-      "./skills",
-      "./domains/chemical/skills"
+      "./skills/core",
+      "./skills/chemical"
     ],
     "themes": [
       "./apps/agent/terminal/themes/coragent.json"
@@ -123,10 +122,10 @@
   },
   "coragent": {
     "execution": [
-      "domains/chemical/execution.json"
+      "skills/chemical/execution.json"
     ],
     "environments": [
-      "domains/chemical/environments/manifest.json"
+      "skills/chemical/environments/manifest.json"
     ]
   }
 }

@@ -11,7 +11,7 @@ import time
 import pytest
 pytest.importorskip('rdkit')
 
-SCRIPTS = Path(__file__).resolve().parents[2] / 'domains/chemical/skills/material-preparation/scripts/materials'
+SCRIPTS = Path(__file__).resolve().parents[2] / 'skills/chemical/material-preparation/scripts/materials'
 from tests.unit.chemical_paths import configure
 configure()
 spec = importlib.util.spec_from_file_location('chemical_material_import', SCRIPTS / 'material.py')

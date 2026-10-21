@@ -11,7 +11,7 @@ Chem = pytest.importorskip('rdkit.Chem')
 AllChem = pytest.importorskip('rdkit.Chem.AllChem')
 
 ROOT = Path(__file__).resolve().parents[2]
-SKILLS = ROOT / 'domains/chemical/skills'
+SKILLS = ROOT / 'skills/chemical'
 sys.path[:0] = [str(SKILLS / '_shared'), str(SKILLS / 'gaussian/scripts')]
 from chemical_identity import identity, compare
 from path_validation import specification_markers
@@ -60,12 +60,12 @@ def test_wrapped_title_digest_is_bounded(marker):
 
 def test_managed_doctor_imports_staged_shared_modules_without_pythonpath(tmp_path):
     job = tmp_path / 'staged'; job.mkdir()
-    shutil.copytree(SKILLS / 'cf22d/scripts', job / 'skills/cf22d/scripts')
-    shutil.copytree(SKILLS / '_shared', job / 'skills/_shared')
+    shutil.copytree(SKILLS / 'cf22d/scripts', job / 'skills/chemical/cf22d/scripts')
+    shutil.copytree(SKILLS / '_shared', job / 'skills/chemical/_shared')
     launcher = ROOT / 'backend/src/research_agent/jobs/python_entrypoint.py'
     env = {k: v for k, v in os.environ.items() if k not in {'PYTHONPATH', 'PYTHONHOME'}}
-    run = subprocess.run([sys.executable, '-I', '-S', str(launcher), '["skills/_shared"]',
-                          'skills/cf22d/scripts/doctor.py'], cwd=job, env=env, capture_output=True, text=True, timeout=30)
+    run = subprocess.run([sys.executable, '-I', '-S', str(launcher), '["skills/chemical/_shared"]',
+                          'skills/chemical/cf22d/scripts/doctor.py'], cwd=job, env=env, capture_output=True, text=True, timeout=30)
     result = json.loads(run.stdout)
     assert run.returncode == 1 and result['ready'] is False
     assert result['code'] == 'dependency_missing'

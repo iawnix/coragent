@@ -40,7 +40,7 @@ This file records user-visible changes. Current architecture is documented in
 - Added bounded Gaussian TD/TDA calculations, supplied-tensor state tracking, and
   local different-spin crossing searches with independent numerical checks.
   Deterministic acceptance does not substitute for real-solver scientific benchmarks;
-  see the [capability inventory](domains/chemical/skills/method-selection/references/capabilities.md).
+  see the [capability inventory](skills/chemical/method-selection/references/capabilities.md).
 - Improved terminal slash completion, focus/draft preservation, semantic field colors,
   system-prompt rendering, and task/connection status in the Monitor row.
 - Removed the retired ordinary-Pi runtime from the supported package surface;

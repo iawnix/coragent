@@ -6,8 +6,8 @@ import pytest
 pytest.importorskip('numpy')
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / 'domains/chemical/skills/_shared'))
-sys.path.insert(0, str(ROOT / 'domains/chemical/skills/gaussian/scripts'))
+sys.path.insert(0, str(ROOT / 'skills/chemical/_shared'))
+sys.path.insert(0, str(ROOT / 'skills/chemical/gaussian/scripts'))
 
 from geometry_safety import assess, assess_gaussian_input  # noqa: E402
 from input_job import inspect_input  # noqa: E402

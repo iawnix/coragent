@@ -26,7 +26,7 @@ def test_release_contains_no_development_answers_or_retired_reaction_tools():
         if path.suffix in {'.md', '.py', '.json', '.mjs', '.toml', '.txt'}:
             text = path.read_text()
             assert REACTANTS not in text and PRODUCT not in text, name
-    registry = json.loads((ROOT / 'domains/chemical/execution.json').read_text())
+    registry = json.loads((ROOT / 'skills/chemical/execution.json').read_text())
     retired = {'chemical.reaction_mapping', 'chemical.gaussian_saddle',
                'chemical.gaussian_irc_connectivity', 'chemical.diels_alder_path'}
     for group in ('executors', 'validators', 'acceptance_profiles'):

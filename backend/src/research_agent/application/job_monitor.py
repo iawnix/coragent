@@ -8,9 +8,20 @@ from types import SimpleNamespace
 from research_agent.jobs import JobState
 from datetime import datetime, timezone
 from pathlib import Path
+from importlib.resources import files
+from jsonschema import Draft202012Validator
 from research_agent.foundation.transactions import TransactionCoordinator, workspace_transaction, write_json, read_json
 from .execution import _runtime, _receipt
 from research_agent.research.operational_ids import allocate_id
+
+_CONTRACTS = json.loads(files(__package__).joinpath('monitor_contracts.json').read_text())
+_VALIDATORS = {name: Draft202012Validator(schema) for name, schema in _CONTRACTS.items()}
+
+
+def validate_record(kind, value):
+    if not _VALIDATORS[kind].is_valid(value):
+        raise ValueError(f'monitor_{kind}_schema_invalid')
+    return value
 
 
 def now():return datetime.now(timezone.utc).isoformat()
@@ -20,31 +31,12 @@ def write(path,value):
 def digest(value):return 'sha256:'+hashlib.sha256(json.dumps(value,sort_keys=True).encode()).hexdigest()
 
 
-def valid_node_binding(value):
-    if {'attempt_id', 'intent_id', 'intent_digest'} & set(value):
-        return False
-    return (value.get('node_id') is None and value.get('node_revision') is None
-            and 'node_id' in value and 'node_revision' in value) or (
-        isinstance(value.get('node_id'), str) and re.fullmatch(r'node_[1-9][0-9]*', value['node_id'])
-        and type(value.get('node_revision')) is int and value['node_revision'] > 0)
-
-
 def read_binding(path):
-    value = read(path)
-    if value.get('enabled') is False:
-        raise ValueError('monitor_pause_migration_required: resolve the legacy Job pause explicitly before enabling Task Controller')
-    if (value.get('schema_version') != 'coragent-job-monitor/2'
-            or not valid_node_binding(value)
-            or any(not value.get(key) for key in ('job_id', 'job_digest'))):
-        raise ValueError('monitor_binding_schema_invalid: current Job binding required')
-    return value
+    return validate_record('binding', read(path))
 
 
 def read_delivery(path):
-    value = read(path)
-    if value.get('schema_version') != 'coragent-job-monitor-delivery/2':
-        raise ValueError('monitor_delivery_schema_invalid: current Job delivery required')
-    return value
+    return validate_record('delivery', read(path))
 
 
 def monitor_view(path):
@@ -52,7 +44,7 @@ def monitor_view(path):
     binding = read_binding(path)
     pending = [row for p in sorted((path.parent / 'deliveries').glob('*.json'))
                if not (row := read_delivery(p)).get('delivered')]
-    events = [read(p) for p in (path.parent / 'events').glob('*.json')]
+    events = [validate_event(read(p)) for p in (path.parent / 'events').glob('*.json')]
     latest = max(events, key=lambda event: event['sequence'], default={})
     errors = [row['error'] for row in pending if row.get('error')]
     return {**binding, 'pending_count': len(pending),
@@ -170,6 +162,8 @@ def _delivery_command(root,base,action,args):
     deliveries=sorted(base.glob('*/deliveries/*.json'))
     if action=='pending':
         pending = [(p, row) for p in deliveries if not (row := read_delivery(p)).get('delivered')]
+        for path, _ in pending:
+            read_binding(path.parent.parent / 'binding.json')
         # Persist immutable batch membership before Host admission. Retries and
         # uncertain RPC outcomes must reuse both identity and message payload.
         sessions = {}
@@ -183,8 +177,6 @@ def _delivery_command(root,base,action,args):
                 row.update(request_id=request_id, batch_event_ids=ids)
                 write(path, row)
         # Task Controller owns admission policy; the outbox retains facts only.
-        for path, _ in pending:
-            read_binding(path.parent.parent / 'binding.json')
         return {'deliveries': [row for _, row in pending]}
     eid=args.get('event_id')
     path=next((p for p in deliveries if p.stem==eid),None)
@@ -206,11 +198,7 @@ def _delivery_command(root,base,action,args):
 
 
 def validate_event(event):
-    if (event.get("schema_version") != "coragent-job-monitor-event/2" or not valid_node_binding(event) or
-            any(not isinstance(event.get(key), str) or not event[key]
-                for key in ("event_id", "monitor_id", "job_id", "workspace_id", "session_id"))):
-        raise ValueError("monitor_event_schema_invalid")
-    return event
+    return validate_record('event', event)
 
 
 def assess(root, event_id, session_id):

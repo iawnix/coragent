@@ -8,7 +8,7 @@ test("Harness package-source guard blocks private package reads but allows publi
   const root = await mkdtemp(join(tmpdir(), "t-"));
   const packageRoot = join(root, "package");
   const workspace = join(root, "workspace");
-  const skillRoot = join(packageRoot, "domains", "chemical", "skills", "demo");
+  const skillRoot = join(packageRoot, "skills", "chemical", "demo");
   await mkdir(skillRoot, { recursive: true });
   await mkdir(join(packageRoot, "src"), { recursive: true });
   await mkdir(workspace, { recursive: true });
@@ -19,16 +19,17 @@ test("Harness package-source guard blocks private package reads but allows publi
   try {
     assert.equal(guard({ toolName: "read", args: { path: join(packageRoot, "src", "private.mjs") } }).block !== undefined, true);
     assert.equal(guard({ toolName: "read", args: { path: join(skillRoot, "SKILL.md") } }), undefined);
-    const missing = guard({ toolName: "read", args: { path: join(packageRoot, "domains/other/skills/demo/SKILL.md") } });
+    const missing = guard({ toolName: "read", args: { path: join(packageRoot, "skills/other/demo/SKILL.md") } });
     const recovery = JSON.parse(missing.block.reason);
     assert.equal(recovery.code, "skill_resource_not_found");
     assert.deepEqual(recovery.skill_locations, [join(skillRoot, "SKILL.md")]);
     const alias = guard({ toolName: "read", args: { path: join(packageRoot, "skills/demo/SKILL.md") } });
-    assert.equal(alias.block, undefined);
-    assert.deepEqual(alias.arguments, { path: join(skillRoot, "SKILL.md") });
+    assert.equal(JSON.parse(alias.block.reason).code, "skill_resource_not_found");
+    assert.equal(alias.arguments, undefined);
     const aliasJob = guard({ toolName: "job_start", args: { command: ["python", join(packageRoot, "skills/demo/run.py")] } });
-    assert.deepEqual(aliasJob.arguments, { command: ["python", join(skillRoot, "run.py")] });
-    const rejectedJob = guard({ toolName: "job_start", args: { command: ["python", join(packageRoot, "domains/other/skills/demo/run.py")] } });
+    assert.equal(JSON.parse(aliasJob.block.reason).code, "skill_resource_not_found");
+    assert.equal(aliasJob.arguments, undefined);
+    const rejectedJob = guard({ toolName: "job_start", args: { command: ["python", join(packageRoot, "skills/other/demo/run.py")] } });
     assert.equal(JSON.parse(rejectedJob.block.reason).code, "skill_resource_not_found");
     assert.equal(guard({ toolName: "job_start", args: { command: ["python", "skills/demo/run.py"] } }), undefined);
     assert.equal(guard({ toolName: "job_start", args: { command: ["python", "/remote/python/script.py"] } }), undefined);

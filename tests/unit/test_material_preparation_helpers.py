@@ -7,7 +7,7 @@ import pytest
 pytest.importorskip('rdkit')
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPTS = ROOT/'domains/chemical/skills/material-preparation/scripts/reaction'
+SCRIPTS = ROOT/'skills/chemical/material-preparation/scripts/reaction'
 from tests.unit.chemical_paths import configure
 configure()
 spec = importlib.util.spec_from_file_location('chemical_input_helper', SCRIPTS/'prepare.py')

@@ -26,9 +26,9 @@ def test_release_inventory_is_shared_by_checker_and_installer() -> None:
 @pytest.mark.parametrize("retired", [
     "apps/app-server/app_server.mjs",
     "packages/agent-runtime/runtime.mjs",
-    "domains/chemical/skills/candidate-generation/scripts/da/da_geometry.py",
-    "domains/chemical/skills/candidate-generation/references/gaussian_path.md",
-    "domains/chemical/skills/validation/scripts/gaussian_saddle.py",
+    "skills/chemical/candidate-generation/scripts/da/da_geometry.py",
+    "skills/chemical/candidate-generation/references/gaussian_path.md",
+    "skills/chemical/validation/scripts/gaussian_saddle.py",
 ])
 def test_retired_runtime_is_rejected_even_if_allowlisted(retired: str, monkeypatch: pytest.MonkeyPatch) -> None:
     allowlisted = check_package.expanded_allowlisted_files() | {retired}
@@ -49,7 +49,8 @@ def test_required_release_members_are_in_the_npm_allowlist() -> None:
     assert "scripts/package_inventory.py" in allowlisted
     assert "environment.lock.txt" in allowlisted
     assert "contracts/coragent-web/provider-response.schema.json" in allowlisted
-    assert "contracts/ts-render/curve-data.schema.json" in allowlisted
+    assert "contracts/monitor/jobs/binding.schema.json" in allowlisted
+    assert not any(path.startswith("tests/") for path in allowlisted)
     assert "apps/agent/pi/prompt.mjs" in allowlisted
     assert manifest["pi"]["extensions"] == []
     assert not any("local_debug" in Path(path).parts for path in allowlisted)

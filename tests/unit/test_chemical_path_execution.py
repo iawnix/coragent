@@ -13,7 +13,7 @@ np = pytest.importorskip('numpy')
 Chem = pytest.importorskip('rdkit.Chem')
 
 ROOT=Path(__file__).resolve().parents[2]
-SKILLS=ROOT/'domains/chemical/skills'
+SKILLS=ROOT/'skills/chemical'
 from tests.unit.chemical_paths import configure
 configure()
 from reaction_checks import reaction, ordered_molecule
@@ -141,13 +141,13 @@ def test_registered_validator_rejects_resource_target_collisions(tmp_path, monke
     from tests.unit.test_job_recovery import workspace
     from research_agent.application.validators import prepare
     workspace(tmp_path)
-    package=tmp_path/'package';domain=package/'domains'/'fixture';domain.mkdir(parents=True)
+    package=tmp_path/'package';domain=package/'skills'/'fixture';domain.mkdir(parents=True)
     script=domain/'validator.py';script.write_text('print("fixture")\n')
     digest='sha256:'+hashlib.sha256(script.read_bytes()).hexdigest()
     descriptor={'id':'fixture.validator','version':'1','entry':'validator.py','sha256':digest,'backend':'validation',
                 'resources':{name:{'path':'validator.py','sha256':digest} for name in destinations}}
     (domain/'execution.json').write_text(json.dumps({'schema_version':'coragent-execution/1','name':'fixture','version':'1.0.0','executors':[],'validators':[descriptor],'acceptance_profiles':[]}))
-    (package/'package.json').write_text(json.dumps({'coragent':{'execution':['domains/fixture/execution.json']}}))
+    (package/'package.json').write_text(json.dumps({'coragent':{'execution':['skills/fixture/execution.json']}}))
     monkeypatch.setenv('CORAGENT_PACKAGE_ROOT',str(package))
     with pytest.raises(ValueError,match='execution_(resource_path_invalid|destinations_overlap_or_reserved)'):
         prepare(tmp_path,{'validator_id':'fixture.validator', "validator_version": "1",'input_artifact_ids':['art_unused']})
@@ -167,11 +167,11 @@ def test_generic_jobs_execute_candidate_gaussian_and_registered_validators(tmp_p
     fixture.write_text(f'#!{sys.executable}\nimport sys,json\nfrom pathlib import Path\nlogs=json.loads({json.dumps(json.dumps(logs))})\ntext=sys.stdin.read()\nassert "IRC=" not in text or any(option in text for option in ("CalcFC", "ReadCartesianFC", "FCCards")), "IRC requires a supported Hessian source"\nkey="forward" if "IRC=(Forward" in text else "reverse" if "IRC=(Reverse" in text else "ts"\nPath(key+".chk").write_bytes(b"synthetic fixture checkpoint")\nprint(logs[key])\n')
     fixture.chmod(0o755)
     def gaussian(gjf,job_id,validation,checkpoint=None):
-        inputs=[{'source':str(SKILLS/'gaussian/scripts'),'destination':'skills/gaussian/scripts'},
-                {'source':str(SKILLS/'_shared'),'destination':'skills/_shared'},
+        inputs=[{'source':str(SKILLS/'gaussian/scripts'),'destination':'skills/chemical/gaussian/scripts'},
+                {'source':str(SKILLS/'_shared'),'destination':'skills/chemical/_shared'},
                 {'source':str(gjf),'destination':'input.gjf'}, {'source':str(fixture),'destination':'fixture_solver.py'}]
         if checkpoint:inputs.append({'source':str(checkpoint),'destination':'ts.chk'})
-        command=[sys.executable,'skills/gaussian/scripts/run.py','--input-gjf','input.gjf','--executable',str(fixture),
+        command=[sys.executable,'skills/chemical/gaussian/scripts/run.py','--input-gjf','input.gjf','--executable',str(fixture),
                  '--output-dir','results','--method','M062X','--basis','6-31G**','--threads','12','--memory-mb','4000','--validation',validation]
         outputs=[{'path':'results/'+name,'required':True} for name in ['gaussian.out','parsed.json','result.json']+(['ts.chk'] if validation=='saddle' else ['irc_path_summary.json','gaussian_endpoint.xyz'])]
         return run_job(tmp_path,{'request_id':job_id,'command':command,'inputs':inputs,'outputs':outputs})

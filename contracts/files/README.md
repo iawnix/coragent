@@ -1,4 +1,4 @@
-# Workspace files v1
+# Workspace files
 
 The phone uses `files/list`, `files/stat`, `files/read`, and `files/pin` capabilities over the
 existing authenticated `coragent-host/2` / Link connection. No public download

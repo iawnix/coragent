@@ -9,7 +9,7 @@ import pytest
 pytest.importorskip('numpy')
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPTS = ROOT/'domains/chemical/skills/gaussian/scripts'
+SCRIPTS = ROOT/'skills/chemical/gaussian/scripts'
 sys.path[:0] = [str(SCRIPTS), str(SCRIPTS.parents[1]/'_shared')]
 spec = importlib.util.spec_from_file_location('gaussian_input_job', SCRIPTS/'input_job.py')
 helper = importlib.util.module_from_spec(spec); spec.loader.exec_module(helper)

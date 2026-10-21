@@ -66,7 +66,7 @@ for session controls and [CoRAgent Link](docs/CORAGENT_LINK.md) for phone access
 - [Documentation index](docs/README.md)
 - [Skill catalog and loading language](skills/README.md)
 - [Scientific and remote execution](docs/SCIENTIFIC_CAPABILITIES_OPERATIONS.md)
-- [Implemented chemistry capabilities and limits](domains/chemical/skills/method-selection/references/capabilities.md)
+- [Implemented chemistry capabilities and limits](skills/chemical/method-selection/references/capabilities.md)
 - [Model compatibility](docs/MODEL_COMPATIBILITY.md)
 - [Architecture](docs/ARCHITECTURE.md) ([简体中文](docs/ARCHITECTURE.zh-CN.md)) and [Maintainer guide](docs/MAINTAINER_GUIDE.md)
 

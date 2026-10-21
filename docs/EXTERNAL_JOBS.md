@@ -23,7 +23,7 @@ driver = "external"
 transport = "local"
 cluster_name = "compute"
 work_root = "/absolute/shared/coragent-jobs"
-handler = ["/usr/bin/python3", "/absolute/coragent/skills/batch-schedulers/scripts/tri.py"]
+handler = ["/usr/bin/python3", "/absolute/coragent/skills/core/batch-schedulers/scripts/tri.py"]
 
 [execution.targets.compute.handler_environment]
 TRI_SOCKET = "/absolute/runtime/tri/server.sock"
@@ -67,7 +67,7 @@ driver = "external"
 transport = "local"
 file_mode = "shared"
 work_root = "/home/iaw/DATA/coragent/workspaces"
-handler = ["/usr/bin/python3", "/absolute/coragent/skills/batch-schedulers/scripts/tri.py"]
+handler = ["/usr/bin/python3", "/absolute/coragent/skills/core/batch-schedulers/scripts/tri.py"]
 ```
 
 Merge this target into `config.toml`; retain the required connection environment
@@ -164,13 +164,13 @@ Describe resource selection, job-script conventions and native CLI usage in the
 Skill. Use a small helper only where persistent observation requires conversion
 to this protocol. A helper can be written in any executable language.
 
-The bundled [TRI helper](../skills/batch-schedulers/scripts/tri.py) calls
+The bundled [TRI helper](../skills/core/batch-schedulers/scripts/tri.py) calls
 `tri_sub`, `tri_stat` and `tri_del` and uses TRI's external identity for recovery.
-Its [usage reference](../skills/batch-schedulers/references/tri.md)
+Its [usage reference](../skills/core/batch-schedulers/references/tri.md)
 documents command overrides and node selection.
 
-The [batch scheduler Skill](../skills/batch-schedulers/SKILL.md) owns both the TRI
-handler and the PBS/Torque/Slurm handler. Its [target reference](../skills/batch-schedulers/references/targets.md)
+The [batch scheduler Skill](../skills/core/batch-schedulers/SKILL.md) owns both the TRI
+handler and the PBS/Torque/Slurm handler. Its [target reference](../skills/core/batch-schedulers/references/targets.md)
 covers native commands, retained accounting and durable submission recovery.
 Scheduler-specific changes belong in these scripts and their documentation.
 

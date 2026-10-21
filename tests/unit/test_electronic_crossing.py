@@ -13,7 +13,7 @@ np = pytest.importorskip('numpy')
 from tests.unit.test_energetics import molecule
 from tests.unit.test_path_search import molecule as h2
 
-SKILLS=Path(__file__).resolve().parents[2]/'domains/chemical/skills'
+SKILLS=Path(__file__).resolve().parents[2]/'skills/chemical'
 sys.path.insert(0,str(SKILLS/'gaussian/scripts'))
 import electronic
 from electronic_contract import BOHR_ANGSTROM,electronic_material,settings,route

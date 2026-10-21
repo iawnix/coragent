@@ -5,7 +5,7 @@ import hashlib, json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DOMAIN = ROOT / 'domains/chemical'
+DOMAIN = ROOT / 'skills/chemical'
 CATALOG = json.loads((DOMAIN / 'execution.json').read_text())
 
 def digest(path: Path) -> str:

@@ -70,7 +70,7 @@ def select(args) -> tuple[list[str],list[dict]]:
         (('backend/src/research_agent/jobs/','backend/src/research_agent/artifacts/','jobs','artifacts'),['integration','native-pi'],'scientific lifecycle'),
         (('apps/agent/pi/','apps/agent/tools/','pi','tools'),['integration','native-pi','source'],'Pi and tool boundary'),
         (('apps/agent/','packages/link/','services/relay/','host','transport','terminal'),['integration','native-pi','source'],'product integration'),
-        (('skills/','domains/','prompts/','skills'),['integration','native-pi'],'resources and execution declarations'),
+        (('skills/','prompts/','skills'),['integration','native-pi'],'resources and execution declarations'),
     ]
     if not paths and not scopes:
         return DETERMINISTIC.copy(),[{'reason':'no bounded change scope; full validation'}]

@@ -35,7 +35,7 @@ def generated(root: Path) -> dict[Path, str]:
                 resource["sha256"] = digest(path.parent / resource["path"])
         output[path] = json.dumps(value, indent=2) + "\n"
     files = {}
-    for directory in ("skills", "domains", "prompts"):
+    for directory in ("skills", "prompts"):
         if not (root / directory).is_dir():
             raise ValueError(f"required resource directory is missing: {directory}")
         for path in sorted((root / directory).rglob("*")):

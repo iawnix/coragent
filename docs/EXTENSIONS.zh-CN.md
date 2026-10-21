@@ -7,7 +7,7 @@
 
 ## Skill 发现与语言
 
-根 `package.json` 的 `pi.skills` 声明 `skills/` 和 `domains/chemical/skills/`。
+根 `package.json` 的 `pi.skills` 声明 `skills/core/` 和 `skills/chemical/`。
 `apps/agent/resources/skills.mjs` 校验发布资源后调用 Pi 的 `loadSkills`，并关闭默认目录发现。
 Pi 从 Skill 目录的 `SKILL.md` 发现技能；当前这些入口使用英文。
 名称、描述和文件位置用于技能选择，正文由 Agent 按需读取，参考资料继续按需展开。
@@ -16,6 +16,14 @@ Pi 从 Skill 目录的 `SKILL.md` 发现技能；当前这些入口使用英文�
 也不会作为第二个独立 Skill 自动加载。Agent 可以在需要时显式读取中文文件；回复和报告语言遵循用户要求。
 中英文须同步维护；仅修复中文不能修复默认加载的英文指导。完整入口见 [Skill 目录](../skills/README.zh-CN.md)。
 
+
+## 资源分组
+
+`skills/core/` 负责不依赖领域的任务工作流、记录、调度和交付；`skills/chemical/` 负责化学方法、软件适配、科学验证与化学报告。两者使用同一 Skill 加载器；分组不改变指令优先级或执行权限。Core Skill 不要求安装 chemical Skill。
+
+化学组同时维护 `execution.json`、`environments/manifest.json` 和 `_shared/` 脚本依赖。这些是执行与环境资源，不是额外的 Skill。执行资源路径相对于执行目录文件所在目录，环境锁文件和检查路径相对于环境清单。`coragent.environments` 独立声明安装环境。实际 target 绑定决定 Job 在哪里执行以及使用什么软件；领域 Skill 不选择 TRI、Slurm 或直接执行。
+
+带脚本的 Skill 链接自身的操作入口与合同。[脚本索引](skill-script-routing.zh-CN.md)只提供导航，不重复维护这些合同。
 
 ## 系统提示词
 
@@ -33,7 +41,7 @@ Pi 从 Skill 目录的 `SKILL.md` 发现技能；当前这些入口使用英文�
 
 ## execution.json 的作用
 
-根 `package.json` 的 `coragent.execution` 指向 `domains/chemical/execution.json`。
+根 `package.json` 的 `coragent.execution` 指向 `skills/chemical/execution.json`。
 Python 的 `backend/src/research_agent/application/execution_catalog.py` 独立读取与验证它。
 该文件声明：
 
@@ -61,5 +69,4 @@ python3 tools/lint_skills.py
 ```
 
 新增 Skill 放入已声明根目录，并提供中英文入口及对应参考资料。
-仅在新增可复用的便捷执行入口时更新执行目录。核心工具装配属于 `apps/agent/`，
-不使用旧的 extension manifest、动态 server allowlist 或 provider 注册流程。
+仅在新增可复用的便捷执行入口时更新执行目录。核心工具装配属于 `apps/agent/`。

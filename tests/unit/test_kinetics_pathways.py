@@ -10,7 +10,7 @@ import time
 import pytest
 from tests.unit.test_energetics import thermo, molecule
 
-SKILLS=Path(__file__).resolve().parents[2]/'domains/chemical/skills'
+SKILLS=Path(__file__).resolve().parents[2]/'skills/chemical'
 sys.path.insert(0,str(SKILLS/'reaction-investigation/scripts'))
 import pathway_job
 from pathway import pathway

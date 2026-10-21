@@ -10,7 +10,7 @@ import pytest
 np = pytest.importorskip('numpy')
 
 ROOT = Path(__file__).resolve().parents[2]
-SKILLS = ROOT/'domains/chemical/skills'
+SKILLS = ROOT/'skills/chemical'
 from tests.unit.chemical_paths import configure
 configure()
 from reactive_geometry import generate, run, diagnostics
@@ -238,11 +238,11 @@ def test_rejected_geometry_and_source_are_exported_without_overwrite(tmp_path):
 
 
 def test_executor_declared_closure_runs_without_source_tree(tmp_path):
-    descriptor=next(e for e in json.loads((SKILLS.parent/'execution.json').read_text())['executors'] if e['id']=='chemical.reactive-geometry')
+    descriptor=next(e for e in json.loads((SKILLS/'execution.json').read_text())['executors'] if e['id']=='chemical.reactive-geometry')
     staged=tmp_path/'stage';staged.mkdir()
     import hashlib
     for path, expected in descriptor['resources'].items():
-        raw=(SKILLS.parent/path).read_bytes()
+        raw=(SKILLS/path).read_bytes()
         assert 'sha256:'+hashlib.sha256(raw).hexdigest()==expected
         target=staged/path;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(raw)
     (staged/'input.json').write_text(json.dumps(request()))

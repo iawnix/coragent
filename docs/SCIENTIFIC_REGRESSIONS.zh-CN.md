@@ -63,7 +63,7 @@
 
 ## 通用化学模块回归
 
-A–J 新增模块的执行合同见[能力清单](../domains/chemical/skills/method-selection/references/capabilities.zh-CN.md)，
+A–J 新增模块的执行合同见[能力清单](../skills/chemical/method-selection/references/capabilities.zh-CN.md)，
 实施范围与当时的测试计数见[实施记录](GENERAL_CHEMISTRY_CAPABILITY_PLAN.zh-CN.md)。
 
 | 测试入口（位于 `tests/unit/`） | 主要覆盖 |

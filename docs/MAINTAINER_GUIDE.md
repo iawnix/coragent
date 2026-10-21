@@ -67,8 +67,8 @@ Rebuild uses immutable records and results to restore Node/map indexes, search a
 ## Deterministic Tool Contracts
 
 Scientific command builders and parsers live in
-`domains/chemical/skills/<skill>/scripts/`, with shared helpers in
-`domains/chemical/skills/_shared/`. Generic local and remote execution lives
+`skills/chemical/<skill>/scripts/`, with shared helpers in
+`skills/chemical/_shared/`. Generic local and remote execution lives
 in `backend/src/research_agent/jobs/`; `backend/src/research_agent/application/` records Job facts and registers
 collected materials in Artifact Store. Public command fields are declared in
 `contracts/commands/`; generated Python and Node catalogs are checked at build time. Every Artifact needs
@@ -78,7 +78,7 @@ recording scheduler state, Job identity, commands, and collection results.
 ## Scientific Analysis Maintenance
 
 Independent analyses run Skill scripts through generic Jobs. Registered
-validators and acceptance profiles are declared in `domains/chemical/execution.json`;
+validators and acceptance profiles are declared in `skills/chemical/execution.json`;
 `backend/src/research_agent/application/validators.py` verifies and stages the
 declared validator and inputs. Python owns execution catalog validation independently of Pi Skill discovery. Pi loads product and domain Skills from `package.json.pi.skills`; `scripts/update_resources.py` generates resource digests. New scientific algorithms require
 bounded inputs, explicit applicability, counterexamples, replayable candidates
@@ -101,7 +101,7 @@ Maintain English `SKILL.md` and Chinese translations together: English is the di
 - `docs/ARCHITECTURE.md` — runtime and scientific boundaries.
 - `docs/INSTALLATION.md` — installer, services, upgrades, and recovery.
 - `docs/TERMINAL.md` — Native Pi TUI, Host, Phone, and Monitor usage.
-- `skills/` and `domains/chemical/skills/` — user-facing scientific procedures and references.
+- `skills/` and `skills/chemical/` — user-facing scientific procedures and references.
 - `contracts/coragent-web/` — optional browser transport schemas for Memory context, Nodes, Results and records.
 
 CoRHub documentation and mobile release tooling are maintained in the

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 import unicodedata
@@ -105,32 +106,31 @@ def _reachable_references(entry: Path, skill_root: Path) -> set[Path]:
 def _check_script_routing(root: Path, skill_roots: list[Path]) -> list[str]:
     """Keep the progressive-disclosure entrypoints tied to the execution registry."""
     errors: list[str] = []
-    routing_doc = root / "docs" / "skill-script-routing.md"
-    routing_doc_zh = root / "docs" / "skill-script-routing.zh-CN.md"
-    if not routing_doc.is_file() or not routing_doc_zh.is_file():
-        return ["docs/skill-script-routing(.zh-CN).md: script routing maps are required"]
-    routing = routing_doc.read_text(encoding="utf-8")
-    execution = root / "domains" / "chemical" / "execution.json"
-    if execution.is_file():
-        for item in json.loads(execution.read_text(encoding="utf-8")).get("executors", []):
-            operation = item["id"]
-            short_operation = operation.removeprefix("chemical.")
-            entry = item.get("entry")
-            cli = item.get("cli")
-            for value, label in ((short_operation, "operation"), (entry, "entry"), (cli, "cli")):
-                if value and value not in routing:
-                    errors.append(f"docs/skill-script-routing.md: missing {label} {value}")
-    for skill_root in skill_roots:
-        english = skill_root / "SKILL.md"
-        chinese = skill_root / "SKILL.zh-CN.md"
-        if english.is_file():
-            text = english.read_text(encoding="utf-8")
-            if "## Script routing" not in text or "skill-script-routing.md" not in text:
-                errors.append(f"{english.relative_to(root)}: missing script routing guidance")
-        if chinese.is_file():
-            text = chinese.read_text(encoding="utf-8")
-            if "## 脚本路由" not in text or "skill-script-routing.zh-CN.md" not in text:
-                errors.append(f"{chinese.relative_to(root)}: missing Chinese script routing guidance")
+    package = json.loads((root / "package.json").read_text())
+    by_name = {_frontmatter(path / "SKILL.md")["name"]: path for path in skill_roots}
+    for declaration in package.get("coragent", {}).get("execution", []):
+        catalog = root / declaration
+        for item in json.loads(catalog.read_text()).get("executors", []):
+            owner = by_name.get(item["skill"])
+            if owner is None:
+                errors.append(f"{declaration}: executor {item['id']} has no Skill owner")
+                continue
+            for suffix in (".md", ".zh-CN.md"):
+                commands = owner / "references" / ("commands" + suffix)
+                if not commands.is_file():
+                    errors.append(f"{commands.relative_to(root)}: missing operation contract")
+                    continue
+                text = commands.read_text()
+                if f"`{item['id']}@{item['version']}`" not in text:
+                    errors.append(f"{commands.relative_to(root)}: missing executor {item['id']}")
+                for key in ("entry", "cli"):
+                    if key not in item:
+                        continue
+                    source = (catalog.parent / item[key]).resolve()
+                    # Local operation tables describe paths relative to their owning Skill.
+                    relative = Path(os.path.relpath(source, owner)).as_posix()
+                    if not source.is_file() or f"`{relative}`" not in text:
+                        errors.append(f"{commands.relative_to(root)}: missing {key} {relative}")
     return errors
 
 

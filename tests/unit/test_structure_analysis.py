@@ -8,7 +8,7 @@ import time
 import pytest
 np = pytest.importorskip('numpy')
 
-SCRIPTS = Path(__file__).resolve().parents[2] / 'domains/chemical/skills/material-preparation/scripts/materials'
+SCRIPTS = Path(__file__).resolve().parents[2] / 'skills/chemical/material-preparation/scripts/materials'
 from tests.unit.chemical_paths import configure
 configure()
 from material import build_material, graph_material

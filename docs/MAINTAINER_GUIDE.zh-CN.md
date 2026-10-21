@@ -61,13 +61,13 @@ Job Runtime 拥有执行回执，Artifact Store 拥有文件和来源。Monitor 
 
 ## 工具合同维护
 
-科学命令构造器和解析器位于 `domains/chemical/skills/<skill>/scripts/`，共享 helper
-位于 `domains/chemical/skills/_shared/`。`backend/src/research_agent/jobs/` 负责通用本地和远端执行，
+科学命令构造器和解析器位于 `skills/chemical/<skill>/scripts/`，共享 helper
+位于 `skills/chemical/_shared/`。`backend/src/research_agent/jobs/` 负责通用本地和远端执行，
 `backend/src/research_agent/application/` 记录 Job 事实并将收集产物登记到 Artifact Store；公开命令字段由
 `contracts/commands/` 定义，生成的 Python 与 Node 目录在构建时核验。每个 Artifact 必须有
 内容摘要和经过核实的位置。记录 scheduler、Job 身份、命令及收集结果时必须保留先前证据。
 
-独立分析由 Skill 脚本通过通用 Job 执行。注册验证器和验收 profile 在 `domains/chemical/execution.json`
+独立分析由 Skill 脚本通过通用 Job 执行。注册验证器和验收 profile 在 `skills/chemical/execution.json`
 中声明，`backend/src/research_agent/application/validators.py` 验证并暂存声明的验证器和输入。
 Python 独立核验执行目录；Pi 按 `package.json.pi.skills` 发现产品与领域 Skill。
 修改资源后使用 `scripts/update_resources.py` 更新摘要，再用 `--check` 检查。
@@ -85,7 +85,7 @@ Job 状态与恢复由执行运行时管理；派发意图、执行观察和收�
 - `docs/ARCHITECTURE.zh-CN.md`：运行时和科学边界。
 - `docs/INSTALLATION.zh-CN.md`：安装、服务、升级和恢复。
 - `docs/TERMINAL.zh-CN.md`：Pi 原生 TUI、Host、Phone 与 Monitor 使用。
-- `skills/` and `domains/chemical/skills/`：面向用户的科学流程和参考资料。
+- `skills/` and `skills/chemical/`：面向用户的科学流程和参考资料。
 - `contracts/coragent-web/`：研究上下文、Node、Result 与记录响应的浏览器传输合同。
 
 CoRHub 文档和移动发布工具由独立的 `corhub` 仓库维护。CoRAgent 拥有小型认证 Host
