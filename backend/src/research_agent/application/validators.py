@@ -20,8 +20,8 @@ def prepare(root, params):
     from research_agent.application.execution_catalog import registered_entry
     base, descriptor = registered_entry('validators', params['validator_id'], params.get('validator_version'))
     script, script_digest = _registered_file(base, descriptor['entry'], descriptor['sha256'])
-    if any(k in params for k in ('command', 'inputs', 'outputs', 'environment', 'env', 'metadata', 'cwd')):
-        raise ValueError('validator_request_invalid: use validator identity, inputs, Job identity and a named platform')
+    if any(k in params for k in ('command', 'inputs', 'outputs', 'environment', 'env', 'metadata', 'cwd', 'platform')):
+        raise ValueError('validator_request_invalid: use validator identity, inputs, Job identity and an execution target')
     from research_agent.jobs.config_contract import load_job_config
     from research_agent.jobs.environment import probe_binding, guarded_command
     config_path = os.environ.get('CORAGENT_JOB_CONFIG')
@@ -29,7 +29,9 @@ def prepare(root, params):
         raise ValueError('job_config_required')
     settings = load_job_config(config_path)
     from .execution_resources import resolve
-    selected, resource_metadata = resolve(settings, params.get('platform') or settings['default_environment'],
+    from research_agent.jobs.config_contract import resolve_target
+    requested_target = params.get('execution_target')
+    selected, resource_metadata = resolve(settings, resolve_target(settings, requested_target),
                                           descriptor['backend'], 'python', submission=params.get('submission'))
     from research_agent.artifacts import PayloadStore
     store = PayloadStore(root / 'artifacts')
@@ -124,7 +126,7 @@ def prepare(root, params):
     module_paths = descriptor.get('module_paths')
     command, guard_inputs = guarded_command(selected, argv, environment, module_paths=module_paths)
     inputs.extend(guard_inputs)
-    return {**{key: value for key, value in params.items() if key != 'submission'}, 'platform': selected['environment'],
+    return {**{key: value for key, value in params.items() if key != 'submission'}, 'execution_target': selected['environment'],
         'command': command,
         'environment': selected['binding'].get('environment', {}),
         'inputs': inputs, 'outputs': [{'path': 'validator_result.json', 'required': True, 'min_bytes': 2}],

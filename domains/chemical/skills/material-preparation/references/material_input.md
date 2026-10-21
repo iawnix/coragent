@@ -60,7 +60,7 @@ Do not fabricate a product or mapping just to import a name.
 ## Execution and outputs
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.material --version 1 --input material=<work_dir>/material-input.json --output <work_dir>/material-request.json
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.material --version 1 --input material=<work_dir>/material-input.json --output <work_dir>/material-request.json
 ```
 
 Submit the returned request_file/request_sha256 with node_id to `job_start`, then

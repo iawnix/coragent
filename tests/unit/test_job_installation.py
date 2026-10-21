@@ -35,7 +35,7 @@ def options(tmp_path, *extra):
 def test_fresh_plan_only_references_execution_and_creates_no_environments(tmp_path):
     args = options(tmp_path)
     plan = jobs.plan(args)
-    assert plan['settings']['environments']['local']['backends'] == {}
+    assert plan['settings']['targets']['local']['backends'] == {}
     assert plan['environments'] == []
     assert plan['targets'] == ['local']
     assert not (tmp_path/'install').exists()
@@ -44,11 +44,11 @@ def test_fresh_plan_only_references_execution_and_creates_no_environments(tmp_pa
 
 def test_profile_completes_partial_native_binding_and_rejects_unknown_target(tmp_path):
     config = tmp_path/'job.toml'
-    config.write_text('default_environment="local"\n[environments.local]\nkind="local"\n'
-                      '[environments.local.backends.xtb]\ncommand="/native/xtb"\n')
+    config.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\n'
+                      '[execution.targets.local.bindings.xtb]\ncommand="/native/xtb"\n')
     value = jobs.plan(options(tmp_path, '--job-config',str(config),'--job-profile','local:wrapper'))
     wizard._validate_job_config(value['settings'])
-    assert value['settings']['environments']['local']['backends']['xtb']['command'] == '/native/xtb'
+    assert value['settings']['targets']['local']['backends']['xtb']['command'] == '/native/xtb'
     with pytest.raises(ValueError, match='target is not configured'):
         jobs.plan(options(tmp_path, '--job-conda', 'typo=/bin/conda'))
 
@@ -97,8 +97,8 @@ def test_managed_upgrade_reuses_identity_and_detects_concurrent_config_change(tm
 
 def test_bootstrap_validation_works_without_site_packages(tmp_path):
     config = tmp_path/'job.toml'
-    config.write_text('default_environment="local"\n[environments.local]\nkind="local"\n'
-                      '[environments.local.backends.shell]\ncommand="/bin/sh"\n')
+    config.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\n'
+                      '[execution.targets.local.bindings.shell]\ncommand="/bin/sh"\n')
     result = subprocess.run([sys.executable, '-S', '-B', str(ROOT/'scripts/installer.py'), 'install',
                              '--source', 'local', '--dry-run', '--job-config', str(config),
                              '--install-root', str(tmp_path/'install')], capture_output=True, text=True)
@@ -107,13 +107,14 @@ def test_bootstrap_validation_works_without_site_packages(tmp_path):
     assert not (tmp_path/'install').exists()
 
 
+@pytest.mark.skipif(importlib.util.find_spec('numpy') is None, reason='fixture environment lacks NumPy for structure acceptance')
 def test_candidate_and_published_config_work_inside_real_jobs(tmp_path):
     from scripts._job_acceptance import accept
     config = tomllib.loads(Path(os.environ['CORAGENT_JOB_CONFIG']).read_text())
-    local = config['environments']['local']
-    local['backends'] = {'structure': local['backends']['structure']}
+    local = config['execution']['targets']['local']
+    local['bindings'] = {'structure': local['bindings']['structure']}
     source = tmp_path/'job.toml'
-    source.write_bytes(jobs.toml_bytes({'default_environment':'local','environments':{'local':local}}))
+    source.write_bytes(jobs.toml_bytes({'execution': {'default_target':'local','targets':{'local':local}}}))
     args = options(tmp_path, '--job-config', str(source))
     plan = jobs.plan(args)
     stage = tmp_path/'candidate'
@@ -121,7 +122,7 @@ def test_candidate_and_published_config_work_inside_real_jobs(tmp_path):
     resolver = stage/'resolver.toml'
     resolver.write_text(plan['resolver'])
     candidate = copy.deepcopy(plan['settings'])
-    candidate['environments']['local']['backends']['structure']['environment']['CORAGENT_NAME_RESOLVER_CONFIG'] = str(resolver)
+    candidate['targets']['local']['backends']['structure']['environment']['CORAGENT_NAME_RESOLVER_CONFIG'] = str(resolver)
     staged = stage/'job.toml'
     staged.write_bytes(jobs.toml_bytes(candidate))
     report = accept(staged, ROOT, stage/'jobs', ['local'], 20)
@@ -151,14 +152,15 @@ def test_ssh_payload_contains_only_selected_target_resources(tmp_path, monkeypat
 
 @pytest.mark.parametrize('scheduler', ['pbs', 'torque', 'slurm'])
 @pytest.mark.parametrize('file_mode', ['staged', 'shared'])
+@pytest.mark.skipif(importlib.util.find_spec('numpy') is None, reason='fixture environment lacks NumPy for structure acceptance')
 def test_remote_acceptance_uses_scheduler_collects_results_and_removes_test_jobs(cluster, tmp_path, monkeypatch, scheduler, file_mode):
     from scripts._job_acceptance import accept
     from research_agent.jobs import environment
     platform, calls, remote_root = cluster
-    local = tomllib.loads(Path(os.environ['CORAGENT_JOB_CONFIG']).read_text())['environments']['local']
+    local = tomllib.loads(Path(os.environ['CORAGENT_JOB_CONFIG']).read_text())['execution']['targets']['local']
     resolver = tmp_path/'remote-resolver.toml'
     resolver.write_text('default_resolver="auto"\n')
-    structure = {**local['backends']['structure'],
+    structure = {**local['bindings']['structure'],
                  'environment': {'CORAGENT_NAME_RESOLVER_CONFIG': str(resolver)}}
     target = {**platform.config, 'file_mode': file_mode, 'handler': [*platform.handler[:-1], scheduler],
               'submission':{'queue':'batch','resources':{'cpus':1,'walltime':'00:00:20'}},

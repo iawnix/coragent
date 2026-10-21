@@ -4,7 +4,7 @@
 
 原始输入保留在 `inputs/`，保留运行时管理的 Job/Artifact 文件，不移动历史请求和证据。避免在工作区根目录散落生成文件。SSH 或远程 Job 使用配置的远程工作、scratch 目录或用户指定目标，本地 `work_dir` 不能当作远程路径。scp/rsync 应区分本地与远程两端，本地下载和重定向输出放入本地草稿或报告目录。这些约定指导 agent 选择文件位置，不增加文件系统隔离，也不改变已有工具权限。
 
-按已安装领域 Skill 准备请求，把返回的 request_file 和 request_sha256 交给 job_start；用 node_id 明确研究归属。其它执行字段已固定在请求文件中。直接 argv 提交需声明实际输入、输出和平台。准备与诊断允许不关联 Node。
+按已安装领域 Skill 准备请求，把返回的 request_file 和 request_sha256 交给 job_start；用 node_id 明确研究归属。其它执行字段已固定在请求文件中。直接 argv 提交需声明实际输入、输出和 execution_target。准备与诊断允许不关联 Node。
 
 适配层在提交时固定 Node 版本和实际输入；后来修改方案不改变旧 Job 检验的内容。Job Runtime 是派发和终止事实的来源。job_status 查看、job_cancel 请求取消、job_reconcile 协调不确定性、job_collect 保存输出和来源，重复收集不会重新执行。
 
@@ -60,6 +60,8 @@ research_update 用 node_id 与 note 解释变化；有可引用产出时，rese
 
 无进展计数用于提示重新评估方法，不是固定停止阈值或资源预算。遵守用户限制继续推进；只有满足上述具体条件和证据要求时才登记阻塞。
 
-有意重复完全相同的计算时，用新的 work_id 准备请求，并提交包含匹配 predecessor_job_id、reason、budget 的 repeat。复用请求身份会复用 Job；duplicate_execution 通常应转为查询或收集返回的 Job。验证器 Job 必须使用已登记的 validator_id/version，并按输入角色规定的数量、顺序传 Artifact；collected_output 角色要求生产 Job 当前已收集的证据。job_probe 检查平台基础设施，不验证科学软件；job_reconcile 恢复已有执行状态，不重新提交；job_cancel 后检查返回状态，unknown 不等于已经停止。
+有意重复完全相同的计算时，用新的 work_id 准备请求，并提交包含匹配 predecessor_job_id、reason、budget 的 repeat。复用请求身份会复用 Job；duplicate_execution 通常应转为查询或收集返回的 Job。验证器 Job 必须使用已登记的 validator_id/version，并按输入角色规定的数量、顺序传 Artifact；collected_output 角色要求生产 Job 当前已收集的证据。job_probe 检查 execution target 基础设施，不验证科学软件；job_reconcile 恢复已有执行状态，不重新提交；job_cancel 后检查返回状态，unknown 不等于已经停止。
 
 每次计算在准备阶段通过 `--` 之前的 `--cpus`、`--job-memory-mb` 指定资源。配置值是默认值，不是上限。调整申请需重新准备，不要修改已固定请求，也不要因默认值较小而判定必须管理员扩容。容量、可用性和排队由 TRI 处理。见[逐作业资源](../../../docs/EXTERNAL_JOBS.zh-CN.md#逐作业资源)。
+
+`correct_execution` 使用原始指令的精确 `execution_intent` 引文和 `reason` 修正误登记目标；用户新改目的地则用 `refine`。`propose_completion` 必须传 `completion_outcome`，每项传 `criterion_id`、`status`、`assessment_ref`、`evidence_refs`。JSON 评估和部分停止依据见[验收说明](acceptance.zh-CN.md)。

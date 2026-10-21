@@ -7,6 +7,12 @@ description: 从名称、SMILES 或坐标准备分子材料和明确反应定义
 
 [English version](SKILL.md)
 
+## 脚本路由
+
+按 executor ID 使用[脚本路由地图](../../../../docs/skill-script-routing.zh-CN.md#material-preparation)选择入口、CLI、输入和主要输出。地图是路由依据；`scripts/` 下的 helper 不是独立命令。不要通过读取源码发现调用方式，先读操作合同，只有合同未说明的选项才使用 executor 的 `--help`。
+
+**入口：** `chemical.resolve@1` → `skills/material-preparation/scripts/reaction/prepare.py`；`chemical.resolve-candidates@1` → `skills/material-preparation/scripts/reaction/prepare.py`；`chemical.inspect@1` → `skills/material-preparation/scripts/reaction/prepare.py`；`chemical.seed@1` → `skills/material-preparation/scripts/reaction/prepare.py`；`chemical.reaction@1` → `skills/material-preparation/scripts/reaction/prepare.py`；`chemical.compare@1` → `skills/material-preparation/scripts/reaction/prepare.py`；`chemical.material@1` → `skills/material-preparation/scripts/materials/material.py`；`chemical.map-candidates@1` → `skills/material-preparation/scripts/geometry/analysis.py`；`chemical.conformer-compare@1` → `skills/material-preparation/scripts/geometry/analysis.py`；`chemical.reorder-tensors@1` → `skills/material-preparation/scripts/geometry/analysis.py`；`chemical.local-diagnostics@1` → `skills/material-preparation/scripts/diagnostics/diagnostics_job.py`。
+
 在计算或反应研究开始时使用本 Skill。它把名称、SMILES、给定 XYZ 和反应描述转成后续几何与电子结构 Job 可使用的 material 记录。
 
 ## 准备流程

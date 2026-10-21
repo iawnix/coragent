@@ -7,6 +7,12 @@ description: 根据相容的计算结果计算电子能、热校正、自由能�
 
 [English version](SKILL.md)
 
+## 脚本路由
+
+按 executor ID 使用[脚本路由地图](../../../../docs/skill-script-routing.zh-CN.md#energetics)选择入口、CLI、输入和主要输出。地图是路由依据；`scripts/` 下的 helper 不是独立命令。不要通过读取源码发现调用方式，先读操作合同，只有合同未说明的选项才使用 executor 的 `--help`。
+
+**入口：** `chemical.thermochemistry@1` → `skills/energetics/scripts/energy.py`；`chemical.ensemble-free-energy@1` → `skills/energetics/scripts/energy.py`；`chemical.energy-profile@1` → `skills/energetics/scripts/energy.py`；`chemical.scan-slice@1` → `skills/energetics/scripts/energy.py`；`chemical.tst@1` → `skills/energetics/scripts/energy.py`；`chemical.branching@1` → `skills/energetics/scripts/energy.py`；`chemical.kinetic-network@1` → `skills/energetics/scripts/energy.py`。
+
 在结构和电子结构结果收集完成后使用本 Skill。它把相容的能量和频率转成热化学、反应/活化能剖面、构象人口、条件 TST 速率、分支估计和显式动力学网络轨迹。
 
 ## 计算流程

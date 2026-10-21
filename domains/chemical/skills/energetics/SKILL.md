@@ -7,6 +7,12 @@ description: Compute electronic, thermal, free-energy, reaction, barrier, ensemb
 
 [Chinese version](SKILL.zh-CN.md)
 
+## Script routing
+
+Use the registered executor ID and the [script routing map](../../../../docs/skill-script-routing.md#energetics) to choose the entrypoint, CLI, inputs, and primary outputs. The map is authoritative for routing; implementation helpers under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details; read the linked operation contract and use executor `--help` only for unspecified options.
+
+**Entrypoints:** `chemical.thermochemistry@1` → `skills/energetics/scripts/energy.py`; `chemical.ensemble-free-energy@1` → `skills/energetics/scripts/energy.py`; `chemical.energy-profile@1` → `skills/energetics/scripts/energy.py`; `chemical.scan-slice@1` → `skills/energetics/scripts/energy.py`; `chemical.tst@1` → `skills/energetics/scripts/energy.py`; `chemical.branching@1` → `skills/energetics/scripts/energy.py`; `chemical.kinetic-network@1` → `skills/energetics/scripts/energy.py`.
+
 Use this Skill after structures and electronic-structure results have been collected. It turns compatible energies and frequencies into thermochemistry, reaction and activation profiles, conformer populations, conditional TST rates, branching estimates, and explicit kinetic-network trajectories.
 
 ## Quantities and workflow

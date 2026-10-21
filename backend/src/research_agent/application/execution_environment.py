@@ -20,8 +20,8 @@ def check_configuration(params):
                                requested=metadata.get('submission_request'))
     if selected != expected or metadata.get("configuration_sha256") != binding_digest(configured):
         raise ValueError("execution_binding_changed: prepare again with the current configuration")
-    if params.get("platform") != selected["environment"]:
-        raise ValueError("execution_binding_platform_mismatch")
+    if params.get("execution_target") != selected["environment"]:
+        raise ValueError("execution_binding_target_mismatch")
     if (params.get("environment", {}) != selected["binding"].get("environment", {}) or "env" in params
             or metadata.get("python_binding") != selected["python"]):
         raise ValueError("execution_binding_override_forbidden")

@@ -18,7 +18,7 @@ def command_workspace(tmp_path, monkeypatch):
     initialize_workspace(root, 'ws_command_results', 'research')
     admit_research_workspace(root)
     config = tmp_path / 'job.toml'
-    config.write_text('default_environment = "local"\n[environments.local]\nkind = "local"\nsupervisor = "process"\n')
+    config.write_text('[execution]\ndefault_target = "local"\n[execution.targets.local]\ntype = "local"\ndriver = "process"\nsupervisor = "process"\n')
     monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(config))
     return root
 
@@ -63,6 +63,8 @@ def test_all_command_results_match_actual_api_replies(command_workspace):
     prepared = call('job.prepare', request_file='prepared.json')
     call('job.resolve_prepared', prepared_ref=prepared['prepared_ref'])
     call('job.probe', job_id='job_999', command=[sys.executable, '-c', 'pass'])
+    call('job.targets')
+    call('job.resolve_target')
     job = call('job.start', request_id='contract', node_id=node, session_id='fixture',
                command=[sys.executable, '-c', "print('local contract fixture')"])
     try:
@@ -111,6 +113,6 @@ def test_result_schemas_cover_non_success_variants():
 
 
 def test_result_catalog_is_complete_and_schemas_are_well_formed():
-    assert len(COMMAND_DEFINITIONS) == 21
+    assert len(COMMAND_DEFINITIONS) == 23
     for definition in COMMAND_DEFINITIONS.values():
         Draft202012Validator.check_schema(definition['result'])

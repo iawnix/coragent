@@ -6,9 +6,9 @@ import shutil
 import subprocess
 import sys
 
-from rdkit import Chem
-from rdkit.Chem import AllChem
 import pytest
+Chem = pytest.importorskip('rdkit.Chem')
+AllChem = pytest.importorskip('rdkit.Chem.AllChem')
 
 ROOT = Path(__file__).resolve().parents[2]
 SKILLS = ROOT / 'domains/chemical/skills'

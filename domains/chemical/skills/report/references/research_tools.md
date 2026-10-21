@@ -8,8 +8,8 @@ They do not launch a solver or need a TS workflow. Prepare with one `input` JSON
 submit returned request/digest with node_id, and collect the recursive results:
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.trajectory --version 1 --input input=<work_dir>/trajectory.json --input-artifact <input-ref> --output <work_dir>/trajectory-request.json
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.research-report --version 1 --input input=<work_dir>/report.json --input-artifact <input-ref> --output <work_dir>/report-request.json
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.trajectory --version 1 --input input=<work_dir>/trajectory.json --input-artifact <input-ref> --output <work_dir>/trajectory-request.json
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.research-report --version 1 --input input=<work_dir>/report.json --input-artifact <input-ref> --output <work_dir>/report-request.json
 ```
 
 Use real absolute paths and Artifact references. Bind original logs/materials as

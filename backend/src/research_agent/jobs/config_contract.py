@@ -9,6 +9,7 @@ import tomllib
 
 NAME_PATTERN = r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}"
 QUEUE_PATTERN = r"[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}"
+SCHEDULER_PATTERN = r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}"
 TIMEOUT_LIMITS = {"connect_timeout_seconds": 300, "command_timeout_seconds": 3600,
                   "transfer_timeout_seconds": 86400}
 TARGET_FIELDS = {"kind", "supervisor", "python", "backends", "submission"}
@@ -58,7 +59,7 @@ def _validate_execution_config(value):
     if not isinstance(targets, dict) or not targets or default not in targets:
         raise ValueError("execution.targets must define the default target")
     local_count = 0
-    environments = {}
+    normalized_targets = {}
     for name, raw in targets.items():
         if not isinstance(name, str) or not re.fullmatch(NAME_PATTERN, name):
             raise ValueError(f"invalid execution target name: {name!r}")
@@ -70,7 +71,7 @@ def _validate_execution_config(value):
         if driver not in {"external", "local", "process", "systemd"} or (not external and target.get("type") != "local"):
             raise ValueError("execution plugin drivers were removed; use driver=external with transport and handler")
         if not external:
-            _keys(target, {"type", "driver", "supervisor", "python", "bindings", "submission"}, f"execution.targets.{name}")
+            _keys(target, {"type", "driver", "supervisor", "python", "bindings", "submission", "scheduler", "location", "aliases"}, f"execution.targets.{name}")
         transport = target.get("transport", "ssh" if target.get("type") == "remote" else "local")
         if external and transport not in {"local", "ssh"}:
             raise ValueError("external transport must be local or ssh")
@@ -78,7 +79,7 @@ def _validate_execution_config(value):
         if external:
             _keys(target, {"type", "driver", "transport", "file_mode", "work_root", "handler", "handler_environment",
                            "cluster_name", "ssh_host", "ssh_config", "submission", "bindings", "python",
-                           "allowed_queues", *TIMEOUT_LIMITS}, f"execution.targets.{name}")
+                           "allowed_queues", "scheduler", "location", "aliases", *TIMEOUT_LIMITS}, f"execution.targets.{name}")
             if "transport" not in target:
                 raise ValueError("external target requires transport=local or transport=ssh")
             if scope != ("remote" if transport == "ssh" else "local"):
@@ -116,32 +117,124 @@ def _validate_execution_config(value):
         if not isinstance(bindings, dict):
             raise ValueError(f"execution.targets.{name}.bindings must be a table")
         normalized = dict(target)
+        scheduler = normalized.get("scheduler", "none" if not external else "external")
+        if not isinstance(scheduler, str) or not re.fullmatch(SCHEDULER_PATTERN, scheduler):
+            raise ValueError(f"execution.targets.{name}.scheduler is invalid")
+        aliases = normalized.get("aliases", [])
+        if (not isinstance(aliases, list) or len(aliases) != len(set(aliases))
+                or any(not isinstance(alias, str) or not re.fullmatch(NAME_PATTERN, alias) for alias in aliases)):
+            raise ValueError(f"execution.targets.{name}.aliases must be unique target names")
+        location = normalized.get("location", "controller" if scope == "local" else "cluster")
+        if not isinstance(location, str) or not re.fullmatch(NAME_PATTERN, location):
+            raise ValueError(f"execution.targets.{name}.location is invalid")
+        normalized.update({"scheduler": scheduler, "location": location, "aliases": aliases})
         normalized.update({"kind": scope, "backends": bindings, "driver": driver})
         if not external:
             normalized.setdefault("supervisor", "process" if driver == "process" else "systemd")
             if normalized["supervisor"] not in {"process", "systemd"}:
                 raise ValueError("local supervisor must be process or systemd")
-        environments[name] = normalized
+        normalized_targets[name] = normalized
     if local_count > 1:
         raise ValueError("execution configuration may define at most one local target")
     normalized_config = {
-        "default_environment": default,
-        "environments": environments,
+        "default_target": default,
+        "targets": normalized_targets,
         "execution": value["execution"],
     }
-    for name, target in environments.items():
+    for name, target in normalized_targets.items():
         _validate_bindings(normalized_config, name, target)
     return normalized_config
 
 
+def resolve_target(settings, requested=None, *, scheduler=None, location=None):
+    """Resolve an explicit target name, scheduler name or alias.
+
+    A missing request uses the installation default. Ambiguous scheduler and
+    alias matches fail closed so a queue cannot be selected by guesswork.
+    """
+    targets = settings["targets"]
+    if not requested and not scheduler and not location:
+        return settings["default_target"]
+    value = str(requested or "").strip().casefold()
+    matches = []
+    for name, target in targets.items():
+        aliases = [name, *target.get("aliases", [])]
+        if requested in targets:
+            named = name == requested
+        else:
+            named = not value or any(value == str(item).casefold() for item in aliases) or value == str(target.get("scheduler")).casefold()
+        if (named and (not scheduler or str(target.get("scheduler")).casefold() == scheduler.casefold())
+                and (not location or target.get("location") == location)):
+            matches.append(name)
+    if not matches:
+        raise ValueError("execution_target_not_configured: " + str(requested))
+    if len(set(matches)) != 1:
+        raise ValueError("execution_target_ambiguous: " + str(requested) + " -> " + ",".join(sorted(set(matches))))
+    return matches[0]
+
+
+def target_route_digest(settings, name):
+    """Pin routing identity, independently of resource defaults and software bindings."""
+    target = settings["targets"][name]
+    keys = ("type", "driver", "supervisor", "scheduler", "location", "transport", "ssh_host",
+            "ssh_config", "cluster_name", "work_root", "file_mode", "handler", "handler_environment")
+    return binding_digest({"target": name, **{key: target.get(key) for key in keys}})
+
+
+def resolve_selection(settings, requested=None, *, scheduler=None, location=None, source_text=None):
+    # The model selects an exact excerpt from a verified user submission. This
+    # catches explicit scheduler/target contradictions; it is not an NLP parser.
+    if source_text:
+        mentioned = {str(t["scheduler"]).casefold() for t in settings["targets"].values()
+                     if t.get("scheduler") not in (None, "none") and re.search(
+                         r"(?<![A-Za-z0-9_])" + re.escape(t["scheduler"]) + r"(?![A-Za-z0-9_])", source_text, re.I)}
+        if len(mentioned) > 1:
+            raise ValueError("execution_intent_ambiguous: select the affirmative execution instruction, excluding alternatives and quotations")
+        if mentioned:
+            explicit = next(iter(mentioned))
+            if scheduler and scheduler.casefold() != explicit:
+                raise ValueError("execution_intent_conflict: scheduler differs from the cited instruction")
+            scheduler = explicit
+    name = resolve_target(settings, requested, scheduler=scheduler, location=location)
+    target = settings["targets"][name]
+    return {"target": name, "scheduler": target.get("scheduler"), "location": target.get("location"),
+            "route_digest": target_route_digest(settings, name),
+            "selection_mode": "explicit" if requested or scheduler or location else "default"}
+
+
+def bound_target(settings, requested=None, context=None):
+    """Apply a task binding before preparation or dispatch; never re-read its default."""
+    if not context:
+        return resolve_target(settings, requested)
+    required = context["target"]
+    if required not in settings["targets"]:
+        raise ValueError("execution_target_not_configured: " + required)
+    actual = resolve_target(settings, requested) if requested else required
+    if actual != required:
+        raise ValueError(f"execution_target_mismatch: task requires {required}, request selects {actual}")
+    if context.get("route_digest") != target_route_digest(settings, required):
+        raise ValueError("execution_target_changed: routing changed; review and resolve the task target before preparing or submitting new work")
+    return required
+
+
+def configured_targets(settings):
+    """Return the canonical execution target map."""
+    return settings["targets"]
+
+
+def default_target(settings):
+    """Return the installation default execution target."""
+    return settings["default_target"]
+
+
 def _validate_bindings(value, name, target):
     if 'allowed_queues' in target:
-        _queues(target['allowed_queues'], f"environments.{name}.allowed_queues")
+        _queues(target['allowed_queues'], f"targets.{name}.allowed_queues")
     if "python" in target:
-        validate_python(target["python"], f"environments.{name}.python")
+        validate_python(target["python"], f"targets.{name}.python")
     backends = target.get("backends", {})
     if not isinstance(backends, dict):
-        raise ValueError(f"environments.{name}.backends must be a table")
+        raise ValueError(f"targets.{name}.backends must be a table")
     for backend, binding in backends.items():
         if not re.fullmatch(NAME_PATTERN, backend):
             raise ValueError(f"invalid backend name: {backend}")
@@ -157,7 +250,7 @@ def _validate_bindings(value, name, target):
                 or not isinstance(item, str) or '\0' in item for key, item in env.items()):
             raise ValueError(f"backend {backend}.environment is invalid")
         if "python" in binding:
-            validate_python(binding["python"], f"environments.{name}.backends.{backend}.python")
+            validate_python(binding["python"], f"targets.{name}.backends.{backend}.python")
         command = binding.get("command")
         if command is not None:
             argv = [command] if isinstance(command, str) else command
@@ -180,31 +273,22 @@ def configuration_document(settings):
     if "execution" not in settings:
         return settings
     targets = {}
-    for name, target in settings["environments"].items():
+    for name, target in settings["targets"].items():
         targets[name] = {key: value for key, value in target.items() if key not in {"kind", "backends", "bindings"}}
         targets[name]["bindings"] = target.get("backends", {})
-    return {"execution": {"default_target": settings["default_environment"], "targets": targets}}
+    return {"execution": {"default_target": settings["default_target"], "targets": targets}}
 
 
 def validate_job_config(value):
-    if isinstance(value, dict) and "execution" in value:
-        return _validate_execution_config(configuration_document(value) if "environments" in value else value)
-    _keys(value, {"default_environment", "environments"}, "job config")
-    environments = value.get("environments")
-    if not isinstance(environments, dict) or not environments or value.get("default_environment") not in environments:
-        raise ValueError("job config must define default_environment and at least one environment")
-    for name, target in environments.items():
-        if not re.fullmatch(NAME_PATTERN, name):
-            raise ValueError(f"invalid job environment name: {name!r}")
-        if not isinstance(target, dict) or target.get("kind") not in {"local", "remote"}:
-            raise ValueError(f"job environment {name!r} must declare kind=local or kind=remote")
-        if 'supervisor' in target and (target['kind'] != 'local' or target['supervisor'] not in {'process', 'systemd'}):
-            raise ValueError('local supervisor must be process or systemd')
-        if target['kind'] == 'remote':
-            raise ValueError("remote scheduler plugins were removed; use execution.targets with driver=external, transport and handler")
-        _keys(target, TARGET_FIELDS, f"environments.{name}")
-        _validate_bindings(value, name, target)
-    return value
+    if not isinstance(value, dict):
+        raise ValueError("job config must contain only the execution table")
+    if set(value) == {"execution", "default_target", "targets"}:
+        if value["default_target"] not in value["targets"]:
+            raise ValueError("execution.targets must define the default target")
+        return value
+    if set(value) != {"execution"}:
+        raise ValueError("job config must contain only the execution table")
+    return _validate_execution_config(value)
 
 
 def load_job_config(path):
@@ -216,7 +300,7 @@ def validate_catalog_bindings(settings, catalogs):
     """Bootstrap binding checks without importing runtime dependencies."""
     settings = validate_job_config(settings)
     results = {}
-    for name, target in settings['environments'].items():
+    for name, target in settings['targets'].items():
         results[name] = {}
         for catalog in catalogs:
             for kind in ('executors', 'validators'):
@@ -237,10 +321,10 @@ def validate_catalog_bindings(settings, catalogs):
 
 
 def resolve_python(config, environment, backend):
-    target = config["environments"][environment]
+    target = config["targets"][environment]
     binding = target.get("backends", {}).get(backend, {}).get("python", target.get("python"))
     if binding is None:
-        raise ValueError(f"python_binding_missing: configure environments.{environment}.python or backends.{backend}.python as a Conda environment")
+        raise ValueError(f"python_binding_missing: configure targets.{environment}.python or backends.{backend}.python as a Conda environment")
     return validate_python(binding)
 
 
@@ -260,9 +344,9 @@ def resolve_binding(config, environment, backend, *, runtime, requested=None):
     """Select only the configuration that can affect this execution."""
     if runtime not in {"python", "native"}:
         raise ValueError("execution_runtime_invalid")
-    if environment not in config["environments"]:
+    if environment not in config["targets"]:
         raise ValueError("execution_environment_not_configured")
-    target = config["environments"][environment]
+    target = config["targets"][environment]
     binding = target.get("backends", {}).get(backend)
     if binding is None:
         raise ValueError("executor_binding_missing: configure the selected environment backend " + str(backend))
@@ -279,7 +363,7 @@ SUBMISSION_FIELDS = {"queue", "resources", "queue_wait_seconds"}
 
 def resolve_submission(config, environment, backend=None, *, requested=None):
     """Merge installation resource defaults; queue allowlists are permissions, not defaults."""
-    target = config["environments"][environment]
+    target = config["targets"][environment]
     binding = target.get("backends", {}).get(backend, {})
     base = target.get("submission", {})
     override = binding.get("submission", {})
@@ -373,14 +457,12 @@ def job_config_schema():
                      "backends": {"type": "object", "propertyNames": text("^" + NAME_PATTERN + "$"), "additionalProperties": backend}}, ("kind",))
     target["allOf"] = [{"properties": {"submission": local_submission,
         "backends": {"additionalProperties": {"properties": {"submission": local_submission}}}}}]
-    legacy = record({'default_environment': text('^' + NAME_PATTERN + '$'),
-                     'environments': {'type': 'object', 'minProperties': 1,
-                                      'propertyNames': text('^' + NAME_PATTERN + '$'), 'additionalProperties': target}},
-                    ('default_environment', 'environments'))
     execution_target = record({
         "type": {"const": "local"}, "driver": {"enum": ["local", "process", "systemd"]},
         "supervisor": {"enum": ["process", "systemd"]}, "python": python, "submission": submission,
         "bindings": {"type": "object", "propertyNames": text("^" + NAME_PATTERN + "$"), "additionalProperties": backend},
+        "scheduler": text("^" + SCHEDULER_PATTERN + "$"), "location": text("^" + NAME_PATTERN + "$"),
+        "aliases": {"type": "array", "uniqueItems": True, "items": text("^" + NAME_PATTERN + "$")},
     }, ("type", "driver"))
     local_submission = {"not": {"anyOf": [{"required": [key]} for key in ("queue", "queue_wait_seconds")]},
                         "properties": {"resources": {"not": {"anyOf": [{"required": [key]} for key in ("select", "gpus")]}}}}
@@ -396,6 +478,8 @@ def job_config_schema():
         'ssh_host': text(r'^[A-Za-z0-9][A-Za-z0-9_.@:-]*$'), 'ssh_config': absolute,
         'python': python, 'submission': submission, 'bindings': execution_target['properties']['bindings'],
         'allowed_queues': queues,
+        'scheduler': text('^' + SCHEDULER_PATTERN + '$'), 'location': text('^' + NAME_PATTERN + '$'),
+        'aliases': {'type': 'array', 'uniqueItems': True, 'items': text('^' + NAME_PATTERN + '$')},
         **{name: integer(limit) for name, limit in TIMEOUT_LIMITS.items()},
     }, ('driver', 'transport', 'work_root', 'handler'))
     external_target['allOf'] = [
@@ -415,4 +499,4 @@ def job_config_schema():
                                     'additionalProperties': {'oneOf': [execution_target, external_target]}}},
                        ('default_target', 'targets'))
     return {'$schema': 'https://json-schema.org/draft/2020-12/schema', 'title': 'Job installation configuration',
-            'oneOf': [legacy, record({'execution': execution}, ('execution',))]}
+            **record({'execution': execution}, ('execution',))}

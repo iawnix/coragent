@@ -32,7 +32,7 @@ def native_fixture(tmp_path, monkeypatch):
     config = tmp_path / 'selected.toml'
     config.write_text(binding(config).replace('"/bin/sh"', json.dumps(str(program))))
     monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(config))
-    args = ['--config', str(config), '--environment', 'local', '--executor', 'external.copy', '--version', '3', '--details']
+    args = ['--config', str(config), '--target', 'local', '--executor', 'external.copy', '--version', '3', '--details']
     return config, program, marker, args
 
 
@@ -44,10 +44,10 @@ def test_probe_detects_missing_executable_in_actual_target_and_does_not_confuse_
     assert missing['error'] == 'environment_executable_missing'
     assert missing['backend'] == 'shell'
     assert not marker.exists()
-    status, unconfigured = run_cli('--config', str(config), '--environment', 'local', '--backend', 'unconfigured')
+    status, unconfigured = run_cli('--config', str(config), '--target', 'local', '--backend', 'unconfigured')
     assert status == 1 and unconfigured['status'] == 'not_configured'
     assert unconfigured['error'] == 'executor_binding_missing'
-    status, recipe = run_cli('--config', str(config), '--environment', 'local', '--executor', 'external.unknown', '--version', '1')
+    status, recipe = run_cli('--config', str(config), '--target', 'local', '--executor', 'external.unknown', '--version', '1')
     assert status == 1 and recipe['status'] == 'recipe_not_found'
     assert recipe['software_availability'] == 'not_checked'
 
@@ -115,13 +115,13 @@ def test_actual_python_probe_distinguishes_missing_dependency_from_executable_an
     module = None
     if requirement == 'initialization':
         settings = load_job_config(config)
-        prefix = Path(settings['environments']['local']['backends']['validation']['python']['prefix'])
+        prefix = Path(settings['targets']['local']['backends']['validation']['python']['prefix'])
         module = next(prefix.glob('lib/python*/site-packages')) / 'coragent_initialization_fixture.py'
         module.write_text('raise RuntimeError("fixture-private-error-content")\n')
         entry['requirements'] = {'imports': ['coragent_initialization_fixture']}
     try:
         path.write_text(json.dumps(declaration))
-        status, result = run_cli('--config', str(config), '--environment', 'local', '--executor', entry['id'], '--version', entry['version'])
+        status, result = run_cli('--config', str(config), '--target', 'local', '--executor', entry['id'], '--version', entry['version'])
         assert status == 1 and result['status'] == 'check_failed'
         assert result['runtime'] == 'python'
         assert result['error'] == ('environment_import_failed' if requirement == 'initialization' else 'environment_dependency_missing')
@@ -140,12 +140,12 @@ def test_missing_activation_script_is_a_binding_failure_without_running_the_prog
     assert not marker.exists()
 
 
-def test_platform_probe_does_not_claim_that_the_configured_software_is_installed(tmp_path, monkeypatch):
+def test_target_probe_does_not_claim_that_the_configured_software_is_installed(tmp_path, monkeypatch):
     config, program, _, args = native_fixture(tmp_path, monkeypatch)
     program.unlink()
     root = tmp_path / 'workspace'; workspace(root)
-    platform = execute('job.probe', root, {'platform': 'local'})
-    assert platform['cwd_exists'] and platform['inputs_present']
-    assert 'executable' not in platform
+    target = execute('job.probe', root, {'execution_target': 'local'})
+    assert target['cwd_exists'] and target['inputs_present']
+    assert 'executable' not in target
     status, software = run_cli(*args)
     assert status == 1 and software['error'] == 'environment_executable_missing'

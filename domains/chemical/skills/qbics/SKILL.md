@@ -7,6 +7,12 @@ description: Plan and execute a QBICS crossing-point study through a declared in
 
 [Chinese version](SKILL.zh-CN.md)
 
+## Script routing
+
+Use the registered executor ID and the [script routing map](../../../../docs/skill-script-routing.md#qbics) to choose the entrypoint, CLI, inputs, and primary outputs. The map is authoritative for routing; implementation helpers under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details; read the linked operation contract and use executor `--help` only for unspecified options.
+
+**Entrypoint:** none bundled; use the documented runtime or generic Job route.
+
 Use QBICS when the study concerns a same-spin crossing or related crossing-point optimization supported by an installed QBICS program. This Skill supplies the scientific setup and generic Job handoff; the repository routes QBICS through an explicit installation and generic Job.
 
 ## Recommended workflow

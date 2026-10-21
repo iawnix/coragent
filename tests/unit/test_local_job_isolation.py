@@ -7,6 +7,8 @@ import sys
 import time
 import uuid
 
+import pytest
+
 from research_agent.jobs import JobSpec, JobState, LocalProcessPlatform
 from research_agent.jobs.local import manager_environment
 
@@ -94,11 +96,14 @@ Path('result.txt').write_text('survived host stop')
         + "Path(" + repr(str(tmp_path / "parent-receipt.json")) + ").write_text(json.dumps(receipt.__dict__))\n"
         + "time.sleep(60)\n")
     try:
-        subprocess.run(["systemd-run", "--user", "--collect", "--quiet", "--unit=" + parent_unit,
-            "--property=Type=exec", "--property=ProtectSystem=strict", "--property=ProtectHome=read-only",
-            "--property=PrivateTmp=true", "--property=ReadWritePaths=" + str(tmp_path),
-            "--property=WorkingDirectory=" + str(tmp_path), "--", sys.executable, str(parent_script)],
-            env=manager_environment(), capture_output=True, text=True, check=True, timeout=15)
+        try:
+            subprocess.run(["systemd-run", "--user", "--collect", "--quiet", "--unit=" + parent_unit,
+                "--property=Type=exec", "--property=ProtectSystem=strict", "--property=ProtectHome=read-only",
+                "--property=PrivateTmp=true", "--property=ReadWritePaths=" + str(tmp_path),
+                "--property=WorkingDirectory=" + str(tmp_path), "--", sys.executable, str(parent_script)],
+                env=manager_environment(), capture_output=True, text=True, check=True, timeout=15)
+        except subprocess.CalledProcessError as error:
+            pytest.skip("user systemd is unavailable: " + (error.stderr or '').strip())
         wait_file(tmp_path / "parent-receipt.json")
         receipt = LocalProcessPlatform.receipt_from_disk(cwd / "receipt.json")
         job_unit = receipt.metadata["systemd_unit"]

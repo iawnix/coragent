@@ -2,6 +2,58 @@
   "schema_version": "coragent-command-source/1",
   "commands": [
     {
+      "id": "job.targets",
+      "domain": "runtime",
+      "schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "examples": [
+        {}
+      ],
+      "result": {
+        "type": "object"
+      }
+    },
+    {
+      "id": "job.resolve_target",
+      "domain": "runtime",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "scheduler": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "source_text": {
+            "type": "string",
+            "maxLength": 32000
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "examples": [
+        {}
+      ],
+      "result": {
+        "type": "object"
+      }
+    },
+    {
       "id": "job.start",
       "domain": "runtime",
       "schema": {
@@ -76,12 +128,9 @@
           "work_id": {
             "type": "string"
           },
-          "platform": {
-            "type": "string",
-            "description": "Direct submission only: configured execution environment name, such as local. Prepared requests already select their environment. Selects the execution target, not a Conda environment or software backend; local does not make scientific libraries available to bare python."
-          },
           "execution_target": {
-            "type": "object"
+            "type": "string",
+            "description": "Direct submission only: configured execution target name, such as local, tri or slurm. Prepared requests already select their target. This selects routing, not a Conda environment or scientific backend."
           },
           "session_id": {
             "type": [
@@ -129,11 +178,16 @@
           "submission": {
             "$ref": "shared.json#/tools/jobStart/properties/submission"
           },
-          "required_environment": {
+          "required_target": {
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
             "description": "Runtime task constraint injected by the tool adapter; checked after resolving any prepared request."
+          },
+          "required_route_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "description": "Runtime routing identity injected from the pinned task selection; not a model override."
           }
         },
         "required": [],
@@ -291,11 +345,8 @@
           "work_id": {
             "type": "string"
           },
-          "platform": {
-            "type": "string"
-          },
           "execution_target": {
-            "type": "object"
+            "type": "string"
           }
         },
         "required": [],

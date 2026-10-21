@@ -102,7 +102,7 @@ export interface ToolParameters {
       "media_type"?: string;
     }>;
     "timeout_seconds"?: number;
-    "platform"?: string;
+    "execution_target"?: string;
     "root"?: string;
     "submission"?: {
       "resources"?: {
@@ -132,7 +132,7 @@ export interface ToolParameters {
     "root"?: string;
   };
   jobProbe: {
-    "platform"?: string;
+    "execution_target"?: string;
     "root"?: string;
   };
   jobReconcile: {
@@ -168,12 +168,18 @@ export interface ToolParameters {
     }>;
     "initial_plan": string;
     "next_action": string;
-    "compute_environment"?: string | null;
+    "execution_target"?: string | null;
+    "execution_intent"?: {
+      "source_submission_id": string;
+      "source_text": string;
+      "scheduler"?: string;
+      "location"?: string;
+    };
   };
   taskRead: Record<string, never>;
   taskUpdate: {
     "expected_revision": number;
-    "action": "refine" | "progress" | "wait" | "block" | "propose_completion" | "set_research" | "apply_user_control";
+    "action": "refine" | "progress" | "wait" | "block" | "propose_completion" | "set_research" | "apply_user_control" | "correct_execution";
     "reason"?: string;
     "block_kind"?: "missing_user_input" | "resource_unavailable" | "execution_failure" | "budget_exhausted" | "scientific_dead_end";
     "resume_when"?: string;
@@ -192,6 +198,8 @@ export interface ToolParameters {
     "completion"?: Array<{
       "criterion_id": string;
       "evidence_refs": Array<string>;
+      "status": "met" | "unmet" | "undetermined";
+      "assessment_ref": string;
     }>;
     "research"?: {
       "entry_node_ids": Array<string>;
@@ -199,6 +207,20 @@ export interface ToolParameters {
     };
     "control"?: "pause" | "resume" | "cancel";
     "jobs"?: "keep" | "cancel";
-    "compute_environment"?: string | null;
+    "execution_target"?: string | null;
+    "execution_intent"?: {
+      "source_submission_id": string;
+      "source_text": string;
+      "scheduler"?: string;
+      "location"?: string;
+    };
+    "completion_outcome"?: "full" | "partial";
+    "stop_basis"?: {
+      "kind": "user_requested" | "budget_exhausted" | "search_exhausted";
+      "reason": string;
+      "evidence_refs"?: Array<string>;
+      "source_submission_ids"?: Array<string>;
+      "source_text"?: string;
+    };
   };
 }

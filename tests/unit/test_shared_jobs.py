@@ -231,7 +231,7 @@ def test_shared_config_schema_and_runtime_agree(queue, mode):
     errors = list(Draft202012Validator(job_config_schema()).iter_errors(document))
     if mode in ('staged','shared'):
         assert not errors
-        assert validate_job_config(document)['environments']['compute']['file_mode'] == mode
+        assert validate_job_config(document)['targets']['compute']['file_mode'] == mode
     else:
         assert errors
         with pytest.raises(ValueError, match='file_mode'):

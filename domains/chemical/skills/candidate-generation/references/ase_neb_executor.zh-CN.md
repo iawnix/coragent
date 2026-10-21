@@ -19,7 +19,7 @@ ASE 是唯一 NEB 实现。旧版本 1 执行入口已删除，旧请求须按�
 执行前检查所选环境、executor 和 version。
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.neb-xtb --version 2 --input input=<work_dir>/neb.json --input-artifact <input-ref> --output <work_dir>/neb-request.json
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.neb-xtb --version 2 --input input=<work_dir>/neb.json --input-artifact <input-ref> --output <work_dir>/neb-request.json
 ```
 
 占位符替换为真实绝对路径/Artifact 引用，随后通过 job_start 提交返回的

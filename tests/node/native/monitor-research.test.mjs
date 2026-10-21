@@ -204,7 +204,7 @@ test('Monitor summaries are bounded and task pages preserve control revisions wi
   const page = await service.handle({ method: 'monitor/tasks', params: { cursor: 'page2' } });
   assert.equal(page.error, null);
   assert.equal(page.result.next_cursor, 'page3');
-  assert.deepEqual(Object.keys(page.result.items[0]).sort(), ['revision', 'state', 'title', 'truncated', 'updated_at', 'user_task_id']);
+  assert.deepEqual(Object.keys(page.result.items[0]).sort(), ['completion_outcome', 'revision', 'state', 'title', 'truncated', 'updated_at', 'user_task_id']);
   assert.equal(page.result.items[0].revision, 7);
   const detail = await service.handle({ method: 'monitor/task/read', params: { user_task_id: task.user_task_id } });
   assert.equal(detail.error, null);

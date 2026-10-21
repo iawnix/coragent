@@ -7,6 +7,12 @@ description: Assemble traceable research reports from structures, calculations, 
 
 [Chinese version](SKILL.zh-CN.md)
 
+## Script routing
+
+Use the registered executor ID and the [script routing map](../../../../docs/skill-script-routing.md#report) to choose the entrypoint, CLI, inputs, and primary outputs. The map is authoritative for routing; implementation helpers under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details; read the linked operation contract and use executor `--help` only for unspecified options.
+
+**Entrypoints:** `chemical.render@1` → `skills/report/scripts/render.py`; `chemical.trajectory@1` → `skills/report/scripts/research_job.py`; `chemical.research-report@1` → `skills/report/scripts/research_job.py`.
+
 Use this Skill when a study needs a readable evidence package. A report should answer the research question, show the methods and source records, distinguish observations from interpretation, and make missing or conflicting evidence visible.
 
 ## Report workflow

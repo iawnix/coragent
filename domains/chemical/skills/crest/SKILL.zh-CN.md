@@ -7,6 +7,12 @@ description: 使用 CREST 搜索构象和刚性片段排列，并将可追溯的
 
 [English version](SKILL.md)
 
+## 脚本路由
+
+按 executor ID 使用[脚本路由地图](../../../../docs/skill-script-routing.zh-CN.md#crest)选择入口、CLI、输入和主要输出。地图是路由依据；`scripts/` 下的 helper 不是独立命令。不要通过读取源码发现调用方式，先读操作合同，只有合同未说明的选项才使用 executor 的 `--help`。
+
+**入口：** `chemical.crest-ensemble@1` → `skills/crest/scripts/ensemble.py`；`chemical.ensemble-select@1` → `skills/crest/scripts/ensemble.py`；`chemical.complex-sample@1` → `skills/crest/scripts/ensemble.py`；`chemical.crest@1` → `skills/crest/scripts/crest_run.py`。
+
 当构象、片段取向或弱复合物堆积可能改变反应搜索时使用 CREST。典型场景包括柔性反应物、多个转子构象的催化剂、预反应复合物，以及需要在过渡态搜索前采样相对姿态的刚性片段。
 
 ## 输入与输出

@@ -14,6 +14,18 @@ import time
 SCHEMA = "coragent-external-job/1"
 
 
+def resource_failure(task, state):
+    """Normalize TRI's resource enforcement outcomes for Job consumers."""
+    if state != "failed":
+        return None
+    error = str(task.get("error") or "").lower()
+    if "memory limit exceeded" in error or "memorymax" in error:
+        return "memory_limit"
+    if task.get("exit_code") == 78 or "resource enforcement" in error:
+        return "resource_enforcement"
+    return None
+
+
 class QueueError(RuntimeError):
     def __init__(self, code, message, *, retryable=False, action_outcome="unknown"):
         super().__init__(message)
@@ -74,7 +86,12 @@ def observation(task):
                 wait_seconds = max(0., time.time() - stamp)
         except (TypeError, ValueError):
             pass  # Missing evidence is not a fabricated zero-second wait.
+    requested_node = os.environ.get("CORAGENT_TRI_NODE")
+    assigned_node = task.get("node")
+    node_mismatch = (requested_node is not None and assigned_node is not None
+                     and assigned_node != requested_node)
     spec = task.get("spec") or {}
+    resource_kind = resource_failure(task, state)
     return {"schema_version": SCHEMA, "scheduler_id": str(task["id"]), "state": state,
             "execution_finished": finished, "exit_code": task.get("exit_code"),
             "started_at": task.get("started_at"), "finished_at": task.get("finished_at"),
@@ -89,8 +106,13 @@ def observation(task):
                 "requested_resources": {"cpus": spec.get("requested_cpu"),
                                         "memory_bytes": spec.get("requested_mem_bytes"),
                                         "gpus": spec.get("requested_gpus")},
+                "effective_memory_limit_bytes": spec.get("requested_mem_bytes"),
+                "memory_swap_limit_bytes": 0,
                 "assigned_cpus": task.get("assigned_cpus"),
-                "assigned_gpus": task.get("assigned_gpus")}}
+                "assigned_gpus": task.get("assigned_gpus"),
+                "requested_node": requested_node,
+                "node_match": not node_mismatch,
+                "resource_failure": resource_kind}}
 
 
 def handle(request):

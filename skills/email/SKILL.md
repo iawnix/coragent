@@ -5,6 +5,12 @@ description: Deliver an authorized email through configured SMTP with prepared a
 
 # Email delivery
 
+## Script routing
+
+Use the [script routing map](../../docs/skill-script-routing.md#email) before invoking a bundled script. It identifies the supported entrypoint and interface; helper files under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details.
+
+**Entrypoint:** `skills/email/scripts/email_cli.py` (see the map for its stdin/subcommand contract).
+
 [Chinese version](SKILL.zh-CN.md)
 
 Use this Skill after a domain Skill has composed a message and the user has authorized sending. It checks the configured SMTP transport, pins attachment digests, sends once, and records a receipt that can be reconciled after an interrupted delivery.

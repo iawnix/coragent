@@ -181,7 +181,7 @@ def test_research_agent_launcher_preserves_validated_custom_compute_profile(
     workspace = installation.workspaces_root / "reaction-a"
     workspace.mkdir(parents=True)
     custom = tmp_path / "job.toml"
-    custom.write_text("default_environment = 'local'\n", encoding="utf-8")
+    custom.write_text("[execution]\ndefault_target = 'local'\n[execution.targets.local]\ntype = 'local'\ndriver = 'process'\n", encoding="utf-8")
     monkeypatch.setenv("CORAGENT_JOB_CONFIG", str(custom))
 
     launcher.configure_process_environment(installation, workspace, "reaction-a")

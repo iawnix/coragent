@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 @pytest.fixture(autouse=True)
-def execution_platform_fixture(tmp_path, monkeypatch):
+def execution_target_fixture(tmp_path, monkeypatch):
     """Give unit tests an explicit local environment without production fallbacks."""
 
     config = tmp_path / "job.toml"
@@ -30,35 +30,37 @@ def execution_platform_fixture(tmp_path, monkeypatch):
     install = runpy.run_path(str(Path(__file__).resolve().parents[2] / 'scripts/install_job_environment.py'))['install']
     install({'manager': 'conda', 'conda_executable': str(conda), 'prefix': str(prefix), 'lock_ref': str(lock)}, adopt=True)
     config.write_text(
-        """default_environment = \"local\"
+        """[execution]
+default_target = "local"
 
-[environments.local]
-kind = \"local\"
-supervisor = \"process\"
+[execution.targets.local]
+type = "local"
+driver = "process"
+supervisor = "process"
 
-[environments.local.backends.validation]
-[environments.local.backends.validation.python]
+[execution.targets.local.bindings.validation]
+[execution.targets.local.bindings.validation.python]
 manager = "conda"
 conda_executable = CONDA_PATH
 prefix = PYTHON_PREFIX
 lock_ref = LOCK_PATH
 
-[environments.local.backends.structure.python]
+[execution.targets.local.bindings.structure.python]
 manager = "conda"
 conda_executable = CONDA_PATH
 prefix = PYTHON_PREFIX
 lock_ref = LOCK_PATH
 
-[environments.local.backends.gaussian]
+[execution.targets.local.bindings.gaussian]
 command = \"g16\"
 
-[environments.local.backends.xtb]
+[execution.targets.local.bindings.xtb]
 command = \"xtb\"
 
-[environments.local.backends.crest]
+[execution.targets.local.bindings.crest]
 command = \"crest\"
 
-[environments.local.backends.ase_neb_xtb]
+[execution.targets.local.bindings.ase_neb_xtb]
 command = \"xtb\"
 """.replace("CONDA_PATH", json.dumps(str(conda))).replace("PYTHON_PREFIX", json.dumps(str(prefix)))
         .replace("LOCK_PATH", json.dumps(str(tmp_path / "fixture.lock"))),

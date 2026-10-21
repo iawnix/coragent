@@ -150,8 +150,8 @@ def test_raw_job_submission_resolves_defaults_before_recording_attempt(tmp_path,
     initialize_workspace(root, 'resources_test', 'research')
     admit_research_workspace(root)
     config = tmp_path / 'defaults.toml'
-    config.write_text('default_environment="local"\n[environments.local]\nkind="local"\nsupervisor="process"\n'
-                      '[environments.local.submission.resources]\ncpus=1\nmemory_mb=256\nwalltime="00:00:15"\n')
+    config.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\nsupervisor="process"\n'
+                      '[execution.targets.local.submission.resources]\ncpus=1\nmemory_mb=256\nwalltime="00:00:15"\n')
     monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(config))
     request = {'root': str(root), 'request_id': 'job_1',
                'command': ['/bin/true'], 'metadata': {'resources': {'memory_mb': 128}}}
@@ -176,15 +176,18 @@ def test_runtime_and_schema_agree_on_scheduler_resource_errors(kind, scheduler, 
     from jsonschema import Draft202012Validator
     target = {'kind': kind, 'submission': submission}
     if kind == 'remote': target.update(ssh_host='fixture', remote_root='/scratch', scheduler=scheduler)
-    config = {'default_environment': 'test', 'environments': {'test': target}}
+    config = {'execution': {'default_target': 'test', 'targets': {'test': target}}}
     with pytest.raises(ValueError): validate_job_config(config)
     assert list(Draft202012Validator(job_config_schema()).iter_errors(config))
 
 
 def test_submission_merges_target_backend_and_requested_resources_once():
-    config = {'environments': {'cluster': {'kind': 'remote', 'allowed_queues': ['batch'],
+    config = validate_job_config({'execution': {'default_target': 'cluster', 'targets': {'cluster': {
+        'type': 'remote', 'driver': 'external', 'transport': 'ssh', 'ssh_host': 'fixture',
+        'work_root': '/scratch/jobs', 'handler': ['/bin/true'], 'allowed_queues': ['batch'],
         'submission': {'queue': 'batch', 'resources': {'cpus': 8, 'memory_mb': 1000, 'walltime': '00:05:00'}},
-        'backends': {'method': {'submission': {'resources': {'cpus': 2}}}}}}}
+        'bindings': {'method': {'command': ['/bin/true'], 'submission': {'resources': {'cpus': 2}}}},
+    }}}})
     result = resolve_submission(config, 'cluster', 'method', requested={'resources': {'memory_mb': 500}})
     assert result == {'queue': 'batch', 'resources': {'cpus': 2, 'memory_mb': 500, 'walltime': '00:05:00'}}
     with pytest.raises(ValueError, match='not allowed'):

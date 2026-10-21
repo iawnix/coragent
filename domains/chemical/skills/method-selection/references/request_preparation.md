@@ -1,10 +1,10 @@
 # Preparing a scientific Job request
 
-Start from the method Skill's instructions and selected software binding. When it supplies a predefined recipe, prepare it with `--config "$CORAGENT_JOB_CONFIG" --environment <name> --executor <id> --version <version> --input <role>=<file>`, followed by `--` and runner arguments. The generic preparer stages declared resources with their module paths intact. Target Python comes from the backend or environment binding in job.toml.
+Start from the method Skill's instructions and selected software binding. When it supplies a predefined recipe, prepare it with `--config "$CORAGENT_JOB_CONFIG" --target <name> --executor <id> --version <version> --input <role>=<file>`, followed by `--` and runner arguments. The generic preparer stages declared resources with their module paths intact. Target Python comes from the backend or environment binding in job.toml.
 
 For runner parameters, use `"$CORAGENT_PYTHON" -m research_agent.application.executors --executor <id> --version <version> --help`. This reads the pinned CLI contract without running science or contacting a compute target. Fixed input/output/executable flags are supplied by the preparer.
 
-If the recipe id is unknown, `executors --list --skill <name>` or `--list --backend <binding>` gives a concise index; `--details` includes full descriptors for diagnostics. This index covers predefined recipes, not all available methods or software. Optional `--config … --environment …` reports whether each recipe's binding is configured, without probing it. Check actual software with the [targeted environment check](runtime_environment.md). An absent recipe can use the task-specific script path below or a native command through a generic Job.
+If the recipe id is unknown, `executors --list --skill <name>` or `--list --backend <binding>` gives a concise index; `--details` includes full descriptors for diagnostics. This index covers predefined recipes, not all available methods or software. Optional `--config … --target …` reports whether each recipe's binding is configured, without probing it. Check actual software with the [targeted environment check](runtime_environment.md). An absent recipe can use the task-specific script path below or a native command through a generic Job.
 
 Preserve the prepared request_id when recovering the same submission. A lost tool response does not authorize a new ID; intentional recalculation uses a new request.
 
@@ -40,7 +40,7 @@ For example, a local RDKit script uses the configured `structure` backend:
 
 ```bash
 "$CORAGENT_PYTHON" -m research_agent.application.executors \
-  --config "$CORAGENT_JOB_CONFIG" --environment local \
+  --config "$CORAGENT_JOB_CONFIG" \
   --script <work_dir>/analysis.py --backend structure \
   --collect analysis.json --output <work_dir>/analysis-request.json
 ```

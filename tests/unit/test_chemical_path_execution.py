@@ -8,9 +8,9 @@ import re
 import sys
 import time
 
-import numpy as np
 import pytest
-from rdkit import Chem
+np = pytest.importorskip('numpy')
+Chem = pytest.importorskip('rdkit.Chem')
 
 ROOT=Path(__file__).resolve().parents[2]
 SKILLS=ROOT/'domains/chemical/skills'

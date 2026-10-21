@@ -7,6 +7,12 @@ description: 在声明的 QBICS 安装环境中规划和执行交叉点研究，
 
 [English version](SKILL.md)
 
+## 脚本路由
+
+按 executor ID 使用[脚本路由地图](../../../../docs/skill-script-routing.zh-CN.md#qbics)选择入口、CLI、输入和主要输出。地图是路由依据；`scripts/` 下的 helper 不是独立命令。不要通过读取源码发现调用方式，先读操作合同，只有合同未说明的选项才使用 executor 的 `--help`。
+
+**入口：** 无仓库内脚本；按文档使用 runtime 或 generic Job。
+
 研究同自旋交叉或其它由已安装 QBICS 程序支持的交叉点优化时使用。本 Skill 提供科学设置和 generic Job 交接；仓库目前没有专用 QBICS runner。
 
 ## 推荐流程

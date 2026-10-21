@@ -51,6 +51,14 @@
       }
     },
     {
+      "command": "job.targets",
+      "params": {}
+    },
+    {
+      "command": "job.resolve_target",
+      "params": {}
+    },
+    {
       "command": "job.start",
       "params": {}
     },

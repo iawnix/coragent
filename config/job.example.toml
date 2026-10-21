@@ -1,49 +1,53 @@
-# Explicit component-import example for --job-config; new installations should
-# use [execution] in config.toml (see job.execution.example.toml).
+# Explicit component-import example for --job-config; target routing and
+# scientific bindings are configured independently.
 # Prepare scientific environments independently with install_job_environment.py,
 # then replace the example paths with their existing bindings.
 
-default_environment = "local"
+[execution]
+default_target = "local"
 
-[environments.local]
-kind = "local"
+[execution.targets.local]
+type = "local"
+driver = "systemd"
+scheduler = "none"
+location = "controller"
 
-[environments.local.python]
+[execution.targets.local.python]
 manager = "conda"
 conda_executable = "/opt/conda/bin/conda"
 prefix = "/opt/coragent/envs/wrapper-20261009"
 lock_ref = "/opt/coragent/locks/wrapper.lock"
 
 # These Python-only methods use the selected target's RDKit/NumPy environment.
-[environments.local.backends.structure]
+[execution.targets.local.bindings.structure]
 # The installer binds its generated name-resolver.toml when no explicit resolver
 # configuration is supplied. Remote targets need their own target-local path.
-[environments.local.backends.structure.python]
+[execution.targets.local.bindings.structure.python]
 manager = "conda"
 conda_executable = "/opt/conda/bin/conda"
 prefix = "/opt/coragent/envs/structure-20261009"
 lock_ref = "/opt/coragent/locks/structure.lock"
-[environments.local.backends.validation]
-[environments.local.backends.validation.python]
+[execution.targets.local.bindings.validation]
+[execution.targets.local.bindings.validation.python]
 manager = "conda"
 conda_executable = "/opt/conda/bin/conda"
 prefix = "/opt/coragent/envs/structure-20261009"
 lock_ref = "/opt/coragent/locks/structure.lock"
 
-[environments.local.backends.gaussian]
+[execution.targets.local.bindings.gaussian]
 command = "/opt/gaussian/g16/g16"
 activation_script = "/opt/gaussian/activate.sh"
-[environments.local.backends.gaussian.environment]
+[execution.targets.local.bindings.gaussian.environment]
 GAUSS_SCRDIR = "{scratch}"
 
-[environments.local.backends.xtb]
+[execution.targets.local.bindings.xtb]
 command = "/opt/xtb/bin/xtb"
 activation_script = "/opt/xtb/activate.sh"
 
 # CF22D uses its own complete Conda lock; no custom LD_PRELOAD is needed.
-[environments.local.backends.pyscf]
+[execution.targets.local.bindings.pyscf]
 
-[environments.local.backends.pyscf.python]
+[execution.targets.local.bindings.pyscf.python]
 manager = "conda"
 conda_executable = "/opt/conda/bin/conda"
 prefix = "/opt/coragent/envs/cf22d-20261009"
@@ -52,7 +56,7 @@ lock_ref = "/opt/coragent/locks/cf22d.lock"
 # Batch targets (local submission or SSH): see job.execution.example.toml.
 
 # Optional molecular images; text reports need no rendering libraries.
-[environments.local.backends.render.python]
+[execution.targets.local.bindings.render.python]
 manager = "conda"
 conda_executable = "/opt/conda/bin/conda"
 prefix = "/opt/coragent/envs/render-20261009"

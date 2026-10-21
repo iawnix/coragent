@@ -8,8 +8,8 @@ import sys
 import time
 import tomllib
 
-import numpy as np
 import pytest
+np = pytest.importorskip('numpy')
 
 SKILLS = Path(__file__).resolve().parents[2] / 'domains/chemical/skills'
 from tests.unit.chemical_paths import configure
@@ -211,12 +211,12 @@ def test_registered_pipeline_stages_collects_and_exports_refinement(tmp_path, mo
     text = config.read_text(); data = tomllib.loads(text)
     # Extend only this test's native binding; all environments stay runner-managed.
     native = fake_crest(tmp_path / 'crest')
-    binding = data['environments']['local']['backends']['structure']['python']
-    text = re.sub(r'(?ms)^\[environments\.local\.backends\.crest\]\n.*?(?=^\[|\Z)', '', text)
-    text += '\n[environments.local.backends.crest]\ncommand = '+json.dumps(str(native))+'\n'
-    text += '[environments.local.backends.crest.python]\n' + ''.join(k+' = '+json.dumps(v)+'\n' for k,v in binding.items())
+    binding = data['execution']['targets']['local']['bindings']['structure']['python']
+    text = re.sub(r'(?ms)^\[execution\.targets\.local\.bindings\.crest\]\n.*?(?=^\[|\Z)', '', text)
+    text += '\n[execution.targets.local.bindings.crest]\ncommand = '+json.dumps(str(native))+'\n'
+    text += '[execution.targets.local.bindings.crest.python]\n' + ''.join(k+' = '+json.dumps(v)+'\n' for k,v in binding.items())
     text = text.replace('command = \"xtb\"', 'command = '+json.dumps(str(native)))
-    text += '[environments.local.backends.xtb.python]\n' + ''.join(k+' = '+json.dumps(v)+'\n' for k,v in binding.items())
+    text += '[execution.targets.local.bindings.xtb.python]\n' + ''.join(k+' = '+json.dumps(v)+'\n' for k,v in binding.items())
     config = tmp_path / 'job.toml'; config.write_text(text); monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(config))
     node = execute('research.create', root, {'goal': 'Independent conformer and complex preparation'})['node']
     source = root / 'material.json'; source.write_text(json.dumps(water()['value']))

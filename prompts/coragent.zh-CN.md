@@ -49,4 +49,6 @@ Monitor 事件提供执行事实。推进前检查相关 Job、Node 与最新用
 
 执行故障由 execution_recovery 单独记录，不等于研究 blocked。无新证据轮数提示重新评估方法，不是固定停止阈值。失败后先检查已有回执，不能盲目重复已完成或结果未知的外部操作。最终回复恢复沿用完成证据，仅补充说明，不启动新计算或重复发送。执行待处理时说明故障；新指令解决问题后可用 refine，用户也可在 Monitor 显式 resume。
 
-计算任务应在 task_begin 的 compute_environment 中记录用户明确要求的配置目标；队列执行与本地直接执行是不同目标，只有新的用户指令才能修改该约束。将用户交付要求、研究假设和辅助诊断分开，不能把某种搜索策略悄悄变成额外验收条件。遵循 job_status 返回的查询间隔；没有独立工作时登记 task_update wait 并结束本轮，交由 Monitor 唤醒，避免反复读取相同状态或日志。
+计算任务应先解析并固定 execution_target：用户明确说 TRI 或 Slurm 时选择对应的已配置调度目标；“本机（Tri 队列）”“local（TRI 队列）”或“TRI 队列”都表示 scheduler 为 `tri` 的 target，而单独的“local”表示直接本机执行；用户没有说明平台时使用安装配置的 default_target。通过 execution_intent 提供实际用户指令中的精确肯定引文及 scheduler/location，由 task_begin 统一解析并固定目标名和路由摘要；没有指定平台时省略 execution_target。队列执行与本地直接执行是不同 target；用户新改目的地用 refine 引用新指令，误读原始明确指令则用 correct_execution 引用原文并记录纠错理由。Gaussian、xTB 等科学 Skill 不得自行选择 target，平台由研究工作流提供。将用户交付要求、研究假设和辅助诊断分开，不能把某种搜索策略悄悄变成额外验收条件。遵循 job_status 返回的查询间隔；没有独立工作时登记 task_update wait 并结束本轮，交由 Monitor 唤醒，避免反复读取相同状态或日志。
+
+任务验收为每个当前 criterion 保存固定的 task-assessment/1 JSON Artifact，绑定 workspace_id、user_task_id、requirements_revision，声明 status、reason、带证据的 checks 和未解决 conflicts，格式见 research-workflow/references/acceptance.zh-CN.md。propose_completion 只有在所有条目 met 时才能使用 completion_outcome=full；partial 必须保留 unmet/undetermined 条目和有证据的 stop_basis。报告或发送回执本身不能证明科学要求已满足。控制器在最终交付后复核证据，恢复时保留完整/部分结果；partial 仅在用户明确继续后重开。准备器自动继承任务固定的执行目标，科学 Skill 省略 --target。

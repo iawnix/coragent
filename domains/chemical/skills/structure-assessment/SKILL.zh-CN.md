@@ -7,6 +7,12 @@ description: 将分子或反应候选几何整理成有证据边界的结构描�
 
 [English version](SKILL.md)
 
+## 脚本路由
+
+按 executor ID 使用[脚本路由地图](../../../../docs/skill-script-routing.zh-CN.md#structure-assessment)选择入口、CLI、输入和主要输出。地图是路由依据；`scripts/` 下的 helper 不是独立命令。不要通过读取源码发现调用方式，先读操作合同，只有合同未说明的选项才使用 executor 的 `--help`。
+
+**入口：** `chemical.structure-cognition@1` → `skills/structure-assessment/scripts/run.py`。
+
 在选择或修正计算前使用本 Skill，建立 material 的共同描述：身份、分子图、片段、电子态声明、反应中心几何和与参考结构的比较。
 
 ## 检查内容

@@ -722,26 +722,26 @@ def configure_remote(installation: Installation) -> None:
         contract = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(contract)
         config = contract.validate_job_config(config)
-        environment_name = config.get("default_environment")
-        environments = config.get("environments", {})
+        environment_name = contract.default_target(config)
+        environments = contract.configured_targets(config)
         if (
             not isinstance(environment_name, str)
             or not isinstance(environments, dict)
             or not environments
             or environment_name not in environments
         ):
-            raise ValueError("job config must define default_environment and at least one environment")
+            raise ValueError("job config must define execution.default_target and at least one target")
         if any(
             not isinstance(name, str)
             or not isinstance(item, dict)
             or item.get("kind") not in {"local", "remote"}
             for name, item in environments.items()
         ):
-            raise ValueError("job config environments must declare kind=local or kind=remote")
+            raise ValueError("job config targets must declare kind=local or kind=remote")
         environment = environments.get(environment_name, {}) if isinstance(environments, dict) else {}
         remote_name = environment_name if isinstance(environment, dict) and environment.get("kind") == "remote" else None
         if remote_name is None and isinstance(environments, dict):
-            # ``default_environment`` controls ordinary calculation selection
+            # ``default_target`` controls ordinary calculation selection
             # and may intentionally remain local.  Pick one remote target for
             # the installation-level doctor, but preserve its canonical config
             # id so the diagnostic cannot silently select another remote when
@@ -762,13 +762,13 @@ def configure_remote(installation: Installation) -> None:
             os.environ["CORAGENT_REMOTE_DISPLAY_TARGET"] = "not configured"
             return
         if not isinstance(environment, dict) or environment.get("kind") != "remote":
-            raise ValueError("selected remote environment must declare kind=remote")
+            raise ValueError("selected remote target must declare kind=remote")
         host = environment.get("ssh_host")
         if not isinstance(host, str) or not host.strip():
-            raise ValueError(f"remote environment {remote_name!r} is missing ssh_host")
+            raise ValueError(f"remote target {remote_name!r} is missing ssh_host")
         scheduler = environment.get("cluster_name", "external")
         if not isinstance(scheduler, str) or not scheduler.strip():
-            raise ValueError(f"remote environment {remote_name!r} has an invalid scheduler")
+            raise ValueError(f"remote target {remote_name!r} has an invalid scheduler")
         scheduler = scheduler.title()
     except (OSError, TypeError, ValueError, tomllib.TOMLDecodeError) as exc:
         raise CoRAgentHostError(f"invalid remote configuration: {path}: {exc}") from exc

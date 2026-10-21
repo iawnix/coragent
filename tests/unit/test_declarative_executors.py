@@ -2,6 +2,7 @@
 
 from research_agent.foundation.layout import paths as app_paths
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import time
@@ -33,11 +34,12 @@ def catalog(root, monkeypatch):
 
 
 def binding(path):
-    text = '''default_environment="local"
-[environments.local]
-kind="local"
-supervisor="process"
-[environments.local.backends.shell]
+    text = '''[execution]
+default_target="local"
+[execution.targets.local]
+type="local"
+driver="process"
+[execution.targets.local.bindings.shell]
 command="/bin/sh"
 '''
     path.write_text(text)
@@ -96,7 +98,7 @@ def test_only_selected_binding_and_actual_input_content_change_work_identity(tmp
     def request():
         return prepare(config, "local", "external.copy", "3", {"data": source})
     first = request()
-    config.write_text(original + '\n[environments.other]\nkind="local"\n[environments.other.backends.other]\ncommand="/unrelated"\n')
+    config.write_text(original + '\n[execution.targets.other]\ntype="local"\ndriver="external"\ntransport="local"\nwork_root="/tmp/other"\nhandler=["/bin/true"]\n[execution.targets.other.bindings.other]\ncommand="/unrelated"\n')
     assert request() == first
     config.write_text(original.replace('/bin/sh', '/bin/bash'))
     assert request()["work_id"] != first["work_id"]
@@ -148,7 +150,7 @@ def test_task_specific_script_uses_explicit_binding_and_pinned_dependencies(tmp_
     import os
     import tomllib
     settings = tomllib.loads(Path(os.environ['CORAGENT_JOB_CONFIG']).read_text())
-    prefix = Path(settings['environments']['local']['backends']['structure']['python']['prefix'])
+    prefix = Path(settings['execution']['targets']['local']['bindings']['structure']['python']['prefix'])
     # This dependency exists only in the selected target, not the control Python.
     site = next(prefix.glob('lib/python*/site-packages'))
     (site / 'target_only_analysis.py').write_text('def transform(text): return text.upper()\n')
@@ -227,7 +229,7 @@ driver="process"
     artifact = evidence("create", {"root": str(tmp_path), "content": "registered input"})
     params = {"validator_id": "external.validator", "validator_version": "1", "input_artifact_ids": [artifact["artifact_id"]]}
     request = prepare_validator(tmp_path, params)
-    assert request["platform"] == "cluster"
+    assert request["execution_target"] == "cluster"
     assert "/cluster/conda/bin/conda" in request["command"]
     assert "/cluster/validation" in request["command"]
     assert request["metadata"]["resources"] == {"cpus": 3}
@@ -238,7 +240,7 @@ driver="process"
     from research_agent.application.execution_environment import check_binding
     check_binding(allocated, probe=False)
     with pytest.raises(ValueError, match="executor_binding_missing"):
-        prepare_validator(tmp_path, {**params, "platform": "local"})
+        prepare_validator(tmp_path, {**params, "execution_target": "local"})
 
 
 @pytest.mark.parametrize("kind", ["seed", "path-candidates", "generic-path-candidates"])
@@ -336,7 +338,7 @@ handler=["/bin/true"]
     assert local['metadata']['execution_argv'][0] == '/bin/sh'
     assert remote['metadata']['execution_argv'][0] == '/cluster/bin/sh'
     assert remote['metadata']['queue'] == 'science'
-    assert remote['platform'] == 'cluster' and local['platform'] == 'local'
+    assert remote['execution_target'] == 'cluster' and local['execution_target'] == 'local'
     assert remote['work_id'] != local['work_id']
     with pytest.raises(ValueError, match='executor_binding_missing'):
         prepare(config, 'empty', 'external.copy', '3', {'data': source})
@@ -354,7 +356,7 @@ def test_readiness_distinguishes_shared_backend_configuration_from_verification(
     declaration['executors'].append(second)
     path.write_text(json.dumps(declaration))
     config = tmp_path / 'job.toml'
-    config.write_text(binding(config) + '\n[environments.empty]\nkind="local"\n')
+    config.write_text(binding(config) + '\n[execution.targets.empty]\ntype="local"\ndriver="external"\ntransport="local"\nwork_root="/tmp/empty"\nhandler=["/bin/true"]\n')
     monkeypatch.setattr('research_agent.application.environment_check.probe_binding',
                         lambda *args: pytest.fail('configuration-only check must not contact a target'))
     result = check_environments(load_job_config(config), catalogs=installed_catalogs(), probe=False)
@@ -364,6 +366,8 @@ def test_readiness_distinguishes_shared_backend_configuration_from_verification(
     assert all(row['status'] == 'not_configured' for row in result['empty'].values())
 
 
+@pytest.mark.skipif(importlib.util.find_spec('numpy') is None or importlib.util.find_spec('rdkit') is None,
+                    reason='fixture environment lacks structure-analysis dependencies')
 def test_installed_resolver_is_used_by_an_isolated_name_resolution_job(tmp_path, monkeypatch):
     import os
     import threading
@@ -393,8 +397,8 @@ def test_installed_resolver_is_used_by_an_isolated_name_resolution_job(tmp_path,
             job = app_paths(root).job_config
             job.parent.mkdir(parents=True)
             settings = tomllib.loads(Path(os.environ['CORAGENT_JOB_CONFIG']).read_text())
-            local = settings['environments']['local']
-            local['backends'] = {'structure': local['backends']['structure']}
+            local = settings['execution']['targets']['local']
+            local['bindings'] = {'structure': local['bindings']['structure']}
             job.write_bytes(wizard._job_config_bytes(settings))
             resolver = app_paths(root).resolver_config
             resolver.write_text('default_resolver="opsin"\n[backends.opsin]\ncache=false\nendpoint=' +
@@ -430,6 +434,8 @@ def test_installed_resolver_is_used_by_an_isolated_name_resolution_job(tmp_path,
             thread.join(timeout=5)
 
 
+@pytest.mark.skipif(importlib.util.find_spec('numpy') is None or importlib.util.find_spec('rdkit') is None,
+                    reason='fixture environment lacks structure-analysis dependencies')
 def test_name_lookup_fallback_candidates_and_geometry_run_as_managed_jobs(tmp_path):
     import os
     workspace(tmp_path)

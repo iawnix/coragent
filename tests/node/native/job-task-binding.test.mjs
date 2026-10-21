@@ -39,14 +39,16 @@ test("task destination reaches runtime for raw, file and registered requests", a
   const calls = [];
   const [start] = createJobTools({
     commandBridge: { execute_command: async (_command, params) => { calls.push(params); return { job_id: "job_1" }; } },
-    getTaskBinding: async () => ({ user_task_id: "task_1", compute_environment: "cluster_a" }),
+    getTaskBinding: async () => ({ user_task_id: "task_1", execution_target: "cluster_a", route_digest: "sha256:" + "a".repeat(64) }),
   });
-  assert.equal("required_environment" in start.parameters.properties, false);
+  assert.equal("required_target" in start.parameters.properties, false);
+  assert.equal("required_route_digest" in start.parameters.properties, false);
   for (const params of [{ command: ["true"] }, { request_file: "request.json", request_sha256: "abc" }, { prepared_ref: "prepared_1" }]) {
     await start.execute(params, api, context);
   }
   assert.equal(calls.length, 3);
-  assert.ok(calls.every(p => p.required_environment === "cluster_a"));
+  assert.ok(calls.every(p => p.required_target === "cluster_a"));
+  assert.ok(calls.every(p => p.required_route_digest === "sha256:" + "a".repeat(64)));
   assert.equal(calls[1].request_file, "request.json");
   assert.equal("platform" in calls[1], false, "task constraint checks but never rewrites a prepared request");
 });

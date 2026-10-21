@@ -3,10 +3,10 @@ import json
 from pathlib import Path
 import sys
 
-import numpy as np
 import pytest
-from rdkit import Chem
-from rdkit.Chem import AllChem
+np = pytest.importorskip('numpy')
+Chem = pytest.importorskip('rdkit.Chem')
+AllChem = pytest.importorskip('rdkit.Chem.AllChem')
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'domains/chemical/skills/_shared'), str(ROOT / 'domains/chemical/skills/gaussian/scripts')]

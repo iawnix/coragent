@@ -125,7 +125,7 @@ material.json：当前连通性保持未指定，参考图/map 标签保存在 d
 不表示构象空间被穷尽。
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.reactive-geometry --version 1 --input input=<work_dir>/edits.json --input-artifact <source-ref> --output <work_dir>/edit-request.json
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.reactive-geometry --version 1 --input input=<work_dir>/edits.json --input-artifact <source-ref> --output <work_dir>/edit-request.json
 ```
 
 使用 research_create/read 返回的 work_dir 绝对路径。将 request_file/request_sha256

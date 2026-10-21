@@ -61,15 +61,7 @@ def publish(args):
         if path.is_file():
             value = tomllib.loads(path.read_text())
             if section == 'execution':
-                if 'execution' in value:
-                    value = value['execution']
-                else:
-                    targets = {}
-                    for name, target in value['environments'].items():
-                        targets[name] = {key: item for key, item in target.items() if key not in {'kind', 'backends', 'supervisor'}}
-                        targets[name].update(type=target['kind'], bindings=target.get('backends', {}))
-                        targets[name].setdefault('driver', target.get('supervisor', 'systemd') if target['kind'] == 'local' else 'external')
-                    value = {'default_target': value['default_environment'], 'targets': targets}
+                value = value['execution']
             # Preserve operator credential references across normalization.
             def references(current, original):
                 if isinstance(original, str) and original.startswith('credential:'):

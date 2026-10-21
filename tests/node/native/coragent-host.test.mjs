@@ -303,7 +303,7 @@ test("Host relays real Job Monitor events and rejects old or mismatched identiti
   const root = join(env.workspaceRoot, "project-a");
   const { create_python_runtime_bridge } = await import("../../../apps/agent/bridge/client.mjs");
   const jobConfig = join(root, "job.toml");
-  await writeFile(jobConfig, 'default_environment="local"\n[environments.local]\nkind="local"\nsupervisor="process"\n');
+  await writeFile(jobConfig, '[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\nsupervisor="process"\n');
   const executionEnv = { ...process.env, CORAGENT_JOB_CONFIG: jobConfig };
   const bridge = create_python_runtime_bridge({ workspace_root: root, env: executionEnv });
   t.after(() => bridge.close());

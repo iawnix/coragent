@@ -1506,10 +1506,10 @@ def _bind_local_name_resolver(job: dict, resolver: Path) -> None:
     raw = destination.read_bytes()
     config = tomllib.loads(raw.decode())
     changed = []
-    targets = config.get("execution", {}).get("targets", config.get("environments", {}))
+    targets = config.get("execution", {}).get("targets", {})
     for name, target in targets.items():
-        structure = target.get("bindings", target.get("backends", {})).get("structure")
-        local = target.get("transport") == "local" if target.get("driver") == "external" else target.get("type", target.get("kind")) == "local"
+        structure = target.get("bindings", {}).get("structure")
+        local = target.get("transport") == "local" if target.get("driver") == "external" else target.get("type") == "local"
         if not local or structure is None:
             continue
         variables = structure.setdefault("environment", {})

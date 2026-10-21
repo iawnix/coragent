@@ -68,23 +68,43 @@ def test_task_destination_is_checked_before_staging_even_for_prepared_jobs(tmp_p
     import hashlib
     from research_agent.application.references import prepare_job
     workspace(tmp_path)
-    request = {'request_id': 'wrong-destination', 'work_id': 'work', 'platform': 'local',
+    request = {'request_id': 'wrong-destination', 'work_id': 'work', 'execution_target': 'local',
                'command': [sys.executable, '-c', 'raise RuntimeError("must not execute")']}
     if form == 'target_alias':
-        request['platform'] = 'tri'
-        request['execution_target'] = {'target': 'local'}
+        request['execution_target'] = 'local'
     params = request
     if form in {'file', 'reference'}:
         source = tmp_path / 'request.json'; source.write_text(json.dumps(request))
         params = {'request_file': str(source), 'request_sha256': hashlib.sha256(source.read_bytes()).hexdigest()}
         if form == 'reference': params = {'prepared_ref': prepare_job(tmp_path, params)['prepared_ref']}
     with pytest.raises(ValueError, match='execution_target_mismatch'):
-        dispatch('start', {**params, 'root': str(tmp_path), 'required_environment': 'tri', 'user_task_id': 'task_1'})
+        dispatch('start', {**params, 'root': str(tmp_path), 'required_target': 'tri', 'user_task_id': 'task_1'})
     assert not list((tmp_path / 'runs/jobs').glob('job_*'))
 
 
 def test_matching_task_destination_does_not_block_normal_execution(tmp_path):
     workspace(tmp_path)
-    result = dispatch('start', {'root': str(tmp_path), 'request_id': 'allowed', 'required_environment': 'local',
+    result = dispatch('start', {'root': str(tmp_path), 'request_id': 'allowed', 'required_target': 'local',
                               'user_task_id': 'task_1', 'command': [sys.executable, '-c', 'pass']})
     assert result['platform'] == 'local'
+
+
+@pytest.mark.parametrize('prepared', [False, True])
+def test_pinned_route_change_rejected_before_any_dispatch(tmp_path, prepared):
+    import os
+    import hashlib
+    from pathlib import Path
+    workspace(tmp_path)
+    selected = dispatch('resolve_target', {'root': str(tmp_path)})
+    request = {'request_id': 'pinned-route', 'execution_target': selected['target'],
+               'command': [sys.executable, '-c', 'raise RuntimeError("must not execute")']}
+    if prepared:
+        path = tmp_path / 'request.json'
+        path.write_text(json.dumps(request))
+        request = {'request_file': str(path), 'request_sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+    config = Path(os.environ['CORAGENT_JOB_CONFIG'])
+    config.write_text(config.read_text().replace('driver = "process"', 'driver = "systemd"').replace('supervisor = "process"', 'supervisor = "systemd"'))
+    with pytest.raises(ValueError, match='execution_target_changed'):
+        dispatch('start', {**request, 'root': str(tmp_path), 'required_target': selected['target'],
+                           'required_route_digest': selected['route_digest'], 'user_task_id': 'task_1'})
+    assert not list((tmp_path / 'runs/jobs').glob('job_*'))

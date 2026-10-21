@@ -7,6 +7,12 @@ description: Build and search transition-state and reaction-path candidate geome
 
 [Chinese version](SKILL.zh-CN.md)
 
+## Script routing
+
+Use the registered executor ID and the [script routing map](../../../../docs/skill-script-routing.md#candidate-generation) to choose the entrypoint, CLI, inputs, and primary outputs. The map is authoritative for routing; implementation helpers under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details; read the linked operation contract and use executor `--help` only for unspecified options.
+
+**Entrypoints:** `chemical.path-candidates@1` → `skills/candidate-generation/scripts/path/prepare_path.py`; `chemical.qst-prepare@1` → `skills/candidate-generation/scripts/search/search.py`; `chemical.search-recovery@1` → `skills/candidate-generation/scripts/search/recovery.py`; `chemical.scan-xtb@1` → `skills/candidate-generation/scripts/search/search.py`; `chemical.scan-gaussian@1` → `skills/candidate-generation/scripts/search/search.py`; `chemical.gradient-xtb@1` → `skills/candidate-generation/scripts/search/search.py`; `chemical.gradient-gaussian@1` → `skills/candidate-generation/scripts/backends/gaussian_path.py`; `chemical.neb-xtb@2` → `skills/candidate-generation/scripts/neb/ase_search.py`; `chemical.neb-gaussian@2` → `skills/candidate-generation/scripts/neb/ase_search.py`.
+
 Use this Skill to turn a reaction hypothesis into one or more geometries that a TS or path solver can search. The input is a mapped elementary step: reactants/products or fragments, bond changes, charge, multiplicity, relevant conformers, and any evidence about approach, proton transfer, or stereochemistry. The output is a candidate set with method, constraints, source frame, and the next validation action.
 
 Before selecting a costly search, read [method selection](../method-selection/SKILL.md) and identify the exploration/refinement levels. Reuse verified structures and failed-search evidence; compare actual mapped geometry, torsions and stereochemistry before treating filenames or random embeddings as distinct candidates.
@@ -29,8 +35,9 @@ Keep multiple site, face, conformer, and mechanism hypotheses until validation o
 2. Prepare compatible endpoint geometries with `chemical.path-candidates@1` (`chemical.qst-prepare@1`) or supply a path specification.
 3. Generate or edit reactive poses with `chemical.reactive-sites@1` and `chemical.reactive-pose@1` when fragments or faces are uncertain.
 4. Run the bounded scan, gradient, QST, or NEB executor and inspect convergence, reaction-center distances, and path frames.
-5. Keep the best few chemically distinct frames, attach their source digests, and send them to a TS optimizer and `validation`.
-6. If a search collapses to a minimum or distorts, use the failure geometry to change the pose, coordinate, endpoint pair, or method before retrying.
+5. When a route fails, run `chemical.search-recovery@1` with the collected Attempt diagnosis and verified endpoint/geometry context. Follow an `auto_continue` decision only when its listed preconditions are present; a `needs_review` decision requires a revised hypothesis or repaired input.
+6. Keep the best few chemically distinct frames, attach their source digests, and send them to a TS optimizer and `validation`.
+7. If a search collapses to a minimum or distorts, use the failure geometry to change the pose, coordinate, endpoint pair, or method before retrying.
 
 Do not require one independent TS for every starting conformer by default. A
 conformer may first relax to another conformer and then enter the same reactive
@@ -45,6 +52,7 @@ distinct, geometry-checked candidates to an expensive Gaussian refinement.
 - `chemical.scan-xtb@1`, `chemical.scan-gaussian@1`: bounded relaxed scans.
 - `chemical.gradient-xtb@1`, `chemical.gradient-gaussian@1`: gradient/path calculators.
 - `chemical.neb-xtb@2`, `chemical.neb-gaussian@2`: ASE NEB v2 searches.
+- `chemical.search-recovery@1`: evidence-directed next-route decisions after a failed search.
 
 Both QST preparers use the shared Cartesian serializer in `skills/_shared/gaussian_input.py`. It reads generated blocks back and checks their state, ordered elements and coordinates against the mapped request before producing the input. Supply the explicit atom mapping to the preparer; coordinate serialization preserves that ordering.
 

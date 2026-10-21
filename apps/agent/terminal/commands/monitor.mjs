@@ -2,7 +2,7 @@ import { formatFields } from '../renderers/fields.mjs';
 
 const STATES = {
   active: 'Researching', waiting: 'Waiting for compute', paused: 'Paused', blocked: 'Needs attention',
-  completing: 'Preparing delivery', completed: 'Completed', cancelled: 'Cancelled', recovering: 'Checking recovery',
+  completing: 'Preparing delivery', completed: 'Completed', partial: 'Partially completed', cancelled: 'Cancelled', recovering: 'Checking recovery',
 };
 
 export const taskStateLabel = state => STATES[state] || 'Unknown';
@@ -16,7 +16,7 @@ export function formatTask(task) {
     `Goal: ${task.objective}`,
     `Progress: ${text(task.progress?.summary)}`,
     ...(task.initial_plan ? [`Plan: ${task.initial_plan}`] : []),
-    ...(task.next_action && !['completed', 'cancelled'].includes(task.state) ? [`Next: ${task.next_action}`] : []),
+    ...(task.next_action && !['completed', 'partial', 'cancelled'].includes(task.state) ? [`Next: ${task.next_action}`] : []),
     ...(task.block_details?.resume_when ? [`To resume: ${task.block_details.resume_when}`] : []),
     ...(task.execution_recovery ? [
       `Execution recovery: ${task.execution_recovery.state} · ${task.execution_recovery.phase}`,
@@ -45,7 +45,7 @@ function jobRow(job) {
 export function continuationLabel(response) {
   const task = response.task, running = response.execution?.state === 'running';
   switch (response.continuation?.state) {
-    case 'idle': return task?.state === 'completed' ? 'Completed'
+    case 'idle': return task?.state === 'partial' ? 'Partially completed' : task?.state === 'completed' ? 'Completed'
       : task?.state === 'cancelled' ? 'Stopped' : running ? 'Working' : 'Idle';
     case 'paused':
     case 'blocked':
@@ -92,7 +92,7 @@ function formatOverview(response) {
     ...(detail ? [`Details: ${detail}`] : []),
     ...(task ? [`Goal: ${task.objective}`] : []),
     ...(task?.progress?.summary ? [`Progress: ${task.progress.summary}`] : []),
-    ...(task?.next_action && !['completed', 'cancelled'].includes(task.state) ? [`Next: ${task.next_action}`] : []),
+    ...(task?.next_action && !['completed', 'partial', 'cancelled'].includes(task.state) ? [`Next: ${task.next_action}`] : []),
     ...(task?.wait ? [`Waiting for: ${task.wait.job_count} jobs (${task.wait.mode === 'all' ? 'all must finish' : 'any may finish'})`] : []),
     ...(task?.reason ? [`Reason: ${task.reason}`] : []),
     ...(task?.resume_when ? [`To resume: ${task.resume_when}`] : []),

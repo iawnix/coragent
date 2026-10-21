@@ -7,6 +7,12 @@ description: Prepare molecular materials and explicit reaction definitions from 
 
 [Chinese version](SKILL.zh-CN.md)
 
+## Script routing
+
+Use the registered executor ID and the [script routing map](../../../../docs/skill-script-routing.md#material-preparation) to choose the entrypoint, CLI, inputs, and primary outputs. The map is authoritative for routing; implementation helpers under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details; read the linked operation contract and use executor `--help` only for unspecified options.
+
+**Entrypoints:** `chemical.resolve@1` → `skills/material-preparation/scripts/reaction/prepare.py`; `chemical.resolve-candidates@1` → `skills/material-preparation/scripts/reaction/prepare.py`; `chemical.inspect@1` → `skills/material-preparation/scripts/reaction/prepare.py`; `chemical.seed@1` → `skills/material-preparation/scripts/reaction/prepare.py`; `chemical.reaction@1` → `skills/material-preparation/scripts/reaction/prepare.py`; `chemical.compare@1` → `skills/material-preparation/scripts/reaction/prepare.py`; `chemical.material@1` → `skills/material-preparation/scripts/materials/material.py`; `chemical.map-candidates@1` → `skills/material-preparation/scripts/geometry/analysis.py`; `chemical.conformer-compare@1` → `skills/material-preparation/scripts/geometry/analysis.py`; `chemical.reorder-tensors@1` → `skills/material-preparation/scripts/geometry/analysis.py`; `chemical.local-diagnostics@1` → `skills/material-preparation/scripts/diagnostics/diagnostics_job.py`.
+
 Use this Skill at the start of a calculation or reaction study. It converts names, SMILES, supplied XYZ, and reaction descriptions into material records that downstream geometry and electronic-structure Jobs can consume.
 
 ## Preparation workflow

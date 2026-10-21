@@ -7,6 +7,12 @@ description: 从物种和机理假设开始，经过候选搜索、验证、能�
 
 [English version](SKILL.md)
 
+## 脚本路由
+
+按 executor ID 使用[脚本路由地图](../../../../docs/skill-script-routing.zh-CN.md#reaction-investigation)选择入口、CLI、输入和主要输出。地图是路由依据；`scripts/` 下的 helper 不是独立命令。不要通过读取源码发现调用方式，先读操作合同，只有合同未说明的选项才使用 executor 的 `--help`。
+
+**入口：** `chemical.pathway-check@1` → `skills/reaction-investigation/scripts/pathway_job.py`。
+
 进行反应机理或过渡态研究时使用本 Skill。它协调领域 Skills，并保持一条化学决策闭环：定义假设、准备材料、构建候选、运行计算、验证证据、比较能量，再选择能区分假设的下一项实验。
 
 ## 工作流合同位置

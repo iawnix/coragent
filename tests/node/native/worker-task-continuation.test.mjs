@@ -18,7 +18,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
   await mkdir(socketRoot);
   const saved = { ...process.env };
   let backend, server, requests = 0, fixtureError, failureRequests = 0, recoveryRestarted = false, blockedWrite = false;
-  let scope;
+  let scope, assessmentPending = false;
   const blockedStopCalls = new Set();
   const observedRequests = [];
   const tools = [];
@@ -28,6 +28,9 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
     Object.assign(process.env, { PI_CODING_AGENT_DIR: agentDir, PI_AGENT_DIR: agentDir,
       CORAGENT_PYTHON: managedPython(), PYTHONDONTWRITEBYTECODE: "1",
       CORAGENT_TASK_RECOVERY_BASE_DELAY_MS: "500", CORAGENT_TASK_RECOVERY_MAX_DELAY_MS: "500" });
+    const jobConfig = join(root, "job.toml");
+    await writeFile(jobConfig, '[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\nsupervisor="process"\n');
+    process.env.CORAGENT_JOB_CONFIG = jobConfig;
     await execute(managedPython(), [join(packageRoot, "apps/agent-cli/workspace_mode.py"),
       "--root", join(workspaceRoot, "task-flow"), "--workspace-id", "task-flow"]);
     server = createServer(async (req, res) => {
@@ -65,7 +68,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
           if (scenario === "user-stop" && message.content.includes("The user stopped this task.")) {
             blockedStopCalls.add(message.tool_call_id); return null;
           }
-          assert.match(message.content, /^\s*[\[{]/, "fixture tools must return their structured success result");
+          assert.match(message.content, /^\s*[\[{]/, `fixture tools must return their structured success result: ${message.content}`);
           return JSON.parse(message.content);
         }).filter(Boolean);
         const envelope = request.messages.findLast(message =>
@@ -165,11 +168,30 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
         ];
         const steps = scenario === "user-stop" ? stopSteps : scenario === "branches" ? branchSteps : scenario === "block-resume" ? blockSteps
           : scenario === "delivery-recovery" ? deliverySteps : singleSteps;
-        const step = steps[requests++];
+        let step = steps[requests++];
+        let insertedAssessment = false;
+        if (step?.arguments?.action === "propose_completion") {
+          if (!assessmentPending) {
+            const item = step.arguments.completion[0];
+            step = { name: "artifact_create", arguments: { name: "task-assessment.json", media_type: "application/json",
+              content: JSON.stringify({ schema_version: "task-assessment/1", workspace_id: "task-flow",
+                user_task_id: task.user_task_id, requirements_revision: task.requirements_revision,
+                criterion_id: item.criterion_id, status: "met", reason: "Requested fixture finding retained", conflicts: [],
+                checks: [{ method: "reasoned", status: "met", reason: "Requested finding and limitations inspected", evidence_refs: item.evidence_refs }] }) } };
+            requests--; assessmentPending = true; insertedAssessment = true;
+          } else {
+            const artifact = results.findLast(value => value?.artifact_id);
+            assert.ok(artifact?.artifact_id);
+            step.arguments.completion_outcome = "full";
+            step.arguments.completion[0].status = "met";
+            step.arguments.completion[0].assessment_ref = artifact.artifact_id;
+            assessmentPending = false;
+          }
+        }
         assert.ok(step, "completed research must not trigger another model request");
         if (typeof step !== "string") tools.push(step.name);
         const delta = typeof step === "string" ? { role: "assistant", content: step } : {
-          role: "assistant", tool_calls: [{ index: 0, id: `task_call_${requests}`, type: "function",
+          role: "assistant", tool_calls: [{ index: 0, id: `task_call_${requests}${insertedAssessment ? "_assessment" : ""}`, type: "function",
             function: { name: step.name, arguments: JSON.stringify(step.arguments) } }],
         };
         res.writeHead(200, { "content-type": "text/event-stream" });
@@ -270,7 +292,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
         await assert.rejects(readFile(join(workspaceRoot, "task-flow", "forbidden-delivery-write")), { code: "ENOENT" });
       }
     }
-    if (scenario === "single") assert.deepEqual(tools, ["task_begin", "research_create", "task_read", "task_read", "research_result", "task_update"]);
+    if (scenario === "single") assert.deepEqual(tools, ["task_begin", "research_create", "task_read", "task_read", "research_result", "artifact_create", "task_update"]);
     else if (scenario === "branches") assert.equal(tools.filter(name => name === "research_create").length, 4);
     assert.equal(overview.jobs.counts.total, 0, "continued analysis must not require a compute event");
     const runs = await backend.monitor("monitor/runs", { ...scope, user_task_id: overview.task.user_task_id });

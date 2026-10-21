@@ -3089,6 +3089,61 @@
       }
     },
     {
+      "id": "job.targets",
+      "domain": "runtime",
+      "allowed": [],
+      "required": [],
+      "schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "result": {
+        "type": "object"
+      }
+    },
+    {
+      "id": "job.resolve_target",
+      "domain": "runtime",
+      "allowed": [
+        "target",
+        "scheduler",
+        "location",
+        "source_text"
+      ],
+      "required": [],
+      "schema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "scheduler": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "source_text": {
+            "type": "string",
+            "maxLength": 32000
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "result": {
+        "type": "object"
+      }
+    },
+    {
       "id": "job.start",
       "domain": "runtime",
       "allowed": [
@@ -3103,7 +3158,6 @@
         "metadata",
         "workspace_id",
         "work_id",
-        "platform",
         "execution_target",
         "session_id",
         "validator_id",
@@ -3116,7 +3170,8 @@
         "node_id",
         "user_task_id",
         "submission",
-        "required_environment"
+        "required_target",
+        "required_route_digest"
       ],
       "required": [],
       "schema": {
@@ -3191,12 +3246,9 @@
           "work_id": {
             "type": "string"
           },
-          "platform": {
-            "type": "string",
-            "description": "Direct submission only: configured execution environment name, such as local. Prepared requests already select their environment. Selects the execution target, not a Conda environment or software backend; local does not make scientific libraries available to bare python."
-          },
           "execution_target": {
-            "type": "object"
+            "type": "string",
+            "description": "Direct submission only: configured execution target name, such as local, tri or slurm. Prepared requests already select their target. This selects routing, not a Conda environment or scientific backend."
           },
           "session_id": {
             "type": [
@@ -3304,11 +3356,16 @@
             "additionalProperties": false,
             "description": "Direct Job or validator only: per-job resource request. Defaults are not limits. memory_mb is total MiB including program overhead. For prepared requests use preparer --cpus/--job-memory-mb/--walltime and re-prepare; never override a pinned request."
           },
-          "required_environment": {
+          "required_target": {
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
             "description": "Runtime task constraint injected by the tool adapter; checked after resolving any prepared request."
+          },
+          "required_route_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "description": "Runtime routing identity injected from the pinned task selection; not a model override."
           }
         },
         "required": [],
@@ -4239,7 +4296,6 @@
         "metadata",
         "workspace_id",
         "work_id",
-        "platform",
         "execution_target"
       ],
       "required": [],
@@ -4316,11 +4372,8 @@
           "work_id": {
             "type": "string"
           },
-          "platform": {
-            "type": "string"
-          },
           "execution_target": {
-            "type": "object"
+            "type": "string"
           }
         },
         "required": [],

@@ -632,7 +632,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 4096,
-          "description": "Path returned by the executor preparer --output. Pair with its exact request_sha256. This file describes a calculation to submit, not a calculation result. Do not combine with prepared_ref or override command, inputs, outputs, platform, metadata, request_id or work_id; rerun preparation to change those fields. New requests belong under the Node work_dir, or research/work/ before association. Historical request paths remain readable; do not move a submitted request."
+          "description": "Path returned by the executor preparer --output. Pair with its exact request_sha256. This file describes a calculation to submit, not a calculation result. Do not combine with prepared_ref or override command, inputs, outputs, execution_target, metadata, request_id or work_id; rerun preparation to change those fields. New requests belong under the Node work_dir, or research/work/ before association. Historical request paths remain readable; do not move a submitted request."
         },
         "prepared_ref": {
           "type": "string",
@@ -676,7 +676,7 @@
               "maxLength": 16384
             }
           },
-          "description": "Direct submission only: environment variable name/value map, not the execution environment name (use platform). Prepared requests own this field."
+          "description": "Direct submission only: environment variable name/value map, not the execution target name (use execution_target). Prepared requests own this field."
         },
         "inputs": {
           "type": "array",
@@ -756,11 +756,11 @@
           "maximum": 604800,
           "description": "Execution time limit in seconds for the submitted Job, not the bash preparation timeout. May accompany either a direct or prepared submission."
         },
-        "platform": {
+        "execution_target": {
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Direct submission only: configured execution environment name, such as local. Prepared requests already select their environment. Selects the execution target, not a Conda environment or software backend; local does not make scientific libraries available to bare python."
+          "description": "Direct submission only: configured execution target name, such as local, tri or slurm. Prepared requests already select their target. Selects routing, not a Conda environment or scientific backend."
         },
         "root": {
           "type": "string"
@@ -936,11 +936,11 @@
     "jobProbe": {
       "type": "object",
       "properties": {
-        "platform": {
+        "execution_target": {
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Configured execution platform name, default local. Checks platform infrastructure, not whether a scientific executable or method works. Use the executor targeted environment check for backend availability."
+          "description": "Configured execution target name. Checks routing infrastructure, not whether a scientific executable or method works. Use the executor targeted environment check for backend availability."
         },
         "root": {
           "type": "string"
@@ -1135,7 +1135,7 @@
           "description": "The first concrete action to perform now. Do not use a status summary or a final answer.",
           "pattern": "\\S"
         },
-        "compute_environment": {
+        "execution_target": {
           "type": [
             "string",
             "null"
@@ -1143,7 +1143,37 @@
           "minLength": 1,
           "maxLength": 128,
           "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
-          "description": "Configured compute environment required by the user (for example tri), or null when unrestricted. Preserve it across follow-ups; refine can change it only with a new actual user instruction. This is an execution destination, not a scientific method."
+          "description": "Optional configured target or alias, checked against the cited execution intent. When omitted, resolve the intent or snapshot the installation default. Tasks pin the result; omitted does not mean unrestricted."
+        },
+        "execution_intent": {
+          "type": "object",
+          "properties": {
+            "source_submission_id": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            },
+            "source_text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "scheduler": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "location": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "required": [
+            "source_submission_id",
+            "source_text"
+          ],
+          "additionalProperties": false,
+          "description": "Quote the affirmative execution instruction from a cited user submission; scheduler and location are independent constraints (for example tri and controller). Use an exact excerpt to disambiguate alternatives or negations."
         }
       },
       "required": [
@@ -1177,9 +1207,10 @@
             "block",
             "propose_completion",
             "set_research",
-            "apply_user_control"
+            "apply_user_control",
+            "correct_execution"
           ],
-          "description": "refine requires source_submission_ids; progress requires evidence_refs; wait requires wait; block requires reason, block_kind and resume_when; all kinds except missing_user_input also require evidence_refs; propose_completion requires completion; set_research requires research. Send only the fields for the selected action. apply_user_control applies an explicit user pause/resume/cancel instruction with control and source_submission_ids; cancel also requires jobs."
+          "description": "refine requires source_submission_ids; progress requires evidence_refs; wait requires wait; block requires reason, block_kind and resume_when; all kinds except missing_user_input also require evidence_refs; propose_completion requires completion; set_research requires research. Send only the fields for the selected action. apply_user_control applies an explicit user pause/resume/cancel instruction with control and source_submission_ids; cancel also requires jobs. correct_execution fixes an incorrect target interpretation using an original task source, execution_intent and reason; it does not authorize a new destination."
         },
         "reason": {
           "type": "string",
@@ -1318,16 +1349,30 @@
                 "minItems": 1,
                 "uniqueItems": true,
                 "maxItems": 64
+              },
+              "status": {
+                "enum": [
+                  "met",
+                  "unmet",
+                  "undetermined"
+                ]
+              },
+              "assessment_ref": {
+                "type": "string",
+                "pattern": "^art_[1-9][0-9]*$",
+                "description": "Fixed task-assessment/1 JSON Artifact with current task/workspace/criterion scope, requirements_revision, status, reason, checks and conflicts. See research-workflow completion reference."
               }
             },
             "required": [
               "criterion_id",
-              "evidence_refs"
+              "evidence_refs",
+              "status",
+              "assessment_ref"
             ],
             "additionalProperties": false
           },
           "maxItems": 32,
-          "description": "propose_completion only: cover every current criterion_id. Each entry needs at least one fixed Result or Artifact; Job/Node/note activity alone is insufficient. This proposes completion; the final user-facing response still must be delivered."
+          "description": "Assess each current criterion exactly once with status, fixed evidence and a scoped task-assessment/1 Artifact. A failure report is evidence of an unmet requirement, not successful validation. The final response must still be delivered."
         },
         "research": {
           "type": "object",
@@ -1373,7 +1418,7 @@
           ],
           "description": "apply_user_control with control=cancel only: keep existing Jobs or request cancellation of all Jobs owned by this task, according to the user instruction. Cancellation failures remain pending; verify receipts before claiming Jobs stopped."
         },
-        "compute_environment": {
+        "execution_target": {
           "type": [
             "string",
             "null"
@@ -1381,7 +1426,126 @@
           "minLength": 1,
           "maxLength": 128,
           "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
-          "description": "Configured compute environment required by the user (for example tri), or null when unrestricted. Preserve it across follow-ups; refine can change it only with a new actual user instruction. This is an execution destination, not a scientific method."
+          "description": "Optional configured target or alias, checked against the cited execution intent. When omitted, resolve the intent or snapshot the installation default. Tasks pin the result; omitted does not mean unrestricted."
+        },
+        "execution_intent": {
+          "type": "object",
+          "properties": {
+            "source_submission_id": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            },
+            "source_text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "scheduler": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "location": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "required": [
+            "source_submission_id",
+            "source_text"
+          ],
+          "additionalProperties": false,
+          "description": "Quote the affirmative execution instruction from a cited user submission; scheduler and location are independent constraints (for example tri and controller). Use an exact excerpt to disambiguate alternatives or negations."
+        },
+        "completion_outcome": {
+          "enum": [
+            "full",
+            "partial"
+          ],
+          "description": "full requires all criteria met; partial retains at least one unmet/undetermined criterion and requires an evidenced stop_basis."
+        },
+        "stop_basis": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "user_requested",
+                "budget_exhausted",
+                "search_exhausted"
+              ]
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "evidence_refs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "maxItems": 64,
+              "description": "Fixed Results or Artifacts documenting the applicable limit and exhausted work."
+            },
+            "source_submission_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "^[1-9][0-9]*$"
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "maxItems": 32,
+              "description": "Actual user submissions containing the instruction to stop with a partial deliverable."
+            },
+            "source_text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          },
+          "required": [
+            "kind",
+            "reason"
+          ],
+          "additionalProperties": false,
+          "description": "Why this round can end partially. user_requested quotes a cited actual user instruction; exhausted budget/search cites fixed evidence. Ordinary progress or a retryable failure is not a stopping basis.",
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "user_requested"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "then": {
+                "required": [
+                  "source_submission_ids",
+                  "source_text"
+                ]
+              },
+              "else": {
+                "required": [
+                  "evidence_refs"
+                ],
+                "properties": {
+                  "source_submission_ids": false,
+                  "source_text": false
+                }
+              }
+            }
+          ]
         }
       },
       "required": [
@@ -1414,7 +1578,10 @@
               "research": false,
               "wait": false,
               "control": false,
-              "jobs": false
+              "jobs": false,
+              "execution_intent": true,
+              "completion_outcome": false,
+              "stop_basis": false
             }
           }
         },
@@ -1445,7 +1612,10 @@
               "wait": false,
               "control": false,
               "jobs": false,
-              "compute_environment": false
+              "execution_target": false,
+              "execution_intent": false,
+              "completion_outcome": false,
+              "stop_basis": false
             }
           }
         },
@@ -1476,7 +1646,10 @@
               "source_submission_ids": false,
               "control": false,
               "jobs": false,
-              "compute_environment": false
+              "execution_target": false,
+              "execution_intent": false,
+              "completion_outcome": false,
+              "stop_basis": false
             }
           }
         },
@@ -1510,7 +1683,10 @@
               "wait": false,
               "control": false,
               "jobs": false,
-              "compute_environment": false
+              "execution_target": false,
+              "execution_intent": false,
+              "completion_outcome": false,
+              "stop_basis": false
             },
             "allOf": [
               {
@@ -1551,7 +1727,8 @@
           },
           "then": {
             "required": [
-              "completion"
+              "completion",
+              "completion_outcome"
             ],
             "properties": {
               "criteria": false,
@@ -1565,8 +1742,32 @@
               "wait": false,
               "control": false,
               "jobs": false,
-              "compute_environment": false
-            }
+              "execution_target": false,
+              "execution_intent": false,
+              "completion_outcome": true,
+              "stop_basis": true
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "completion_outcome": {
+                      "const": "partial"
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "stop_basis"
+                  ]
+                },
+                "else": {
+                  "properties": {
+                    "stop_basis": false
+                  }
+                }
+              }
+            ]
           }
         },
         {
@@ -1596,7 +1797,10 @@
               "wait": false,
               "control": false,
               "jobs": false,
-              "compute_environment": false
+              "execution_target": false,
+              "execution_intent": false,
+              "completion_outcome": false,
+              "stop_basis": false
             }
           }
         },
@@ -1627,7 +1831,10 @@
               "completion": false,
               "research": false,
               "reason": false,
-              "compute_environment": false
+              "execution_target": false,
+              "execution_intent": false,
+              "completion_outcome": false,
+              "stop_basis": false
             },
             "allOf": [
               {
@@ -1653,6 +1860,40 @@
                 }
               }
             ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "correct_execution"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "required": [
+              "execution_intent",
+              "reason"
+            ],
+            "properties": {
+              "block_kind": false,
+              "resume_when": false,
+              "objective": false,
+              "criteria": false,
+              "source_submission_ids": false,
+              "evidence_refs": false,
+              "next_action": false,
+              "wait": false,
+              "completion": false,
+              "research": false,
+              "control": false,
+              "jobs": false,
+              "completion_outcome": false,
+              "stop_basis": false
+            }
           }
         }
       ]

@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import { defineDoc, defineDocFamily } from "@earendil-works/pi-durable";
+import { resolveTaskSelection } from "./execution-selection.mjs";
+import { verifyAssessment, checkCompletion } from "./assessment.mjs";
 import { taskRecoveryPolicy, retryableSubmission, recoveryReady } from "./recovery.mjs";
 import { hasPendingInput } from "../host/admission/input.mjs";
 import shared from "../../../contracts/commands/shared.json" with { type: "json" };
@@ -22,7 +24,7 @@ const UserControlFinalization = defineDocFamily({ kind: "coragent.task-user-cont
 // must not restart automatic work; new task evidence and a successful run must agree.
 const UserRecoveryAttempt = defineDocFamily({ kind: "coragent.task-user-recovery", version: 1, family: true,
   scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
-const terminal = new Set(["completed", "cancelled"]);
+const terminal = new Set(["completed", "partial", "cancelled"]);
 const jobFinished = new Set(["succeeded", "failed", "timed_out", "cancelled", "collected", "unknown"]);
 const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const copy = value => JSON.parse(JSON.stringify(value));
@@ -106,7 +108,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       requireValue(read.node_id === ref, "task_research_invalid", "Research reference must resolve to a Node in this workspace");
     }));
   };
-  const verifyEvidence = async (refs, ctx, { completion = false, userTaskId } = {}) => {
+  const verifyEvidence = async (refs, ctx, { completion = false, current = false, userTaskId } = {}) => {
     requireValue(Array.isArray(refs) && refs.length > 0, "task_evidence_required", "Completion and progress require evidence references");
     requireValue(!refs.some(ref => ref.startsWith("job_result_")), "task_evidence_invalid",
       "Job result receipts are not task evidence references; cite the owning job_id or collected Artifact/Result references");
@@ -125,7 +127,11 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       }
       const read = await kernel.execute_command("research.read", { ref, limit: 1 });
       requireValue(read.ref === ref, "task_evidence_invalid", "Evidence reference did not resolve");
-      if (ref.startsWith("result_")) return [resultIdentity(ref)];
+      if (ref.startsWith("result_")) {
+        requireValue(!current || !(read.review_notice_count || read.review_notices?.length),
+          "task_evidence_stale", "A met criterion cannot rely on a Result requiring review; publish a current assessment with current evidence");
+        return [resultIdentity(ref)];
+      }
       return [];
     }));
     const fixed = [...new Set(identities.flat())];
@@ -378,12 +384,12 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
             && receipt.submission_ids?.includes(record.id) && live.run?.inputs.includes(record.id);
         }
         if (origin.producer === "task_controller") {
-          requireValue(task?.user_task_id === origin.identity.user_task_id && (finalizingBlock || finalizingStop || !["paused", "blocked", "cancelled", "completed"].includes(task.state)),
+          requireValue(task?.user_task_id === origin.identity.user_task_id && (finalizingBlock || finalizingStop || !["paused", "blocked", "cancelled", "completed", "partial"].includes(task.state)),
             "task_superseded", "Task no longer permits automatic execution");
           if (!origin.consumption) requireValue(task.control_epoch === origin.admission_basis.control_epoch,
             "task_superseded", "New user input superseded this automatic continuation");
         } else if (task) {
-          requireValue(finalizingBlock || finalizingStop || !["paused", "blocked", "cancelled", "completed"].includes(task.state), "task_paused", "Task is not accepting automatic execution");
+          requireValue(finalizingBlock || finalizingStop || !["paused", "blocked", "cancelled", "completed", "partial"].includes(task.state), "task_paused", "Task is not accepting automatic execution");
           if (!origin.consumption) requireValue(task.continuation.reservation?.submission_id === record.id
             && task.continuation.reservation.control_epoch === task.control_epoch,
           "task_superseded", "New user input superseded this automatic event");
@@ -443,7 +449,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       if (!task || terminal.has(task.state)) return null;
       requireValue(task.state === "active", "task_not_active", "Only an active user task may start new Jobs");
       return { user_task_id: task.user_task_id,
-        ...(task.compute_environment ? { compute_environment: task.compute_environment } : {}) };
+        ...(task.execution_target ? { execution_target: task.execution_target, route_digest: task.execution_selection?.route_digest } : {}) };
     },
     async read({ user_task_id }, ctx) {
       const task = await harness.snapshot(UserTask, conversation.id, user_task_id, ctx);
@@ -497,6 +503,8 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       const replayed = await readReceipt(requestId, params, ctx);
       if (replayed !== null) return replayed;
       const sources = await sourceRecords(params.source_submission_ids, ctx);
+      const selection = await resolveTaskSelection(kernel, params, sources);
+      requireValue(new Set(params.criteria.map(c => c.id)).size === params.criteria.length, "task_criteria_invalid", "Criterion IDs must be unique");
       return conversation.commit(tx => receipt(tx, requestId, params, async () => {
         const { index, task: existing } = await currentTx(tx);
         requireValue(!existing || terminal.has(existing.state), "task_already_exists", "This conversation already has a nonterminal user task; update it");
@@ -505,11 +513,11 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         Object.assign(task, { schema_version: "coragent-user-task/2", user_task_id: id,
           workspace_id: workspaceId, session_id: sessionId, conversation_id: conversation.id,
           title: params.title, objective: params.objective, sources, criteria: params.criteria,
-          compute_environment: params.compute_environment ?? null,
+          execution_target: selection.target, execution_selection: selection, requirements_revision: 1,
           initial_plan: params.initial_plan || "Preserve the user's deliverables, establish the research scope, and produce evidence for the first decision before choosing the next action.",
           next_action: params.next_action || "Read the current requirements and perform the first concrete evidence-producing action.",
           state: "active", reason: null, revision: 1, control_epoch: 1, wait: null,
-          progress: null, progress_version: 0, completion: null, execution_recovery: null, block_details: null,
+          progress: null, progress_version: 0, completion: null, completion_outcome: null, completion_stop_basis: null, execution_recovery: null, block_details: null,
           research: { entry_node_ids: [], focus_node_ids: [] }, research_review: null, progress_identities: [],
           event_inputs: [],
           continuation: { sequence: 0, reservation: null, no_progress: 0 }, audit: [],
@@ -531,7 +539,14 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       }
       const sources = params.action === "refine" ? await sourceRecords(params.source_submission_ids, ctx) : null;
       requireValue(params.action === "set_research" || params.research === undefined, "task_research_invalid", "Research bindings use set_research");
-      requireValue(params.action === "refine" || params.compute_environment === undefined, "task_constraint_invalid", "Execution destination changes require refine and a new user source");
+      requireValue(["refine", "correct_execution"].includes(params.action) || (params.execution_target === undefined && params.execution_intent === undefined), "task_constraint_invalid", "Execution target changes require refine and a new user source");
+      const changingTarget = params.execution_target !== undefined || params.execution_intent !== undefined;
+      const selection = changingTarget && ["refine", "correct_execution"].includes(params.action)
+        ? await resolveTaskSelection(kernel, params, params.action === "correct_execution" ? basis.sources : sources, basis.execution_selection) : null;
+      if (params.action === "correct_execution") requireValue(params.reason?.trim() && selection
+        && selection.selection_mode === "explicit", "execution_correction_invalid", "Correction needs the original explicit instruction and an audit reason");
+      if (params.criteria) requireValue(new Set(params.criteria.map(c => c.id)).size === params.criteria.length,
+        "task_criteria_invalid", "Criterion IDs must be unique");
       if (params.action === "set_research") await verifyResearch(params.research);
       const identities = params.action === "progress" ? await verifyEvidence(params.evidence_refs, ctx, { userTaskId: basis?.user_task_id }) : [];
       if (params.action === "block") {
@@ -546,8 +561,22 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         requireValue(!requiresEvidence || blockEvidence.length > 0,
           "task_block_evidence_required", "A blocker needs verified Result, Artifact or owned Job evidence; plans and notes alone are insufficient");
       }
+      let assessed = null;
       if (params.action === "propose_completion") {
-        for (const item of params.completion || []) await verifyEvidence(item.evidence_refs, ctx, { completion: true, userTaskId: basis?.user_task_id });
+        checkCompletion(basis, params);
+        for (const item of params.completion) await verifyEvidence(item.evidence_refs, ctx, { completion: true, userTaskId: basis.user_task_id });
+        assessed = await Promise.all(params.completion.map(item => verifyAssessment(kernel, basis, item, verifyEvidence, ctx)));
+        const jobs = await ownedJobs(basis.user_task_id);
+        requireValue(jobs.every(job => ["succeeded", "failed", "timed_out", "cancelled"].includes(job.state)),
+          "task_jobs_unsettled", "Reconcile outstanding Jobs before closing the task");
+        if (params.completion_outcome === "partial") {
+          const stop = params.stop_basis;
+          if (stop.kind === "user_requested") {
+            const userSources = await sourceRecords(stop.source_submission_ids, ctx);
+            requireValue(userSources.some(source => source.text.includes(stop.source_text || "\0")),
+              "task_source_invalid", "Partial closure must quote the user's stopping instruction");
+          } else await verifyEvidence(stop.evidence_refs, ctx, { completion: true, userTaskId: basis.user_task_id });
+        }
       }
       if (params.action === "wait") {
         const task = await getCurrent(ctx);
@@ -562,10 +591,10 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         requireValue(task.user_task_id === basis?.user_task_id && task.control_epoch === basis.control_epoch,
           "task_superseded", "Task control changed while references were being verified");
         requireValue(task.state !== "paused", "task_paused", "Only the user may resume a paused task");
-        requireValue(task.state !== "blocked" || ["refine", "progress", "set_research", "block"].includes(params.action),
+        requireValue(task.state !== "blocked" || ["refine", "correct_execution", "progress", "set_research", "block"].includes(params.action),
           "task_blocked", "Resolve the blocker with refine and the new user submission ID before continuing work");
         if (params.action === "refine") {
-          if (params.objective !== undefined || params.criteria !== undefined || params.compute_environment !== undefined) {
+          if (params.objective !== undefined || params.criteria !== undefined || changingTarget) {
             requireValue(sources.some(source => !task.sources.some(previous => previous.submission_id === source.submission_id)),
               "task_source_required", "Changing the agreed scope requires a new user instruction; partial evidence does not reduce delivery criteria");
           }
@@ -577,13 +606,21 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           }
           if (params.objective !== undefined) task.objective = params.objective;
           if (params.criteria !== undefined) task.criteria = params.criteria;
-          if (params.compute_environment !== undefined) task.compute_environment = params.compute_environment;
+          if (selection) { task.execution_target = selection.target; task.execution_selection = selection; }
+          if (params.objective !== undefined || params.criteria !== undefined) task.requirements_revision += 1;
           task.execution_recovery = null;
           task.block_details = null;
-          task.completion = null; delete task.completion_submission_id; delete task.completion_control_epoch;
+          task.completion = null; task.completion_outcome = null; task.completion_stop_basis = null; delete task.completion_submission_id; delete task.completion_control_epoch;
           if (task.state === "completing") task.state = "active";
           task.sources.push(...sources); task.control_epoch += 1;
           if (params.next_action !== undefined) task.next_action = params.next_action;
+        } else if (params.action === "correct_execution") {
+          requireValue(selection.target !== task.execution_target, "execution_correction_invalid", "Correction must fix a different target, not silently accept changed routing");
+          task.execution_target = selection.target; task.execution_selection = selection;
+          task.control_epoch += 1;
+          task.completion = null; task.completion_outcome = null; task.completion_stop_basis = null;
+          delete task.completion_submission_id; delete task.completion_control_epoch;
+          if (task.state === "completing") task.state = "active";
         } else if (params.action === "progress") {
           if (recordProgress(task, identities)) await recordUserRecoveryProgress(tx, task);
           task.progress = { summary: params.reason ?? null, evidence_refs: params.evidence_refs, at: stamp() };
@@ -601,14 +638,12 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
             submission_ids: live.run?.inputs ?? [], control_epoch: task.control_epoch });
           task.state = "blocked"; task.reason = params.reason; task.wait = null;
           task.block_details = { kind: params.block_kind, resume_when: params.resume_when, evidence_refs: params.evidence_refs ?? [] };
-          task.execution_recovery = null; task.completion = null; delete task.completion_submission_id; delete task.completion_control_epoch;
+          task.execution_recovery = null; task.completion = null; task.completion_outcome = null; task.completion_stop_basis = null; delete task.completion_submission_id; delete task.completion_control_epoch;
         } else if (params.action === "propose_completion") {
-          requireValue(task.criteria.length > 0 && task.criteria.every(criterion =>
-            params.completion?.some(item => item.criterion_id === criterion.id && item.evidence_refs.length)),
-          "task_completion_incomplete", "Every delivery criterion needs verified evidence");
           const live = await tx.doc(LiveDoc, conversation.id);
           requireValue(live.run?.inputs.length, "task_completion_run_required", "Completion must be delivered in an active model run");
-          task.state = "completing"; task.wait = null; task.completion = params.completion;
+          task.state = "completing"; task.wait = null; task.completion = assessed;
+          task.completion_outcome = params.completion_outcome; task.completion_stop_basis = params.stop_basis || null;
           task.completion_submission_id = live.run.inputs[0]; task.completion_control_epoch = task.control_epoch;
           task.execution_recovery = null;
         } else throw taskError("task_action_invalid", "Unknown task update action");
@@ -656,7 +691,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       const result = await conversation.commit(tx => receipt(tx, request_id,
         userInstruction?.payload || { user_task_id, action, expected_revision, jobs }, async () => {
           const { index, task } = await currentTx(tx);
-          requireValue(task?.user_task_id === user_task_id && !terminal.has(task.state), "task_not_active", "Task is not the current nonterminal task");
+          requireValue(task?.user_task_id === user_task_id && (!terminal.has(task.state) || task.state === "partial" && action === "resume"), "task_not_active", "Task is not the current nonterminal task");
           requireValue(task.revision === expected_revision, "task_revision_conflict", "Read the current task revision before controlling it");
           const live = await tx.doc(LiveDoc, conversation.id);
           if (userInstruction) {
@@ -665,6 +700,12 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
               && userInstruction.sources.every(source => live.run?.inputs.includes(Number(source.submission_id))),
             "task_control_source_invalid", "Cite the latest actual user instruction consumed by this run; automatic inputs and historical instructions cannot control a task");
             task.sources.push(...userInstruction.sources.filter(source => !task.sources.some(previous => previous.submission_id === source.submission_id)));
+          }
+          if (task.state === "partial" && action === "resume") {
+            task.completion_history = [...(task.completion_history || []), { completion: copy(task.completion), outcome: task.completion_outcome,
+              stop_basis: copy(task.completion_stop_basis), closed_at: task.updated_at }];
+            task.completion = null; task.completion_outcome = null; task.completion_stop_basis = null;
+            delete task.completion_submission_id; delete task.completion_control_epoch;
           }
           task.control_epoch += 1;
           task.state = action === "resume" ? "active" : action === "pause" ? "paused" : "cancelled";
@@ -751,13 +792,30 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       if (task.state === "completing") {
         const delivery = await (await harness.submission(task.completion_submission_id, ctx)).status(ctx);
         if (!["done", "unanswered"].includes(delivery.status)) return;
+        let assessmentError = null;
+        if (delivery.status === "done") {
+          try {
+            for (const item of task.completion) {
+              const checked = await verifyAssessment(kernel, task, item, verifyEvidence, ctx);
+              requireValue(JSON.stringify(checked.evidence_identities) === JSON.stringify(item.evidence_identities),
+                "task_evidence_changed", "Fixed acceptance evidence changed after the completion proposal");
+            }
+          } catch (error) { assessmentError = error; }
+        }
         await conversation.commit(async tx => {
           const { task: current } = await currentTx(tx);
           if (current.revision !== task.revision || current.state !== "completing") return;
-          if (delivery.status === "done") {
-            current.state = "completed"; current.execution_recovery = null;
-            current.reason = "Verified references and final response recorded";
-            changed(current, "completed", "task_controller", current.reason);
+          if (assessmentError) {
+            current.state = "active"; current.reason = "Completion evidence requires reassessment: " + assessmentError.message;
+            current.completion = null; current.completion_outcome = null; current.completion_stop_basis = null;
+            delete current.completion_submission_id; delete current.completion_control_epoch;
+            current.next_action = "Reassess the changed or unavailable acceptance evidence; retain existing delivery receipts and do not repeat external delivery.";
+            changed(current, "completion_invalidated", "task_controller", current.reason);
+          } else if (delivery.status === "done") {
+            current.state = current.completion_outcome === "partial" ? "partial" : "completed";
+            current.execution_recovery = null;
+            current.reason = current.state === "partial" ? "Partial delivery recorded; unmet criteria retained" : "All criterion assessments met and final response recorded";
+            changed(current, current.state, "task_controller", current.reason);
           } else {
             recordExecutionFailure(current, delivery, "delivery",
               current.completion_control_epoch !== undefined && current.completion_control_epoch !== current.control_epoch);

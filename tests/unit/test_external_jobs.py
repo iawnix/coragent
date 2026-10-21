@@ -204,6 +204,37 @@ def test_real_handler_queue_age_wakes_monitor_once_and_reports_allocation(queue,
     assert diagnostics['wait_seconds'] is None
 
 
+@pytest.mark.parametrize('error,exit_code,kind', [
+    ('memory limit exceeded (MemoryMax)', None, 'memory_limit'),
+    ('resource enforcement verification failed; see task stderr', 78, 'resource_enforcement'),
+    ('task exited with status 7', 7, None),
+])
+def test_tri_resource_failures_are_structured_without_changing_job_state(queue, tmp_path, error, exit_code, kind):
+    config, state = queue
+    platform = ExternalJobPlatform(config)
+    receipt = platform.start(spec(tmp_path, command=('/bin/true',),
+                                  metadata={'resources': {'cpus': 2, 'memory_mb': 128}}))
+    update_task(state, state='fail', finished_at='now', lease_id=None,
+                exit_code=exit_code, error=error)
+    status = platform.status(receipt)
+    assert status.state == JobState.FAILED
+    assert status.diagnostics['resource_failure'] == kind
+    assert status.diagnostics['effective_memory_limit_bytes'] == 128 * 1024**2
+    assert status.diagnostics['memory_swap_limit_bytes'] == 0
+
+
+def test_tri_fixed_node_is_reported_in_resource_diagnostics(queue, tmp_path):
+    config, state = queue
+    config = {**config, 'handler_environment': {**config['handler_environment'], 'CORAGENT_TRI_NODE': 'fed1'}}
+    platform = ExternalJobPlatform(config)
+    receipt = platform.start(spec(tmp_path, command=('/bin/true',)))
+    update_task(state, state='run', node='fed2', started_at='now', lease_id='lease-1')
+    status = platform.status(receipt)
+    assert status.state == JobState.RUNNING
+    assert status.diagnostics['requested_node'] == 'fed1'
+    assert status.diagnostics['node_match'] is False
+
+
 def test_recover_lost_submission_response_without_resubmitting(queue, tmp_path):
     config, state = queue
     request = spec(tmp_path, command=("/bin/true",))

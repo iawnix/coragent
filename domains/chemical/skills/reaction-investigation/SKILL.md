@@ -7,6 +7,12 @@ description: Run a closed-loop reaction investigation from species and mechanism
 
 [Chinese version](SKILL.zh-CN.md)
 
+## Script routing
+
+Use the registered executor ID and the [script routing map](../../../../docs/skill-script-routing.md#reaction-investigation) to choose the entrypoint, CLI, inputs, and primary outputs. The map is authoritative for routing; implementation helpers under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details; read the linked operation contract and use executor `--help` only for unspecified options.
+
+**Entrypoints:** `chemical.pathway-check@1` → `skills/reaction-investigation/scripts/pathway_job.py`.
+
 Use this Skill for a reaction mechanism or transition-state study. It coordinates the domain Skills while keeping the chemistry decision in one loop: define the hypothesis, prepare materials, construct candidates, run calculations, validate evidence, compare energetics, and choose the next discriminating experiment.
 
 ## Workflow contract

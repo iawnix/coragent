@@ -20,7 +20,7 @@ NEB 统一使用 [ASE](ase_neb_executor.zh-CN.md)，输入和执行器为版本 
 占位符应换成真实绝对路径和 Artifact 引用：
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.scan-xtb --version 1 --input input=<work_dir>/scan.json --input-artifact <scan-ref> --output <work_dir>/scan-request.json -- --max-points 16
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.scan-xtb --version 1 --input input=<work_dir>/scan.json --input-artifact <scan-ref> --output <work_dir>/scan-request.json -- --max-points 16
 ```
 
 | 入口 | 后端绑定 | 结果 |

@@ -19,7 +19,7 @@ except ImportError:
 from research_agent.application.api import execute
 from research_agent.application.environment_check import check_environments
 from research_agent.application.executors import prepare, prepare_script
-from research_agent.jobs.config_contract import load_job_config, binding_digest
+from research_agent.jobs.config_contract import binding_digest, configured_targets, load_job_config
 from research_agent.research.workspace import initialize_workspace, admit_research_workspace
 
 
@@ -76,13 +76,13 @@ def run_job(root, request, timeout):
                 execute('job.collect', root, {'job_id': receipt['job_id']})
             from research_agent.jobs import platforms_from_config
             settings = load_job_config(os.environ['CORAGENT_JOB_CONFIG'])
-            target = settings['environments'][request['platform']]
+            target = configured_targets(settings)[request['execution_target']]
             remote = receipt['metadata']['remote_dir']
             scope = hashlib.sha256(str(Path(receipt['cwd']).resolve()).encode()).hexdigest()[:24]
             expected = target['work_root'].rstrip('/') + '/' + receipt['job_id'] + '-' + scope
             if remote != expected:
                 raise RuntimeError('acceptance_cleanup_path_mismatch')
-            platform = platforms_from_config(Path(os.environ['CORAGENT_JOB_CONFIG']))[0][request['platform']]
+            platform = platforms_from_config(Path(os.environ['CORAGENT_JOB_CONFIG']))[0][request['execution_target']]
             platform.run_command('rm -rf -- ' + shlex.quote(remote))
 
 
@@ -94,7 +94,7 @@ def accept(config, package, directory, targets, timeout, *, bindings_only=False,
     available = profiles(package)
     report = {'schema_version': 'coragent-job-readiness/1', 'checked_at': datetime.now(timezone.utc).isoformat(),
               'configuration_sha256': binding_digest(settings), 'external_services': 'not_checked', 'targets': {}}
-    for name, target in settings['environments'].items():
+    for name, target in configured_targets(settings).items():
         if name not in targets:
             report['targets'][name] = {'status': 'not_verified'}
             continue
@@ -104,9 +104,7 @@ def accept(config, package, directory, targets, timeout, *, bindings_only=False,
         shared_workspace = None
         accepted = False
         try:
-            selected = {'default_environment': name, 'environments': {name: target},
-                        **({'execution': settings['execution']} if 'execution' in settings else {})}
-            row['environments'] = check_environments(selected)[name]
+            row['environments'] = check_environments(settings)[name]
             row['status'] = 'environment_verified'
             if target.get('file_mode', 'staged') == 'shared':
                 # Acceptance must exercise the same filesystem as real Jobs.

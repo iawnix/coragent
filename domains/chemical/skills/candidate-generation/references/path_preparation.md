@@ -69,7 +69,7 @@ Use the Node's returned work_dir (workspace research/work/ before association).
 The placeholders below represent actual absolute paths and returned Artifact refs:
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.path-candidates --version 1 --input spec=<work_dir>/spec.json --input-artifact <spec-ref> --output <work_dir>/candidates-request.json -- --conformers 1
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.path-candidates --version 1 --input spec=<work_dir>/spec.json --input-artifact <spec-ref> --output <work_dir>/candidates-request.json -- --conformers 1
 ```
 
 Submit its returned request_file/request_sha256 with node_id through job_start and

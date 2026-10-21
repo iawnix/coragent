@@ -80,13 +80,17 @@ blocks cancellation. TRI currently cancels by numeric ID only, so the helper's
 lookup and cancellation are not an atomic operation; do not reset/replace a queue
 while operations are in flight.
 
-Diagnostics show the observed node, requested CPU/memory/GPU resources and assigned
-CPU/GPU sets separately. A request is not evidence of allocation. While queued or
-held, `wait_seconds` is the age since TRI's `created_at`; missing timestamps remain
-unknown. This feeds the existing `queue_wait_seconds` Monitor threshold, with one
-queue-delay event per Job. Normal queue/running changes do not wake the Agent.
-Running cancellation is terminal only with completion evidence and
-`cancel_confirmed=true`; `completion_reason=lease_expired` is not stop proof.
+Diagnostics show the observed node, requested CPU/memory/GPU resources, effective
+memory and swap limits, and assigned CPU/GPU sets separately. A request is not
+evidence of allocation. `resource_failure` distinguishes `memory_limit` from
+`resource_enforcement` failures, while ordinary command failures remain null.
+When `CORAGENT_TRI_NODE` pins a target, `requested_node` and `node_match` make the
+actual assignment explicit. While queued or held, `wait_seconds` is the age since
+TRI's `created_at`; missing timestamps remain unknown. This feeds the existing
+`queue_wait_seconds` Monitor threshold, with one queue-delay event per Job. Normal
+queue/running changes do not wake the Agent. Running cancellation is terminal only
+with completion evidence and `cancel_confirmed=true`; `completion_reason=lease_expired`
+is not stop proof.
 
 ## Verify each compute node and backend
 

@@ -169,23 +169,23 @@ def plan(args, package=ROOT):
     # A managed selection persists across upgrades, provided its bindings have
     # not been edited by the operator since the last publication.
     for row in previous['environments']:
-        target = settings['environments'].get(row['target'], {})
+        target = settings['targets'].get(row['target'], {})
         if row.get('managed') and all(target.get('backends', {}).get(backend, {}).get('python') == row['binding']
                                      for backend in row['backends']):
             if target.get('kind') == 'local':
                 selections.append(row['target'] + ':' + row['profile'])
     roots = assignments(getattr(args, 'job_software_root', None), '--job-software-root')
     condas = assignments(getattr(args, 'job_conda', None), '--job-conda')
-    if (roots.keys() | condas.keys()) - settings['environments'].keys():
+    if (roots.keys() | condas.keys()) - settings['targets'].keys():
         raise ValueError('software root or Conda target is not configured')
     identity = digest(os.fsencode(root))[:16]
     default_store = str(Path.home() / 'soft/compute-envs')
     rows, selected_targets = [], set(getattr(args, 'verify_job_target', None) or [])
     for selection in dict.fromkeys(selections):
         target_name, separator, identifier = selection.partition(':')
-        if not separator or target_name not in settings['environments'] or identifier not in available:
+        if not separator or target_name not in settings['targets'] or identifier not in available:
             raise ValueError('--job-profile requires a configured TARGET:PROFILE: ' + selection)
-        target, profile = settings['environments'][target_name], available[identifier]
+        target, profile = settings['targets'][target_name], available[identifier]
         selected_targets.add(target_name)
         backends = target.setdefault('backends', {})
         names = [name for name in profile['backends'] if profile.get('auto_bind', True) or name in backends]
@@ -228,8 +228,8 @@ def plan(args, package=ROOT):
     identities = {(row['target'], row['profile']) for row in rows}
     rows.extend({**row, 'prepare': False} for row in previous['environments']
                 if (row['target'], row['profile']) not in identities)
-    selected_targets.update(name for name, target in settings['environments'].items() if target['kind'] == 'local')
-    if selected_targets - settings['environments'].keys():
+    selected_targets.update(name for name, target in settings['targets'].items() if target['kind'] == 'local')
+    if selected_targets - settings['targets'].keys():
         raise ValueError('verification target is not configured')
     resolver_path = app_paths(root).resolver_config
     existing_resolver = toml_bytes(document['name_resolver']) if 'name_resolver' in document else None
@@ -237,7 +237,7 @@ def plan(args, package=ROOT):
     if resolver is None:
         resolver = (package / 'config/name-resolver.example.toml').read_bytes()
     resolver_bindings, remote_resolvers = [], {}
-    for name, target in settings['environments'].items():
+    for name, target in settings['targets'].items():
         structure = target.get('backends', {}).get('structure')
         if structure is None:
             continue

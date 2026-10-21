@@ -13,7 +13,7 @@ import pytest
 from scripts import install_wizard as wizard
 from research_agent.foundation.installation_maintenance import InstallationMaintenance, assert_installation_available
 
-CONFIG = 'default_environment = "local"\n[environments.local]\nkind = "local"\n'
+CONFIG = '[execution]\ndefault_target = "local"\n[execution.targets.local]\ntype = "local"\ndriver = "process"\n'
 
 
 def test_exclusive_installation_and_durable_activation_window(tmp_path):

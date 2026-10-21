@@ -35,10 +35,11 @@ test('task action contracts require their own payloads and reject ignored fields
   const base={expected_revision:1};
   const actions=[
     ['refine',{source_submission_ids:['12'],objective:'Updated objective'}],
+    ['correct_execution',{reason:'Original scheduler misread',execution_intent:{source_submission_id:'12',source_text:'Use TRI',scheduler:'tri'}}],
     ['progress',{evidence_refs:['result_example']}],
     ['wait',{wait:{job_ids:['job_example'],mode:'all'}}],
     ['block',{reason:'Missing user input',block_kind:'missing_user_input',resume_when:'The user supplies the missing input.'}],
-    ['propose_completion',{completion:[{criterion_id:'c1',evidence_refs:['a1']}]}],
+    ['propose_completion',{completion_outcome:'full',completion:[{criterion_id:'c1',status:'met',assessment_ref:'art_1',evidence_refs:['art_2']}]}],
     ['set_research',{research:{entry_node_ids:[],focus_node_ids:[]}}],
     ['apply_user_control',{control:'cancel',jobs:'cancel',source_submission_ids:['12']}],
   ];
@@ -90,4 +91,15 @@ test('task action contracts require their own payloads and reject ignored fields
     assert.throws(()=>check('taskBegin',{...begin,source_submission_ids:['12'],[field]:' \n\t'}));
   }
   assert.throws(()=>check('taskBegin',{...begin,source_submission_ids:['user_1']}));
+});
+
+test("partial closure contracts require the appropriate stopping evidence", () => {
+  const schema = createPublicToolContracts(Type).taskUpdate.parameters;
+  const base = { action: "propose_completion", expected_revision: 1, completion_outcome: "partial",
+    completion: [{ criterion_id: "c1", status: "unmet", assessment_ref: "art_1", evidence_refs: ["result_1"] }] };
+  for (const kind of ["user_requested", "budget_exhausted", "search_exhausted"]) {
+    assert.equal(Value.Check(schema, { ...base, stop_basis: { kind, reason: "Stop reason" } }), false);
+    const support = kind === "user_requested" ? { source_submission_ids: ["12"], source_text: "Stop and deliver partial findings" } : { evidence_refs: ["art_2"] };
+    assert.equal(Value.Check(schema, { ...base, stop_basis: { kind, reason: "Stop reason", ...support } }), true);
+  }
 });

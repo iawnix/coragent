@@ -1,4 +1,6 @@
 # Search diagnosis and recovery
+## Contents
+
 
 [中文](search_recovery.zh-CN.md)
 
@@ -8,6 +10,55 @@ hypothesis or setting in a new immutable Job. Reconcile running/unknown jobs bef
 resubmission. Independent hypotheses may run in parallel within the budget; no
 fixed failure count, mandatory phase sequence or reaction-specific state machine
 is needed. Record observations and next decisions in the existing research Node.
+
+The `chemical.search-recovery@1` executor turns this diagnosis into one explicit
+next-route decision. It accepts a canonical Attempt record and verified context,
+then returns `auto_continue`, `needs_review`, `no_action`, or `exhausted`. An
+automatic decision always names its parent Attempt, changed variables and
+preconditions. The control plane creates a new Job from that decision; the
+recovery executor never mutates or replays the old Job.
+
+The input is `chemical-search-recovery-input/1`:
+
+```json
+{
+  "attempt": {
+    "id": "attempt-07",
+    "input_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "evidence_refs": ["artifact:diagnosis-07"],
+    "route": "qst2",
+    "status": "failed",
+    "diagnosis": {"primary": "optimization_limit", "events": ["optimization_limit"]}
+  },
+  "context": {
+    "mapping": "verified",
+    "endpoint_compatibility": "verified",
+    "geometry_preflight": "passed",
+    "endpoints_minima": "unknown",
+    "reaction_coordinates": [{"kind": "distance", "atoms": ["atom_1", "atom_2"]}],
+    "candidate": {"available": false, "geometry_safe": false, "finite_gradients": false}
+  },
+  "policy": {
+    "allowed_routes": ["qst2", "scan-xtb", "neb-xtb", "direct-ts"],
+    "attempted_routes": ["qst2"],
+    "max_jobs": 6,
+    "jobs_used": 1
+  }
+}
+```
+
+The diagnostic `primary` is the first item in `events`; it is supplied by the
+Gaussian/xTB parser or a reviewed path result, rather than inferred from a
+nonzero process exit alone.
+
+The initial transitions are deliberately general: QST3 coordinate or guess
+failure can move to QST2 when endpoint mapping is verified; a QST numerical
+failure can move to a bounded xTB scan when a reaction coordinate and safe seed
+are present; a valid scan or NEB candidate can move to direct TS refinement.
+Endpoint minima and mapping are required before NEB. Input, state, route,
+transport, unknown-job, and bare solver-crash diagnostics stop automatic
+degradation. Lower-level scan and NEB candidates remain candidates and require
+target-level stationary, mode, and IRC checks.
 
 | Observation | Inspect first | Evidence-directed response |
 | --- | --- | --- |

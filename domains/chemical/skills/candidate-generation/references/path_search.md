@@ -21,7 +21,7 @@ with node_id to job_start and collect the terminal Job. Example (replace absolut
 paths and Artifact refs with the real returned values):
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.scan-xtb --version 1 --input input=<work_dir>/scan.json --input-artifact <scan-ref> --output <work_dir>/scan-request.json -- --max-points 16
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.scan-xtb --version 1 --input input=<work_dir>/scan.json --input-artifact <scan-ref> --output <work_dir>/scan-request.json -- --max-points 16
 ```
 
 | Recipe | Backend binding | Result |

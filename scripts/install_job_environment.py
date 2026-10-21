@@ -141,7 +141,7 @@ def _offline_conda_lock(lock):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--config", required=True)
-    p.add_argument("--environment", required=True)
+    p.add_argument("--target", required=True)
     p.add_argument("--backend", required=True)
     p.add_argument("--adopt", action="store_true", help="Verify an explicitly seeded/cloned environment against its exported locks before recording it")
     p.add_argument('--package-cache', type=Path, help='Directory for pinned pip wheels/source archives; defaults below the environment parent')

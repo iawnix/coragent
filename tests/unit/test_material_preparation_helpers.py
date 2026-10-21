@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 
 import pytest
+pytest.importorskip('rdkit')
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT/'domains/chemical/skills/material-preparation/scripts/reaction'

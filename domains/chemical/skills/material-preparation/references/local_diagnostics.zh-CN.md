@@ -27,7 +27,7 @@ chemical-local-diagnostics-result/1 包含每个中心原子的最近六个邻�
 短接触只是邻近启发式，不推断键/价态、不认证 TS 或机制，scientific_verdict 为 not_assessed。
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.local-diagnostics --version 1 --input input=<work_dir>/diagnostics.json --input-artifact <input-ref> --output <work_dir>/diagnostics-request.json
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.local-diagnostics --version 1 --input input=<work_dir>/diagnostics.json --input-artifact <input-ref> --output <work_dir>/diagnostics-request.json
 ```
 
 替换占位符，提交返回请求/摘要与 node_id，随后收集 results/result.json；结果保留

@@ -7,12 +7,12 @@ import { createCodingTools } from "../../../apps/agent/pi/coding-tools.mjs";
 import { loadPi } from "../../../apps/agent/pi/source.mjs";
 import { TEST_ROOT } from "./test-environment.mjs";
 
-async function fixture(t) {
+async function fixture(t, getSelection) {
   const cwd = await mkdtemp(join(TEST_ROOT, "c-"));
   const { ExecutionEnvs } = await loadPi("setup");
   const environments = new ExecutionEnvs(cwd);
   t.after(async () => { await environments.cleanup(TODO_CONTEXT); await rm(cwd, { recursive: true, force: true }); });
-  const tools = await createCodingTools(cwd);
+  const tools = await createCodingTools(cwd, getSelection);
   const invoke = async (name, args, context = TODO_CONTEXT) => {
     const output = [];
     let details;
@@ -66,4 +66,17 @@ test("search cancellation reaches the original Pi implementations", async t => {
   for (const name of ["grep", "find", "ls"]) {
     await assert.rejects(invoke(name, name === "ls" ? {} : { pattern: "anything" }, context), /abort/i);
   }
+});
+
+test("bash inherits the current pinned target without shell interpolation or stale context", async t => {
+  let selection = { target: "tri'$(touch should-not-exist)", route_digest: "sha256:" + "a".repeat(64),
+    sources: [{ text: "quote ' and $(touch should-not-exist)" }] };
+  const { cwd, invoke } = await fixture(t, async () => selection);
+  const response = await invoke("bash", { command: 'printf "%s" "$CORAGENT_TASK_EXECUTION"' });
+  assert.ok(response.text.includes(JSON.stringify({ target: selection.target, route_digest: selection.route_digest })));
+  assert.doesNotMatch(response.text, /sources/);
+  await assert.rejects(readFile(join(cwd, "should-not-exist")), { code: "ENOENT" });
+  selection = null;
+  const empty = await invoke("bash", { command: 'printf "context=%s" "${CORAGENT_TASK_EXECUTION-unset}"' });
+  assert.match(empty.text, /context=unset/);
 });

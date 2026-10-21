@@ -12,7 +12,7 @@
 准备请求时已经核验所选目标。准备前需要诊断时，只检查选定的入口和环境：
 
 ```bash
-"$CORAGENT_PYTHON" -m research_agent.application.environment_check --config "$CORAGENT_JOB_CONFIG" --environment <环境> --executor <id> --version <版本>
+"$CORAGENT_PYTHON" -m research_agent.application.environment_check --config "$CORAGENT_JOB_CONFIG" --target <环境> --executor <id> --version <版本>
 ```
 
 使用没有预设入口的原生命令或任务脚本时，将 executor/version 换成 `--backend <绑定>`。

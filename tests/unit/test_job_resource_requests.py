@@ -1,5 +1,6 @@
 """Per-job allocation travels from preparation to the scheduler and program."""
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -20,8 +21,8 @@ from tests.unit.test_job_recovery import workspace
 
 def configured(tmp_path, *, external=None):
     path = Path(os.environ['CORAGENT_JOB_CONFIG'])
-    source = tomllib.loads(path.read_text())['environments']['local']
-    python = source['backends']['validation']['python']
+    source = tomllib.loads(path.read_text())['execution']['targets']['local']
+    python = source['bindings']['validation']['python']
     program = tmp_path / 'g16'
     program.write_text('#!/bin/sh\ncat > observed.gjf\nprintf "%s" "$OMP_NUM_THREADS" > observed.threads\n'
                        "printf '%s\\n' ' #p M062X/6-31G** SP SCF=Tight Int=UltraFine' ' ----------------' "
@@ -46,6 +47,7 @@ def gaussian(config, tmp_path, **kw):
     return prepare(config, 'local', 'chemical.gaussian', '1', {'geometry': geometry(tmp_path)}, ['--task', 'sp'], **kw)
 
 
+@pytest.mark.skipif(importlib.util.find_spec('numpy') is None, reason='fixture environment lacks NumPy for Gaussian execution')
 def test_explicit_allocation_reaches_tri_and_gaussian_without_changing_defaults(tmp_path, queue):
     target, state = queue
     config = configured(tmp_path, external=target)
@@ -63,14 +65,14 @@ def test_explicit_allocation_reaches_tri_and_gaussian_without_changing_defaults(
         assert arguments[arguments.index('--timeout') + 1] == '600'
         finish(state)
         result = execute('job.collect', root, {'job_id': receipt['job_id']})
-        assert result['status']['state'] == 'succeeded'
+        assert result['status']['state'] == 'succeeded', (Path(receipt['cwd']) / 'logs/stderr.log').read_text()
         output = Path(receipt['cwd']) / 'results/sp'
         assert (output / 'observed.threads').read_text() == '12'
         assert '%nprocshared=12' in (output / 'observed.gjf').read_text().lower()
         assert '%mem=14745MB' in (output / 'observed.gjf').read_text()
         spec = json.loads((Path(receipt['cwd']) / 'spec.json').read_text())
         assert spec['metadata']['resources']['cpus'] == 12
-        assert load_job_config(config)['environments']['local']['submission']['resources']['cpus'] == 4
+        assert load_job_config(config)['targets']['local']['submission']['resources']['cpus'] == 4
         # Neither changing an existing file nor attaching an override can reuse its digest.
         prepared['metadata']['resources']['cpus'] = 16
         path.write_text(json.dumps(prepared))
@@ -117,7 +119,7 @@ def test_script_resources_are_pinned_without_claiming_internal_parallelism(tmp_p
 def test_target_activation_cannot_restore_stale_thread_defaults(tmp_path):
     from tests.unit.test_execution_environment import stage, run_guard
     config = configured(tmp_path)
-    conda = Path(load_job_config(config)['environments']['local']['python']['conda_executable'])
+    conda = Path(load_job_config(config)['targets']['local']['python']['conda_executable'])
     conda.write_text(conda.read_text().replace('else shift 5;',
         'else export OMP_NUM_THREADS=2 CORAGENT_JOB_CPUS=2 CORAGENT_JOB_MEMORY_MB=256; shift 5;'))
     script = tmp_path / 'analysis.py'
@@ -210,11 +212,12 @@ def test_input_changes_and_program_argument_tampering_are_rechecked(tmp_path, mo
         check_binding(prepared, probe=False)
 
 
+@pytest.mark.skipif(importlib.util.find_spec('numpy') is None, reason='fixture environment lacks NumPy for Gaussian binding probe')
 def test_preparer_cli_has_a_single_job_resource_entry_point(tmp_path):
     config = configured(tmp_path)
     path = tmp_path / 'request.json'
     result = subprocess.run([sys.executable, '-m', 'research_agent.application.executors',
-        '--config', str(config), '--environment', 'local', '--executor', 'chemical.gaussian', '--version', '1',
+        '--config', str(config), '--target', 'local', '--executor', 'chemical.gaussian', '--version', '1',
         '--input', 'geometry=' + str(geometry(tmp_path)), '--cpus', '12', '--job-memory-mb', '16384',
         '--walltime', '01:00:00', '--output', str(path), '--', '--task', 'sp'], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr

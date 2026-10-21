@@ -7,6 +7,12 @@ description: 根据目标观测量、体系、电子态、环境和不确定性�
 
 [English version](SKILL.md)
 
+## 脚本路由
+
+按 executor ID 使用[脚本路由地图](../../../../docs/skill-script-routing.zh-CN.md#method-selection)选择入口、CLI、输入和主要输出。地图是路由依据；`scripts/` 下的 helper 不是独立命令。不要通过读取源码发现调用方式，先读操作合同，只有合同未说明的选项才使用 executor 的 `--help`。
+
+**入口：** 无仓库内脚本；按文档使用 runtime 或 generic Job。
+
 需要选方法、比较方法或在命名计算环境中准备固定方法时使用。本 Skill 从研究需要的量开始，把方法选择写入研究 Node 和 Job intent。
 
 ## 选择流程

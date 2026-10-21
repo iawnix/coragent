@@ -7,6 +7,12 @@ description: 使用能隙、投影梯度和 seam 曲率证据搜索并检查不�
 
 [English version](SKILL.md)
 
+## 脚本路由
+
+按 executor ID 使用[脚本路由地图](../../../../docs/skill-script-routing.zh-CN.md#surface-crossing)选择入口、CLI、输入和主要输出。地图是路由依据；`scripts/` 下的 helper 不是独立命令。不要通过读取源码发现调用方式，先读操作合同，只有合同未说明的选项才使用 executor 的 `--help`。
+
+**入口：** `chemical.mecp-gaussian@1` → `skills/surface-crossing/scripts/crossing.py`；`chemical.crossing-check@1` → `skills/surface-crossing/scripts/crossing.py`。
+
 研究两个不同自旋多重度 Gaussian HF/DFT 表面的交叉时使用。原生搜索为 `chemical.mecp-gaussian@1`，独立数值证据为 `chemical.crossing-check@1`。
 
 ## 工作流

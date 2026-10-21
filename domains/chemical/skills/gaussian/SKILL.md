@@ -7,6 +7,12 @@ description: Prepare and execute Gaussian XYZ or explicit input jobs, parse nati
 
 [Chinese version](SKILL.zh-CN.md)
 
+## Script routing
+
+Use the registered executor ID and the [script routing map](../../../../docs/skill-script-routing.md#gaussian) to choose the entrypoint, CLI, inputs, and primary outputs. The map is authoritative for routing; implementation helpers under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details; read the linked operation contract and use executor `--help` only for unspecified options.
+
+**Entrypoints:** `chemical.gaussian@1` → `skills/gaussian/scripts/run.py`; `chemical.gaussian-input@1` → `skills/gaussian/scripts/run.py`; `chemical.electronic-gaussian@1` → `skills/gaussian/scripts/electronic.py`; `chemical.state-tracking@1` → `skills/gaussian/scripts/electronic.py`.
+
 Use this Skill when Gaussian is the chosen backend for optimization, single point, QST/TS, frequency, IRC, relaxed scan, electronic-state tracking, or final log evidence. It handles route construction, staged files, native execution, and parsing; the operation Skill defines the scientific question and acceptance criteria.
 
 ## Registered adapters
@@ -22,7 +28,7 @@ The path-specific gradient and NEB adapters live in `candidate-generation`; Gaus
 ## XYZ shortcut
 
 ```bash
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.gaussian --version 1 --input geometry=input.xyz --cpus 12 --job-memory-mb 16384 --output prepared/gaussian.json -- --task opt-sp --method M062X --basis '6-31G**' --charge 0 --multiplicity 1
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.gaussian --version 1 --input geometry=input.xyz --cpus 12 --job-memory-mb 16384 --output prepared/gaussian.json -- --task opt-sp --method M062X --basis '6-31G**' --charge 0 --multiplicity 1
 ```
 
 Use `opt` for geometry, `sp` for a fixed geometry, and `opt-sp` for both. The wrapper records energies, convergence, optimized geometry, method/basis, state, raw log, and parser summary.
@@ -34,7 +40,7 @@ Read `summary.optimization_completed` with `optimization_completion_reason` for 
 Stage a complete input and relative checkpoint/dependency names inside the Job:
 
 ```bash
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.gaussian-input --version 1 --input input=ts.gjf --collect results/ts.chk --output prepared/ts.json -- --method M062X --basis '6-31G**' --charge 0 --multiplicity 1 --validation none
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.gaussian-input --version 1 --input input=ts.gjf --collect results/ts.chk --output prepared/ts.json -- --method M062X --basis '6-31G**' --charge 0 --multiplicity 1 --validation none
 ```
 
 Use `--validation opt|sp|frequency|minimum|saddle|irc` when the input is intended for a parser check. Keep the final blank section terminator and complete Link1 metadata. Submit prepared requests with `job_start`, then inspect `gaussian.out`, `parsed.json`, checkpoint, geometry, and validation fields.

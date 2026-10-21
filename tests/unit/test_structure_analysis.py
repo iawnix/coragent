@@ -5,8 +5,8 @@ from pathlib import Path
 import sys
 import time
 
-import numpy as np
 import pytest
+np = pytest.importorskip('numpy')
 
 SCRIPTS = Path(__file__).resolve().parents[2] / 'domains/chemical/skills/material-preparation/scripts/materials'
 from tests.unit.chemical_paths import configure

@@ -26,7 +26,11 @@ def test_conda_selection_and_host_python_isolation():
 
 
 def test_legacy_interpreter_is_not_a_second_configuration_protocol():
-    c = config(); c["environments"]["remote"]["python"] = "/usr/bin/python3"
+    c = {"execution": {"default_target": "local", "targets": {
+        "local": {"type": "local", "driver": "local"},
+        "remote": {"type": "remote", "driver": "external", "transport": "ssh",
+                   "ssh_host": "fixture", "work_root": "/scratch/jobs", "handler": ["/bin/true"],
+                   "python": "/usr/bin/python3"}}}}
     with pytest.raises(ValueError, match="migrate legacy"):
         validate_job_config(c)
 
@@ -63,7 +67,7 @@ lock_ref = "/opt/locks/cf22d.lock"
     xyz = tmp_path / "water.xyz"; xyz.write_text("1\nH\nH 0 0 0\n")
     job = prepare(path, "remote", "chemical.xtb", "1", {"geometry": xyz}, ["--task", "opt-sp"])
     assert "/opt/runner" in job["command"]
-    assert job["platform"] == "remote"
+    assert job["execution_target"] == "remote"
     assert job["metadata"]["python_binding"]["lock_ref"] == "/opt/locks/runner.lock"
     with pytest.raises(ValueError, match="runner_arguments_invalid.*",):
         prepare(path, "remote", "chemical.xtb", "1", {"geometry": xyz}, ["--task", "opt-sp", "--method", "GFN2-xTB"])
@@ -88,14 +92,14 @@ def test_example_and_python_binding_share_public_schema():
     validator.validate(example)
     validate_job_config(example)
     inherited = copy.deepcopy(example)
-    inherited['environments']['local']['backends']['pyscf'] = {}
+    inherited['execution']['targets']['local']['bindings']['pyscf'] = {}
     validator.validate(inherited)
     validate_job_config(inherited)
-    assert resolve_python(inherited, 'local', 'pyscf') == inherited['environments']['local']['python']
+    assert resolve_python(validate_job_config(inherited), 'local', 'pyscf') == validate_job_config(inherited)['targets']['local']['python']
     for invalid in ['/usr/bin/python3', {**binding('/opt/env'), 'manager': 'venv'},
                     {**binding('/opt/env'), 'prefix': 'relative'}, {**binding('/opt/env'), 'extra': True}]:
         c = copy.deepcopy(example)
-        c['environments']['local']['python'] = invalid
+        c['execution']['targets']['local']['python'] = invalid
         assert list(validator.iter_errors(c))
         with pytest.raises(ValueError):
             validate_job_config(c)
@@ -151,7 +155,7 @@ def test_pip_install_requires_pinned_versions_and_hashes_before_creating_prefix(
 
 def test_remote_queue_selection_is_explicit_and_allowlisted():
     from research_agent.jobs.config_contract import resolve_submission
-    c=config();remote=c['environments']['remote'];remote['allowed_queues']=['test']
+    c=config();remote=c['targets']['remote'];remote['allowed_queues']=['test']
     assert resolve_submission(c,'remote','xtb')['queue']=='test'
     remote['submission']['queue']='forbidden'
     with pytest.raises(ValueError,match='not allowed'):resolve_submission(c,'remote','xtb')
@@ -166,18 +170,19 @@ def test_remote_queue_selection_is_explicit_and_allowlisted():
     lambda target: target.update(command_timeout_seconds=0),
     lambda target: target.update(max_nodes=2),
     lambda target: target.update(commands={'pbsnodes': 'pbsnodes'}),
-    lambda target: target['backends']['xtb'].update(requires_gpu=False),
-    lambda target: target['backends']['xtb'].update(allowed_queues=['bad queue']),
+    lambda target: target['bindings']['xtb'].update(requires_gpu=False),
+    lambda target: target['bindings']['xtb'].update(allowed_queues=['bad queue']),
 ])
 def test_runtime_and_generated_schema_reject_invalid_remote_settings(mutate):
     from jsonschema import Draft202012Validator
     from research_agent.jobs.config_contract import job_config_schema
-    value = config(); mutate(value['environments']['remote'])
+    value = configuration_document(config())
+    mutate(value['execution']['targets']['remote'])
     with pytest.raises(ValueError): validate_job_config(value)
-    assert list(Draft202012Validator(job_config_schema()).iter_errors(configuration_document(value)))
+    assert list(Draft202012Validator(job_config_schema()).iter_errors(value))
 
 
-def test_platform_selection_has_no_implicit_local_or_remote_alias(tmp_path, monkeypatch):
+def test_target_selection_has_no_implicit_local_or_remote_alias(tmp_path, monkeypatch):
     from research_agent.jobs.config import platforms_from_config
     monkeypatch.delenv('CORAGENT_JOB_CONFIG', raising=False)
     with pytest.raises(ValueError, match='job_config_required'): platforms_from_config()
@@ -191,17 +196,18 @@ def test_local_supervisor_is_explicit_and_part_of_prepared_binding(tmp_path):
     from research_agent.jobs.config_contract import resolve_binding, binding_digest
     from research_agent.jobs.config import platforms_from_config
     settings = config()
-    settings['environments']['local']['backends'] = {'shell': {'command': '/bin/sh'}}
+    settings['targets']['local']['backends'] = {'shell': {'command': '/bin/sh'}}
     baseline = resolve_binding(settings, 'local', 'shell', runtime='native')
     assert baseline['supervisor'] == 'systemd'
-    settings['environments']['local']['supervisor'] = 'process'
+    settings['targets']['local']['supervisor'] = 'process'
     selected = resolve_binding(validate_job_config(settings), 'local', 'shell', runtime='native')
     assert selected['supervisor'] == 'process'
     assert binding_digest(selected) != binding_digest(baseline)
     path = tmp_path / 'process.toml'
-    path.write_text('default_environment="local"\n[environments.local]\nkind="local"\nsupervisor="process"\n')
+    path.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\nsupervisor="process"\n')
     platforms, _ = platforms_from_config(path)
     assert platforms['local'].supervisor == 'process'
-    settings['environments']['remote']['supervisor'] = 'process'
+    settings = configuration_document(settings)
+    settings['execution']['targets']['remote']['supervisor'] = 'process'
     with pytest.raises(ValueError, match='unsupported fields'):
         validate_job_config(settings)

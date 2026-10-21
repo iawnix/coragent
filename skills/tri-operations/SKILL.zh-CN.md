@@ -5,6 +5,12 @@ description: 安装和运维 TRI 任务队列，配置服务端与计算节点�
 
 # TRI 运维
 
+## 脚本路由
+
+调用仓库脚本前先看[脚本路由地图](../../docs/skill-script-routing.zh-CN.md#tri-operations)。地图列出支持的入口和接口；`scripts/` 下的 helper 不是独立命令。不要通过读取源码发现调用方式。
+
+**入口：** `skills/tri-operations/scripts/queue.py`（stdin/子命令合同见脚本地图）。
+
 [English version](SKILL.md)
 
 在部署 TRI、配置节点与资源、维护服务、排查任务时使用。TRI 由持久队列服务端、计算节点客户端和命令行工具组成，适用于单机以及共享任务文件的多机环境。

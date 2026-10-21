@@ -7,6 +7,12 @@ description: Run CF22D through the PySCF binding for single points, optimization
 
 [Chinese version](SKILL.zh-CN.md)
 
+## Script routing
+
+Use the registered executor ID and the [script routing map](../../../../docs/skill-script-routing.md#cf22d) to choose the entrypoint, CLI, inputs, and primary outputs. The map is authoritative for routing; implementation helpers under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details; read the linked operation contract and use executor `--help` only for unspecified options.
+
+**Entrypoints:** `chemical.cf22d@1` → `skills/cf22d/scripts/run.py`; `chemical.cf22d-doctor@1` → `skills/cf22d/scripts/doctor.py`.
+
 Use this Skill when CF22D is the chosen electronic method. It translates an XYZ material and explicit electronic settings into the registered PySCF/CF22D runner, writes parser-readable evidence, and returns geometries, energies, gradients, frequencies, and thermochemistry fields when the task provides them.
 
 ## Task vocabulary
@@ -30,7 +36,7 @@ Provide an XYZ file in angstroms, a basis (default `def2-tzvp`), charge, multipl
 ## Typical request
 
 ```bash
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.cf22d --version 1 --input geometry=input.xyz --output prepared/cf22d.json -- --task opt-sp --basis def2-tzvp --charge 0 --multiplicity 1 --threads 8 --memory-mb 8000
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.cf22d --version 1 --input geometry=input.xyz --output prepared/cf22d.json -- --task opt-sp --basis def2-tzvp --charge 0 --multiplicity 1 --threads 8 --memory-mb 8000
 ```
 
 Start the prepared request with `job_start`, then submit and collect the Job. The result contains `results/result.json`, `results/geometry.xyz`, task output, units, convergence fields, and raw provenance. Use `chemical.cf22d-doctor@1` when the PySCF/CF22D environment needs diagnosis.

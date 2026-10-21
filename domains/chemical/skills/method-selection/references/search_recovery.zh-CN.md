@@ -7,6 +7,49 @@
 独立假设可在预算内并行，不设置固定失败次数、强制阶段顺序或反应专用状态机。
 观察与下一步决策记录在当前研究 Node。
 
+`chemical.search-recovery@1` 将这类诊断转换成一条明确的下一路线决策。它接收规范化的
+Attempt 记录和已核实的上下文，返回 `auto_continue`、`needs_review`、`no_action` 或
+`exhausted`。自动决策必须写明父 Attempt、改变的变量和前置条件；控制面依据决策创建新
+Job，恢复执行器不修改或重放旧 Job。
+
+输入版本为 `chemical-search-recovery-input/1`：
+
+```json
+{
+  "attempt": {
+    "id": "attempt-07",
+    "input_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "evidence_refs": ["artifact:diagnosis-07"],
+    "route": "qst2",
+    "status": "failed",
+    "diagnosis": {"primary": "optimization_limit", "events": ["optimization_limit"]}
+  },
+  "context": {
+    "mapping": "verified",
+    "endpoint_compatibility": "verified",
+    "geometry_preflight": "passed",
+    "endpoints_minima": "unknown",
+    "reaction_coordinates": [{"kind": "distance", "atoms": ["atom_1", "atom_2"]}],
+    "candidate": {"available": false, "geometry_safe": false, "finite_gradients": false}
+  },
+  "policy": {
+    "allowed_routes": ["qst2", "scan-xtb", "neb-xtb", "direct-ts"],
+    "attempted_routes": ["qst2"],
+    "max_jobs": 6,
+    "jobs_used": 1
+  }
+}
+```
+
+`diagnosis.primary` 必须是 `events` 的第一项，由 Gaussian/xTB 解析器或已审查的路径结果
+提供，不能仅根据进程非零退出码推断。
+
+第一版转换保持通用：QST3 的猜测或坐标变换失败且端点映射已核实时可转 QST2；QST 数值
+失败且存在反应坐标和安全种子时可转有界 xTB 扫描；扫描或 NEB 产生有效候选时可转直接
+TS 精修。NEB 前必须核实端点极小点和映射。输入、电子态、route、传输、状态未知以及
+没有实质诊断的 solver 崩溃都停止自动降级。低级别扫描和 NEB 只产生候选，仍须用目标级别
+完成驻点、模式和 IRC 检查。
+
 | 现象 | 先检查什么 | 根据证据恢复 |
 | --- | --- | --- |
 | 导入、程序、许可、排队或传输失败 | 选定绑定、激活、路径、stderr、调度器和 Job 状态 | 修复执行路径，不推断为化学失败，也不悄悄换方法 |

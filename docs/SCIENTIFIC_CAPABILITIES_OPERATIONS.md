@@ -12,7 +12,7 @@ new entry for each calculation. See [Skills and the execution catalog](EXTENSION
 
 Start from the relevant Skill, then choose its recipe, native command or task script and a named environment from installation-owned `etc/job.toml`. A recipe supplies its backend key, pinned scripts, pure CLI parser, input roles and outputs. Native commands need no Python binding; Python scripts use the selected target's configured interpreter.
 
-`"$CORAGENT_PYTHON" -m research_agent.application.executors --list` returns a compact recipe index, with optional `--skill`, `--backend`, or `--executor`/`--version` filters. `--details` returns full descriptors. Adding `--config … --environment …` shows binding presence without probing software. For actual runner options, use `executors --executor <id> --version <version> --help`; this loads only the pinned CLI parser, without executing the scientific program.
+`"$CORAGENT_PYTHON" -m research_agent.application.executors --list` returns a compact recipe index, with optional `--skill`, `--backend`, or `--executor`/`--version` filters. `--details` returns full descriptors. Adding `--config … --target …` shows binding presence without probing software. For actual runner options, use `executors --executor <id> --version <version> --help`; this loads only the pinned CLI parser, without executing the scientific program.
 
 The preparation command writes a request and returns `request_file` and `request_sha256`. Submit these to `job_start`, supplying `node_id` when associating a research question. Runtime checks the file and inputs and fixes the selected Node association and content revision, `prepared_ref` and dispatch intent. Preparation alone dispatches no Job and proves no scientific outcome.
 
@@ -22,11 +22,11 @@ Recover a lost response with the original request identity. Use `job_status`, `j
 
 ## Platform checks
 
-Use `job_probe` in a session to inspect a configured platform. Check software
+Use `job_probe` in a session to inspect a configured execution target. Check software
 for a selected recipe from the installed control environment:
 
 ```bash
-"$CORAGENT_PYTHON" -m research_agent.application.environment_check --config "$CORAGENT_JOB_CONFIG" --environment <name> --executor <id> --version <version>
+"$CORAGENT_PYTHON" -m research_agent.application.environment_check --config "$CORAGENT_JOB_CONFIG" --target <name> --executor <id> --version <version>
 ```
 
 This contacts only the selected environment. For a program or task script without
@@ -36,7 +36,7 @@ Missing recipes, missing configuration, and failed checks return `recipe_not_fou
 `not_configured`, and `check_failed`, respectively. `verified` means that the
 selected environment prerequisites passed.
 
-For installation maintenance, omit the environment and recipe/backend selection
+For installation maintenance, omit the target and recipe/backend selection
 to check all configured targets, including SSH targets. Platform observations
 from `job_probe` and software dependency checks are distinct.
 
@@ -46,7 +46,7 @@ The selected job.toml backend provides the command, Python binding, activation a
 
 Preparation probes the selected local or SSH target: interpreter prefix, explicit Conda lock, pinned pip versions, installation receipt, package inventory, executable and activation file digests. This observation contributes to request identity. New submissions recheck it, and the staged, digest-pinned guard checks again when execution begins. Activation is verified before sourcing. Drift prevents execution; retries of an existing Job still return its original identity. Environment agreement does not itself prove a scientific method works.
 
-Installation receipts now include `inventory_sha256`. Reverify an existing environment using `scripts/install_job_environment.py --config … --environment … --backend … --adopt` before publishing a new receipt; do not hand-fill a digest. The unified installer prepares selected domain profiles, validates the configuration and environments in its managed control runtime, then runs bounded ordinary acceptance Jobs before switching releases. Local targets are checked automatically; remote targets are checked when selected with `--job-profile TARGET:PROFILE` or `--verify-job-target TARGET`. Reports distinguish environment verification, tested backends and unverified targets; external PubChem/OPSIN availability does not gate offline acceptance. `job_probe` continues to describe platform availability only.
+Installation receipts now include `inventory_sha256`. Reverify an existing environment using `scripts/install_job_environment.py --config … --target … --backend … --adopt` before publishing a new receipt; do not hand-fill a digest. The unified installer prepares selected domain profiles, validates the configuration and environments in its managed control runtime, then runs bounded ordinary acceptance Jobs before switching releases. Local targets are checked automatically; remote targets are checked when selected with `--job-profile TARGET:PROFILE` or `--verify-job-target TARGET`. Reports distinguish target verification, tested backends and unverified targets; external PubChem/OPSIN availability does not gate offline acceptance. `job_probe` describes target infrastructure only.
 
 Application-submitted local Jobs run in independent transient systemd user services. They survive Host restarts, receive a minimal environment plus explicit Job variables, and use CPUQuota/MemoryMax when resources are requested. Runtime creates a private scratch directory inside the Job or below the configured scratch_root; explicit environment values can reference `{scratch}`. Receipts remain in the workspace after a transient unit is removed.
 

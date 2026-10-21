@@ -7,6 +7,12 @@ description: Search and check distinct-spin Gaussian crossing candidates using e
 
 [Chinese version](SKILL.zh-CN.md)
 
+## Script routing
+
+Use the registered executor ID and the [script routing map](../../../../docs/skill-script-routing.md#surface-crossing) to choose the entrypoint, CLI, inputs, and primary outputs. The map is authoritative for routing; implementation helpers under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details; read the linked operation contract and use executor `--help` only for unspecified options.
+
+**Entrypoints:** `chemical.mecp-gaussian@1` → `skills/surface-crossing/scripts/crossing.py`; `chemical.crossing-check@1` → `skills/surface-crossing/scripts/crossing.py`.
+
 Use this Skill for a crossing between two Gaussian HF/DFT surfaces with different spin multiplicities. The native search is `chemical.mecp-gaussian@1`; independent numerical evidence is `chemical.crossing-check@1`.
 
 ## Workflow

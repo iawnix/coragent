@@ -7,6 +7,12 @@ description: 准备和执行 Gaussian 的 XYZ 或显式输入 Job，解析原生
 
 [English version](SKILL.md)
 
+## 脚本路由
+
+按 executor ID 使用[脚本路由地图](../../../../docs/skill-script-routing.zh-CN.md#gaussian)选择入口、CLI、输入和主要输出。地图是路由依据；`scripts/` 下的 helper 不是独立命令。不要通过读取源码发现调用方式，先读操作合同，只有合同未说明的选项才使用 executor 的 `--help`。
+
+**入口：** `chemical.gaussian@1` → `skills/gaussian/scripts/run.py`；`chemical.gaussian-input@1` → `skills/gaussian/scripts/run.py`；`chemical.electronic-gaussian@1` → `skills/gaussian/scripts/electronic.py`；`chemical.state-tracking@1` → `skills/gaussian/scripts/electronic.py`。
+
 Gaussian 用于优化、单点、QST/TS、频率、IRC、松弛扫描、电子态跟踪或最终日志证据时使用。本 Skill 负责 route、文件暂存、原生执行和解析；科学问题与验收标准由操作 Skill 决定。
 
 ## 已注册适配器
@@ -16,7 +22,7 @@ Gaussian 用于优化、单点、QST/TS、频率、IRC、松弛扫描、电子�
 ## XYZ 快捷方式
 
 ```bash
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.gaussian --version 1 --input geometry=input.xyz --cpus 12 --job-memory-mb 16384 --output prepared/gaussian.json -- --task opt-sp --method M062X --basis '6-31G**' --charge 0 --multiplicity 1
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.gaussian --version 1 --input geometry=input.xyz --cpus 12 --job-memory-mb 16384 --output prepared/gaussian.json -- --task opt-sp --method M062X --basis '6-31G**' --charge 0 --multiplicity 1
 ```
 
 `opt` 做几何优化，`sp` 做固定几何单点，`opt-sp` 两者都做。结果记录能量、收敛、优化几何、方法/基组、电子态、原生日志和解析摘要。
@@ -26,7 +32,7 @@ Gaussian 用于优化、单点、QST/TS、频率、IRC、松弛扫描、电子�
 ## 显式输入
 
 ```bash
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.gaussian-input --version 1 --input input=ts.gjf --collect results/ts.chk --output prepared/ts.json -- --method M062X --basis '6-31G**' --charge 0 --multiplicity 1 --validation none
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.gaussian-input --version 1 --input input=ts.gjf --collect results/ts.chk --output prepared/ts.json -- --method M062X --basis '6-31G**' --charge 0 --multiplicity 1 --validation none
 ```
 
 可用 `--validation opt|sp|frequency|minimum|saddle|irc` 选择解析检查。输入要有完整 Link1 元数据和末尾空白段。用 `job_start` 提交后检查 `gaussian.out`、`parsed.json`、checkpoint、几何和验证字段。

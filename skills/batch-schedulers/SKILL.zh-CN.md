@@ -5,6 +5,12 @@ description: 配置 PBS、Torque 和 Slurm 执行目标，选择批处理资源�
 
 # PBS、Torque 与 Slurm 运维
 
+## 脚本路由
+
+调用仓库脚本前先看[脚本路由地图](../../docs/skill-script-routing.zh-CN.md#batch-schedulers)。地图列出支持的入口和接口；`scripts/` 下的 helper 不是独立命令。不要通过读取源码发现调用方式。
+
+**入口：** `skills/batch-schedulers/scripts/queue.py`（stdin/子命令合同见脚本地图）。
+
 连接已有批处理集群，或排查提交、排队、取消和已完成任务时使用本 Skill。
 
 ## 选择提交位置和资源

@@ -2,6 +2,7 @@
 
 from research_agent.foundation.layout import paths as app_paths
 import base64
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -9,16 +10,18 @@ import shutil
 import subprocess
 import sys
 import tomllib
+import pytest
 
 from scripts.build_package import build_package
 from scripts import _job_install as jobs
-from tests.unit.conftest import execution_platform_fixture
 from research_agent.foundation.layout import paths
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_public_package_install_accepts_jobs_and_preserves_external_environment(tmp_path):
+    if importlib.util.find_spec('setuptools') is None:
+        pytest.skip('local test environment lacks setuptools build backend')
     built = build_package(output_dir=tmp_path/'package', agent_manifest_path=None, allow_dirty=True, include_web=False)
     root = tmp_path/'installation'
     paths(root).initialize()
@@ -33,10 +36,10 @@ def test_public_package_install_accepts_jobs_and_preserves_external_environment(
     subprocess.run(['cp','--reflink=auto','-a',os.environ['CORAGENT_TEST_PI_RUNTIME_ROOT']+'/.',str(pi_root)],check=True)
     config = tmp_path/'job.toml'
     settings = tomllib.loads(Path(os.environ['CORAGENT_JOB_CONFIG']).read_text())
-    local = settings['environments']['local']
-    local['backends'] = {'structure': local['backends']['structure']}
-    config.write_bytes(jobs.toml_bytes({'default_environment':'local', 'environments':{'local':local}}))
-    prefix = Path(local['backends']['structure']['python']['prefix'])
+    local = settings['execution']['targets']['local']
+    local['bindings'] = {'structure': local['bindings']['structure']}
+    config.write_bytes(jobs.toml_bytes({'execution': {'default_target':'local', 'targets':{'local':local}}}))
+    prefix = Path(local['bindings']['structure']['python']['prefix'])
     stamp = (prefix/'bin/python').stat().st_ino
     conda = os.environ.get('CORAGENT_TEST_CONDA') or shutil.which('conda')
     assert conda, 'Prepare with CORAGENT_TEST_CONDA set'
@@ -78,6 +81,8 @@ def test_remote_provisioning_transports_and_executes_real_helper_offline(tmp_pat
     # namespace. The bundle, target helper, Conda install and probe are real.
     conda = os.environ.get('CORAGENT_TEST_CONDA') or shutil.which('conda')
     assert conda
+    if not os.environ.get('CONDA_PKGS_DIRS'):
+        pytest.skip('offline remote provisioning needs an explicit local Conda package cache')
     profile = jobs.profiles(ROOT)['wrapper']
     content = jobs.resource(Path(profile['root']), profile['lock']).read_bytes()
     checksum = jobs.digest(content+b'\0')

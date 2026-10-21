@@ -7,6 +7,12 @@ description: 根据映射端点、反应坐标和结构证据构建并搜索过�
 
 [English version](SKILL.md)
 
+## 脚本路由
+
+按 executor ID 使用[脚本路由地图](../../../../docs/skill-script-routing.zh-CN.md#candidate-generation)选择入口、CLI、输入和主要输出。地图是路由依据；`scripts/` 下的 helper 不是独立命令。不要通过读取源码发现调用方式，先读操作合同，只有合同未说明的选项才使用 executor 的 `--help`。
+
+**入口：** `chemical.path-candidates@1` → `skills/candidate-generation/scripts/path/prepare_path.py`；`chemical.qst-prepare@1` → `skills/candidate-generation/scripts/search/search.py`；`chemical.search-recovery@1` → `skills/candidate-generation/scripts/search/recovery.py`；`chemical.scan-xtb@1` → `skills/candidate-generation/scripts/search/search.py`；`chemical.scan-gaussian@1` → `skills/candidate-generation/scripts/search/search.py`；`chemical.gradient-xtb@1` → `skills/candidate-generation/scripts/search/search.py`；`chemical.gradient-gaussian@1` → `skills/candidate-generation/scripts/backends/gaussian_path.py`；`chemical.neb-xtb@2` → `skills/candidate-generation/scripts/neb/ase_search.py`；`chemical.neb-gaussian@2` → `skills/candidate-generation/scripts/neb/ase_search.py`。
+
 把反应假设转成可供 TS 或路径求解器搜索的几何时使用本 Skill。输入是一个有映射的基元步骤：反应物/产物或片段、键变化、电荷、多重度、相关构象，以及进攻方向、质子转移或立体化学证据。输出是带方法、约束、来源帧和下一项验证动作的候选集合。
 
 ## 方法选择经验
@@ -27,12 +33,14 @@ description: 根据映射端点、反应坐标和结构证据构建并搜索过�
 2. 用 `chemical.path-candidates@1`（`chemical.qst-prepare@1`）准备相容端点，或提供 path specification。
 3. 片段或进攻面不清楚时，用 `chemical.reactive-sites@1` 和 `chemical.reactive-pose@1` 生成/编辑反应姿态。
 4. 运行扫描、梯度、QST 或 NEB，并检查收敛、反应中心距离和路径帧。
-5. 保留若干化学上不同的帧，附上来源 digest，交给 TS 优化和 `validation`。
-6. 若搜索坍缩到极小点或出现畸变，根据失败几何改变姿态、坐标、端点或方法后再试。
+5. 路线失败后，使用收集到的 Attempt 诊断以及已核实的端点/几何上下文运行 `chemical.search-recovery@1`。只有列出的前置条件都满足时才执行 `auto_continue`；`needs_review` 必须先修订假设或修复输入。
+6. 保留若干化学上不同的帧，附上来源 digest，交给 TS 优化和 `validation`。
+7. 若搜索坍缩到极小点或出现畸变，根据失败几何改变姿态、坐标、端点或方法后再试。
 
 ## 已注册操作
 
 `chemical.path-candidates@1`：映射 QST/路径输入；`chemical.qst-prepare@1`：QST2/QST3；`chemical.scan-xtb@1`、`chemical.scan-gaussian@1`：受限松弛扫描；`chemical.gradient-xtb@1`、`chemical.gradient-gaussian@1`：梯度/路径计算；`chemical.neb-xtb@2`、`chemical.neb-gaussian@2`：ASE NEB v2。
+`chemical.search-recovery@1`：搜索失败后的证据驱动下一路线决策。
 
 两个 QST 准备入口共用 `skills/_shared/gaussian_input.py` 的笛卡尔序列化器。生成后自动回读并核对电子态、元素顺序和坐标；向准备器提供显式原子映射，生成过程保留这一顺序。
 

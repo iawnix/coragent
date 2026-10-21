@@ -7,6 +7,12 @@ description: 为过渡态候选建立鞍点、振动模式、电子态、结构�
 
 [English version](SKILL.md)
 
+## 脚本路由
+
+按 executor ID 使用[脚本路由地图](../../../../docs/skill-script-routing.zh-CN.md#validation)选择入口、CLI、输入和主要输出。地图是路由依据；`scripts/` 下的 helper 不是独立命令。不要通过读取源码发现调用方式，先读操作合同，只有合同未说明的选项才使用 executor 的 `--help`。
+
+**入口：** `chemical.path-irc@1` → `skills/validation/scripts/irc_preparation.py`；`chemical.stationary-check@1` → `skills/validation/scripts/evidence_check.py`；`chemical.mode-check@1` → `skills/validation/scripts/evidence_check.py`；`chemical.irc-check@1` → `skills/validation/scripts/evidence_check.py`；`chemical.gaussian-evidence@1` → `skills/validation/scripts/evidence_check.py`。
+
 候选生成和实际 TS 优化或路径搜索完成后使用本 Skill。它把一个候选的独立证据组合成决定：已验证鞍点、需要指定检查的候选，或带下一步搜索动作的失败。
 
 ## 验证顺序

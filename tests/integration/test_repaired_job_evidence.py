@@ -18,7 +18,7 @@ def research_workspace(tmp_path, monkeypatch):
     initialize_workspace(tmp_path, 'repaired_evidence', 'research')
     admit_research_workspace(tmp_path)
     config = tmp_path / 'job.toml'
-    config.write_text('default_environment="local"\n[environments.local]\nkind="local"\nsupervisor="process"\n')
+    config.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\nsupervisor="process"\n')
     monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(config))
     return tmp_path
 

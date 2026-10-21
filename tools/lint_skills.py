@@ -102,6 +102,38 @@ def _reachable_references(entry: Path, skill_root: Path) -> set[Path]:
     return visited
 
 
+def _check_script_routing(root: Path, skill_roots: list[Path]) -> list[str]:
+    """Keep the progressive-disclosure entrypoints tied to the execution registry."""
+    errors: list[str] = []
+    routing_doc = root / "docs" / "skill-script-routing.md"
+    routing_doc_zh = root / "docs" / "skill-script-routing.zh-CN.md"
+    if not routing_doc.is_file() or not routing_doc_zh.is_file():
+        return ["docs/skill-script-routing(.zh-CN).md: script routing maps are required"]
+    routing = routing_doc.read_text(encoding="utf-8")
+    execution = root / "domains" / "chemical" / "execution.json"
+    if execution.is_file():
+        for item in json.loads(execution.read_text(encoding="utf-8")).get("executors", []):
+            operation = item["id"]
+            short_operation = operation.removeprefix("chemical.")
+            entry = item.get("entry")
+            cli = item.get("cli")
+            for value, label in ((short_operation, "operation"), (entry, "entry"), (cli, "cli")):
+                if value and value not in routing:
+                    errors.append(f"docs/skill-script-routing.md: missing {label} {value}")
+    for skill_root in skill_roots:
+        english = skill_root / "SKILL.md"
+        chinese = skill_root / "SKILL.zh-CN.md"
+        if english.is_file():
+            text = english.read_text(encoding="utf-8")
+            if "## Script routing" not in text or "skill-script-routing.md" not in text:
+                errors.append(f"{english.relative_to(root)}: missing script routing guidance")
+        if chinese.is_file():
+            text = chinese.read_text(encoding="utf-8")
+            if "## 脚本路由" not in text or "skill-script-routing.zh-CN.md" not in text:
+                errors.append(f"{chinese.relative_to(root)}: missing Chinese script routing guidance")
+    return errors
+
+
 def validate_skills(root: Path = ROOT) -> list[str]:
     errors: list[str] = []
     skill_roots: list[Path] = []
@@ -170,6 +202,7 @@ def validate_skills(root: Path = ROOT) -> list[str]:
             errors.extend(_check_links(path, path.read_text(encoding="utf-8")))
         errors.extend(_check_links(english, en_text))
         errors.extend(_check_links(chinese, zh_text))
+    errors.extend(_check_script_routing(root, skill_roots))
     return errors
 
 

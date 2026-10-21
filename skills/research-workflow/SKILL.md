@@ -5,6 +5,12 @@ description: Coordinate tasks, research Nodes, scientific Jobs, materials, evide
 
 # Research workflow
 
+## Script routing
+
+Use the [script routing map](../../docs/skill-script-routing.md#research-workflow) before invoking a bundled script. It identifies the supported entrypoint and interface; helper files under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details.
+
+**Entrypoint:** none bundled; use the documented runtime or generic Job route.
+
 [Chinese version](SKILL.zh-CN.md)
 
 Use this Skill to run a sustained research assignment. It connects user requirements, Research Memory, domain Skills, managed Jobs, evidence inspection, and final delivery. The domain Skill owns scientific method; this Skill owns task state, execution lifecycle, and durable progress.
@@ -28,4 +34,6 @@ Keep a question's retries and scan points in its Node. When a route stops yieldi
 
 Match every delivery criterion to immutable Results or Materials, identify remaining Jobs, and use the report/domain Skill to assemble the requested output. Partial and negative results are useful progress; completion follows the agreed scope and evidence. For email delivery, use the [email Skill](../email/SKILL.md), prepare the message, and retain its send receipt.
 
-Read [Tools and execution](references/tools.md) for Job commands and file conventions, [Exact Skill resource paths](references/skills.md) for domain routing, and [Generated public contract](references/public_contract.md) for the callable interface. For multistep chemistry, use the [pathway evidence contract](../../domains/chemical/skills/reaction-investigation/references/pathway_execution.md).
+Read [Tools and execution](references/tools.md) for Job commands and file conventions, [Execution target selection](references/execution-targets.md) for routing, [Exact Skill resource paths](references/skills.md) for domain routing, and [Generated public contract](references/public_contract.md) for the callable interface. For multistep chemistry, use the [pathway evidence contract](../../domains/chemical/skills/reaction-investigation/references/pathway_execution.md).
+
+See [Task acceptance and delivery](references/acceptance.md) before proposing completion. Every criterion needs a scoped fixed assessment; full and partial delivery have different terminal states.

@@ -8,7 +8,7 @@
 下列占位符应替换成实际绝对路径和 Artifact 引用：
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.crest --version 1 --input material=<material.json> --input-artifact <material-ref> --output <request.json> -- --method gfn2 --threads 2 --timeout 3600 --energy-window 6
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.crest --version 1 --input material=<material.json> --input-artifact <material-ref> --output <request.json> -- --method gfn2 --threads 2 --timeout 3600 --energy-window 6
 ```
 
 将返回的 request_file/request_sha256 和 node_id 交给 job_start，终止后收集。

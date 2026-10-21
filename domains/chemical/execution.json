@@ -2259,6 +2259,49 @@
       ]
     },
     {
+      "id": "chemical.search-recovery",
+      "version": "1",
+      "skill": "candidate-generation",
+      "backend": "structure",
+      "runtime": "python",
+      "entry": "skills/candidate-generation/scripts/search/recovery.py",
+      "cli": "skills/candidate-generation/scripts/search/recovery_cli.py",
+      "argv": [
+        "{entry}",
+        "--input",
+        "{input:input}",
+        "--output-dir",
+        "results"
+      ],
+      "inputs": {
+        "input": "input.json"
+      },
+      "outputs": [
+        {
+          "path": "results",
+          "recursive": true,
+          "required": false,
+          "min_bytes": 0
+        },
+        {
+          "path": "results/result.json",
+          "required": true,
+          "min_bytes": 2,
+          "media_type": "application/json"
+        }
+      ],
+      "requirements": {
+        "python": ">=3.11"
+      },
+      "resources": {
+        "skills/candidate-generation/scripts/search/recovery.py": "sha256:980ef09e26b1c11c00c17a0695e2776e11cceae7eae56b7baf935bc154526ff0",
+        "skills/candidate-generation/scripts/search/recovery_cli.py": "sha256:e2050c3d76af41e47eb1185efc80b490f58ac20e8739512a407f23374e84bc74"
+      },
+      "module_paths": [
+        "skills/candidate-generation/scripts/search"
+      ]
+    },
+    {
       "id": "chemical.scan-xtb",
       "version": "1",
       "skill": "candidate-generation",

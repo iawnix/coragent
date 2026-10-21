@@ -9,6 +9,7 @@ import sys
 import time
 
 import pytest
+pytest.importorskip('rdkit')
 
 SCRIPTS = Path(__file__).resolve().parents[2] / 'domains/chemical/skills/material-preparation/scripts/materials'
 from tests.unit.chemical_paths import configure

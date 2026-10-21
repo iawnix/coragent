@@ -10,7 +10,7 @@ import signal
 import subprocess
 import tempfile
 
-from .config_contract import binding_digest, python_command
+from .config_contract import binding_digest, configured_targets, python_command
 from .worker import supervisor_environment
 
 PROBE_FILE = Path(__file__).with_name("environment_probe.py")
@@ -96,7 +96,7 @@ def _capture(command, *, env=None, timeout):
 
 
 def _run_target(settings, selected, script):
-    target = settings["environments"][selected["environment"]]
+    target = configured_targets(settings)[selected["environment"]]
     env = selected["binding"].get("environment", {})
     timeout = target.get("command_timeout_seconds", 120)
     if selected["kind"] == "local":

@@ -7,6 +7,12 @@ description: Establish saddle, mode, electronic-state, structure, and IRC eviden
 
 [Chinese version](SKILL.zh-CN.md)
 
+## Script routing
+
+Use the registered executor ID and the [script routing map](../../../../docs/skill-script-routing.md#validation) to choose the entrypoint, CLI, inputs, and primary outputs. The map is authoritative for routing; implementation helpers under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details; read the linked operation contract and use executor `--help` only for unspecified options.
+
+**Entrypoints:** `chemical.path-irc@1` → `skills/validation/scripts/irc_preparation.py`; `chemical.stationary-check@1` → `skills/validation/scripts/evidence_check.py`; `chemical.mode-check@1` → `skills/validation/scripts/evidence_check.py`; `chemical.irc-check@1` → `skills/validation/scripts/evidence_check.py`; `chemical.gaussian-evidence@1` → `skills/validation/scripts/evidence_check.py`.
+
 Use this Skill after candidate generation and an actual TS optimization or path search. It assembles independent evidence into a decision for one candidate: validated saddle, candidate needing a specified check, or a failure with the next search action.
 
 ## Validation sequence

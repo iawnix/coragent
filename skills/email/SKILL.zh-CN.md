@@ -5,6 +5,12 @@ description: 通过配置的 SMTP 发送已授权邮件，固定附件并保存�
 
 # 邮件交付
 
+## 脚本路由
+
+调用仓库脚本前先看[脚本路由地图](../../docs/skill-script-routing.zh-CN.md#email)。地图列出支持的入口和接口；`scripts/` 下的 helper 不是独立命令。不要通过读取源码发现调用方式。
+
+**入口：** `skills/email/scripts/email_cli.py`（stdin/子命令合同见脚本地图）。
+
 [English version](SKILL.md)
 
 领域 Skill 完成邮件内容并获得用户发送授权后，使用本 Skill。它检查 SMTP 配置、固定附件 digest、执行一次发送，并在中断后提供可核对的回执。

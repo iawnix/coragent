@@ -20,7 +20,7 @@ export function projectMonitorTask(task, { list = false } = {}) {
     return clipped;
   };
   const result = { user_task_id: task.user_task_id, revision: task.revision,
-    title: text(task.title, 256), state: task.state, updated_at: task.updated_at };
+    title: text(task.title, 256), state: task.state, completion_outcome: task.completion_outcome ?? null, updated_at: task.updated_at };
   if (!list) Object.assign(result, {
     objective: text(task.objective, 1024), next_action: text(task.next_action, 1024),
     progress: task.progress ? { summary: text(task.progress.summary, 512), at: task.progress.at } : null,
@@ -35,7 +35,7 @@ export function projectMonitorTask(task, { list = false } = {}) {
 
 /** A read-time scheduling observation, never a new persisted task lifecycle. */
 export function projectMonitorContinuation(task, health = {}, now = Date.now()) {
-  if (!task || ["completed", "cancelled"].includes(task.state)) return { state: "idle" };
+  if (!task || ["completed", "partial", "cancelled"].includes(task.state)) return { state: "idle" };
   if (["paused", "blocked"].includes(task.state)) return { state: task.state };
   if (health.error) return { state: "error" };
   if (task.execution_recovery?.state === "attention_required") return { state: "attention_required" };
@@ -57,7 +57,9 @@ export function projectTaskContinuation(task) {
     truncated ||= clipped !== value;
     return clipped;
   };
-  if (task?.compute_environment) result.compute_environment = task.compute_environment;
+  if (task?.requirements_revision) result.requirements_revision = task.requirements_revision;
+  if (task?.completion_outcome) result.completion_outcome = task.completion_outcome;
+  if (task?.execution_target) result.execution_target = task.execution_target;
   if (task?.next_action) result.next_action = text(task.next_action, 1024);
   if (task?.block_details) {
     const block = task.block_details;
@@ -88,7 +90,12 @@ export function projectUserTask(task) {
   const criteria = task.criteria.slice(0, 8);
   const projection = {
     user_task_id: task.user_task_id, title: text(task.title, 256), objective: text(task.objective, 2048),
-    compute_environment: task.compute_environment ?? null,
+    execution_target: task.execution_target ?? null, execution_selection: task.execution_selection ? {
+      target: text(task.execution_selection.target, 128), scheduler: text(task.execution_selection.scheduler ?? null, 128),
+      location: text(task.execution_selection.location ?? null, 128), version: task.execution_selection.version,
+      selection_mode: task.execution_selection.selection_mode,
+    } : null,
+    requirements_revision: task.requirements_revision, completion_outcome: task.completion_outcome ?? null,
     initial_plan: text(task.initial_plan ?? null, 2048), next_action: text(task.next_action ?? null, 1024),
     state: task.state, reason: text(task.reason, 512), revision: task.revision, control_epoch: task.control_epoch,
     research: { entry_node_ids: task.research.entry_node_ids.slice(0, 8), focus_node_ids: task.research.focus_node_ids.slice(0, 8),
@@ -119,10 +126,14 @@ export function projectUserTask(task) {
       evidence_refs: task.block_details.evidence_refs.slice(0, 8).map(ref => text(ref, 128)),
       evidence_omitted: Math.max(0, task.block_details.evidence_refs.length - 8) } : null,
     completion: task.completion?.slice(0, 8).map(item => ({ criterion_id: text(item.criterion_id, 128),
-      evidence_refs: item.evidence_refs.slice(0, 8).map(ref => text(ref, 128)) })) ?? null,
+      status: item.status, assessment_ref: item.assessment_ref, reason: text(item.reason ?? null, 512),
+      evidence_refs: item.evidence_refs.slice(0, 8).map(ref => text(ref, 128)),
+      evidence_omitted: Math.max(0, item.evidence_refs.length - 8) })) ?? null,
+    completion_omitted: Math.max(0, (task.completion?.length || 0) - 8),
     continuation: { sequence: task.continuation.sequence, no_progress: task.continuation.no_progress },
   };
-  projection.projection_truncated = truncated || projection.sources_omitted > 0 || projection.criteria_omitted > 0
+  projection.projection_truncated = truncated || projection.completion_omitted > 0
+    || projection.completion?.some(item => item.evidence_omitted > 0) || projection.sources_omitted > 0 || projection.criteria_omitted > 0
     || projection.research.entry_nodes_omitted > 0 || projection.research.focus_nodes_omitted > 0
     || (projection.wait?.jobs_omitted || 0) > 0 || (projection.progress?.evidence_omitted || 0) > 0
     || (projection.block_details?.evidence_omitted || 0) > 0;
@@ -137,8 +148,9 @@ export function projectUserTask(task) {
 export function projectDecisionTask(task) {
   if (!task) return null;
   const { user_task_id, revision, state, objective, criteria } = task;
-  const result = { user_task_id, revision, state, objective, criteria,
-    ...(task.compute_environment ? { compute_environment: task.compute_environment } : {}),
+  const result = { user_task_id, revision, state, objective, criteria, requirements_revision: task.requirements_revision,
+    completion_outcome: task.completion_outcome ?? null, completion: task.completion?.map(({ criterion_id, status, assessment_ref }) => ({ criterion_id, status, assessment_ref })) ?? null,
+    ...(task.execution_target ? { execution_target: task.execution_target } : {}),
     ...(task.initial_plan ? { initial_plan: task.initial_plan } : {}),
     ...(task.next_action ? { next_action: task.next_action } : {}) };
   if (task.title !== objective) result.title = task.title;

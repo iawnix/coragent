@@ -51,7 +51,7 @@ XYZ 只接受单帧、元素符号和三坐标，所有数值必须有限。多�
 ## 执行与输出
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.material --version 1 --input material=<work_dir>/material-input.json --output <work_dir>/material-request.json
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.material --version 1 --input material=<work_dir>/material-input.json --output <work_dir>/material-request.json
 ```
 
 提交返回的 request_file/request_sha256 与 node_id 到 `job_start`，结束后用 `job_collect` 收集。

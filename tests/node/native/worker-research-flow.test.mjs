@@ -42,7 +42,7 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     Object.assign(process.env, { PI_CODING_AGENT_DIR: agentDir, PI_AGENT_DIR: agentDir, CORAGENT_PYTHON: python,
       PYTHONDONTWRITEBYTECODE: "1", CORAGENT_NOTIFICATION_CONFIG: config });
     const jobConfig = join(root, "job.toml");
-    await writeFile(jobConfig, 'default_environment="local"\n[environments.local]\nkind="local"\nsupervisor="process"\n');
+    await writeFile(jobConfig, '[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\nsupervisor="process"\n');
     process.env.CORAGENT_JOB_CONFIG = jobConfig;
     await execute(python, [join(packageRoot, "apps/agent-cli/workspace_mode.py"), "--root", workspace, "--workspace-id", "flow"]);
     const fixtureJobId = "job_1";

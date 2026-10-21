@@ -7,6 +7,12 @@ description: Construct reactive complexes and revise TS guesses with local react
 
 [Chinese version](SKILL.zh-CN.md)
 
+## Script routing
+
+Use the registered executor ID and the [script routing map](../../../../docs/skill-script-routing.md#reactive-geometry) to choose the entrypoint, CLI, inputs, and primary outputs. The map is authoritative for routing; implementation helpers under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details; read the linked operation contract and use executor `--help` only for unspecified options.
+
+**Entrypoints:** `chemical.reactive-geometry@1` → `skills/reactive-geometry/scripts/reactive_geometry.py`; `chemical.reactive-sites@1` → `skills/reactive-geometry/scripts/reactive_sites.py`; `chemical.reactive-pose@1` → `skills/reactive-geometry/scripts/reactive_pose.py`.
+
 Use this Skill when separate reactants need a chemically plausible encounter geometry or when a failed scan, NEB, optimization, or IRC frame needs a targeted revision. It edits coordinates and records provenance; the resulting pose is handed to candidate generation or constrained refinement.
 
 ## Build a reactive pose

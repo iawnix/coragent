@@ -22,7 +22,8 @@ export function createJobTools({ commandBridge, getTaskBinding = async () => nul
         ...(!params.prepared_ref && !params.request_file ? { request_id: params.request_id || `${toolContext.operation_id}:${api.callId}` } : {}),
         session_id: toolContext.session_id,
         ...(taskBinding === null ? {} : { user_task_id: taskBinding.user_task_id }),
-        ...(taskBinding?.compute_environment ? { required_environment: taskBinding.compute_environment } : {}),
+        ...(taskBinding?.execution_target ? { required_target: taskBinding.execution_target } : {}),
+        ...(taskBinding?.route_digest ? { required_route_digest: taskBinding.route_digest } : {}),
       } : request);
       const result = await (["status", "collect", "reconcile"].includes(operation)
         ? withJobQueryRecovery(root, `job_${operation}`, params, invoke) : invoke());

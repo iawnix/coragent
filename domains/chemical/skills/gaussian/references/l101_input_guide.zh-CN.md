@@ -195,7 +195,7 @@ Frequency from checkpoint
 
 ```bash
 "$CORAGENT_PYTHON" -m research_agent.application.executors \
-  --config "$CORAGENT_JOB_CONFIG" --environment local \
+  --config "$CORAGENT_JOB_CONFIG" \
   --executor chemical.gaussian-input --version 1 \
   --input input=water.gjf --output prepared/water.json -- \
   --method B3LYP --basis '6-31G(d)' --charge 0 --multiplicity 1 \

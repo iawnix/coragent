@@ -1,6 +1,7 @@
 """Behavioral regression coverage for the executable scientific Skills."""
 from pathlib import Path
 import json
+import importlib.util
 import subprocess
 import sys
 import os
@@ -24,6 +25,8 @@ def test_xtb_failure_does_not_start_single_point(tmp_path):
 
 @pytest.mark.parametrize('skill',['cf22d','xtb','gaussian'])
 def test_installed_skill_entrypoint_does_not_import_host_or_provider(skill,tmp_path):
+    if skill == 'gaussian' and importlib.util.find_spec('numpy') is None:
+        pytest.skip('fixture environment lacks NumPy for Gaussian parser')
     import shutil
     installed=tmp_path/'skills'
     shutil.copytree(SKILLS/skill,installed/skill)
@@ -87,6 +90,8 @@ def test_report_reads_environment_from_job_identity_instead_of_method_label(tmp_
 @pytest.mark.parametrize('skill', ['cf22d', 'xtb', 'gaussian'])
 @pytest.mark.parametrize('atom,multiplicity', [('H 0 0 0', '1'), ('H NaN 0 0', '2'), ('Qq 0 0 0', '2')])
 def test_runners_reject_bad_geometry_or_electronic_state_before_execution(tmp_path, skill, atom, multiplicity):
+    if skill == 'gaussian' and importlib.util.find_spec('numpy') is None:
+        pytest.skip('fixture environment lacks NumPy for Gaussian parser')
     source = tmp_path/'input.xyz'; source.write_text('1\ninvalid input\n'+atom+'\n')
     marker = tmp_path/'executed'
     executable = tmp_path/'solver'
@@ -102,6 +107,8 @@ def test_runners_reject_bad_geometry_or_electronic_state_before_execution(tmp_pa
 
 @pytest.mark.parametrize('skill', ['xtb', 'gaussian'])
 def test_doublet_runner_and_report_separate_numeric_checks_from_scientific_acceptance(tmp_path, skill):
+    if skill == 'gaussian' and importlib.util.find_spec('numpy') is None:
+        pytest.skip('fixture environment lacks NumPy for Gaussian parser')
     source = tmp_path/'hydrogen.xyz'; source.write_text('1\nH atom\nH 0D0 0 0\n')
     program = tmp_path/'solver'
     if skill == 'xtb':

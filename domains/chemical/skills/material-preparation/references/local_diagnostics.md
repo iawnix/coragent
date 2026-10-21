@@ -33,7 +33,7 @@ Short contacts are a proximity heuristic, not inferred bonds/valence or evidence
 that a TS/mechanism is valid. The scientific verdict remains `not_assessed`.
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.local-diagnostics --version 1 --input input=<work_dir>/diagnostics.json --input-artifact <input-ref> --output <work_dir>/diagnostics-request.json
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.local-diagnostics --version 1 --input input=<work_dir>/diagnostics.json --input-artifact <input-ref> --output <work_dir>/diagnostics-request.json
 ```
 
 Replace placeholders, submit the returned request/digest with node_id, then collect

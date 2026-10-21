@@ -5,6 +5,12 @@ description: Configure PBS, Torque and Slurm execution targets, choose batch res
 
 # PBS, Torque and Slurm operations
 
+## Script routing
+
+Use the [script routing map](../../docs/skill-script-routing.md#batch-schedulers) before invoking a bundled script. It identifies the supported entrypoint and interface; helper files under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details.
+
+**Entrypoint:** `skills/batch-schedulers/scripts/queue.py` (see the map for its stdin/subcommand contract).
+
 Use this Skill when connecting CoRAgent to an existing batch cluster or diagnosing
 submission, queue waits, cancellation and completed jobs.
 

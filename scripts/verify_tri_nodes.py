@@ -26,7 +26,7 @@ def verify(config, package, directory, target, nodes, timeout):
         operator = Configuration(config)
         document = {'execution': operator.resolve_credentials(operator.read()['execution'])}
     settings = validate_job_config(document)
-    selected = settings['environments'].get(target)
+    selected = settings['targets'].get(target)
     if not selected or selected.get('driver') != 'external':
         raise ValueError('TRI acceptance requires a configured external target')
     if (not isinstance(nodes, list) or not nodes
@@ -47,7 +47,7 @@ def verify(config, package, directory, target, nodes, timeout):
             pinned = copy.deepcopy(selected)
             pinned['handler_environment'] = {**pinned.get('handler_environment', {}), 'CORAGENT_TRI_NODE': node}
             document = configuration_document({'execution': settings.get('execution', {}),
-                'default_environment': target, 'environments': {target: pinned}})
+                'default_target': target, 'targets': {target: pinned}})
             candidate = node_dir / 'config.toml'
             write_private(candidate, toml_bytes(document))
             # Retain the pinned configuration on failure for reconciliation.

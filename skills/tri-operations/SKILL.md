@@ -5,6 +5,12 @@ description: Install and operate TRI task queues, configure server and compute-n
 
 # TRI operations
 
+## Script routing
+
+Use the [script routing map](../../docs/skill-script-routing.md#tri-operations) before invoking a bundled script. It identifies the supported entrypoint and interface; helper files under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details.
+
+**Entrypoint:** `skills/tri-operations/scripts/queue.py` (see the map for its stdin/subcommand contract).
+
 [简体中文](SKILL.zh-CN.md)
 
 Use this Skill for TRI deployment, node/resource configuration, service maintenance and task troubleshooting. TRI consists of a persistent queue server, compute-node clients and command-line tools. It can run on one host or across hosts with shared job files.

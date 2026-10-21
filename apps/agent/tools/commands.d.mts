@@ -100,6 +100,13 @@ export interface CommandParameters {
     "session_id": string;
     "request_id": string;
   };
+  "job.targets": Record<string, never>;
+  "job.resolve_target": {
+    "target"?: string;
+    "scheduler"?: string;
+    "location"?: string;
+    "source_text"?: string;
+  };
   "job.start": {
     "request_id"?: string;
     "command"?: Array<string>;
@@ -112,8 +119,7 @@ export interface CommandParameters {
     "metadata"?: Record<string, unknown> | null;
     "workspace_id"?: string;
     "work_id"?: string;
-    "platform"?: string;
-    "execution_target"?: Record<string, unknown>;
+    "execution_target"?: string;
     "session_id"?: string | null;
     "validator_id"?: string;
     "input_artifact_ids"?: Array<string>;
@@ -139,7 +145,8 @@ export interface CommandParameters {
       "queue"?: string;
       "queue_wait_seconds"?: number;
     };
-    "required_environment"?: string;
+    "required_target"?: string;
+    "required_route_digest"?: string;
   };
   "job.status": {
     "job_id"?: string;
@@ -166,8 +173,7 @@ export interface CommandParameters {
     "metadata"?: Record<string, unknown> | null;
     "workspace_id"?: string;
     "work_id"?: string;
-    "platform"?: string;
-    "execution_target"?: Record<string, unknown>;
+    "execution_target"?: string;
   };
   "job.reconcile": {
     "job_id"?: string;
@@ -603,6 +609,8 @@ export interface CommandResults {
   "research.allocate_task": {
     "identifier": string;
   };
+  "job.targets": Record<string, unknown>;
+  "job.resolve_target": Record<string, unknown>;
   "job.start": {
     "job_id": string;
     "platform": string;

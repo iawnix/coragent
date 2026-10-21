@@ -62,12 +62,14 @@ JSON
 身份不符保持未知，并阻止取消。TRI 当前仅支持按数字 ID 取消，因此核对与取消
 无法组成原子操作；操作进行时不要重建或替换队列。
 
-诊断分别显示实际观察到的节点、申请的 CPU/内存/GPU 和分配的 CPU/GPU 集合。
-申请量不能当成实际分配证据。排队或挂起时，`wait_seconds` 表示距 TRI
-`created_at` 的时间；时间戳缺失仍为未知。该值接入已有 `queue_wait_seconds`
-Monitor 阈值，每个 Job 仅产生一次排队超时事件，普通排队/运行变化不唤醒代理。
-运行中任务取消需完成证据及 `cancel_confirmed=true` 才视为终态；
-`completion_reason=lease_expired` 不能证明进程已停止。
+诊断分别显示实际观察到的节点、申请的 CPU/内存/GPU、有效内存和 swap 上限，以及
+分配的 CPU/GPU 集合。申请量不能当成实际分配证据。`resource_failure` 区分
+`memory_limit` 和 `resource_enforcement` 失败，普通命令失败时为空。固定
+`CORAGENT_TRI_NODE` 的目标还会给出 `requested_node` 和 `node_match`，明确实际分配
+是否一致。排队或挂起时，`wait_seconds` 表示距 TRI 的 `created_at` 的时间；时间戳
+缺失仍为未知。该值接入已有 `queue_wait_seconds` Monitor 阈值，每个 Job 仅产生一次
+排队超时事件，普通排队/运行变化不唤醒代理。运行中任务取消需完成证据及
+`cancel_confirmed=true` 才视为终态；`completion_reason=lease_expired` 不能证明进程已停止。
 
 ## 按计算节点和后端验收
 

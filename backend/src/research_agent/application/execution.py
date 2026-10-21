@@ -193,9 +193,7 @@ def _platform_name(params: dict[str, Any]) -> str | None:
     elif isinstance(target, dict):
         value = target.get("target") or target.get("environment")
     else:
-        value = params.get("platform") or (
-            params.get("environment") if isinstance(params.get("environment"), str) else None
-        )
+        value = params.get("environment") if isinstance(params.get("environment"), str) else None
     return str(value) if value is not None else None
 
 
@@ -219,7 +217,7 @@ def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
     preparation = None
     if operation == "start" and (params.get("prepared_ref") or params.get("request_file")):
         from research_agent.application.references import read_prepared_file, resolve_prepared_job
-        transport = {key: params[key] for key in ("root", "workspace_root", "session_id", "user_task_id", "required_environment") if key in params}
+        transport = {key: params[key] for key in ("root", "workspace_root", "session_id", "user_task_id", "required_target", "required_route_digest") if key in params}
         controls = {key: params[key] for key in ("timeout_seconds", "repeat", "node_id") if key in params}
         allowed = {*transport, *controls, "prepared_ref"} if params.get("prepared_ref") else {
             *transport, *controls, "request_file", "request_sha256"}
@@ -233,19 +231,40 @@ def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
             )
         if params.get("prepared_ref"):
             request = resolve_prepared_job(root, {key: value for key, value in params.items()
-                                                  if key not in {"session_id", "user_task_id", "node_id", "required_environment"}})
+                                                  if key not in {"session_id", "user_task_id", "node_id", "required_target", "required_route_digest"}})
         else:
             if not isinstance(params.get("request_sha256"), str):
                 raise ValueError("prepared_request_digest_required")
             preparation = read_prepared_file(root, params)
             request = preparation["request"]
         params = {**request, **controls, **transport}
+    if operation == "resolve_target":
+        from research_agent.jobs.config_contract import load_job_config, resolve_selection
+        return resolve_selection(load_job_config(os.environ["CORAGENT_JOB_CONFIG"]), params.get("target"),
+                                 scheduler=params.get("scheduler"), location=params.get("location"),
+                                 source_text=params.get("source_text"))
     runtime = _runtime(root)
+    if operation == "targets":
+        # Task state records the resolved default once, so a later installation
+        # config change cannot silently retarget an in-flight task. Expose only
+        # routing metadata; bindings and credentials remain private to Jobs.
+        from research_agent.jobs.config_contract import configured_targets, default_target, load_job_config
+        settings = load_job_config(os.environ["CORAGENT_JOB_CONFIG"])
+        return {"default_target": default_target(settings),
+                "targets": {name: {key: target.get(key) for key in ("scheduler", "location", "aliases")}
+                            for name, target in configured_targets(settings).items()}}
     if operation == "start":
-        required = params.get("required_environment")
-        actual = _platform_name(params) or runtime.default
+        required = params.get("required_target")
+        from research_agent.jobs.config_contract import bound_target, load_job_config, resolve_target
+        settings = load_job_config(os.environ["CORAGENT_JOB_CONFIG"])
+        if required and params.get("required_route_digest"):
+            actual = bound_target(settings, _platform_name(params),
+                                  {"target": required, "route_digest": params["required_route_digest"]})
+        else:
+            actual = resolve_target(settings, _platform_name(params) or required)
         if required and actual != required:
-            raise ValueError(f"execution_target_mismatch: task requires {required}, request selects {actual}; prepare for the required environment")
+            raise ValueError(f"execution_target_mismatch: task requires {required}, request selects {actual}; prepare for the required target")
+        params["execution_target"] = actual
         return _start(root, runtime, params, preparation=preparation)
     if operation == "probe":
         # Probe is a capability query and intentionally does not require a

@@ -16,7 +16,7 @@ Request preparation already checks the chosen target. For diagnosis before
 preparation, check only the selected recipe and environment:
 
 ```bash
-"$CORAGENT_PYTHON" -m research_agent.application.environment_check --config "$CORAGENT_JOB_CONFIG" --environment <name> --executor <id> --version <version>
+"$CORAGENT_PYTHON" -m research_agent.application.environment_check --config "$CORAGENT_JOB_CONFIG" --target <name> --executor <id> --version <version>
 ```
 
 For a native command or task script without a recipe, replace executor/version

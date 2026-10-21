@@ -7,6 +7,12 @@ description: Turn a molecular or reaction-candidate geometry into an evidence-bo
 
 [Chinese version](SKILL.zh-CN.md)
 
+## Script routing
+
+Use the registered executor ID and the [script routing map](../../../../docs/skill-script-routing.md#structure-assessment) to choose the entrypoint, CLI, inputs, and primary outputs. The map is authoritative for routing; implementation helpers under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details; read the linked operation contract and use executor `--help` only for unspecified options.
+
+**Entrypoints:** `chemical.structure-cognition@1` → `skills/structure-assessment/scripts/run.py`.
+
 Use this Skill before choosing or revising a calculation when the Agent needs a common description of a material: identity, graph, fragments, electronic declaration, reaction-center geometry, and comparison with a reference structure.
 
 ## What to inspect

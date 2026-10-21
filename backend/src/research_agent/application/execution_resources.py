@@ -17,14 +17,14 @@ def contract(base, descriptor):
     return module
 
 
-def resolve(settings, environment, backend, runtime, *, submission=None, requirements=None, defaults=None):
+def resolve(settings, target, backend, runtime, *, submission=None, requirements=None, defaults=None):
     requested = copy.deepcopy({} if submission is None else submission)
     # Validate the caller's unmerged object too: do not hide malformed requests.
-    resolve_binding(settings, environment, backend, runtime=runtime, requested=requested)
-    configured = resolve_binding(settings, environment, backend, runtime=runtime)
+    resolve_binding(settings, target, backend, runtime=runtime, requested=requested)
+    configured = resolve_binding(settings, target, backend, runtime=runtime)
     fallback = {key: value for key, value in (defaults or {}).items() if key not in configured['submission']['resources']}
     requested['resources'] = {**fallback, **(requirements or {}), **requested.get('resources', {})}
-    selected = resolve_binding(settings, environment, backend, runtime=runtime, requested=requested)
+    selected = resolve_binding(settings, target, backend, runtime=runtime, requested=requested)
     validate_resource_environment(selected['submission']['resources'], selected['binding'].get('environment', {}))
     return selected, {'configuration_sha256': binding_digest(configured), 'submission_request': requested}
 

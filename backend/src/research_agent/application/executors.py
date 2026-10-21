@@ -13,9 +13,10 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 
-from research_agent.jobs.config_contract import binding_digest, load_job_config
+from research_agent.jobs.config_contract import binding_digest, configured_targets, load_job_config, bound_target
 from research_agent.jobs.environment import probe_binding, guarded_command
 from research_agent.jobs.inputs import content_digest
 from research_agent.application.execution_catalog import installed_catalogs
@@ -31,13 +32,11 @@ def registered_executor(identifier, version):
 
 
 def list_recipes(*, executor=None, version=None, backend=None, skill=None, details=False,
-                 config=None, environment=None):
+                 config=None, target=None):
     """Index preparation shortcuts, independently of scientific capability."""
     settings = load_job_config(config) if config else None
-    if bool(config) != bool(environment):
-        raise ValueError("recipe_list_requires_config_and_environment_together")
-    if settings and environment not in settings['environments']:
-        raise ValueError("execution_environment_not_configured")
+    if config:
+        target = preparation_target(settings, target)
     recipes = []
     for catalog in installed_catalogs():
         for entry in catalog['executors']:
@@ -48,10 +47,10 @@ def list_recipes(*, executor=None, version=None, backend=None, skill=None, detai
                 key: entry[key] for key in ('id', 'version', 'skill', 'backend', 'runtime', 'inputs') if key in entry}
             if settings:
                 row['binding_status'] = ('configured' if entry['backend'] in
-                    settings['environments'][environment].get('backends', {}) else 'not_configured')
+                    configured_targets(settings)[target].get('backends', {}) else 'not_configured')
             recipes.append(row)
     return {'scope': 'predefined_recipes', 'software_availability': 'not_checked',
-            **({'environment': environment} if environment else {}), 'recipes': recipes}
+            **({'target': target} if target else {}), 'recipes': recipes}
 
 
 def _load_cli(base, descriptor):
@@ -141,25 +140,31 @@ def validate_prepared_entry(params, descriptor, base):
         raise ValueError('execution_program_resources_mismatch: prepare again')
 
 
-def prepare(config, environment, executor, version, inputs, arguments=(), *, dependencies=(), collect=(), work_id=None, input_artifact_ids=(), submission=None):
+def prepare(config, target, executor, version, inputs, arguments=(), *, dependencies=(), collect=(), work_id=None, input_artifact_ids=(), submission=None):
     base, descriptor = registered_executor(executor, version)
-    return _prepare(config, environment, base, descriptor, descriptor["resources"], inputs, arguments,
+    return _prepare(config, target, base, descriptor, descriptor["resources"], inputs, arguments,
                     dependencies=dependencies, collect=collect, work_id=work_id, input_artifact_ids=input_artifact_ids, submission=submission)
 
 
-def prepare_script(config, environment, backend, script, arguments=(), *, dependencies=(), collect=(), work_id=None, input_artifact_ids=(), submission=None):
+def prepare_script(config, target, backend, script, arguments=(), *, dependencies=(), collect=(), work_id=None, input_artifact_ids=(), submission=None):
     """Pin a task-specific Python script without inventing an installed method."""
     script = Path(script).expanduser().resolve()
     if not script.is_file() or script.suffix != ".py":
         raise ValueError("execution_script_invalid: provide an existing Python script")
     descriptor = {"backend": backend, "runtime": "python", "entry": script.name,
                   "argv": ["{entry}", "{args}"], "inputs": {}, "outputs": []}
-    return _prepare(config, environment, script.parent, descriptor, {script.name: "sha256:" + content_digest(script)},
+    return _prepare(config, target, script.parent, descriptor, {script.name: "sha256:" + content_digest(script)},
                     {}, arguments, dependencies=dependencies, collect=collect, work_id=work_id, input_artifact_ids=input_artifact_ids, submission=submission)
 
 
-def _prepare(config, environment, base, descriptor, resources, inputs, arguments, *, dependencies, collect, work_id, input_artifact_ids, submission):
+def preparation_target(settings, requested=None):
+    context = json.loads(os.environ["CORAGENT_TASK_EXECUTION"]) if os.environ.get("CORAGENT_TASK_EXECUTION") else None
+    return bound_target(settings, requested, context)
+
+
+def _prepare(config, target, base, descriptor, resources, inputs, arguments, *, dependencies, collect, work_id, input_artifact_ids, submission):
     settings = load_job_config(config)
+    target = preparation_target(settings, target)
     if not isinstance(inputs, dict) or set(inputs) != set(descriptor["inputs"]):
         raise ValueError("executor_inputs_invalid: provide exactly the declared input roles")
     if not isinstance(arguments, (list, tuple)) or any(not isinstance(arg, str) or "\0" in arg for arg in arguments):
@@ -171,7 +176,7 @@ def _prepare(config, environment, base, descriptor, resources, inputs, arguments
     inputs = {role: Path(source).expanduser().resolve() for role, source in inputs.items()}
     module = contract(base, descriptor)
     requirements = module.requirements(descriptor, list(arguments), inputs) if module else {}
-    selected, resource_metadata = resolve(settings, environment, descriptor['backend'], descriptor['runtime'],
+    selected, resource_metadata = resolve(settings, target, descriptor['backend'], descriptor['runtime'],
                                           submission=submission, requirements=requirements,
                                           defaults=module.defaults(descriptor) if module else {})
     arguments, program_resources = check_program(base, descriptor, arguments, inputs, selected['submission']['resources'])
@@ -252,7 +257,7 @@ def _prepare(config, environment, base, descriptor, resources, inputs, arguments
     if not isinstance(work_id, str) or not work_id:
         raise ValueError("work_id_invalid")
     return {"request_id": "executor_" + hashlib.sha256(work_id.encode()).hexdigest()[:48],
-            "work_id": work_id, "command": argv, "platform": environment,
+            "work_id": work_id, "command": argv, "execution_target": target,
             "inputs": staged, "outputs": outputs, "environment": binding.get("environment", {}),
             **({"input_artifact_ids": list(input_artifact_ids)} if input_artifact_ids else {}),
             "metadata": {**submission,
@@ -274,7 +279,7 @@ def main():
     parser.add_argument("--details", action="store_true", help="Include full descriptors with --list")
     parser.add_argument("--skill", help="Filter --list by associated Skill")
     parser.add_argument("--config")
-    parser.add_argument("--environment", help="Named execution target in job.toml; the executor or --backend selects its software/Python binding")
+    parser.add_argument("--target", help="Named execution target in job.toml; the executor or --backend selects its software/Python binding")
     parser.add_argument("--executor")
     parser.add_argument("--version")
     parser.add_argument("--script", help="Pin a task-specific Python script and run it in the --backend Python binding; requires --backend, not executor/version/input")
@@ -303,12 +308,12 @@ def main():
         return
     if args.list:
         print(json.dumps(list_recipes(executor=args.executor, version=args.version, backend=args.backend,
-            skill=args.skill, details=args.details, config=args.config, environment=args.environment), indent=2))
+            skill=args.skill, details=args.details, config=args.config, target=args.target), indent=2))
         return
     if args.details or args.skill:
         parser.error("--details and --skill require --list")
-    if not args.config or not args.environment:
-        parser.error("--config and --environment are required")
+    if not args.config:
+        parser.error("--config is required")
     if args.script:
         if not args.backend or args.executor or args.version or args.input:
             parser.error("--script requires --backend; do not combine it with executor/version/input")
@@ -326,9 +331,10 @@ def main():
         'cpus': args.cpus, 'memory_mb': args.job_memory_mb, 'gpus': args.gpus, 'walltime': args.walltime}.items() if value is not None},
         **{key: value for key, value in {'queue': args.queue, 'queue_wait_seconds': args.queue_wait_seconds}.items() if value is not None}}
     try:
-        request = (prepare_script(args.config, args.environment, args.backend, args.script, arguments, **options)
-                   if args.script else prepare(args.config, args.environment, args.executor, args.version, inputs, arguments, **options))
-    except RunnerArgumentsError as exc:
+        target = preparation_target(load_job_config(args.config), args.target)
+        request = (prepare_script(args.config, target, args.backend, args.script, arguments, **options)
+                   if args.script else prepare(args.config, target, args.executor, args.version, inputs, arguments, **options))
+    except (RunnerArgumentsError, ValueError) as exc:
         parser.exit(2, str(exc) + '\n')
     encoded = (json.dumps(request, indent=2) + "\n").encode()
     if args.output:

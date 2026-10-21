@@ -105,7 +105,7 @@ angstrom 坐标。不嵌入、不优化、不分别移动片段。对每个保�
 node_id 交给 `job_start`，再 `job_collect` 收集材料。
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.map-candidates --version 1 --input left=<work_dir>/reactant/material.json --input right=<work_dir>/product/material.json --output <work_dir>/prepared/map.json -- --mode reaction --max-candidates 64
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.conformer-compare --version 1 --input left=<work_dir>/first/material.json --input right=<work_dir>/second/material.json --output <work_dir>/prepared/conformers.json -- --rmsd-threshold 0.1
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.reorder-tensors --version 1 --input tensors=<work_dir>/tensors.json --input order=<work_dir>/selected-order.json --output <work_dir>/prepared/reorder.json
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.map-candidates --version 1 --input left=<work_dir>/reactant/material.json --input right=<work_dir>/product/material.json --output <work_dir>/prepared/map.json -- --mode reaction --max-candidates 64
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.conformer-compare --version 1 --input left=<work_dir>/first/material.json --input right=<work_dir>/second/material.json --output <work_dir>/prepared/conformers.json -- --rmsd-threshold 0.1
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.reorder-tensors --version 1 --input tensors=<work_dir>/tensors.json --input order=<work_dir>/selected-order.json --output <work_dir>/prepared/reorder.json
 ```

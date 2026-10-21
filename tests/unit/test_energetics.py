@@ -8,6 +8,7 @@ import sys
 import time
 
 import pytest
+pytest.importorskip('numpy')
 
 SKILLS = Path(__file__).resolve().parents[2] / 'domains/chemical/skills'
 from tests.unit.chemical_paths import configure

@@ -1145,10 +1145,10 @@ def test_job_toml_is_validated_and_written_private(tmp_path: Path) -> None:
     assert stat.S_IMODE(destination.stat().st_mode) == 0o600
 
 
-def test_legacy_scientific_config_is_rejected_before_install_copy(tmp_path):
+def test_invalid_scientific_binding_is_rejected_before_install_copy(tmp_path):
     root = tmp_path / "install"
     source = tmp_path / "job.toml"
-    source.write_text('default_environment="local"\n[environments.local]\nkind="local"\n[environments.local.backends.pyscf]\ncommand="/old/python"\n')
+    source.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\n[execution.targets.local.bindings.pyscf]\ncommand="/old/python"\n')
     args = wizard.parse_args(["--install-root", str(root), "--job-config", str(source),
                               "--service-scope", "none", "--non-interactive"])
     with pytest.raises(ValueError, match="python_binding_missing"):
@@ -1161,7 +1161,7 @@ def test_legacy_scientific_config_is_rejected_before_install_copy(tmp_path):
 def test_configured_install_checks_science_before_relay_or_secret_copy(tmp_path, monkeypatch):
     from scripts import _install_inputs, _install_relay
     source = tmp_path / "config"; source.mkdir()
-    (source / "job.toml").write_text('default_environment="local"\n[environments.local]\nkind="local"\n[environments.local.backends.xtb]\ncommand="xtb"\n')
+    (source / "job.toml").write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\n[execution.targets.local.bindings.xtb]\ncommand="xtb"\n')
     def unexpected(*args):
         pytest.fail("invalid scientific config must fail before installation side effects")
     monkeypatch.setattr(_install_relay, "install", unexpected)
@@ -1175,7 +1175,7 @@ def _configured_email_fixture(tmp_path):
     config.mkdir()
     for name in ("models.json", "auth.json"):
         (config / name).write_text("{}\n")
-    (config / "job.toml").write_text('default_environment="local"\n[environments.local]\nkind="local"\n')
+    (config / "job.toml").write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\n')
     root = tmp_path / "install"
     args = wizard.parse_args([
         "--import-config", str(config), "--install-root", str(root),
@@ -1255,8 +1255,8 @@ def test_installed_execution_readiness_probes_unregistered_native_binding(tmp_pa
     config.parent.mkdir(parents=True)
     binary = tmp_path / 'native-program'
     binary.write_text('#!/bin/sh\nexit 0\n'); binary.chmod(0o700)
-    config.write_text('default_environment="local"\n[environments.local]\nkind="local"\n'
-                      '[environments.local.backends.fixture_native]\ncommand=' + json.dumps(str(binary)) + '\n')
+    config.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\n'
+                      '[execution.targets.local.bindings.fixture_native]\ncommand=' + json.dumps(str(binary)) + '\n')
     monkeypatch.setenv('PYTHONPATH', os.pathsep.join(sys.path))
     # The installer returns a suite root whose Agent component owns extensions.
     suite_root = tmp_path / 'suite'

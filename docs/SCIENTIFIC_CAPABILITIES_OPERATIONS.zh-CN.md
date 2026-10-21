@@ -11,7 +11,7 @@
 
 先读取相关 Skill，选择其预设入口、原生命令或任务脚本，以及安装目录 `etc/job.toml` 中的命名环境。预设入口提供后端键、固定脚本、纯 CLI 解析器、输入角色和输出。原生命令无需 Python 绑定；Python 脚本使用目标环境配置的解释器。
 
-`"$CORAGENT_PYTHON" -m research_agent.application.executors --list` 返回简短的预设入口索引，可按 `--skill`、`--backend` 或 `--executor`/`--version` 筛选；`--details` 返回完整声明。加 `--config … --environment …` 只显示绑定是否已配置，不探测软件。实际 runner 参数通过 `executors --executor <id> --version <版本> --help` 获取；只加载已固定的 CLI 解析器，不运行科学程序。
+`"$CORAGENT_PYTHON" -m research_agent.application.executors --list` 返回简短的预设入口索引，可按 `--skill`、`--backend` 或 `--executor`/`--version` 筛选；`--details` 返回完整声明。加 `--config … --target …` 只显示绑定是否已配置，不探测软件。实际 runner 参数通过 `executors --executor <id> --version <版本> --help` 获取；只加载已固定的 CLI 解析器，不运行科学程序。
 
 准备命令写入请求并返回 `request_file` 与 `request_sha256`，提交到 `job_start`；关联研究问题时提供 `node_id`。Runtime 检查文件和输入，固定所选 Node 归属与内容版本、`prepared_ref` 与提交意图。准备本身不派发 Job，也不证明科学结果。
 
@@ -19,17 +19,17 @@
 
 丢失响应时复用原请求身份，通过 `job_status`、`job_reconcile` 和 `job_collect` 恢复；超时或客户端断连不代表允许重投。明确重复计算需要新身份和前驱、原因、预算声明。
 
-## 平台检查
+## 执行目标检查
 
-在会话中使用 `job_probe` 检查已配置平台。在安装的控制环境中，针对所选入口核验软件：
+在会话中使用 `job_probe` 检查已配置 execution target。在安装的控制环境中，针对所选入口核验软件：
 
 ```bash
-"$CORAGENT_PYTHON" -m research_agent.application.environment_check --config "$CORAGENT_JOB_CONFIG" --environment <环境> --executor <id> --version <版本>
+"$CORAGENT_PYTHON" -m research_agent.application.environment_check --config "$CORAGENT_JOB_CONFIG" --target <环境> --executor <id> --version <版本>
 ```
 
 该命令只连接所选环境。没有预设入口的程序或任务脚本用 `--backend <绑定>` 替代 executor/version；可加 `--runtime native` 或 `--runtime python` 指定运行方式。`--details` 展示底层观测。缺少预设入口、缺少配置和实际检查失败分别返回 `recipe_not_found`、`not_configured` 和 `check_failed`；成功的 `verified` 只表示环境前置条件通过。
 
-安装维护时省略环境及入口/后端选择，可检查所有已配置目标（包括 SSH 目标）。`job_probe` 的平台观察与具体软件依赖核验是不同检查。
+安装维护时省略 target 及入口/后端选择，可检查所有已配置目标（包括 SSH 目标）。`job_probe` 的目标基础设施观察与具体软件依赖核验是不同检查。
 
 ## 环境与进程归属
 
@@ -37,7 +37,7 @@ job.toml 所选后端提供程序、Python 绑定、激活脚本及资源默认�
 
 准备器在选定本地或 SSH 目标上核验解释器前缀、Conda 显式锁、pip 固定版本、安装回执、包清单，以及程序和激活文件摘要。请求身份包含这次观测；新提交时复查，真正运行时由暂存并固定摘要的检查程序再次复查。激活文件先检查再加载。变化导致拒绝执行，既有 Job 的查询和重试仍返回原身份。核验保证环境与记录一致，科学能力仍须由实际求解与验证证明。
 
-安装回执增加 `inventory_sha256`。旧环境应通过 `scripts/install_job_environment.py --config … --environment … --backend … --adopt` 实际核验后发布新回执；不得手工补写摘要。统一安装器准备所选 domain 环境，在受管控制环境中核验配置与依赖，并在切换版本前运行有时限的普通验收 Job。本机目标自动检查；远端仅在选择 `--job-profile TARGET:PROFILE` 或 `--verify-job-target TARGET` 时检查。报告区分环境验证、已测试后端和未验证目标，PubChem/OPSIN 外部可用性不阻止离线验收。`job_probe` 仍只表示平台可达。
+安装回执增加 `inventory_sha256`。旧环境应通过 `scripts/install_job_environment.py --config … --target … --backend … --adopt` 实际核验后发布新回执；不得手工补写摘要。统一安装器准备所选 domain 环境，在受管控制环境中核验配置与依赖，并在切换版本前运行有时限的普通验收 Job。本机目标自动检查；远端仅在选择 `--job-profile TARGET:PROFILE` 或 `--verify-job-target TARGET` 时检查。报告区分目标验证、已测试后端和未验证目标，PubChem/OPSIN 外部可用性不阻止离线验收。`job_probe` 只表示目标基础设施状态。
 
 应用提交的本地 Job 运行在独立 systemd 用户临时服务中，Host 重启不会连带终止它们。任务只接收最小环境和显式变量，资源请求通过 CPUQuota/MemoryMax 实施。Runtime 在 Job 内或配置的 scratch_root 下创建专属 scratch；显式环境值可引用 `{scratch}`。临时单元移除后，回执仍保留在工作区。
 

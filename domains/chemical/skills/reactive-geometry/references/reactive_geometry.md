@@ -144,7 +144,7 @@ Zero accepted candidates exits nonzero but retains reports. `enumeration_complet
 means the finite configured list was visited, not exhaustive conformational sampling.
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.reactive-geometry --version 1 --input input=<work_dir>/edits.json --input-artifact <source-ref> --output <work_dir>/edit-request.json
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.reactive-geometry --version 1 --input input=<work_dir>/edits.json --input-artifact <source-ref> --output <work_dir>/edit-request.json
 ```
 
 Use absolute work_dir paths from research_create/read. Submit request_file/request_sha256

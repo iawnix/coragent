@@ -5,6 +5,12 @@ description: 持久保存研究问题、尝试、证据、关系和不可变结�
 
 # 研究记忆
 
+## 脚本路由
+
+调用仓库脚本前先看[脚本路由地图](../../docs/skill-script-routing.zh-CN.md#research-memory)。地图列出支持的入口和接口；`scripts/` 下的 helper 不是独立命令。不要通过读取源码发现调用方式。
+
+**入口：** 无仓库内脚本；按文档使用 runtime 或 generic Job。
+
 [English version](SKILL.md)
 
 跨轮次保持科学研究连贯时使用本 Skill。Node 保存问题和假设，Job/Artifact 保存执行证据，Result 保存可复用解释。运行时提供 `research-review/1` 投影；需要细节时读取其引用的源记录。

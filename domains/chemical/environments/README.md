@@ -55,7 +55,7 @@ An existing remote target is only tested when selected for provisioning or with
 
 For administrator maintenance, the lower-level target-local helper is still
 available as `python3 scripts/install_job_environment.py --config /absolute/job.toml
---environment local --backend structure`. It requires existing explicit bindings
+--backend structure`. It requires existing explicit bindings
 and does not perform the public installer's release activation or Job acceptance.
 Structure and validation may share a prefix. CF22D needs no activation script
 or `LD_PRELOAD` workaround.
@@ -86,7 +86,7 @@ local-only wheel, or replace the lock of a running installation in place.
 The optional `path` profile uses path.lock for explicitly configured
 `path_xtb` / `path_gaussian` native bindings. It provides RDKit/NumPy, ASE and SciPy for scans,
 gradients and ASE NEB v2 without changing the existing lightweight wrappers. For example,
-configure `[environments.local.backends.path_xtb]` with `command = "/opt/xtb/bin/xtb"`
+configure `[execution.targets.local.bindings.path_xtb]` with `command = "/opt/xtb/bin/xtb"`
 (and activation_script if needed), then select `--job-profile local:path`.
 This profile has no default native scientific smoke calculation; the selected
 recipe's environment check and an explicit bounded scientific Job are separate.

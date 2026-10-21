@@ -144,6 +144,8 @@ def test_killed_supervisor_cannot_leave_a_detached_namespace_child(tmp_path):
 
 def test_shared_dependency_mounts_are_read_only():
     import errno
+    if 'CORAGENT_TEST_DEPENDENCIES' not in os.environ:
+        pytest.skip('shared dependency mounts are only available in the isolated test runner')
     paths=json.loads(os.environ['CORAGENT_TEST_DEPENDENCIES'])
     assert paths
     for directory in paths:

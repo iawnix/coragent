@@ -9,8 +9,9 @@ import sys
 import time
 import tomllib
 
-import numpy as np
 import pytest
+
+np = pytest.importorskip('numpy')
 
 SKILLS = Path(__file__).resolve().parents[2] / 'domains/chemical/skills'
 from tests.unit.chemical_paths import configure
@@ -345,11 +346,11 @@ def test_registered_path_operations_through_jobs(tmp_path,monkeypatch,operation)
     from tests.unit.test_job_recovery import workspace
     root=tmp_path/'work';workspace(root)
     config=Path(os.environ['CORAGENT_JOB_CONFIG']);text=config.read_text();data=tomllib.loads(text)
-    binding=data['environments']['local']['backends']['structure']['python']
+    binding=data['execution']['targets']['local']['bindings']['structure']['python']
     for backend,program in [('path_xtb',fake_xtb(tmp_path/'xtb')),('path_gaussian',fake_gaussian(tmp_path/'g16'))]:
-        text=re.sub(r'(?ms)^\[environments\.local\.backends\.'+backend+r'\]\n.*?(?=^\[|\Z)','',text)
-        text+='\n[environments.local.backends.'+backend+']\ncommand = '+json.dumps(str(program))+'\n'
-        text+='[environments.local.backends.'+backend+'.python]\n'+''.join(k+' = '+json.dumps(v)+'\n' for k,v in binding.items())
+        text=re.sub(r'(?ms)^\[execution\.targets\.local\.bindings\.'+backend+r'\]\n.*?(?=^\[|\Z)','',text)
+        text+='\n[execution.targets.local.bindings.'+backend+']\ncommand = '+json.dumps(str(program))+'\n'
+        text+='[execution.targets.local.bindings.'+backend+'.python]\n'+''.join(k+' = '+json.dumps(v)+'\n' for k,v in binding.items())
     config=tmp_path/'job.toml';config.write_text(text);monkeypatch.setenv('CORAGENT_JOB_CONFIG',str(config))
     if operation=='qst-prepare':spec=qst_input(True)
     elif operation.startswith('scan'):spec=scan_input(backend=operation.split('-')[1])
@@ -420,9 +421,9 @@ def test_path_environment_profile_is_opt_in_and_preserves_wrapper_bindings(tmp_p
     from scripts import _job_install as jobs
     from tests.unit.test_job_installation import options
     config=tmp_path/'job.toml'
-    config.write_text('default_environment="local"\n[environments.local]\nkind="local"\n'
-                      '[environments.local.backends.xtb]\ncommand="/native/xtb"\n'
-                      '[environments.local.backends.path_xtb]\ncommand="/native/xtb"\n')
+    config.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\n'
+                      '[execution.targets.local.bindings.xtb]\ncommand="/native/xtb"\n'
+                      '[execution.targets.local.bindings.path_xtb]\ncommand="/native/xtb"\n')
     value=jobs.plan(options(tmp_path,'--job-config',str(config),'--job-profile','local:path'))
     assert len(value['environments'])==1
     row=value['environments'][0]

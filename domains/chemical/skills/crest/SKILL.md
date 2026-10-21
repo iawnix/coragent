@@ -7,6 +7,12 @@ description: Explore conformers and rigid-fragment arrangements with CREST, then
 
 [Chinese version](SKILL.zh-CN.md)
 
+## Script routing
+
+Use the registered executor ID and the [script routing map](../../../../docs/skill-script-routing.md#crest) to choose the entrypoint, CLI, inputs, and primary outputs. The map is authoritative for routing; implementation helpers under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details; read the linked operation contract and use executor `--help` only for unspecified options.
+
+**Entrypoints:** `chemical.crest-ensemble@1` → `skills/crest/scripts/ensemble.py`; `chemical.ensemble-select@1` → `skills/crest/scripts/ensemble.py`; `chemical.complex-sample@1` → `skills/crest/scripts/ensemble.py`; `chemical.crest@1` → `skills/crest/scripts/crest_run.py`.
+
 Use CREST when uncertainty in conformation, fragment orientation, or weak-complex packing is likely to change a reaction search. It is useful for flexible reactants, catalysts with several rotamers, pre-reactive complexes, and rigid fragments whose relative pose must be sampled before transition-state work.
 
 ## What to prepare

@@ -5,6 +5,12 @@ description: 通过原生研究闭环协调任务、研究 Node、科学 Job、�
 
 # 研究工作流
 
+## 脚本路由
+
+调用仓库脚本前先看[脚本路由地图](../../docs/skill-script-routing.zh-CN.md#research-workflow)。地图列出支持的入口和接口；`scripts/` 下的 helper 不是独立命令。不要通过读取源码发现调用方式。
+
+**入口：** 无仓库内脚本；按文档使用 runtime 或 generic Job。
+
 [English version](SKILL.md)
 
 执行持续研究任务时使用本 Skill。它连接用户需求、Research Memory、领域 Skill、托管 Job、证据检查和最终交付；领域 Skill 负责科学方法，本 Skill 负责任务状态、执行生命周期和持久进度。
@@ -28,4 +34,6 @@ description: 通过原生研究闭环协调任务、研究 Node、科学 Job、�
 
 把每项交付标准对应到不可变 Result 或 Material，确认剩余 Job，再由报告/领域 Skill 组装所需输出。部分和否定结果都是有用进度；是否完成取决于约定范围和证据。邮件交付使用[email Skill](../email/SKILL.zh-CN.md)，准备消息并保留发送回执。
 
-Job 命令和文件约定见[工具与执行](references/tools.zh-CN.md)，领域路由见[Skill 资源路径](references/skills.zh-CN.md)，可调用接口见[公共合同](references/public_contract.zh-CN.md)。多步化学使用[路径证据合同](../../domains/chemical/skills/reaction-investigation/references/pathway_execution.zh-CN.md)。
+Job 命令和文件约定见[工具与执行](references/tools.zh-CN.md)，执行目标选择见[执行目标选择](references/execution-targets.zh-CN.md)，领域路由见[Skill 资源路径](references/skills.zh-CN.md)，可调用接口见[公共合同](references/public_contract.zh-CN.md)。多步化学使用[路径证据合同](../../domains/chemical/skills/reaction-investigation/references/pathway_execution.zh-CN.md)。
+
+申请完成前阅读[任务验收与交付](references/acceptance.zh-CN.md)。每项要求都需要归属明确的固定评估；完整完成和部分交付使用不同终态。

@@ -7,6 +7,12 @@ description: Choose exploration and refinement methods before costly searches, o
 
 [Chinese version](SKILL.zh-CN.md)
 
+## Script routing
+
+Use the registered executor ID and the [script routing map](../../../../docs/skill-script-routing.md#method-selection) to choose the entrypoint, CLI, inputs, and primary outputs. The map is authoritative for routing; implementation helpers under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details; read the linked operation contract and use executor `--help` only for unspecified options.
+
+**Entrypoint:** none bundled; use the documented runtime or generic Job route.
+
 Use this Skill when a study must choose a method, compare methods, or prepare a fixed method in a named compute environment. Start with the quantity the study needs, then make the method choice explicit in the research Node and Job intent.
 
 ## Selection workflow

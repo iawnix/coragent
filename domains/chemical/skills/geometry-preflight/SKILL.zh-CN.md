@@ -7,6 +7,12 @@ description: 在电子结构计算前筛查坐标，同时保留声明的非平�
 
 [English version](SKILL.md)
 
+## 脚本路由
+
+按 executor ID 使用[脚本路由地图](../../../../docs/skill-script-routing.zh-CN.md#geometry-preflight)选择入口、CLI、输入和主要输出。地图是路由依据；`scripts/` 下的 helper 不是独立命令。不要通过读取源码发现调用方式，先读操作合同，只有合同未说明的选项才使用 executor 的 `--help`。
+
+**入口：** `chemical.geometry-safety@1` → `skills/geometry-preflight/scripts/run.py`。
+
 Gaussian、xTB、CF22D、QST、NEB 或重启帧进入求解器前，对 XYZ 或 Gaussian 输入运行此检查。它捕获非有限坐标、原子数/标题不一致、核塌缩和严重的非反应短接触，同时允许 TS 种子中有意形成/断裂的键处于非平衡距离。
 
 ## profile 与输入

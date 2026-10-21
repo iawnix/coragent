@@ -7,6 +7,12 @@ description: Screen coordinates before electronic-structure work while preservin
 
 [Chinese version](SKILL.zh-CN.md)
 
+## Script routing
+
+Use the registered executor ID and the [script routing map](../../../../docs/skill-script-routing.md#geometry-preflight) to choose the entrypoint, CLI, inputs, and primary outputs. The map is authoritative for routing; implementation helpers under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details; read the linked operation contract and use executor `--help` only for unspecified options.
+
+**Entrypoints:** `chemical.geometry-safety@1` → `skills/geometry-preflight/scripts/run.py`.
+
 Run this check on an XYZ or Gaussian input before Gaussian, xTB, CF22D, QST, NEB, or a restart frame enters a solver. It catches non-finite coordinates, atom/header mismatches, nuclear collapse, and severe non-reaction contacts while allowing deliberate forming/breaking bonds in a TS seed.
 
 ## Profiles and inputs

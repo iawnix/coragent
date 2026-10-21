@@ -7,6 +7,7 @@ import subprocess
 import sys
 
 import pytest
+pytest.importorskip('numpy')
 
 SKILLS = Path(__file__).resolve().parents[2] / 'domains/chemical/skills'
 sys.path[:0] = [str(SKILLS / 'gaussian/scripts'), str(SKILLS / '_shared')]

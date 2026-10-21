@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import os
 import subprocess
 import sys
 import tomllib
 import zipfile
 from pathlib import Path
+import pytest
 
 import research_agent
 
@@ -61,6 +63,8 @@ def test_python_payload_digest_covers_code_and_runtime_data() -> None:
     assert wheel_source_payload_sha256(ROOT) == original
 
 
+@pytest.mark.skipif(importlib.util.find_spec('setuptools') is None or importlib.util.find_spec('setuptools.build_meta') is None,
+                    reason='local test environment lacks setuptools build backend')
 def test_wheel_build_uses_a_temporary_source_copy(tmp_path: Path) -> None:
     before = sorted(path.relative_to(ROOT).as_posix() for path in ROOT.rglob("*.egg-info"))
 
@@ -80,6 +84,8 @@ def test_wheel_build_uses_a_temporary_source_copy(tmp_path: Path) -> None:
     assert not {"research_agent.research/model.py", "research_agent.research/decisions.py", "research_agent.research/evidence.py"} & names
 
 
+@pytest.mark.skipif(importlib.util.find_spec('setuptools') is None or importlib.util.find_spec('setuptools.build_meta') is None,
+                    reason='local test environment lacks setuptools build backend')
 def test_built_wheel_installs_as_a_self_contained_kernel(tmp_path: Path) -> None:
     descriptor = build_wheel(ROOT, tmp_path / "wheel")
     wheel = tmp_path / "wheel" / descriptor["filename"]

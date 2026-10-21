@@ -51,7 +51,12 @@ def run_guard(cwd, command):
 
 def test_actual_python_environment_matches_receipt_and_declared_dependencies():
     settings, selected = target()
-    result = probe_binding(settings, selected, {'python': '>=3.11', 'packages': {'rdkit': '>=2025.9,<2027'}, 'imports': ['rdkit.Chem']})
+    try:
+        result = probe_binding(settings, selected, {'python': '>=3.11', 'packages': {'rdkit': '>=2025.9,<2027'}, 'imports': ['rdkit.Chem']})
+    except ValueError as exc:
+        if str(exc) == 'environment_dependency_missing':
+            pytest.skip('fixture Python environment does not include RDKit')
+        raise
     observed = result['observation']['python']
     assert observed['prefix'] == selected['python']['prefix']
     assert observed['lock_sha256'] and observed['inventory_sha256'] and observed['receipt_sha256']
@@ -115,8 +120,8 @@ def test_native_target_needs_no_python_and_checks_activation_before_sourcing(tmp
     binary.chmod(0o700)
     activation = tmp_path / 'activate.sh'
     activation.write_text('export SCIENCE_MODE=test\n')
-    settings = {'environments': {'local': {'kind': 'local', 'backends': {'native': {
-        'command': str(binary), 'activation_script': str(activation)}}}}}
+    settings = {'default_target': 'local', 'targets': {'local': {'kind': 'local', 'type': 'local', 'driver': 'process',
+        'backends': {'native': {'command': str(binary), 'activation_script': str(activation)}}}}}
     selected = resolve_binding(settings, 'local', 'native', runtime='native')
     snapshot = probe_binding(settings, selected, {})
     command, inputs = guarded_command(selected, [str(binary)], snapshot)
@@ -235,7 +240,7 @@ def test_guard_cannot_be_reused_for_a_different_script(tmp_path):
 
 def test_ssh_probe_runs_target_checks_and_cleans_remote_scratch(tmp_path, monkeypatch):
     settings, selected = target()
-    target_settings = settings['environments']['local']
+    target_settings = settings['targets']['local']
     target_settings.update(kind='remote', ssh_host='fixture.invalid', work_root=str(tmp_path / 'new-remote-root'), driver='external',
                            ssh_config=str(tmp_path / 'ssh-config'), submission={'queue': 'science'})
     activation = tmp_path / 'activate.sh'

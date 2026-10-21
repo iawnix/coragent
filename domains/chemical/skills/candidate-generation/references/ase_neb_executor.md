@@ -24,7 +24,7 @@ structure environments do not automatically acquire ASE. Check the selected
 executor/version in the chosen environment before dispatch.
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.neb-xtb --version 2 --input input=<work_dir>/neb.json --input-artifact <input-ref> --output <work_dir>/neb-request.json
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.neb-xtb --version 2 --input input=<work_dir>/neb.json --input-artifact <input-ref> --output <work_dir>/neb-request.json
 ```
 
 Replace placeholders with actual absolute paths/Artifact references. Submit returned

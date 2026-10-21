@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { join } from "node:path";
@@ -47,13 +48,19 @@ async function fixture(t, storage = new MemoryStorage(), controllerOptions = {},
       if (!allocatedTasks.has(key)) allocatedTasks.set(key, `task_${allocatedTasks.size + 1}`);
       return { identifier: allocatedTasks.get(key) };
     }
+    if (command === "job.resolve_target") return { target: params.target || "local", scheduler: params.target === "cluster_a" ? "slurm" : "none",
+      location: params.target === "cluster_a" ? "cluster" : "controller", route_digest: "sha256:" + "a".repeat(64), selection_mode: params.target ? "explicit" : "default" };
+    if (command === "job.targets") return { default_target: "local", targets: {
+      local: { scheduler: "none", location: "controller", aliases: [] },
+      cluster_a: { scheduler: "slurm", location: "cluster", aliases: [] },
+    } };
     calls.push({ command, params });
     if (command === "job.list") return { jobs: [...jobStates].map(([job_id, state]) => ({ job_id, state })), next_cursor: null };
     if (command === "job.status") return { job_id: params.job_id, state: jobStates.get(params.job_id) };
     if (command === "job.cancel") { jobStates.set(params.job_id, "cancelled"); return { job_id: params.job_id, state: "cancelled" }; }
     if (command === "research.read") { if (params.ref === "missing") throw new Error("unknown evidence"); return { ref: params.ref, node_id: params.ref }; }
     if (command === "artifact.read") return { artifact_id: params.artifact_id,
-      sha256: artifacts.get(params.artifact_id) };
+      ...(typeof artifacts.get(params.artifact_id) === "object" ? artifacts.get(params.artifact_id) : { sha256: artifacts.get(params.artifact_id) }) };
     throw new Error(`Unexpected test command ${command}`);
   } };
   const openController = () => createTaskController({ harness, conversation, admission, LiveDoc, InboxDoc, kernel, workspaceId: "workspace", sessionId: "session", context, ...controllerOptions });
@@ -71,7 +78,16 @@ async function fixture(t, storage = new MemoryStorage(), controllerOptions = {},
       next_action: "Inspect the available mechanism inputs.", ...overrides }, "begin", context);
     return task;
   };
-  return { harness, conversation, admission, get controller() { return controller; }, native, faux, begin, jobStates, calls, kernel, session, artifacts,
+  const assess = (task, refs, status = "met") => {
+    const assessment_ref = `art_${100 + artifacts.size}`;
+    const content = JSON.stringify({ schema_version: "task-assessment/1", workspace_id: "workspace",
+      user_task_id: task.user_task_id, requirements_revision: task.requirements_revision, criterion_id: "report",
+      status, reason: "Assess the requested report against the retained evidence", conflicts: [],
+      checks: [{ method: "reasoned", status, reason: "Report evidence inspected", evidence_refs: refs.filter(ref => /^(art|result)_/.test(ref)) }] });
+    artifacts.set(assessment_ref, { content, sha256: createHash("sha256").update(content).digest("hex") });
+    return { criterion_id: "report", status, assessment_ref, evidence_refs: refs };
+  };
+  return { assess, harness, conversation, admission, get controller() { return controller; }, native, faux, begin, jobStates, calls, kernel, session, artifacts,
     reopen: async () => { await controller.close(); controller = openController(); } };
 }
 
@@ -316,7 +332,7 @@ test("committed updates replay before external validation, even after another ta
 });
 
 test("canonical Artifact IDs deduplicate progress and support completion", async t => {
-  const { controller, begin, artifacts, calls, conversation, faux } = await fixture(t);
+  const { controller, begin, artifacts, calls, conversation, faux, assess } = await fixture(t);
   await begin();
   const artifactId = "art_1", digest = "ab".repeat(32);
   artifacts.set(artifactId, digest); artifacts.set("art_1", "sha256:" + digest);
@@ -334,7 +350,7 @@ test("canonical Artifact IDs deduplicate progress and support completion", async
   task = await controller.current(context);
   try {
     task = await controller.update({ action: "propose_completion", expected_revision: task.revision,
-      completion: [{ criterion_id: "report", evidence_refs: [artifactId] }] }, "canonical-artifact-completion", context);
+      completion_outcome: "full", completion: [assess(task, [artifactId])] }, "canonical-artifact-completion", context);
     assert.equal(task.state, "completing");
   } finally { finish(); }
   await conversation.waitForIdle(context); await controller.reconcile();
@@ -364,7 +380,7 @@ test("new planning records and changing evidence combinations cannot hide an idl
   assert.equal(task.continuation.no_progress, 3);
   assert.equal(task.continuation.sequence, 4);
   await assert.rejects(controller.update({ action: "propose_completion", expected_revision: task.revision,
-    completion: [{ criterion_id: "report", evidence_refs: [nodeId(1)] }] }, "node-completion", context), { code: "task_completion_evidence_invalid" });
+    completion_outcome: "full", completion: [{ criterion_id: "report", status: "met", assessment_ref: "art_100", evidence_refs: [nodeId(1)] }] }, "node-completion", context), { code: "task_completion_evidence_invalid" });
 });
 
 test("Job progress recognizes real milestones once, not status polls or reconciliation timestamps", async t => {
@@ -491,7 +507,7 @@ test("native abort persists pause and control retries are idempotent", async t =
 });
 
 test("a negative theoretical Result completes a zero-Job task only after the final Pi answer", async t => {
-  const { controller, conversation, faux, begin, kernel, calls } = await fixture(t);
+  const { controller, conversation, faux, begin, kernel, calls, assess } = await fixture(t);
   await begin(); let finish, entered;
   const original = kernel.execute_command;
   kernel.execute_command = async (method, params) => method === "research.read"
@@ -502,11 +518,11 @@ test("a negative theoretical Result completes a zero-Job task only after the fin
   await controller.reconcile(); await ready;
   let task = await controller.current(context);
   await assert.rejects(controller.update({ expected_revision: task.revision, action: "propose_completion", completion: [] }, "incomplete", context), { code: "task_completion_incomplete" });
-  task = await controller.update({ expected_revision: task.revision, action: "propose_completion", completion: [{ criterion_id: "report", evidence_refs: ["result_1", nodeId(1)] }] }, "complete", context);
+  task = await controller.update({ expected_revision: task.revision, action: "propose_completion", completion_outcome: "full", completion: [assess(task, ["result_1", nodeId(1)])] }, "complete", context);
   assert.equal(task.state, "completing");
   finish(); await conversation.waitForIdle(context); await controller.reconcile();
   assert.equal((await controller.current(context)).state, "completed");
-  assert.equal(calls.some(call => call.command.startsWith("job.")), false);
+  assert.equal(calls.some(call => call.command === "job.start"), false);
 });
 
 test("task sources reject internal continuations and Monitor queries never resume work", async t => {
@@ -621,7 +637,7 @@ for (const mode of ["all", "any"]) test(`completed ${mode} waits release Job bin
     assert.ok((await harness.snapshot(LiveDoc, conversation.id, context)).run);
     task = await controller.current(context);
     assert.equal(task.state, "active"); assert.equal(task.wait, null);
-    assert.deepEqual(await controller.binding(context), { user_task_id: task.user_task_id });
+    assert.deepEqual(await controller.binding(context), { user_task_id: task.user_task_id, execution_target: "local", route_digest: "sha256:" + "a".repeat(64) });
     assert.equal(task.continuation.sequence, 1, "settling wait must not submit another run");
   } finally { finish(); }
   await conversation.waitForIdle(context);
@@ -722,7 +738,7 @@ test("transient wait status failure preserves user access and can recover", asyn
   assert.equal(controller.health().error.code, "task_wait_observation_failed");
   await assert.rejects(controller.binding(context), { code: "task_not_active" });
   kernel.execute_command = execute; jobStates.set("job_1", "succeeded");
-  assert.deepEqual(await controller.binding(context), { user_task_id: task.user_task_id });
+  assert.deepEqual(await controller.binding(context), { user_task_id: task.user_task_id, execution_target: "local", route_digest: "sha256:" + "a".repeat(64) });
 });
 
 const transientFailure = () => ({ ...fauxAssistantMessage(""), stopReason: "error", errorMessage: "503 Service Unavailable" });
@@ -1118,19 +1134,63 @@ for (const control of ["pause", "cancel"]) test(`a ${control} steered into a con
 
 test("compute destination persists and only a new user source can change it", async t => {
   const f = await fixture(t);
-  const task = await f.begin({ compute_environment: "cluster_a" });
-  assert.equal((await f.controller.binding(context)).compute_environment, "cluster_a");
+  const task = await f.begin({ execution_target: "cluster_a" });
+  assert.equal((await f.controller.binding(context)).execution_target, "cluster_a");
   await f.reopen();
-  assert.equal((await f.controller.current(context)).compute_environment, "cluster_a");
+  assert.equal((await f.controller.current(context)).execution_target, "cluster_a");
   await assert.rejects(f.controller.update({ action: "refine", expected_revision: task.revision,
-    source_submission_ids: [task.sources[0].submission_id], compute_environment: "local" }, "bad-refine", context), /new user instruction/);
+    source_submission_ids: [task.sources[0].submission_id], execution_target: "local" }, "bad-refine", context), /new user instruction/);
   await assert.rejects(f.controller.update({ action: "progress", expected_revision: task.revision,
-    compute_environment: null, evidence_refs: [] }, "bad-progress", context), /Execution destination changes/);
+    execution_target: null, evidence_refs: [] }, "bad-progress", context), /Execution target changes/);
   f.faux.setResponses([fauxAssistantMessage("Using the newly requested destination")]);
   const source = await f.admission.submitUser({ requestId: "change-destination", content: "Use local for the remaining calculations" }, context);
   await f.conversation.waitForIdle(context);
   const current = await f.controller.current(context);
   await f.controller.update({ action: "refine", expected_revision: current.revision,
-    source_submission_ids: [String(source.id)], compute_environment: "local" }, "good-refine", context);
-  assert.equal((await f.controller.binding(context)).compute_environment, "local");
+    source_submission_ids: [String(source.id)], execution_target: "local" }, "good-refine", context);
+  assert.equal((await f.controller.binding(context)).execution_target, "local");
+});
+
+test("correcting a misread original target is distinct from changing user requirements", async t => {
+  const { controller, begin, admission, conversation, faux } = await fixture(t);
+  faux.setResponses([fauxAssistantMessage("Read original target")]);
+  const source = await admission.submitUser({ requestId: "original-platform", content: "Use Slurm for the full report" }, context);
+  await conversation.waitForIdle(context);
+  // Resolver is deliberately mocked here to reproduce a previously misregistered task.
+  let task = await begin({ source_submission_ids: [String(source.id)] });
+  const originalCriteria = task.criteria;
+  task = await controller.update({ action: "correct_execution", expected_revision: task.revision,
+    execution_target: "cluster_a", execution_intent: { source_submission_id: String(source.id), source_text: "Use Slurm", scheduler: "slurm" },
+    reason: "Original scheduler instruction was misread" }, "correct-target", context);
+  assert.equal(task.execution_target, "cluster_a");
+  assert.equal(task.execution_selection.version, 2);
+  assert.equal(task.requirements_revision, 1);
+  assert.deepEqual(task.criteria, originalCriteria);
+  await assert.rejects(controller.update({ action: "refine", expected_revision: task.revision,
+    execution_target: "local", source_submission_ids: [String(source.id)] }, "change-without-source", context), { code: "task_source_required" });
+});
+
+for (const mutation of ["stale_result", "artifact_changed"]) test(`completion rechecks ${mutation} before closing`, async t => {
+  const { controller, begin, conversation, faux, assess, kernel, artifacts } = await fixture(t);
+  await begin();
+  let entered, finish;
+  const ready = new Promise(resolve => { entered = resolve; });
+  faux.setResponses([() => new Promise(resolve => { entered(); finish = () => resolve(fauxAssistantMessage("Report delivered")); })]);
+  await controller.reconcile(); await ready;
+  try {
+    let task = await controller.current(context);
+    const item = assess(task, ["result_1"]);
+    await controller.update({ action: "propose_completion", expected_revision: task.revision,
+      completion_outcome: "full", completion: [item] }, "propose", context);
+    if (mutation === "stale_result") {
+      const original = kernel.execute_command;
+      kernel.execute_command = async (method, params) => method === "research.read"
+        ? { ref: params.ref, review_notice_count: 1 } : original(method, params);
+    } else artifacts.get(item.assessment_ref).sha256 = "b".repeat(64);
+  } finally { finish(); }
+  await conversation.waitForIdle(context); await controller.reconcile();
+  const task = await controller.current(context);
+  assert.equal(task.state, "active");
+  assert.equal(task.completion_outcome, null);
+  assert.match(task.next_action, /do not repeat external delivery/);
 });

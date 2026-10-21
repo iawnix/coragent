@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 import pytest
+pytest.importorskip('numpy')
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT/'domains/chemical/skills/gaussian/scripts'
@@ -135,20 +136,22 @@ def test_preparer_argument_error_is_actionable_and_recoverable(tmp_path, monkeyp
     program = tmp_path/'g16'
     program.write_text(f'#!/bin/sh\ntouch "{marker}"\n')
     program.chmod(0o700)
-    config.write_text('''default_environment = "local"
-[environments.local]
-kind = "local"
-[environments.local.python]
+    config.write_text('''[execution]
+default_target = "local"
+[execution.targets.local]
+type = "local"
+driver = "process"
+[execution.targets.local.python]
 manager = "conda"
 conda_executable = "/fixture/conda"
 prefix = "/fixture/runner"
 lock_ref = "/fixture/runner.lock"
-[environments.local.backends.gaussian]
+[execution.targets.local.bindings.gaussian]
 command = ''' + json.dumps(str(program)) + '\n')
     source = tmp_path/'input.xyz'
     source.write_text('3\nfixture\nO 0 0 0\nH 0 0 1\nH 0 1 0\n')
     output = tmp_path/'request.json'
-    args = ['--config', str(config), '--environment', 'local', '--executor', 'chemical.gaussian',
+    args = ['--config', str(config), '--target', 'local', '--executor', 'chemical.gaussian',
             '--version', '1', '--input', f'geometry={source}', '--output', str(output), '--', '--task', 'opt']
     # Exercise the actual CLI entrypoint: rejection occurs before any target probe or calculation.
     rejected = subprocess.run([sys.executable, '-m', executors.__name__, *args, *option],
@@ -188,15 +191,17 @@ def test_explicit_gjf_task_error_preserves_validation_mode(capsys):
 def test_prepared_gaussian_request_tracks_checkpoint_and_collection(tmp_path, mock_environment_probe):
     from research_agent.application.executors import prepare
     config = tmp_path/'job.toml'
-    config.write_text('''default_environment = "local"
-[environments.local]
-kind = "local"
-[environments.local.python]
+    config.write_text('''[execution]
+default_target = "local"
+[execution.targets.local]
+type = "local"
+driver = "process"
+[execution.targets.local.python]
 manager = "conda"
 conda_executable = "/opt/conda/bin/conda"
 prefix = "/opt/runner"
 lock_ref = "/opt/locks/runner.lock"
-[environments.local.backends.gaussian]
+[execution.targets.local.bindings.gaussian]
 command = ["/opt/g16"]
 ''')
     source = gjf(tmp_path/'input.gjf', 'IRC=(Forward,ReadFC)')

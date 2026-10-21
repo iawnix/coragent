@@ -38,6 +38,7 @@
 | `chemical.path-irc` | `executor` | `validation` | `structure` | `skills/validation/scripts/irc_preparation.py` | `skills/validation/scripts/irc_preparation_cli.py` |
 | `chemical.pathway-check` | `executor` | `reaction-investigation` | `structure` | `skills/reaction-investigation/scripts/pathway_job.py` | `skills/reaction-investigation/scripts/pathway_cli.py` |
 | `chemical.qst-prepare` | `executor` | `candidate-generation` | `structure` | `skills/candidate-generation/scripts/search/search.py` | `skills/candidate-generation/scripts/search/search_cli.py` |
+| `chemical.search-recovery` | `executor` | `candidate-generation` | `structure` | `skills/candidate-generation/scripts/search/recovery.py` | `skills/candidate-generation/scripts/search/recovery_cli.py` |
 | `chemical.reaction` | `executor` | `material-preparation` | `structure` | `skills/material-preparation/scripts/reaction/prepare.py` | `skills/material-preparation/scripts/reaction/cli.py` |
 | `chemical.reactive-geometry` | `executor` | `reactive-geometry` | `structure` | `skills/reactive-geometry/scripts/reactive_geometry.py` | `skills/reactive-geometry/scripts/reactive_cli.py` |
 | `chemical.reactive-pose` | `executor` | `reactive-geometry` | `structure` | `skills/reactive-geometry/scripts/reactive_pose.py` | `skills/reactive-geometry/scripts/pose_cli.py` |

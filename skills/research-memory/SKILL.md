@@ -5,6 +5,12 @@ description: Preserve research questions, attempts, evidence, relations, and imm
 
 # Research memory
 
+## Script routing
+
+Use the [script routing map](../../docs/skill-script-routing.md#research-memory) before invoking a bundled script. It identifies the supported entrypoint and interface; helper files under `scripts/` are not standalone commands. Do not inspect source code to discover invocation details.
+
+**Entrypoint:** none bundled; use the documented runtime or generic Job route.
+
 [Chinese version](SKILL.zh-CN.md)
 
 Use this Skill to keep a scientific study coherent across turns. Nodes hold questions and hypotheses, Jobs and Artifacts hold execution evidence, and Results hold durable interpretations. The runtime supplies a `research-review/1` projection; read the referenced source records when details matter.

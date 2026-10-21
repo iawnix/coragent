@@ -102,7 +102,10 @@ export async function createCoRAgentHarness(databasePath, options) {
     const recordedUserSources = new Set();
     const registry = createRegistry();
     registry.install(defineExtension({ name: "coding-tools", tools:
-      await createCodingTools(cwd),
+      await createCodingTools(cwd, async context => {
+        const task = await taskController.current(context);
+        return task && ["active", "waiting"].includes(task.state) ? task.execution_selection : null;
+      }),
     }));
     registry.install(defineExtension({ name: "coragent-tools", tools: durableTools }));
     registry.install(defineExtension({

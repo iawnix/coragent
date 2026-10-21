@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { join } from "node:path";
@@ -16,6 +17,7 @@ const gate = () => { let resolve; const promise = new Promise(done => { resolve 
 
 async function fixture(t) {
   const faux = fauxProvider(), models = createModels(); models.setProvider(faux.provider);
+  const artifacts = new Map();
   const jobs = new Map(), cancellations = [], failures = new Set(), events = new Map(), cancelOutcomes = new Map();
   let controller, admission, monitor, harness, beforeAutomatic = async () => {}, beforeAssess = async () => {};
   let requests = 0;
@@ -42,6 +44,11 @@ async function fixture(t) {
       if (!allocatedTasks.has(key)) allocatedTasks.set(key, `task_${allocatedTasks.size + 1}`);
       return { identifier: allocatedTasks.get(key) };
     }
+    if (method === "job.resolve_target") return { target: params.target || "local", scheduler: params.target === "cluster_a" ? "slurm" : "none",
+      location: params.target === "cluster_a" ? "cluster" : "controller", route_digest: "sha256:" + "a".repeat(64), selection_mode: params.target ? "explicit" : "default" };
+    if (method === "job.targets") return { default_target: "local", targets: {
+      local: { scheduler: "none", location: "controller", aliases: [] },
+    } };
     if (method === "job.list") return { jobs: [...jobs].map(([job_id, state]) => ({ job_id, state })), next_cursor: null };
     if (method === "job.status") return { job_id: params.job_id, state: jobs.get(params.job_id) };
     if (method === "job.cancel") {
@@ -51,6 +58,7 @@ async function fixture(t) {
       jobs.set(params.job_id, state);
       return { job_id: params.job_id, state };
     }
+    if (method === "artifact.read") return artifacts.get(params.artifact_id);
     if (method === "research.read") return { ref: params.ref };
     if (method === "job.monitor_assess") {
       await beforeAssess();
@@ -70,7 +78,15 @@ async function fixture(t) {
   const source = await admission.submitUser({ requestId: "user-source", content: "Investigate and deliver the final report" }, context);
   await conversation.waitForIdle(context);
   await controller.begin({ title: "Research", objective: "Deliver report", source_submission_ids: [String(source.id)], criteria: [{ id: "report", description: "Final report" }] }, "begin", context);
-  return { get controller() { return controller; }, harness, conversation, admission, monitor, faux, jobs, cancellations, failures, events, source, cancelOutcomes, kernel,
+  const assess = (task, status = "met") => {
+    const content = JSON.stringify({ schema_version: "task-assessment/1", workspace_id: "workspace",
+      user_task_id: task.user_task_id, requirements_revision: task.requirements_revision, criterion_id: "report",
+      status, reason: "Report acceptance", conflicts: [],
+      checks: [{ method: "reasoned", status, reason: "Report evaluated", evidence_refs: ["result_1"] }] });
+    artifacts.set("art_1", { content, sha256: createHash("sha256").update(content).digest("hex") });
+    return { criterion_id: "report", status, assessment_ref: "art_1", evidence_refs: ["result_1"] };
+  };
+  return { assess, get controller() { return controller; }, harness, conversation, admission, monitor, faux, jobs, cancellations, failures, events, source, cancelOutcomes, kernel,
     get requests() { return requests; }, setBeforeAutomatic: fn => { beforeAutomatic = fn; }, setBeforeAssess: fn => { beforeAssess = fn; },
     reopen: async () => { await controller.close(); openController(); } };
 }
@@ -125,13 +141,14 @@ test("pause before first automatic consumption can resume past the invalidated r
   assert.equal((await env.controller.current(context)).continuation.sequence, 2);
 });
 
-test("failed final delivery retains completion evidence and supports delivery-only recovery", async t => {
+for (const outcome of ["full", "partial"]) test(`failed ${outcome} delivery retains acceptance and supports delivery-only recovery`, async t => {
   const env = await fixture(t), entered = gate(), fail = gate();
   env.faux.setResponses([async () => { entered.resolve(); await fail.promise; throw new Error("Final delivery rejected"); }]);
   await env.controller.reconcile(context); await entered.promise;
   const task = await env.controller.current(context);
   await env.controller.update({ expected_revision: task.revision, action: "propose_completion",
-    completion: [{ criterion_id: "report", evidence_refs: ["result_report"] }] }, "complete", context);
+    completion_outcome: outcome, completion: [env.assess(task, outcome === "full" ? "met" : "unmet")],
+    ...(outcome === "partial" ? { stop_basis: { kind: "search_exhausted", reason: "Bounded search exhausted", evidence_refs: ["result_1"] } } : {}) }, "complete", context);
   fail.resolve(); await env.conversation.waitForIdle(context);
   await env.reopen(); await env.controller.reconcile(context);
   const recovered = await env.controller.current(context);
@@ -150,9 +167,20 @@ test("failed final delivery retains completion evidence and supports delivery-on
   } finally { release.resolve(); }
   await env.conversation.waitForIdle(context); await env.controller.reconcile();
   const delivered = await env.controller.current(context);
-  assert.equal(delivered.state, "completed");
+  assert.equal(delivered.state, outcome === "full" ? "completed" : "partial");
+  assert.equal(delivered.completion_outcome, outcome);
   assert.deepEqual(delivered.completion, recovered.completion);
   assert.equal(delivered.execution_recovery, null);
+  if (outcome === "partial") {
+    const requests = env.requests;
+    await env.controller.reconcile(context);
+    assert.equal(env.requests, requests, "partial tasks do not automatically restart");
+    const resumed = await env.controller.control({ user_task_id: delivered.user_task_id, action: "resume",
+      expected_revision: delivered.revision, request_id: "resume-partial" }, context);
+    assert.equal(resumed.task.state, "active");
+    assert.equal(resumed.task.completion_outcome, null);
+    assert.equal((await env.controller.read({ user_task_id: delivered.user_task_id }, context)).completion_history[0].outcome, "partial");
+  }
 });
 
 test("mixed historical and current Job batches retain identity without driving the new task from old facts", async t => {

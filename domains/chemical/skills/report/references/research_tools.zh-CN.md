@@ -7,8 +7,8 @@ structure.lock 已有的 RDKit/NumPy、Matplotlib 和 Pillow；不启动求解�
 一个 input JSON 准备请求，以返回请求/摘要和 node_id 提交，再递归收集 results：
 
 ```text
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.trajectory --version 1 --input input=<work_dir>/trajectory.json --input-artifact <input-ref> --output <work_dir>/trajectory-request.json
-"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --environment local --executor chemical.research-report --version 1 --input input=<work_dir>/report.json --input-artifact <input-ref> --output <work_dir>/report-request.json
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.trajectory --version 1 --input input=<work_dir>/trajectory.json --input-artifact <input-ref> --output <work_dir>/trajectory-request.json
+"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.research-report --version 1 --input input=<work_dir>/report.json --input-artifact <input-ref> --output <work_dir>/report-request.json
 ```
 
 替换真实绝对路径和 Artifact 引用，原始日志/材料也应注册为 Artifact。数据摘要不等于
