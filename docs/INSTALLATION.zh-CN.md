@@ -69,8 +69,9 @@ password = "credential:smtp_password"
 无交互安装增加 `--non-interactive --yes`。`--dry-run` 不下载、安装或启动服务，且不输出凭据。
 
 安装器准备 CoRAgent 自身的 Python/Pi 运行环境、生成服务并检查已配置的执行环境。
-科学计算环境需独立准备，再在 `execution.targets.*.bindings` 中绑定。
-`install_job_environment.py` 可用于显式准备版本化的计算环境；主安装不默认创建科学环境。
+科学计算环境可独立准备后在 `execution.targets.*.bindings` 中绑定，也可显式使用安装参数
+`--job-profile TARGET:PROFILE` 选择受管环境。主安装不默认创建科学环境，详见
+[科学执行与运维](SCIENTIFIC_CAPABILITIES_OPERATIONS.zh-CN.md)。
 
 安装器不会隐式导入 `~/.pi/agent`。需要导入已有组件配置时，可以显式使用
 `--import-config DIRECTORY`，或 `--agent-config-dir`、`--job-config`、`--name-resolver-config`。

@@ -1,34 +1,50 @@
-# CoRAgent Documentation
+# CoRAgent documentation
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-Start with installation and terminal usage. This directory contains current user
-and maintainer documentation, alongside linked implementation records. Those
-records retain their original baselines and dated test results; use the current
-capability inventory for supported operations. Superseded documents are available
-in Git history.
+Start with installation and terminal usage. These guides describe the current
+source and versioned contracts. Completed implementation plans and one-off test
+reports are retained in Git history rather than used as operating instructions.
+
+## Use and operate
 
 | Need | Read |
 | --- | --- |
-| Skill catalog, loading language, and execution declarations | [Skills](../skills/README.md), [Execution catalog](EXTENSIONS.md) |
-| Install, configure, upgrade and recover | [Installation and Operations](INSTALLATION.md) |
-| Installation directories, state and managed environments | [Installation layout](APP_LAYOUT.md) |
-| Workspace, Node, Result, Agent Server and Monitor ownership | [Architecture](ARCHITECTURE.md) |
-| Research storage, tools and evidence | [Research Memory Skill](../skills/core/research-memory/SKILL.md), [Evidence architecture (Chinese)](RESEARCH_EVIDENCE_ARCHITECTURE.zh-CN.md) |
-| Execution ownership and material provenance | [Execution boundaries](ARCHITECTURE_BOUNDARIES.md), [Artifact Store and views](ARTIFACT_PROVIDERS.md) |
-| Scientific methods and execution | [Scientific operations](SCIENTIFIC_CAPABILITIES_OPERATIONS.md), [Current capability inventory](../skills/chemical/method-selection/references/capabilities.md) |
-| General chemistry modules, contracts and implementation scope | [A–J implementation record (Chinese)](GENERAL_CHEMISTRY_CAPABILITY_PLAN.zh-CN.md) |
-| Deterministic geometry, Gaussian and evidence regressions | [Scientific regressions (Chinese)](SCIENTIFIC_REGRESSIONS.zh-CN.md) |
-| Terminal, Phone and browser | [Terminal](TERMINAL.md), [CoRAgent Link](CORAGENT_LINK.md) |
-| Monitor, persistent user tasks and execution diagnostics | [Task Controller implementation record (Chinese)](MONITOR_TASK_CONTROLLER_PLAN.zh-CN.md) |
-| Node granularity, research planning, backtracking and continuation | [Research graph design and implementation (Chinese)](RESEARCH_NODE_PLANNING_PLAN.zh-CN.md) |
-| Maintain, test and package | [Maintainer Guide](MAINTAINER_GUIDE.md), [Contributing](../CONTRIBUTING.md) |
-| Test environments, selection and cleanup | [Test runner](../tools/test/README.md) |
-| Maintain the pinned Pi runtime | [Pi patches](PI_RUNTIME_PATCHES.md) |
-| Coordinate the current mobile protocol cutover | [Phone protocol contract (Chinese)](CORAGENT_PHONE_PROTOCOL_MIGRATION.zh-CN.md) |
-| Model/provider behavior | [Model Compatibility](MODEL_COMPATIBILITY.md) |
+| Install, configure, upgrade and uninstall | [Installation](INSTALLATION.md), [Directory layout](APP_LAYOUT.md) |
+| Terminal, sessions and Monitor | [Terminal](TERMINAL.md) |
+| Phone connection and client contract | [CoRAgent Link](CORAGENT_LINK.md), [Phone protocol (Chinese)](PHONE_PROTOCOL.zh-CN.md) |
+| Models, credentials and context capacity | [Model configuration](MODEL_COMPATIBILITY.md) |
+| Scientific methods and supported scope | [Scientific operations](SCIENTIFIC_CAPABILITIES_OPERATIONS.md), [Capability inventory](../skills/chemical/method-selection/references/capabilities.md) |
+| Scheduler handlers and Job resources | [External Jobs](EXTERNAL_JOBS.md) |
+| Skills and their operation entrypoints | [Skill catalog](../skills/README.md), [Script index](skill-script-routing.md) |
 
-Current code and versioned schemas define behavior. Validation applies to the
-tested source or release artifact; historical results do not certify a later
-version. Project source uses [Apache License 2.0](../LICENSE); preserve separate
-third-party dependency, Pi source and asset notices.
+## Understand and maintain
+
+| Need | Read |
+| --- | --- |
+| Runtime and storage ownership | [Architecture](ARCHITECTURE.md), [Execution boundaries](ARCHITECTURE_BOUNDARIES.md) |
+| Task Controller, Job Manager and input admission | [Task and Job architecture (Chinese)](TASK_JOB_ARCHITECTURE.zh-CN.md) |
+| Research Memory selection, injection and synthesis | [Research context (Chinese)](RESEARCH_CONTEXT.zh-CN.md) |
+| Node granularity, planning and correction | [Research planning (Chinese)](RESEARCH_PLANNING.zh-CN.md) |
+| Evidence, materials and provenance | [Research Memory Skill](../skills/core/research-memory/SKILL.md), [Evidence architecture (Chinese)](RESEARCH_EVIDENCE_ARCHITECTURE.zh-CN.md), [Artifact Store](ARTIFACT_PROVIDERS.md) |
+| Skill loading, prompt assembly and execution declarations | [Skills and execution catalog](EXTENSIONS.md) |
+| Maintain, test and package | [Maintainer Guide](MAINTAINER_GUIDE.md), [Contributing](../CONTRIBUTING.md), [Test runner](../tools/test/README.md) |
+| Scientific regression scope | [Scientific regressions (Chinese)](SCIENTIFIC_REGRESSIONS.zh-CN.md) |
+| Pinned Pi integration | [Pi runtime patches](PI_RUNTIME_PATCHES.md) |
+
+## Proposals
+
+[Pi 1.3.0 migration audit (Chinese)](PI_1_3_MIGRATION.zh-CN.md) is a dated upstream
+comparison and unimplemented proposal. The current runtime remains pinned to Pi
+1.1.0 in `config/pi-source.json`; the audit is not an upgrade procedure.
+
+## Documentation maintenance
+
+Use code, configuration examples and schemas to verify commands and paths.
+Update paired English/Chinese guides together. Keep one current explanation of
+each contract and link to it; remove superseded plans once their useful guidance
+has been incorporated. Label unimplemented proposals explicitly. Test results
+apply only to the tested source or release artifact, not every later version.
+
+Project source uses [Apache License 2.0](../LICENSE); third-party dependencies,
+Pi source and assets retain their own notices.

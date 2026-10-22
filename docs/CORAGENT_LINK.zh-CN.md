@@ -53,7 +53,7 @@ node /opt/coragent-relay/current/services/relay/cli.mjs enrollment create \
 
 在 Host 上运行 CoRAgent 安装器，选择 `CoRAgent Link Relay` Phone access，并输入 Relay URL 和
 enrollment code。安装器把 Host 凭据写入 owner-only 的
-`var/state/host/host.token`。之后 Host service 会自动维持出站 Link 连接。
+`<state_root>/host/host.token`。之后 Host service 会自动维持出站 Link 连接。
 
 ## 配对与撤销手机
 

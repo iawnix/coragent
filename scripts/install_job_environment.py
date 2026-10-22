@@ -147,7 +147,7 @@ def main():
     p.add_argument('--package-cache', type=Path, help='Directory for pinned pip wheels/source archives; defaults below the environment parent')
     p.add_argument('--offline', action='store_true', help='Install only from the Conda and pip package caches')
     a = p.parse_args()
-    print(json.dumps(install(resolve_python(load_job_config(a.config), a.environment, a.backend), adopt=a.adopt,
+    print(json.dumps(install(resolve_python(load_job_config(a.config), a.target, a.backend), adopt=a.adopt,
                              package_cache=a.package_cache, offline=a.offline), indent=2))
 
 

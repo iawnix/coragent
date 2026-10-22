@@ -2,7 +2,7 @@
 
 [English](MAINTAINER_GUIDE.md) | 简体中文
 
-CoRAgent 使用 Pi 原生 Harness。Host 绑定工作区、认证输入和持久调度；Python Research Memory 保存原始要求、问题 Node、不可变 Result 与关系。`runtime-bridge` 只传输命令，CoRAgent Web 只读同一查询协议。当前职责边界见[架构](ARCHITECTURE.zh-CN.md)。
+CoRAgent 使用 Pi 原生 Harness。Host 负责工作区路由和认证，SessionWorker 负责持久输入和任务推进；Python Research Memory 保存原始要求、问题 Node、不可变 Result 与关系。`runtime-bridge` 只传输命令，CoRAgent Web 只读同一查询协议。当前职责边界见[架构](ARCHITECTURE.zh-CN.md)。
 
 ## 开发环境
 
@@ -18,7 +18,7 @@ npm run lint:public
 ```
 
 完整 Python 套件使用 `python3 tools/test/runner.py source -- -q`。原生 lane 覆盖 Harness
-Host、Pi 原生 client、会话历史隔离、Monitor 投递、CoRAgent Link 以及固定 Pi 的
+Host、Pi 原生 client、会话历史隔离、Job Manager 投递、CoRAgent Link 以及固定 Pi 的
 extension/provider 边界。统一运行器选择私有测试目录中准备好的固定依赖：
 
 ```bash
@@ -37,7 +37,7 @@ Native Pi Harness 不需要 tmux，也是唯一支持的运行时。不提供后
 权威测试清单是 `tools/test/manifest.toml`，由 `tools/test/runner.py` 调度。
 Python 测试按 `tests/unit/`、`tests/contract/` 和 `tests/integration/` 分组；Node
 测试位于 `tests/node/`；共享 fixture 位于 `tests/support/`。外部探针和真实场景位于
-`tools/test/probes/` 与 `tools/test/scenarios/`，不能加入默认 Python 测试套件。
+`tools/test/probes/` 与 `tests/scenarios/`，不能加入默认 Python 测试套件。
 
 ## 研究记忆与执行边界
 
@@ -45,7 +45,7 @@ Python 测试按 `tests/unit/`、`tests/contract/` 和 `tests/integration/` 分�
 
 Agent 使用 research_read / research_search / research_create / research_update / research_result。创建只要求 goal，记事只要求 node_id 与 note，发布只要求 node_id 与 conclusion。身份、读取依据、修订号和事务由适配层提供。后台 Job 不修改 Node 内容版本。显式关系单次存储，反向查询自动生成；实际 uses 需要确证输入，搜索不是采用证据。
 
-Job Manager 拥有执行回执，Artifact Store 拥有文件和来源。Monitor next_run 只依赖事件及投递身份，不读取 Memory sequence，也不要求 checkpoint。邮件去重属于发送回执，Memory 失败不能触发重发。新旧工作区不迁移或混写。
+Job Manager 拥有执行回执，Artifact Store 拥有文件和来源。Job Manager 的 next_run 投递 只依赖事件及投递身份，不读取 Memory sequence，也不要求 checkpoint。邮件去重属于发送回执，Memory 失败不能触发重发。新旧工作区不迁移或混写。
 
 ## 研究视图修复
 
@@ -75,17 +75,17 @@ Python 独立核验执行目录；Pi 按 `package.json.pi.skills` 发现产品�
 新增算法必须声明适用条件、反例、可重放候选，并在确定性输出语义变化时提升版本。
 不要加入科学 successor routing。
 
-Job 状态与恢复由执行运行时管理；派发意图、执行观察和收集证据必须遵守
-工作区事务边界，同时保持查看、收集和取消能力。应测试 Harness client、Pi 资源与科学执行合同、Monitor
-重试与回执、wheel 安装、研究快照和检索的 Web 展示 和源码篡改拒绝。当前证据以稳定的运维文档、
-源码测试和组件测试为准，过时方案和一次性验收报告保留在 Git 历史中，不放入当前文档目录。
+Job 状态与恢复由 Job Manager 管理；派发意图、执行观察和收集证据必须遵守
+工作区事务边界，同时保持查看、收集和取消能力。应测试 Harness client、Pi 资源与科学执行合同、Job Manager
+重试与回执、wheel 安装、研究快照和检索的 Web 展示和源码篡改拒绝。当前证据以稳定的运维文档、
+源码测试和组件测试为准，过时方案和一次性验收报告保留在 Git 历史中；尚未实施的提案单独标注和索引，不混入当前操作说明。
 
 ## 文档归属
 
 - `docs/ARCHITECTURE.zh-CN.md`：运行时和科学边界。
 - `docs/INSTALLATION.zh-CN.md`：安装、服务、升级和恢复。
 - `docs/TERMINAL.zh-CN.md`：Pi 原生 TUI、Host、Phone 与 Monitor 使用。
-- `skills/` and `skills/chemical/`：面向用户的科学流程和参考资料。
+- `skills/core/` 与 `skills/chemical/`：面向用户的科学流程和参考资料。
 - `contracts/coragent-web/`：研究上下文、Node、Result 与记录响应的浏览器传输合同。
 
 CoRHub 文档和移动发布工具由独立的 `corhub` 仓库维护。CoRAgent 拥有小型认证 Host

@@ -8,9 +8,11 @@ Research Memory 是持久研究记录。Research Context 是 Agent Runtime 内�
 
 选择当前 Task 的焦点、事件涉及的节点、等待 Job 的节点和任务入口，再扩展直接的
 `part_of`、`requires`、`alternative_to` 以及选定结论的引用关系。未绑定范围时最多选择
-本会话最近活动的一个节点。完整证据仍通过 research_read、research_search 和 job_status 获取。
+本会话创建的节点中最近活动的一个节点。完整证据仍通过 research_read、research_search 和 job_status 获取。
 
 每次 generation 准备时，运行本地确定性读取，并比较范围和相关事实的指纹。
+入口是 `apps/agent/pi/setup.mjs` 的 `prepareContext` hook；已认证的输入事件引用
+也会在没有顶层 Task 时传入选择器。筛选和摘取由 Python 完成，不调用模型决定读哪些记录。
 范围包括任务身份、要求版本、入口、焦点、要求来源和等待 Job；事实包括候选节点与结果、
 相关关系、诊断和 Job 状态。省略的候选记录也参与版本判断，无关研究的活动不改变该版本。
 首次进入、范围变化或相关事实变化才追加新的 pi.context，相同事实不重复注入。
@@ -34,6 +36,18 @@ Research Memory 是持久研究记录。Research Context 是 Agent Runtime 内�
 摘要输出最多 700 tokens，按具体概览指纹缓存；引用必须来自概览。
 失败保留确定性概览，不阻止 Agent 读取原始证据。模型摘要不会写入 Research Memory。
 整体背景以 2,000 tokens 为软目标，出现矛盾时可到 4,000；最终请求仍受输入预算检查。
+
+## 压缩与输入预算
+
+研究概览只是上下文的一部分。Pi 管理对话历史、工具结果、压缩摘要和最近保留内容；
+`beforeRequest` 附加当前任务控制信息，然后检查整个请求的估算大小。
+输入预算取 `contextWindow - reserveTokens` 与可选 `maxInputTokens` 的较小值。
+`reserveTokens` 是回答和请求开销的预留；它与研究概览的 2,000/4,000 token 软目标不同。
+模型窗口、输出额度和部署上限的配置见[模型配置](MODEL_COMPATIBILITY.zh-CN.md)。
+
+`prepareSummary` 只根据被压缩的历史生成补充说明和上下文锚点，不读取最新研究并倒填历史。
+最终请求超预算时可要求 Pi 做一次阻塞压缩；仍无法满足预算时不会发出主模型请求。
+窗口估算和输入预算由终端显示，详细计数可通过 `/usage` 查看。
 
 ## 单一合同
 

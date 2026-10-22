@@ -16,14 +16,14 @@ There is one Agent Server owner and several clients:
 
 ```text
 CoRHub/Web -- Link/HTTP --+      CoRAgent Agent Server / Host API
-Pi native TUI -- Unix/SSH ---+-->   Root Agent Session
+Pi native TUI -- Unix/SSH ---+-->   Agent Session
 Monitor -- Host RPC ---------+      Harness / Pi App Server / SessionWorker
 ```
 
 The Host is the Agent Server API and hosting layer. It owns routing, authentication,
 session discovery, session-management RPC receipts, and
-the Monitor supervisor. The Pi Harness worker inside that same Agent Server
-owns input admission and idempotency, user-task control receipts, the Root Agent loop, model, tools, transcript, and durable SQLite lane.
+the Job Manager supervisor. The Pi Harness worker inside that same Agent Server
+owns input admission and idempotency, user-task control receipts, the Agent loop, model, tools, transcript, and durable SQLite lane.
 The native Pi TUI, Phone, and Monitor all address that same lane; none starts
 another agent loop.
 
@@ -178,8 +178,8 @@ task; up to five active jobs are previewed. Paused, blocked, or disabled continu
 does not promise an automatic wakeup. Long summaries explicitly link to full details. Use `/monitor task <id>`
 for delivery criteria and research details, `/monitor jobs` for execution and
 collection, and `/monitor run <id>` for Pi generation/tool tasks. A successful Job
-is not treated as completed scientific analysis; the task's research review and
-Results are the source for that distinction.
+is not treated as completed scientific analysis. Read the recorded Results and
+their evidence; a Research Brief is only an orientation summary.
 
 At launch, `-c` selects the latest writable SQLite durable session and
 `--session-id <id>` selects an exact session. Startup `-r`/`--resume` is
@@ -209,7 +209,7 @@ does not start Pi or a worker. This transport gateway is separate from
 [CoRAgent Web](../components/coragent-web/README.md), the read-only research browser
 that does not submit prompts.
 
-Host accepts only `initialize` with `protocol: "coragent-host/3"`. Version 1 clients
+Host accepts only `initialize` with `protocol: "coragent-host/3"`. Clients using earlier Host protocols
 must be updated. Capability names are the callable slash-separated methods.
 Session reads and attachments accept only `after_cursor: {epoch, sequence}`;
 a different Host epoch returns a current snapshot without replaying old events.
@@ -220,7 +220,7 @@ Session lists use `{sessions: [...]}` and contain no legacy backend or format fl
 
 Monitor unifies user-task controls and compute-Job observations. Task Controller
 runs alongside the Pi Harness in the SessionWorker and uses the same durable
-transaction and admission boundary. The installation Monitor worker polls Compute
+transaction and admission boundary. The installation Job Manager worker polls Job
 status and records execution events. Pi remains the only model/tool execution loop;
 Research Memory stores scientific evidence and conclusions.
 
@@ -238,7 +238,7 @@ Research Memory stores scientific evidence and conclusions.
 | `/monitor job cancel <id>` | Request cancellation of one compute Job |
 | `/monitor runs [--task <id>]` | Execution records grouped by Pi submission/run |
 | `/monitor run <id>` | Bounded generation/tool execution details |
-| `/monitor health` | Task Controller and shared Monitor worker health |
+| `/monitor health` | Task Controller and shared Job Manager worker health |
 
 Task details include research entry points, current focus, local plan excerpts,
 original problem status, assessment/Result references, and related Jobs. Only
@@ -280,10 +280,10 @@ alias translation.
 
 ## Session storage
 
-The installation-level `var/state/pi/sessions/` tree is the only
+The `<state_root>/pi/sessions/` tree is the only
 session store used by Native Pi Harness. Workspace `.pi/sessions` history is not a
 supported input and is neither resumed nor imported by the Native runtime. Durable
-history lives in `var/state/pi/sessions/<workspace-id>/<session-id>/session.sqlite`;
+history lives in `<state_root>/pi/sessions/<workspace-id>/<session-id>/session.sqlite`;
 metadata is in the adjacent `meta.json`. Keep research state in the workspace
 Research Memory and use the Host session controls for SQLite durable sessions.
 

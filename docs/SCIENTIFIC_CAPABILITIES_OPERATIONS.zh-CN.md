@@ -9,7 +9,7 @@
 
 ## 准备与执行
 
-先读取相关 Skill，选择其预设入口、原生命令或任务脚本，以及安装目录 `etc/job.toml` 中的命名环境。预设入口提供后端键、固定脚本、纯 CLI 解析器、输入角色和输出。原生命令无需 Python 绑定；Python 脚本使用目标环境配置的解释器。
+先读取相关 Skill，选择其预设入口、原生命令或任务脚本，以及`config.toml` 中 `execution.targets.<target>.bindings` 的环境绑定。预设入口提供后端键、固定脚本、纯 CLI 解析器、输入角色和输出。原生命令无需 Python 绑定；Python 脚本使用目标环境配置的解释器。
 
 `"$CORAGENT_PYTHON" -m research_agent.application.executors --list` 返回简短的预设入口索引，可按 `--skill`、`--backend` 或 `--executor`/`--version` 筛选；`--details` 返回完整声明。加 `--config … --target …` 只显示绑定是否已配置，不探测软件。实际 runner 参数通过 `executors --executor <id> --version <版本> --help` 获取；只加载已固定的 CLI 解析器，不运行科学程序。
 
@@ -33,11 +33,11 @@
 
 ## 环境与进程归属
 
-job.toml 所选后端提供程序、Python 绑定、激活脚本及资源默认值。结构/材料分析及通用科学检查执行器使用化学扩展的 `structure` 后端，注册的 validator 配方使用 `validation`；各目标须配置自己的依赖。执行入口与验证器可以声明 `requirements`，其中 `python` 和 `packages` 使用 Python 版本约束，`imports` 列出需要实际导入的模块；原生入口不声明 Python 依赖。
+`CORAGENT_JOB_CONFIG` 指向生成的组件 job.toml，所选后端提供程序、Python 绑定、激活脚本及资源默认值。结构/材料分析及通用科学检查执行器使用化学扩展的 `structure` 后端，注册的 validator 配方使用 `validation`；各目标须配置自己的依赖。执行入口与验证器可以声明 `requirements`，其中 `python` 和 `packages` 使用 Python 版本约束，`imports` 列出需要实际导入的模块；原生入口不声明 Python 依赖。
 
 准备器在选定本地或 SSH 目标上核验解释器前缀、Conda 显式锁、pip 固定版本、安装回执、包清单，以及程序和激活文件摘要。请求身份包含这次观测；新提交时复查，真正运行时由暂存并固定摘要的检查程序再次复查。激活文件先检查再加载。变化导致拒绝执行，既有 Job 的查询和重试仍返回原身份。核验保证环境与记录一致，科学能力仍须由实际求解与验证证明。
 
-安装回执记录 `inventory_sha256`。已安装环境通过 `scripts/install_job_environment.py --config … --target … --backend … --adopt` 实际核验后发布新回执；不得手工补写摘要。统一安装器准备所选 domain 环境，在受管控制环境中核验配置与依赖，并在切换版本前运行有时限的普通验收 Job。本机目标自动检查；远端仅在选择 `--job-profile TARGET:PROFILE` 或 `--verify-job-target TARGET` 时检查。报告区分目标验证、已测试后端和未验证目标，PubChem/OPSIN 外部可用性不阻止离线验收。`job_probe` 只表示目标基础设施状态。
+安装回执根据实际准备和核验记录 `inventory_sha256`。通过 `./install.sh --config /absolute/path/config.toml --job-profile TARGET:PROFILE` 选择受管环境；独立管理的环境通过主配置绑定。在目标主机维护单个环境时，可运行 `python3 -B scripts/install_job_environment.py --config "$CORAGENT_JOB_CONFIG" --target TARGET --backend BACKEND`，增加 `--adopt` 可核验既有 prefix 并发布回执。该命令读取组件 Job 配置并在目标主机本地执行；主安装器使用单独的目标环境准备路径。统一安装器准备所选 domain 环境，在受管控制环境中核验配置与依赖，并在切换版本前运行有时限的普通验收 Job。本机目标自动检查；远端仅在选择 `--job-profile TARGET:PROFILE` 或 `--verify-job-target TARGET` 时检查。报告区分目标验证、已测试后端和未验证目标，PubChem/OPSIN 外部可用性不阻止离线验收。`job_probe` 只表示目标基础设施状态。
 
 应用提交的本地 Job 运行在独立 systemd 用户临时服务中，Host 重启不会连带终止它们。任务只接收最小环境和显式变量，资源请求通过 CPUQuota/MemoryMax 实施。Runtime 在 Job 内或配置的 scratch_root 下创建专属 scratch；显式环境值可引用 `{scratch}`。临时单元移除后，回执仍保留在工作区。
 
@@ -76,7 +76,7 @@ Gaussian 与本地 NumPy 算法。态跟踪需要提供 AO 密度/重叠张量�
 
 ## 验证
 
-用 `tools/test/runner.py` 选择源码、Native 与发行检查。真实求解器和远端验收使用隔离工作区及明确绑定。合成日志、解析势和确定性求解器替身验证合同、数值算法、解析与本地 Job 生命周期，不证明真实求解精度或自主机理发现。A–J 模块已通过确定性验收，真实求解器科学基准与真实模型研究验收尚未执行。
+用 `tools/test/runner.py` 选择源码、Native 与发行检查。真实求解器和远端验收使用隔离工作区及明确绑定。合成日志、解析势和确定性求解器替身验证合同、数值算法、解析与本地 Job 生命周期，不证明真实求解精度或自主机理发现。通过情况以对应源码的运行报告为准；本文不为真实求解器基准或真实模型研究能力提供验收结论。
 
 原生程序的前置探测只解析并固定所配置可执行文件的摘要，不运行求解器，也不证明许可、
 收敛或科学结论成立。`environment_executable_missing` 表示所选命令无法执行；

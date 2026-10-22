@@ -1,45 +1,61 @@
-# Model Compatibility
+# Model configuration and compatibility
 
 [English](MODEL_COMPATIBILITY.md) | [简体中文](MODEL_COMPATIBILITY.zh-CN.md)
 
-Model access is managed by Pi. CoRAgent focuses on the research workflow: each
-installation has one Host, and the terminal, CoRHub, and Monitor attach to
-the same Pi Harness lane and model configuration.
+The pinned Pi runtime implements provider access and model calls. CoRAgent Host
+exposes the same session model selection to the terminal, CoRHub and browser.
+`config/pi-source.json` and `package.json` identify the current Pi version.
 
-Custom models use Pi's `models.json` and normal authentication mechanisms. CoRAgent
-does not maintain a separate model catalog, credential store, or provider API
-adapter.
+## Configuration
 
-## Compatibility Matrix
+Define custom providers and models in `[models.providers]` in `config.toml`,
+using Pi model fields such as `api`, `baseUrl`, model ID, `contextWindow`,
+`maxTokens` and applicable `compat` options. See
+[config.example.toml](../config/config.example.toml).
 
-| Family | CoRAgent status | Pi provider or route |
-|---|---|---|
-| OpenAI GPT | Inherited, built in | `openai` or `openai-codex` |
-| Google Gemini | Inherited, built in | `google` or `google-vertex` |
-| DeepSeek | Inherited, built in | `deepseek`; CoRAgent also avoids incompatible named `tool_choice` on thinking turns |
-| GLM / Zhipu | Inherited when present in the pinned Pi catalog | `zai`, `zai-coding-cn`, or a tested OpenAI-compatible custom model |
-| Kimi | Inherited, built in | `kimi-coding`; compatible catalog routes such as OpenRouter may also be used |
-| Other OpenAI-compatible chat models | Conditional | Define the provider/model in Pi's `models.json` with the correct `api`, `baseUrl`, auth, and `compat` fields |
-| SeedDance / Seedream | Not an Agent model | These are media-generation APIs, not chat/tool-calling LLMs; CoRAgent does not claim Root/Compute/Review compatibility |
+Adjacent `credentials.json` stores Pi provider credentials in `models` and named
+secrets in `secrets`. Secret fields can reference `credential:NAME`. Refreshed
+OAuth credentials are written back to this canonical file. Configuration produces
+`<state_root>/pi/agent/models.json`; do not edit that generated file or use the
+retired `<install>/etc/pi/` or personal `~/.pi/agent` as installation configuration.
 
-"Inherited" means that the exact model must exist in the pinned Pi catalog or
-in a valid custom Pi model configuration, authentication must be available to
-the Host account, and the endpoint must support the tool calls used by CoRAgent.
-Provider branding alone is not a compatibility guarantee.
-
-## Configuration And Verification
-
-For an installation, Pi state is under `<install>/etc/pi/`. Put custom model
-definitions in `<install>/etc/pi/models.json` and authenticate using Pi's
-normal login or `auth.json`/environment mechanisms. Select a model with Pi
-settings before restarting the Host:
+Restart the owning Host after changing provider configuration. For the default
+user service:
 
 ```bash
-systemctl --user restart coragent.service  # user scope
-systemctl restart coragent.service         # system scope
+systemctl --user restart coragent.service
 ```
 
-Before production use, run one real session that exercises `read`, `write`,
-`bash`, and a CoRAgent tool. The repository's recording-provider tests verify the
-adapter contract and error taxonomy, but cannot prove a third-party endpoint's
-current credentials, quota, model availability, or tool-calling behavior.
+Omit `--user` for a system service. Within a session, `/model` selects an available
+model and `/thinking` selects a supported reasoning level. Use `false` for an
+unsupported level in `thinkingLevelMap`; materialization restores Pi's `null`.
+
+## Compatibility
+
+Available built-in providers and models come from the pinned Pi catalog and the
+installation's custom definitions. A provider brand alone does not establish
+endpoint, authentication, tool-call or reasoning compatibility. An OpenAI-compatible
+endpoint needs matching API and compatibility fields. Media-generation APIs are
+not interchangeable with the conversational model used by the research Agent.
+
+Repository model tests use local deterministic providers to verify invocation and
+error contracts. Actual credentials, quota and endpoint behavior need separate
+validation. Repository tests must not send private `local_debug/` materials to real models.
+
+## Context capacity and input budget
+
+The runtime uses the selected model's `contextWindow` metadata. Custom endpoint
+definitions must match the actual service; marketing specifications are not read
+at runtime. The operating input budget is:
+
+```text
+min(contextWindow - reserveTokens, maxInputTokens)
+```
+
+Without `maxInputTokens`, only the first term applies. Pi's `reserveTokens` leaves
+room for the answer and request overhead. `CORAGENT_CONTEXT_INPUT_TOKENS` provides
+an optional lower input cap and is unset by default. `maxTokens` is the current
+output allowance, separate from the context window. The terminal displays input
+budget and model window; `/usage` provides usage details. Estimates are not billing
+measurements. See [Architecture](ARCHITECTURE.md#context-and-next_run) for compaction
+and research context preparation.

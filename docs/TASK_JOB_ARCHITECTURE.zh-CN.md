@@ -11,10 +11,36 @@
 Task 是用户目标，Run 是一次输入启动的 Agent 执行，Job 是外部计算。
 Pi generation/tool task 只在诊断中称为内部执行单元，不是用户 Task。
 
+## Task Controller
+
+`task_begin` 登记持续委托，`task_read` 读取完整任务，`task_update` 修订任务、
+记录进展、等待 Job 或提出完成。普通问答不自动建立任务。每个会话至多有一个
+非终态任务，状态保存在 SessionWorker 的 Pi durable 文档中。
+
+| 状态 | 含义 |
+| --- | --- |
+| active | 可以继续推进 |
+| waiting | 等待指定归属 Job 满足条件 |
+| paused | 用户暂停自动推进 |
+| blocked | 需要输入、资源或其他外部条件 |
+| completing | 已提出有证据的完成条件，等待最终回复成功交付 |
+| completed | 完成条件与最终回复已结算 |
+| cancelled | 用户取消委托 |
+
+控制器在执行变化和周期核对时检查任务；没有新的 Job 事件也能续接活跃任务。
+用户输入优先。暂停允许当前回复和已有 Job 收尾；取消任务明确选择保留或请求取消 Job。
+临时执行故障可触发有限自动重试，需人工处理的故障保存在恢复记录中。
+进展按 Result、Artifact 和归属 Job 里程碑记录，单纯改计划或重复查询不计为新证据。
+
+任务控制与作业取消通过同一 Monitor 界面操作，具体命令见[终端](TERMINAL.zh-CN.md)。
+研究入口和焦点见[研究规划](RESEARCH_PLANNING.zh-CN.md)。
+
 ## Job Manager
 
-jobs/manager.py 提供唯一的 job_* 执行方法，由平台适配器处理实际进程和调度系统。
-application/job_manager.py 管理状态观察与持久事件，host/jobs/worker.mjs 运行后台轮询和投递。
+`backend/src/research_agent/jobs/manager.py` 提供唯一的 `job_*` 执行方法，
+由平台适配器处理实际进程和调度系统。
+`backend/src/research_agent/application/job_manager.py` 管理状态观察与持久事件，
+`apps/agent/host/jobs/worker.mjs` 运行后台轮询和投递。
 后台进程是 Job Manager 的内部工作部分，不作为另一个 Observer/Controller 对外暴露。
 普通排队和运行状态变化被记录；结束、失败、状态未知或排队超时可产生需要处理的事件。
 
@@ -41,8 +67,11 @@ producer 与 reason 都由运行时验证，参与幂等身份。Monitor 的执�
 
 ## 升级边界
 
-这次调整是单协议切换，Host 使用 coragent-host/3，旧客户端必须同步更新：旧 producer=monitor、旧内部 monitor-wake、旧 JobRuntime 导入、
+当前 Host 使用 `coragent-host/3`，旧客户端必须同步更新：旧 producer=monitor、旧内部 monitor-wake、旧 JobRuntime 导入、
 旧研究 Review 接口不提供别名。未完成的旧输入不接受无来源或无原因的恢复；旧 Task 文档需要
-匹配当前版本，否则明确拒绝。不会修改已安装服务或现存用户数据库，也不提供隐式转换。
+匹配当前版本，否则明确拒绝；旧协议没有隐式转换。
 升级前应结束旧执行，保留原研究记录，并在新会话中显式绑定既有研究节点。
 Job 观察的持久登记与投递格式保持原有唯一合同，不引入另一套作业状态库。
+
+源码验证入口见[测试运行器](../tools/test/README.md)。重点覆盖输入来源、重复投递、
+忙碌与暂停竞争、Job 等待、故障恢复及最终回复结算；科学结论正确性需要独立证据。

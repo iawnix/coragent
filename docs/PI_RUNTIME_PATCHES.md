@@ -32,7 +32,7 @@ a separate checkout before installing it.
 | 010-context-lifecycle | Atomic passive context preparation, pinned summary supplements and an operating input budget | Native context persistence, compaction, recovery and budget tests |
 | 011-markdown-presentation | Register Markdown transformers in the experimental chat view | Native Markdown rendering and retained transcript text |
 | 012-skill-presentation | Keep attached user/tool detail inside the expandable Skill card | Collapsed/expanded Skill card and ordinary InteractiveMode rendering |
-| 013-monitor-presentation | Present recorded Monitor wake messages as compact event cards | Native Monitor transcript rendering and reconnect replay |
+| 013-monitor-presentation | Present recorded Job event messages as compact event cards | Native Job event transcript rendering and reconnect replay |
 | 014-runtime-presentation | Render task continuations as compact runtime status messages | Native continuation rendering, legacy messages and transcript replay |
 
 There is also a source modification outside the patch directory:
@@ -71,23 +71,22 @@ now uses 3.5 characters per token, so budget admission may compact earlier.
 Research tool cards show Pi's recorded `durationMs` for final results, including
 after reconnect, and omit it for older or untimed results. For `job_start` this
 is the tool's submission time; scientific Job duration remains owned by Job
-Runtime. Expanded cards preserve the full result and label the tool duration.
+Manager. Expanded cards preserve the full result and label the tool duration.
 
-Pi 1.0.3 renamed the Azure provider from `azure-openai-responses` to `azure`.
-Installations using Azure must update that provider key in authentication, model,
-and settings configuration when moving from 1.0.2 to 1.0.4. The corresponding
-`AZURE_OPENAI_*` environment variables are unchanged. This upgrade does not add
-ordinary Pi's full command set to the experimental TUI.
+The pinned runtime uses `azure` as the Azure provider identity. Configure providers
+and credentials through the installation configuration described in
+[Model configuration](MODEL_COMPATIBILITY.md). The experimental TUI exposes only
+its supported commands, not the ordinary Pi command set.
 
-Monitor admission is implemented in CoRAgent's worker service rather than another
-Pi source patch. `monitor-admission.mjs` uses the pinned
+Job event admission is implemented in CoRAgent's worker service rather than another
+Pi source patch. `apps/agent/host/admission/jobs.mjs` uses the pinned
 `packages/durable/src/harness/submissions.ts` transaction primitive
 `admitSubmission`: run/inbox checks, immutable input provenance and placement
 share one short Pi commit. All State/Python assessment runs outside that commit.
 The Worker reassesses internal input before its first model consumption and
 records the State basis against the submission, across generation task changes.
 An authenticated producer submits structured event IDs; message text and ID
-prefixes never establish provenance. Monitor acknowledges consumption, retaining
+prefixes never establish provenance. Job Manager acknowledges consumption, retaining
 pending or deferred events and earlier identities when State supersedes an input.
 Native tests cover busy rejection, batch idempotency, a slow bridge racing native
 input, consumption reassessment, and real Worker/Host restart recovery. Recheck
@@ -108,5 +107,5 @@ snapshots on reconnect and every five seconds. Monitor status includes an
 observational pending-delivery summary; reading it never claims or batches an
 outbox entry. Counts are scoped to the attached session, while worker health is
 shared. Host `next_run` is not a Pi inbox enum: accepted queued messages use
-`followUp`. User input retains Pi's own queue display. Monitor waits
+`followUp`. User input retains Pi's own queue display. Job Manager waits
 for idle admission, so busy-session wakes normally remain pending delivery.

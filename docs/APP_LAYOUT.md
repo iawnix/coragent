@@ -1,52 +1,74 @@
 # CoRAgent installation layout
 
-Only fresh standalone installations are supported. Installation-level `.pi/` and
-`.agents/` trees are rejected. There is no legacy fallback, migration tool or
-compatibility link.
+[English](APP_LAYOUT.md) | [简体中文](APP_LAYOUT.zh-CN.md)
+
+An installation has four separate roots. `config.toml` selects the software,
+local state and workspace roots; its own location selects the configuration directory.
+The canonical implementation is `backend/src/research_agent/foundation/layout.py`.
+
+| Root | Default | Configuration |
+| --- | --- | --- |
+| Software | `~/soft/coragent/` | `paths.software_root` |
+| Configuration | `~/.config/coragent/` | Installer `--config`, runtime `CORAGENT_CONFIG` |
+| Local state | `~/.local/state/coragent/` | `paths.state_root` |
+| Research workspaces | `~/DATA/coragent/workspaces/` | `paths.workspace_root` |
 
 ```text
-<install>/
-  coragent             # sole public client, follows current
-  uninstall.sh              # independent recovery/uninstall entry
-  current -> releases/<id>  # sole active release selection
-  releases/<id>/            # immutable application code and complete Skills
-  runtimes/pi/<commit>/     # required pinned Pi dependency, not a cache
-  runtimes/maintenance/     # recovery code independent of the active release
-  etc/installation.json     # identity, environment store, workspace root, service
-  etc/job.toml
-  etc/email.toml
-  etc/name-resolver.toml
-  etc/pi/                   # Pi native settings, models and authentication
-  etc/secrets/              # private SMTP and other credentials
-  var/state/installation/   # installation receipts and Python manifests
-  var/state/host/           # Host identity, receipts, leases and Monitor state
-  var/state/pi/sessions/    # native SQLite session repository
-  var/log/
-  var/cache/                # safely rebuildable caches
-  workspaces/               # default; an explicit external root is supported
+<software_root>/
+  coragent
+  uninstall.sh
+  installation.json          # locator: configuration and state roots
+  current -> releases/<id>
+  releases/<id>/             # application code and bundled Skills
+  runtimes/pi/<commit>/      # pinned Pi runtime
+  runtimes/maintenance/      # independent uninstall/recovery code
+  host-envs/                 # default Host Python environment store
+
+<configuration_directory>/
+  config.toml               # operator-owned settings
+  credentials.json          # model credentials and named secrets
+
+<state_root>/
+  installation/             # installation identity and environment receipts
+  host/                     # Host identity, Link token, leases and worker health
+  pi/sessions/              # Pi durable SQLite sessions
+  pi/agent/                 # Pi settings and generated model definitions
+  generated/                # generated component configuration
+  logs/
+  cache/
+
+<workspace_root>/<name>/
+  workspace_manifest.json
+  research/
+  runs/jobs/
+  operations/
+  artifacts/
 ```
 
-No root `bin/` or public `coragentServer` is installed. Systemd invokes
-`current/agent/libexec/coragent-host` with an explicit installation root.
-Use `coragent --workspace <name>` for research, and
-`systemctl --user … coragent.service` for service management.
+Edit `config.toml` and adjacent `credentials.json`. `generated/job.toml`,
+`generated/email.toml`, `generated/name-resolver.toml` and `pi/agent/models.json`
+are materialized component inputs under the state root. Editing them does not
+update the operator configuration; the next materialization can replace them.
+Runtime commands receive `CORAGENT_JOB_CONFIG` and the other resolved paths.
 
-Host Conda bases and wheel overlays live under
-`~/soft/coragent/host-envs/<installation-id>/{base,kernels}/<hash>`. The installer
-accepts `CORAGENT_HOST_ENV_ROOT` for a dedicated alternate store and persists it.
-Scientific Job environments remain explicitly bound through `etc/job.toml`,
-with separate local and remote paths. Existing Conda prefixes are not moved.
+Host Python bases and wheel overlays use
+`<env_root>/<installation-id>/{base,kernels}/<hash>`.
+`runtime.env_root` selects a dedicated store; the installer also accepts
+`CORAGENT_HOST_ENV_ROOT`. Scientific interpreters and programs are configured
+separately under `execution.targets.<target>.bindings` in `config.toml`.
 
 Sockets and process locks use the installation-scoped system runtime directory.
-Durable receipts stay in state. The standard-library-only `research_agent.foundation.layout`
-contract is shared by bootstrap, installers and the read-only doctor:
+Pi session history lives at
+`<state_root>/pi/sessions/<workspace-id>/<session-id>/session.sqlite`, with adjacent
+`meta.json`. Research files remain in the workspace across session changes.
+
+Inspect resolved paths without changing the installation:
 
 ```bash
-python3 scripts/app_layout_doctor.py --install-root /absolute/path --json
+python3 -B scripts/app_layout_doctor.py --config /absolute/path/config.toml --json
 ```
 
-Default uninstall preserves configuration, credentials, sessions, workspaces and
-Python environments. Explicit runtime removal requires an installation ownership
-receipt and never removes shared scientific software. Fresh installation does
-not restore archived sessions or replay old work. Workspace-local Pi files are
-not installation state and are not removed by name matching.
+The layout schema is `coragent-installation/3`. Old installation-root `etc/`,
+`var/`, `.pi/` and `.agents/` layouts are not migrated. Keep their data when
+redeploying into the current layout. Uninstall options and ownership rules are
+documented in [Installation](INSTALLATION.md).

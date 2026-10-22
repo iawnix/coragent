@@ -1,48 +1,70 @@
 # CoRAgent 安装布局
 
-仅支持全新独立应用布局。旧安装级 `.pi/` 和 `.agents/` 不受支持；请先卸载旧应用并归档数据，再安装。没有旧路径回退、迁移器或兼容链接。
+[English](APP_LAYOUT.md) | 简体中文
+
+安装使用四个独立根目录。`config.toml` 指定软件、运行状态和工作区根目录；
+配置文件自身的位置确定配置目录。实现依据为
+`backend/src/research_agent/foundation/layout.py`。
+
+| 根目录 | 默认路径 | 配置入口 |
+| --- | --- | --- |
+| 软件 | `~/soft/coragent/` | `paths.software_root` |
+| 配置 | `~/.config/coragent/` | 安装参数 `--config`、运行时 `CORAGENT_CONFIG` |
+| 运行状态 | `~/.local/state/coragent/` | `paths.state_root` |
+| 研究工作区 | `~/DATA/coragent/workspaces/` | `paths.workspace_root` |
 
 ```text
-<install>/
-  coragent             # 唯一公开客户端入口，经 current 选择版本
-  uninstall.sh              # 独立卸载入口
-  current -> releases/<id>  # 唯一活动版本指针
-  releases/<id>/            # 不可变代码、Skill 文本、脚本和模板
-  runtimes/pi/<commit>/     # 启动必需的固定 Pi 运行依赖，不是缓存
-  runtimes/maintenance/     # 不依赖活动版本的恢复卸载程序
-  etc/installation.json     # 安装身份、Host 环境存储位置、工作区根、服务配置
-  etc/job.toml              # 科学执行绑定、Conda prefix、远程队列
-  etc/email.toml            # 邮件 Skill 配置
-  etc/name-resolver.toml
-  etc/pi/                   # Pi 原生模型、认证和设置
-  etc/secrets/              # SMTP 等私有密钥
-  var/state/installation/   # 安装回执、Python 环境清单
-  var/state/host/           # Host 身份、请求回执、持久租约和 Monitor 状态
-  var/state/pi/sessions/    # Pi 原生 SQLite 会话
-  var/log/                  # 安装和 Worker 日志
-  var/cache/                # 可删除并重建的缓存
-  workspaces/               # 默认研究数据根，可显式配置其它位置
+<software_root>/
+  coragent
+  uninstall.sh
+  installation.json          # 配置和状态根目录的定位记录
+  current -> releases/<id>
+  releases/<id>/             # 应用代码和随包 Skill
+  runtimes/pi/<commit>/      # 固定 Pi 运行时
+  runtimes/maintenance/      # 独立卸载和恢复程序
+  host-envs/                 # Host Python 环境的默认存储目录
+
+<configuration_directory>/
+  config.toml               # 操作者维护的设置
+  credentials.json          # 模型凭据和具名密钥
+
+<state_root>/
+  installation/             # 安装身份和环境回执
+  host/                     # Host 身份、Link token、租约和后台健康状态
+  pi/sessions/              # Pi durable SQLite 会话
+  pi/agent/                 # Pi 设置和生成的模型定义
+  generated/                # 生成的组件配置
+  logs/
+  cache/
+
+<workspace_root>/<name>/
+  workspace_manifest.json
+  research/
+  runs/jobs/
+  operations/
+  artifacts/
 ```
 
-`bin/` 和公开的 `coragentServer` 不再创建。systemd 调用
-`current/agent/libexec/coragent-host`，并明确传入安装根目录。日常使用
-`./coragent --workspace <name>`，服务管理使用 `systemctl --user … coragent.service`。
+日常修改 `config.toml` 及相邻的 `credentials.json`。状态根下的
+`generated/job.toml`、`generated/email.toml`、`generated/name-resolver.toml`
+和 `pi/agent/models.json` 是生成的组件输入；直接编辑不会更新主配置，重新生成时会被覆盖。
+运行命令通过 `CORAGENT_JOB_CONFIG` 等变量取得解析后的路径。
 
-Host Conda 基础环境及应用 overlay 存放在
-`~/soft/coragent/host-envs/<installation-id>/{base,kernels}/<hash>`；安装器可通过
-`CORAGENT_HOST_ENV_ROOT` 指定其它专属路径，该路径会持久记录，运行时不依赖此临时变量。
-科学 Job 环境通过 `etc/job.toml` 单独指定；本地与远端解释器分别验证。
+Host Python 基础环境和 wheel overlay 位于
+`<env_root>/<installation-id>/{base,kernels}/<hash>`。
+`runtime.env_root` 可指定专属存储目录；安装器也接受 `CORAGENT_HOST_ENV_ROOT`。
+科学解释器和程序通过 `config.toml` 的 `execution.targets.<target>.bindings` 单独配置。
 
-Socket 和进程互斥锁位于安装身份隔离的系统 runtime 目录；持久回执不随它清理。
-所有者定义以 `research_agent.foundation.layout` 为准，安装器、bootstrap 和诊断工具复用同一实现。
-Node 服务由 bootstrap 接收解析后的路径，Skill 从显式配置/环境绑定读取依赖。
-工作区内部的 Pi 设置与安装级目录是不同的边界，不按目录名称批量删除。
+Socket 和进程锁使用按安装身份隔离的系统 runtime 目录。Pi 会话历史位于
+`<state_root>/pi/sessions/<workspace-id>/<session-id>/session.sqlite`，
+相邻 `meta.json` 保存元数据。研究文件保存在工作区，不随切换会话搬迁。
 
-只读检查：
+只读检查解析后的路径：
 
 ```bash
-python3 scripts/app_layout_doctor.py --install-root /absolute/path --json
+python3 -B scripts/app_layout_doctor.py --config /absolute/path/config.toml --json
 ```
 
-默认卸载删除所属服务、应用代码和缓存，保留配置、凭据、会话、工作区及 Python 环境。
-清理环境需显式选择且校验所属安装，不清除共享科学软件。新安装不自动导入离线归档的旧会话或恢复历史任务。
+当前布局 schema 为 `coragent-installation/3`。安装根下的旧 `etc/`、`var/`、
+`.pi/` 和 `.agents/` 不会自动迁移；重新部署时应保留原有数据。
+卸载选项和归属规则见[安装与运维](INSTALLATION.zh-CN.md)。

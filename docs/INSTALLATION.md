@@ -61,9 +61,10 @@ nor starts services and does not print credentials.
 
 The installer prepares CoRAgent's own Python/Pi runtime and generated services,
 and checks configured execution bindings. Prepare scientific environments
-separately, optionally with `scripts/install_job_environment.py`, then bind their
-paths in `execution.targets.*.bindings`. Core installation does not provision
-scientific environments by default.
+separately and bind their paths in `execution.targets.*.bindings`, or explicitly
+select installer profiles with `--job-profile TARGET:PROFILE`. Core installation
+does not provision scientific environments by default. See
+[Scientific operations](SCIENTIFIC_CAPABILITIES_OPERATIONS.md) for environment preparation.
 
 There is no implicit import from `~/.pi/agent`. Explicit one-time component
 imports use `--import-config DIRECTORY`, `--agent-config-dir`, `--job-config` or

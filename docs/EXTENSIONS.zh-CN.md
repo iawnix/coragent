@@ -34,7 +34,9 @@ Pi 从 Skill 目录的 `SKILL.md` 发现技能；当前这些入口使用英文�
 系统提示词保留跨任务通用的决策规则：指令优先级、研究对象、执行归属、授权与预算、证据标准、
 结果纠正和沟通。具体科学方法与完整工具示例留在按需读取的 Skill 中。
 工作区 AGENTS.md 由提示词要求 Agent 主动读取，不在上述组装步骤中自动拼接。
-每次模型请求前另外注入有限的研究快照；它提供当前记录，不赋予新指令或行动授权。
+Research Context 在每次 generation 准备时读取有限概览，仅在范围或相关事实变化时追加上下文。
+`beforeRequest` 提供当前任务控制信息并检查输入预算；历史概览不赋予新指令或授权。
+详见[研究上下文](RESEARCH_CONTEXT.zh-CN.md)。
 
 资源摘要检查能验证加载字节，确定性测试能验证注入与记录行为；这些检查不能证明模型会遵循所有准则，
 也不能替代实际费用限制或执行权限控制。
@@ -67,7 +69,8 @@ Python 的 `backend/src/research_agent/application/execution_catalog.py` 独立�
 选择 `--executor` 或 `validator_id` 时必须使用已登记 ID 和版本；这是所选便捷入口的契约。
 对目录外的方法，可以直接通过 `job_start` 提交明确的 command、inputs、outputs 和 platform，
 或使用准备器的 `--script <file.py> --backend <binding>`。无需为每个新任务修改此 JSON。
-实际程序、Python、激活脚本和计算资源由安装级 `etc/job.toml` 的环境绑定配置。
+实际程序、Python、激活脚本和计算资源由 `config.toml` 的
+`execution.targets.<target>.bindings` 配置，运行时通过 `CORAGENT_JOB_CONFIG` 读取生成的组件配置。
 
 完整的准备、提交、收集与恢复过程见[科学计算指南](SCIENTIFIC_CAPABILITIES_OPERATIONS.zh-CN.md)。
 

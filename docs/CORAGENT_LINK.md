@@ -60,7 +60,7 @@ node /opt/coragent-relay/current/services/relay/cli.mjs enrollment create \
 
 Run the CoRAgent installer on the Host, select `CoRAgent Link Relay` Phone access, and enter
 the Relay URL and enrollment code. The installer stores the Host credential in
-`var/state/host/host.token` with owner-only permissions. The Host service
+`<state_root>/host/host.token` with owner-only permissions. The Host service
 then maintains the outbound Link connection automatically.
 
 ## Pair And Revoke Phones

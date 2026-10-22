@@ -121,6 +121,30 @@ def test_installer_refuses_unverified_prefix_and_does_not_publish_bad_receipt(tm
     assert not (prefix / 'coragent-environment.json').exists()
 
 
+@pytest.mark.parametrize('adopt', [False, True])
+def test_installer_cli_uses_selected_target(tmp_path, adopt):
+    import json
+    import subprocess
+    import sys
+    root = Path(__file__).resolve().parents[2]
+    config_path = tmp_path / 'job.toml'
+    config_path.write_text(config_path.read_text().replace('execution.targets.local', 'execution.targets.science')
+                           .replace('default_target = "local"', 'default_target = "queue"')
+                           + '\n[execution.targets.queue]\ndriver = "external"\ntransport = "local"\n'
+                           + 'work_root = ' + json.dumps(str(tmp_path / 'queue')) + '\nhandler = ["/bin/true"]\n')
+    receipt = tmp_path / 'target-python/coragent-environment.json'
+    if adopt:
+        receipt.unlink()
+    result = subprocess.run([sys.executable, '-B', str(root / 'scripts/install_job_environment.py'),
+                             '--config', str(config_path), '--target', 'science', '--backend', 'structure',
+                             *(['--adopt'] if adopt else [])], capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+    installed = json.loads(result.stdout)
+    assert installed == json.loads(receipt.read_text())
+    assert installed['python']['prefix'] == str(tmp_path / 'target-python')
+    assert installed['inventory_sha256'].startswith('sha256:')
+
+
 def test_failed_new_install_removes_only_its_partial_prefix(tmp_path, monkeypatch):
     import runpy
     import subprocess

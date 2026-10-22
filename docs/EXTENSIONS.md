@@ -42,9 +42,11 @@ The prompt contains decisions shared across tasks: instruction priority, researc
 objects, execution ownership, authorization and budgets, evidence, corrections,
 and communication. Scientific procedures and full tool examples remain in on-demand
 Skills. It instructs the Agent to read applicable workspace AGENTS.md files; the
-assembly step does not automatically concatenate them. A bounded research snapshot
-is injected separately before each model request as current records, not new
-instructions or authorization.
+assembly step does not automatically concatenate them. Research Context reads a bounded
+brief at each generation boundary and appends it only when scope or relevant facts
+change. `beforeRequest` supplies current task controls and checks the input budget.
+The historical brief is neither a new instruction nor authorization; see
+[Architecture](ARCHITECTURE.md#context-and-next_run).
 
 Resource checks verify loaded bytes and deterministic tests verify injection and
 record behavior. They do not establish model compliance with every rule or replace
@@ -79,8 +81,9 @@ Selecting `--executor` or `validator_id` requires a registered ID/version as the
 contract for that helper. For other methods, submit explicit command, inputs,
 outputs, and platform through `job_start`, or prepare a task with
 `--script <file.py> --backend <binding>`. Neither requires a new catalog entry.
-Installation-level `etc/job.toml` bindings configure actual programs, Python,
-activation scripts, and compute resources.
+Bindings in `config.toml` under `execution.targets.<target>.bindings` configure
+actual programs, Python, activation scripts and resources. The runtime consumes
+the generated component configuration through `CORAGENT_JOB_CONFIG`.
 
 See [Scientific operations](SCIENTIFIC_CAPABILITIES_OPERATIONS.md) for preparation,
 submission, collection, and recovery.

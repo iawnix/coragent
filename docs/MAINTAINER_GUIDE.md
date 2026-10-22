@@ -1,6 +1,6 @@
 # Maintainer Guide
 
-CoRAgent uses native Pi Harness. Host binds workspaces, authenticated input and durable scheduling; Python Research Memory stores original requirements, problem Nodes, immutable Results and relations. `runtime-bridge` only transports commands; CoRAgent Web consumes the same read-only queries. See [architecture](ARCHITECTURE.md) for the current ownership boundaries.
+CoRAgent uses native Pi Harness. Host owns workspace routing and authentication; the SessionWorker owns durable input and task progression; Python Research Memory stores original requirements, problem Nodes, immutable Results and relations. `runtime-bridge` only transports commands; CoRAgent Web consumes the same read-only queries. See [architecture](ARCHITECTURE.md) for the current ownership boundaries.
 
 ## Development Setup
 
@@ -18,7 +18,7 @@ npm run lint:public
 
 The full suite uses `python3 tools/test/runner.py source -- -q`. Use
 `python3 tools/test/runner.py list` to inspect all lanes. The native lane
-exercises the Harness Host, native Pi client, session-history isolation, Monitor
+exercises the Harness Host, native Pi client, session-history isolation, Job Manager
 delivery, CoRAgent Link, and the pinned Pi extension/provider boundaries. Use the pinned dependencies prepared in the private test root:
 
 ```bash
@@ -41,7 +41,7 @@ The authoritative lane and path definition is `tools/test/manifest.toml`,
 dispatched by `tools/test/runner.py`. Python tests are grouped under
 `tests/unit/`, `tests/contract/`, and `tests/integration/`; Node tests live under
 `tests/node/`; shared fixtures are under `tests/support/`. External probes and
-live scenarios belong to `tools/test/probes/` and `tools/test/scenarios/` and
+live scenarios belong to `tools/test/probes/` and `tests/scenarios/` and
 must not be added to the default Python suite.
 
 ## Research Memory and Execution Boundaries
@@ -50,7 +50,7 @@ must not be added to the default Python suite.
 
 Agent tools are research_read / research_search / research_create / research_update / research_result. Creation needs goal; a note needs node_id and note; publication needs node_id and conclusion. The trusted adapter supplies identities, read basis, revisions and transactions. Background Jobs do not change Node content revision. Relations are stored once with generated reverse queries. Actual uses requires proven inputs; search is not evidence adoption.
 
-Job Manager owns execution receipts; Artifact Store owns bytes and provenance. Monitor next_run depends on event and delivery identity, never Memory sequence or checkpoint. Email receipts own deduplication; Memory failure cannot trigger resending. Old workspaces are rejected without migration or mixed writes.
+Job Manager owns execution receipts; Artifact Store owns bytes and provenance. Job Manager next_run delivery depends on event and delivery identity, never Memory sequence or checkpoint. Email receipts own deduplication; Memory failure cannot trigger resending. Old workspaces are rejected without migration or mixed writes.
 
 ## Repair research views
 
@@ -85,14 +85,15 @@ bounded inputs, explicit applicability, counterexamples, replayable candidates
 and a version change when deterministic output semantics change. Keep domain
 schemas out of the always-loaded tools. Do not add scientific successor routing.
 
-Job state and recovery belong to the execution runtime. Preserve the
+Job state and recovery belong to Job Manager. Preserve the
 workspace transaction boundary around dispatch intentions, execution observations,
 and collected evidence; keep inspection, collection and cancellation available.
 Test the Native Harness client and Pi resource and scientific execution contracts,
-Monitor retry/acknowledgement behavior, wheel
+Job Manager retry/acknowledgement behavior, wheel
 installation, Memory Node/Result Web queries and retrieval, and source-tampering rejection.
 Use the stable operations guide and focused test suites as the current evidence;
-superseded plans and one-off reports remain in Git history, not in the current docs tree.
+superseded plans and one-off reports remain in Git history. Unimplemented proposals
+are labeled and indexed separately from current operating instructions.
 
 Maintain English `SKILL.md` and Chinese translations together: English is the discovery entrypoint. See [Skills and the execution catalog](EXTENSIONS.md).
 

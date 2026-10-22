@@ -14,12 +14,12 @@ Pi 的 editor、transcript 渲染或输入循环。它与普通 Pi 的 Interacti
 ```text
 CoRHub/Web ── Link/HTTP ──┐
 Pi 原生 TUI ─ Unix/SSH ─────┼─> CoRAgent Agent Server / Host API
-Monitor ─ Host RPC ─────────┘       ├─ Root Agent Session
+Monitor ─ Host RPC ─────────┘       ├─ Agent Session
                                     └─ Harness / Pi App Server / SessionWorker
 ```
 
 Host 是 Agent Server 的 API 和宿主层，负责路由、认证、会话管理 RPC 回执、会话发现
-以及 Monitor supervisor；Harness worker 在同一个 Agent Server 内拥有 agent loop、模型、工具、
+以及 Job Manager supervisor；Harness worker 在同一个 Agent Server 内拥有 agent loop、模型、工具、
 transcript、用户任务控制回执和 SQLite durable lane。Pi 原生 TUI、Phone、Monitor 都是同一个 lane 的客户端，
 不会启动第二个 agent loop。
 
@@ -137,7 +137,7 @@ Esc 关闭候选并保留输入，Tab 可重新打开。`/monitor` 按当前参�
 Job 数量统计当前任务的全部分页；没有当前任务时统计本会话。最多预览五个运行中或排队中的 Job。
 长摘要会提示查看完整详情。用 `/monitor task <id>` 查看交付条件与研究详情，
 用 `/monitor jobs` 查看执行和收集状态，用 `/monitor run <id>` 查看 Pi generation/tool Task。
-Job 成功不直接等于科学分析完成；该区别以任务的 Research Brief 和 Result 为准。
+Job 成功不直接等于科学分析完成；应读取已记录的 Result 和证据，Research Brief 只提供导航概览。
 
 启动时，`-c` 选择当前 workspace 最近的可写 SQLite durable session，`--session-id <id>` 选择
 指定 session。顶层 `-r`/`--resume` 会被明确拒绝，因为 Host-mediated client 必须先取得
@@ -166,7 +166,7 @@ Host 握手仅接受 `protocol: "coragent-host/3"`，v1 客户端必须更新。
 会话列表只返回 `{sessions: [...]}`，不携带旧 backend 或格式标记。
 
 Monitor 统一用户任务控制与计算作业观察。Task Controller 在 Pi SessionWorker 中运行，
-沿用 Harness 的 durable 事务与输入接纳边界；安装级 Monitor worker 观察 Compute 状态并登记执行事件。
+沿用 Harness 的 durable 事务与输入接纳边界；安装级 Job Manager worker 观察 Job 状态并登记执行事件。
 模型/工具循环始终由 Pi 持有，科学证据与结论仍归 Research Memory。
 
 | 命令 | 行为 |
@@ -183,7 +183,7 @@ Monitor 统一用户任务控制与计算作业观察。Task Controller 在 Pi S
 | `/monitor job cancel <id>` | 请求取消一个计算作业 |
 | `/monitor runs [--task <id>]` | 按 Pi submission/run 分组的执行记录 |
 | `/monitor run <id>` | 有界读取 generation/tool 执行详情 |
-| `/monitor health` | Task Controller 与共享 Monitor worker 健康信息 |
+| `/monitor health` | Task Controller 与共享 Job Manager worker 健康信息 |
 
 任务详情展示研究入口、当前关注问题、局部方案摘录、问题原始状态、assessment/Result
 引用和相关 Job。只有当前会话归属的 Job 提供 `/monitor job` 命令；其它 Job 保持可见，
@@ -213,8 +213,8 @@ Task Controller 在继续执行前核对持久任务与 Job 状态；Agent 仍�
 
 ## 会话存储
 
-安装级 `var/state/pi/sessions/` 是 Native Pi Harness 使用的唯一 session 存储。
-workspace `.pi/sessions` 历史不是受支持的输入，Native runtime 不会 resume 或导入它；持久历史位于 `var/state/pi/sessions/<workspace-id>/<session-id>/session.sqlite`，旁边的 `meta.json` 保存路由元数据。
+`<state_root>/pi/sessions/` 是 Native Pi Harness 使用的唯一 session 存储。
+workspace `.pi/sessions` 历史不是受支持的输入，Native runtime 不会 resume 或导入它；持久历史位于 `<state_root>/pi/sessions/<workspace-id>/<session-id>/session.sqlite`，旁边的 `meta.json` 保存路由元数据。
 研究状态应保存在 workspace Research Memory；SQLite durable session 使用 Host 的会话控制接口。
 
 详见[架构](ARCHITECTURE.zh-CN.md)和[安装说明](INSTALLATION.zh-CN.md)。
