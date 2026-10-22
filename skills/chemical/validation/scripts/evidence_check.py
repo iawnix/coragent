@@ -37,7 +37,7 @@ def run(args):
             result = irc_check(material, evidence, [forward, reverse], [reactant, product],
                 endpoint_rmsd=args.endpoint_rmsd, origin_rmsd=args.origin_rmsd,
                 max_search=args.max_search, max_candidates=args.max_candidates,
-                energy_tolerance=args.energy_tolerance, max_step_rmsd=args.max_step_rmsd, **options)
+                energy_tolerance=args.energy_tolerance, max_step_rmsd=args.max_step_rmsd, policy=args.policy, **options)
         result['sources'] = sources
     encoded = json.dumps(result, indent=2, ensure_ascii=False, allow_nan=False) + '\n'
     args.output.parent.mkdir(parents=True, exist_ok=True)

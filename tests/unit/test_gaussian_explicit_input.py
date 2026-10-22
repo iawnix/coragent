@@ -239,3 +239,41 @@ def test_reject_coordinate_in_route_or_title_before_dispatch(tmp_path, target):
     path.write_text(path.read_text().replace(old, old[:-1] + 'H 2.45 2.00 -0.64\n\n'))
     with pytest.raises(ValueError, match='coordinate record in route/title'):
         helper.inspect_input(path, 'M062X','6-31G**',0,1,12,4000)
+
+
+@pytest.mark.parametrize('size', ['0.5', '0', '-0.5'])
+def test_invalid_irc_stepsize_rejected_before_launch(tmp_path, size):
+    from input_job import inspect_input
+    source = gjf(tmp_path / 'input.gjf', f'IRC=(Forward,CalcFC,StepSize={size})')
+    with pytest.raises(ValueError, match='StepSize must be a nonzero integer'):
+        inspect_input(source, 'M062X', '6-31G**', 0, 1, 12, 4000)
+
+
+def test_failed_irc_preserves_accepted_points_and_original_origin(tmp_path):
+    import shlex
+    from tests.unit.test_chemical_path_execution import orientation
+    source = gjf(tmp_path / 'input.gjf', 'IRC=(Forward,CalcFC,MaxPoints=20)')
+    start = [('O', 0., 0., 0.), ('H', 0., 0., 1.), ('H', 0., 1., 0.)]
+    trial = [('O', 0., 0., 0.), ('H', 0., 0., 1.1), ('H', 0., 1., 0.)]
+    text = '#p M062X/6-31G** IRC=(Forward,CalcFC,MaxPoints=20)\n ----\n' + orientation(start)
+    text += ' Point Number 1 in FORWARD path direction\n' + orientation(trial)
+    for i in [1, 2]:
+        text += f' SCF Done: E(RM062X) = {-76.0-i*.01} A.U.\n Point Number: {i} Path Number: 1\n CURRENT STRUCTURE\n'
+        text += ' 1 8 0.0 0.0 0.0\n 2 1 0.0 0.0 1.1\n 3 1 0.0 1.0 0.0\n'
+        text += f' NET REACTION COORDINATE UP TO THIS POINT = {i}.0\n'
+    text += ' Maximum number of corrector steps exceeded\n Error termination via Lnk1e\n'
+    log = tmp_path / 'fixture.out'; log.write_text(text)
+    program = tmp_path / 'solver'
+    program.write_text('#!/bin/sh\ncat >/dev/null\ncat ' + shlex.quote(str(log)) + '\nexit 1\n')
+    program.chmod(0o700)
+    out = tmp_path / 'out'
+    completed = subprocess.run([sys.executable, str(SCRIPTS / 'run.py'), '--input-gjf', str(source),
+        '--executable', str(program), '--output-dir', str(out), '--validation', 'irc',
+        '--threads', '12', '--memory-mb', '4000'], capture_output=True, text=True)
+    assert completed.returncode == 1
+    result = json.loads((out / 'result.json').read_text())
+    assert result['execution_status'] == 'failed' and not result['checks_passed']
+    assert result['irc']['point_count'] == 2
+    assert result['irc']['origin_atoms'] == [list(a) for a in start]
+    assert len(json.loads((out / 'irc_path_points.json').read_text())['points']) == 2
+    assert (out / 'gaussian_endpoint.xyz').is_file()

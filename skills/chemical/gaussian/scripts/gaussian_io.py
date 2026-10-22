@@ -31,6 +31,8 @@ ROUTE_KEYWORDS_WITH_KNOWN_LINE_WRAPS = (
     ("calcfc", "CalcFC"),
     ("nosymm", "NoSymm"),
     ("freq", "Freq"),
+    ("xqc", "XQC"),
+    ("qc", "QC"),
 )
 
 
@@ -392,8 +394,32 @@ def _parse_convergence_number(token: str) -> float | str:
         return token
 
 
+def optimization_phase(lines: list[str]):
+    """Separate the one-shot Hessian diagnostic after an Opt+Freq calculation.
+
+    Gaussian's automatic frequency link runs Berny once with a maximum of two
+    steps after Link 716. This is not a new geometry optimization. Only exclude
+    that block when no subsequent SCF/geometry iteration or explicit route is
+    present; a real restart must still invalidate an earlier stationary point.
+    """
+    harmonic = [i for i, line in enumerate(lines) if line.strip().startswith('Harmonic frequencies')]
+    if harmonic:
+        start = harmonic[-1]
+        for i in range(start + 1, len(lines)):
+            if not re.search(r'Step number\s+1\s+out of a maximum of\s+2\s*$', lines[i]):
+                continue
+            prefix, tail = lines[start:i], lines[i:]
+            if (any(re.search(r'Leave Link\s+716\b', line) for line in prefix)
+                    and any('Stationary point found' in line for line in lines[:start])
+                    and not any(re.search(r'SCF Done:|^\s*#|Step number\s+(?:[2-9]\b|\d{2,}\b)|Optimization stopped', line)
+                                for line in tail)):
+                return lines[:i], tail
+    return lines, []
+
+
 def parse_optimization(lines: list[str]):
     """Read the final optimization attempt, retaining the solver's completion rule."""
+    lines, _ = optimization_phase(lines)
     convergence_rows: dict[str, dict[str, str | float]] = {}
     stationary_convergence_rows: dict[str, dict[str, str | float]] | None = None
     completion_rule = None
@@ -551,8 +577,10 @@ def parse_irc_path(lines: list[str], route: str | None = None) -> dict[str, obje
     if not points:
         raise ValueError("Gaussian IRC log contains no coordinate-bearing path points")
     point_numbers = [int(point["point_number"]) for point in points]
-    if point_numbers != list(range(1, point_numbers[-1] + 1)):
-        raise ValueError(f"Gaussian IRC point sequence is not contiguous from 1: {point_numbers}")
+    if point_numbers != list(range(point_numbers[0], point_numbers[-1] + 1)):
+        raise ValueError(f"Gaussian IRC point sequence is not contiguous: {point_numbers}")
+    if point_numbers[0] != 1 and not re.search(r'\brestart\b', route or '', re.I):
+        raise ValueError('IRC sequence does not start at 1 and is not a declared restart')
     route_values = route_settings(route)
     max_points = route_values.get("maxpoints")
     endpoint_atoms = points[-1]["atoms"]
@@ -562,17 +590,29 @@ def parse_irc_path(lines: list[str], route: str | None = None) -> dict[str, obje
         {key: point[key] for key in ("point_number", "path_number", "reaction_coordinate", "electronic_energy_hartree", "reference_scf_energy_hartree")}
         for point in points
     ]
+    text = '\n'.join(lines)
+    failure = failure_diagnostics(lines)['primary_failure']
+    reached = isinstance(max_points, int) and point_numbers[-1] >= max_points
+    reason = (failure['kind'] if failure else 'max_points' if reached or 'Maximum number of steps reached' in text
+              else 'pes_minimum' if 'PES minimum detected' in text else 'unknown')
+    origin_blocks = orientation_blocks(lines, 'orientation:')
     return {
         "schema_version": "gaussian-irc-path/1",
         "energy_evidence": energy_evidence,
         "direction": direction,
         "point_zero_policy": "coordinate_free_ts_marker_excluded",
         "point_zero_marker_present": point_zero_marker_present,
+        "origin_atoms": origin_blocks[0] if origin_blocks else [],
+        "restart_segment": point_numbers[0] != 1 or bool(re.search(r'\brestart\b', route or '', re.I)),
+        "stop_reason": reason,
+        "scientific_validation": "not_assessed",
+        "next_action": ('correct_input_before_retry' if reason == 'input_syntax' else
+                        'inspect_last_accepted_point_then_optimize_endpoint_or_continue'),
         "first_point_number": point_numbers[0],
         "last_point_number": point_numbers[-1],
         "point_count": len(points),
         "max_points_requested": max_points,
-        "max_points_reached": isinstance(max_points, int) and point_numbers[-1] == max_points,
+        "max_points_reached": reached,
         "path_complete_marker": bool(
             direction
             and f"Calculation of {direction.upper()} path complete." in "\n".join(lines)
@@ -888,8 +928,12 @@ def parse_log(
     }
     summary.update(failure_diagnostics(section_lines, section["start_line"]))
     summary.update(parse_thermochemistry(section_lines))
-    return {"summary": summary, "frequencies": section_frequencies, "atoms": atoms,
-            "normal_modes": parse_normal_modes(section_lines, len(atoms))}
+    _, diagnostic = optimization_phase(section_lines)
+    summary['post_frequency_diagnostic'] = ({'force_convergence': parse_optimization(diagnostic)[0],
+        'scope': 'One-shot Hessian diagnostic, separate from the completed geometry optimization'} if diagnostic else None)
+    from gaussian_cclib import reconcile_numerics
+    return reconcile_numerics(section_lines, {"summary": summary, "frequencies": section_frequencies, "atoms": atoms,
+            "normal_modes": parse_normal_modes(section_lines, len(atoms))})
 
 
 def _scan_energy_points(lines: list[str]) -> list[dict[str, object]]:

@@ -13,6 +13,8 @@ from geometry_safety import assess, require_safe
 
 
 def validate(summary, task, method, basis):
+    if summary.get('numerical_parser', {}).get('status') == 'conflict':
+        raise ValueError('Gaussian numerical parsers disagree; review source before recalculating')
     compact = re.sub(r'\s+', '', str(summary.get('gaussian_route') or '')).lower()
     if f'{method}/{basis}'.lower() not in compact:
         raise ValueError('Gaussian output route does not match requested method/basis')

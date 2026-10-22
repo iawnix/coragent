@@ -90,3 +90,5 @@ configure `[execution.targets.local.bindings.path_xtb]` with `command = "/opt/xt
 (and activation_script if needed), then select `--job-profile local:path`.
 This profile has no default native scientific smoke calculation; the selected
 recipe's environment check and an explicit bounded scientific Job are separate.
+
+Gaussian numerical parsing uses pinned cclib 1.8.1 through the wrapper, structure and path `.requirements.txt` supplements; wrapper/structure also add SciPy. Provision a new immutable environment when updating. cclib extracts numerical data; it does not decide optimization phases, IRC completeness or chemical connectivity.

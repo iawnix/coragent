@@ -323,3 +323,50 @@ def test_unsupported_scan_keeps_reference_points_without_target_energies(tmp_pat
     assert parsed['summary']['electronic_energy_hartree'] is None
     assert [p['reference_scf_energy_hartree'] for p in parsed['profile']['points']] == [-75., -75.1]
     assert all(p['energy_hartree'] is None for p in parsed['profile']['points'])
+
+
+def test_post_frequency_berny_diagnostic_does_not_replace_converged_opt(tmp_path):
+    tail = (' Harmonic frequencies\n Frequencies -- -400 100 200\n Leave Link 716\n'
+            ' Step number 1 out of a maximum of 2\n' +
+            CONVERGED.replace(' Stationary point found.\n', '').replace('0.00001 0.00180 YES', '0.02 0.00180 NO'))
+    summary = parse(tmp_path, CONVERGED + tail + ' Normal termination of Gaussian\n')['summary']
+    assert summary['optimization_completed']
+    assert summary['force_convergence']['Maximum Displacement']['converged'] == 'YES'
+    assert summary['post_frequency_diagnostic']['force_convergence']['Maximum Displacement']['converged'] == 'NO'
+    for later in [' Step number 10\n', ' SCF Done: E(RHF) = -1.0 A.U.\n Optimization stopped.\n']:
+        summary = parse(tmp_path, CONVERGED + tail + later + ' Normal termination of Gaussian\n')['summary']
+        assert not summary['optimization_completed']
+        assert summary['post_frequency_diagnostic'] is None
+
+
+def test_wrapped_xqc_readback_does_not_hide_actual_method_mismatch(tmp_path):
+    path = tmp_path / 'gaussian.out'
+    path.write_text('#p HF/STO-3G Opt SCF=(X\n QC,Tight)\n ----\n Normal termination of Gaussian\n')
+    assert parse_log(path, expected_route='#p HF/STO-3G Opt SCF=(XQC,Tight)')['summary']['route_expectation']['matched']
+    assert not parse_log(path, expected_route='#p B3LYP/STO-3G Opt SCF=(XQC,Tight)')['summary']['route_expectation']['matched']
+
+
+def test_cclib_energy_conversion_and_disagreement_do_not_override_solver_events(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from cclib.parser import Gaussian
+    from cclib.parser.utils import convertor
+    monkeypatch.setattr(Gaussian, 'parse', lambda self: SimpleNamespace(
+        scfenergies=[convertor(-1., 'hartree', 'eV')], optdone=True))
+    text = '#p HF/STO-3G Opt\n ----\n SCF Done: E(RHF) = -1.0 A.U.\n Error termination\n'
+    parsed = parse(tmp_path, text)
+    assert parsed['summary']['numerical_parser']['status'] == 'completed'
+    assert parsed['summary']['electronic_energy_hartree'] == pytest.approx(-1.)
+    assert not parsed['summary']['optimization_completed']
+    monkeypatch.setattr(Gaussian, 'parse', lambda self: SimpleNamespace(scfenergies=[0.], optdone=True))
+    parsed = parse(tmp_path, text)
+    assert parsed['summary']['numerical_parser']['status'] == 'conflict'
+    assert parsed['summary']['electronic_energy_hartree'] == -1.
+
+
+def test_malformed_cclib_arrays_preserve_text_evidence_for_review(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from cclib.parser import Gaussian
+    monkeypatch.setattr(Gaussian, 'parse', lambda self: SimpleNamespace(vibfreqs=[[1.], [2., 3.]]))
+    parsed = parse(tmp_path, CONVERGED + ' Normal termination of Gaussian\n')
+    assert parsed['summary']['optimization_completed']
+    assert parsed['summary']['numerical_parser']['status'] == 'conflict'

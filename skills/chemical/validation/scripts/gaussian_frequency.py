@@ -11,6 +11,9 @@ def validate(paths):
     result = json.loads(Path(paths[0]).read_text())
     summary = result.get('summary', {})
     frequencies = result.get('frequencies', [])
+    if summary.get('numerical_parser', {}).get('status') == 'conflict':
+        return {'schema_version': 'validator-output/1', 'verdict': 'inconclusive',
+                'reason': 'Numerical parsers disagree; review the source before recalculating'}
     if not summary.get('normal_termination') or summary.get('error_termination') or not frequencies:
         return {'schema_version': 'validator-output/1', 'verdict': 'inconclusive',
                 'reason': 'A normally terminated frequency calculation is required'}

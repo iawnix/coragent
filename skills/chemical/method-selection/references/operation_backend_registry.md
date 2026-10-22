@@ -18,6 +18,8 @@ This cross-reference is exhaustive for the current `execution.json`: every execu
 | `chemical.ensemble-free-energy` | `executor` | `energetics` | `structure` | `skills/chemical/energetics/scripts/energy.py` | `skills/chemical/energetics/scripts/energy_cli.py` |
 | `chemical.ensemble-select` | `executor` | `crest` | `structure` | `skills/chemical/crest/scripts/ensemble.py` | `skills/chemical/crest/scripts/ensemble_cli.py` |
 | `chemical.gaussian` | `executor` | `gaussian` | `gaussian` | `skills/chemical/gaussian/scripts/run.py` | `skills/chemical/gaussian/scripts/cli.py` |
+| `chemical.ts-connectivity-inputs` | `executor` | `validation` | `structure` | `skills/chemical/validation/scripts/connectivity.py` | `skills/chemical/validation/scripts/connectivity_cli.py` |
+| `chemical.displacement-check` | `executor` | `validation` | `structure` | `skills/chemical/validation/scripts/connectivity.py` | `skills/chemical/validation/scripts/connectivity_cli.py` |
 | `chemical.gaussian-evidence` | `executor` | `validation` | `structure` | `skills/chemical/validation/scripts/evidence_check.py` | `skills/chemical/validation/scripts/check_cli.py` |
 | `chemical.gaussian-input` | `executor` | `gaussian` | `gaussian` | `skills/chemical/gaussian/scripts/run.py` | `skills/chemical/gaussian/scripts/cli.py` |
 | `chemical.gaussian_frequency` | `validator` | `validation` | `validation` | `skills/chemical/validation/scripts/gaussian_frequency.py` | `—` |

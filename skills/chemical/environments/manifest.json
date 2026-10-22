@@ -52,7 +52,8 @@
       },
       "resources": {
         "check_structure.py": "sha256:ed7605165f391a611027c147d6bfb2b1c909f87ccf27686065bf192669e3d936",
-        "structure.lock": "sha256:b2447fff9059d0819049b9d4761e740d6a69a5f3686bf40cc7122edc3307d39b"
+        "structure.lock": "sha256:b2447fff9059d0819049b9d4761e740d6a69a5f3686bf40cc7122edc3307d39b",
+        "structure.requirements.txt": "sha256:1c310758c4ee6eab5e8a7971a2b6de85fbaaa90a2fd389710bf35548fea6a556"
       }
     },
     "pyscf": {
@@ -170,7 +171,8 @@
         "glibc": "2.17"
       },
       "resources": {
-        "wrapper.lock": "sha256:9f74148e2c7834987a83ec8c911b88458bc7800296f87ce2d22768ca25f78a4b"
+        "wrapper.lock": "sha256:9f74148e2c7834987a83ec8c911b88458bc7800296f87ce2d22768ca25f78a4b",
+        "wrapper.requirements.txt": "sha256:e7105dfe2343ef6be207fea74fe04e5dbf3c32cd80501bf5f19fa614d30faf1a"
       }
     },
     "path": {
@@ -190,7 +192,8 @@
         "glibc": "2.28"
       },
       "resources": {
-        "path.lock": "sha256:61495791d074c193b71decd13283fd1e63dd965be34f65e8f4e6ecba7d7c5eec"
+        "path.lock": "sha256:61495791d074c193b71decd13283fd1e63dd965be34f65e8f4e6ecba7d7c5eec",
+        "path.requirements.txt": "sha256:9aa81e31b2786941e3a54fb011e2103dcaeb033b11819aaee36607b397263de5"
       }
     }
   }

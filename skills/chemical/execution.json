@@ -180,10 +180,12 @@
       "requirements": {
         "python": ">=3.11",
         "packages": {
-          "numpy": ">=2,<3"
+          "numpy": ">=2,<3",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
-          "numpy"
+          "numpy",
+          "cclib"
         ]
       },
       "resources": {
@@ -195,9 +197,11 @@
         "_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "gaussian/scripts/cli.py": "sha256:b020439cd06a75962e9d75752b65b621264b7897d71ccea2167c49d5e0476bbc",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
-        "gaussian/scripts/input_job.py": "sha256:5e37689963af8590bff52571a5f35cd532596132b68b1631e40e5df7865eb11c",
-        "gaussian/scripts/run.py": "sha256:a2bb3cd3e543628b9b156de92a9c1e20bc905563d5c8341b065e986d05757ebe"
+        "gaussian/scripts/gaussian_binding.py": "sha256:e7b2d3dc7e91b8d62bb2647f0e680f4c726a7ea74a7019855b9cac5a7f2e9810",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
+        "gaussian/scripts/input_job.py": "sha256:1b743742e7f056fcf053811dd4d164213ecf71abaa25d7b138da170945becf47",
+        "gaussian/scripts/run.py": "sha256:6cb3730d975b8b658dc1bfcb442ee02b19e0802135c156957932339475f05ff3"
       },
       "module_paths": [
         "_shared"
@@ -260,10 +264,12 @@
       "requirements": {
         "python": ">=3.11",
         "packages": {
-          "numpy": ">=2,<3"
+          "numpy": ">=2,<3",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
-          "numpy"
+          "numpy",
+          "cclib"
         ]
       },
       "resources": {
@@ -275,9 +281,11 @@
         "_shared/science.py": "sha256:6cbee46b539cbfa05e48e657c64bf596a80a86b92fcece59d6fe5cab668bf2a8",
         "_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
         "gaussian/scripts/cli.py": "sha256:b020439cd06a75962e9d75752b65b621264b7897d71ccea2167c49d5e0476bbc",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
-        "gaussian/scripts/input_job.py": "sha256:5e37689963af8590bff52571a5f35cd532596132b68b1631e40e5df7865eb11c",
-        "gaussian/scripts/run.py": "sha256:a2bb3cd3e543628b9b156de92a9c1e20bc905563d5c8341b065e986d05757ebe"
+        "gaussian/scripts/gaussian_binding.py": "sha256:e7b2d3dc7e91b8d62bb2647f0e680f4c726a7ea74a7019855b9cac5a7f2e9810",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
+        "gaussian/scripts/input_job.py": "sha256:1b743742e7f056fcf053811dd4d164213ecf71abaa25d7b138da170945becf47",
+        "gaussian/scripts/run.py": "sha256:6cb3730d975b8b658dc1bfcb442ee02b19e0802135c156957932339475f05ff3"
       },
       "module_paths": [
         "_shared"
@@ -1527,11 +1535,13 @@
         "python": ">=3.11",
         "packages": {
           "rdkit": ">=2025.9,<2027",
-          "numpy": ">=1.26,<3"
+          "numpy": ">=1.26,<3",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
-          "numpy"
+          "numpy",
+          "cclib"
         ]
       },
       "resources": {
@@ -1539,7 +1549,8 @@
         "_shared/gaussian_input.py": "sha256:8ec9fc695131f46e12699d57777e250cac90a5a3356b3ede704b0c688b66e50c",
         "_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
         "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -1554,12 +1565,12 @@
         "material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
         "material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
-        "validation/scripts/check_cli.py": "sha256:7646bfed10b0116261ed85dad196ce1ab25dd4cb962bbb06233b9ee03a7f7594",
+        "validation/scripts/check_cli.py": "sha256:d63f373a84b29f8eff1e8042f926df559a7f31630cb631a6caadd8b9816a5b9b",
         "validation/scripts/check_common.py": "sha256:731ad2905f50457208fae4ddc4c5cf1e5e947b9c0fc0dea49a693e6b6d9f05c3",
         "validation/scripts/endpoint_identity.py": "sha256:33e533fa7200b6df00068dd6fe9742716c7f5ead78b944e4de66ec47e10145fe",
-        "validation/scripts/evidence_check.py": "sha256:7d52cf2b8cc6692154fb58e4b669e79c66232888b41a1ef534efe2b6603d34c7",
-        "validation/scripts/gaussian_evidence.py": "sha256:a303265e1b9c8b57aad1cbaf577a760636a009cb9d1821c907adbe42958d8e7b",
-        "validation/scripts/irc_check.py": "sha256:b349e9c185047e313ce3dcd03d0402e3c9c90e01566a892607af7a91135d6a2c",
+        "validation/scripts/evidence_check.py": "sha256:769a9eebfe49ba81115d54eb03e8b6b40584410704c46430eaf24ebe74d7efff",
+        "validation/scripts/gaussian_evidence.py": "sha256:b397a794e27e530358ae3c017cfeddc92a152bb80ba63ceabb0e6da6a02c1465",
+        "validation/scripts/irc_check.py": "sha256:231b15782fa4966a615acb0be28d63723962d0ff2c86afb23697e932cd0b8497",
         "validation/scripts/mode_check.py": "sha256:6cf321a29e995651a28ad5c5fdc3acac7f10d995d9a4faf236abf751390eddaf"
       },
       "module_paths": [
@@ -1609,11 +1620,13 @@
         "python": ">=3.11",
         "packages": {
           "rdkit": ">=2025.9,<2027",
-          "numpy": ">=1.26,<3"
+          "numpy": ">=1.26,<3",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
-          "numpy"
+          "numpy",
+          "cclib"
         ]
       },
       "resources": {
@@ -1621,7 +1634,8 @@
         "_shared/gaussian_input.py": "sha256:8ec9fc695131f46e12699d57777e250cac90a5a3356b3ede704b0c688b66e50c",
         "_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
         "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -1636,12 +1650,12 @@
         "material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
         "material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
-        "validation/scripts/check_cli.py": "sha256:7646bfed10b0116261ed85dad196ce1ab25dd4cb962bbb06233b9ee03a7f7594",
+        "validation/scripts/check_cli.py": "sha256:d63f373a84b29f8eff1e8042f926df559a7f31630cb631a6caadd8b9816a5b9b",
         "validation/scripts/check_common.py": "sha256:731ad2905f50457208fae4ddc4c5cf1e5e947b9c0fc0dea49a693e6b6d9f05c3",
         "validation/scripts/endpoint_identity.py": "sha256:33e533fa7200b6df00068dd6fe9742716c7f5ead78b944e4de66ec47e10145fe",
-        "validation/scripts/evidence_check.py": "sha256:7d52cf2b8cc6692154fb58e4b669e79c66232888b41a1ef534efe2b6603d34c7",
-        "validation/scripts/gaussian_evidence.py": "sha256:a303265e1b9c8b57aad1cbaf577a760636a009cb9d1821c907adbe42958d8e7b",
-        "validation/scripts/irc_check.py": "sha256:b349e9c185047e313ce3dcd03d0402e3c9c90e01566a892607af7a91135d6a2c",
+        "validation/scripts/evidence_check.py": "sha256:769a9eebfe49ba81115d54eb03e8b6b40584410704c46430eaf24ebe74d7efff",
+        "validation/scripts/gaussian_evidence.py": "sha256:b397a794e27e530358ae3c017cfeddc92a152bb80ba63ceabb0e6da6a02c1465",
+        "validation/scripts/irc_check.py": "sha256:231b15782fa4966a615acb0be28d63723962d0ff2c86afb23697e932cd0b8497",
         "validation/scripts/mode_check.py": "sha256:6cf321a29e995651a28ad5c5fdc3acac7f10d995d9a4faf236abf751390eddaf"
       },
       "module_paths": [
@@ -1700,11 +1714,13 @@
         "python": ">=3.11",
         "packages": {
           "rdkit": ">=2025.9,<2027",
-          "numpy": ">=1.26,<3"
+          "numpy": ">=1.26,<3",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
-          "numpy"
+          "numpy",
+          "cclib"
         ]
       },
       "resources": {
@@ -1712,7 +1728,8 @@
         "_shared/gaussian_input.py": "sha256:8ec9fc695131f46e12699d57777e250cac90a5a3356b3ede704b0c688b66e50c",
         "_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
         "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -1727,12 +1744,12 @@
         "material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
         "material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
-        "validation/scripts/check_cli.py": "sha256:7646bfed10b0116261ed85dad196ce1ab25dd4cb962bbb06233b9ee03a7f7594",
+        "validation/scripts/check_cli.py": "sha256:d63f373a84b29f8eff1e8042f926df559a7f31630cb631a6caadd8b9816a5b9b",
         "validation/scripts/check_common.py": "sha256:731ad2905f50457208fae4ddc4c5cf1e5e947b9c0fc0dea49a693e6b6d9f05c3",
         "validation/scripts/endpoint_identity.py": "sha256:33e533fa7200b6df00068dd6fe9742716c7f5ead78b944e4de66ec47e10145fe",
-        "validation/scripts/evidence_check.py": "sha256:7d52cf2b8cc6692154fb58e4b669e79c66232888b41a1ef534efe2b6603d34c7",
-        "validation/scripts/gaussian_evidence.py": "sha256:a303265e1b9c8b57aad1cbaf577a760636a009cb9d1821c907adbe42958d8e7b",
-        "validation/scripts/irc_check.py": "sha256:b349e9c185047e313ce3dcd03d0402e3c9c90e01566a892607af7a91135d6a2c",
+        "validation/scripts/evidence_check.py": "sha256:769a9eebfe49ba81115d54eb03e8b6b40584410704c46430eaf24ebe74d7efff",
+        "validation/scripts/gaussian_evidence.py": "sha256:b397a794e27e530358ae3c017cfeddc92a152bb80ba63ceabb0e6da6a02c1465",
+        "validation/scripts/irc_check.py": "sha256:231b15782fa4966a615acb0be28d63723962d0ff2c86afb23697e932cd0b8497",
         "validation/scripts/mode_check.py": "sha256:6cf321a29e995651a28ad5c5fdc3acac7f10d995d9a4faf236abf751390eddaf"
       },
       "module_paths": [
@@ -1779,11 +1796,13 @@
         "python": ">=3.11",
         "packages": {
           "rdkit": ">=2025.9,<2027",
-          "numpy": ">=1.26,<3"
+          "numpy": ">=1.26,<3",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
-          "numpy"
+          "numpy",
+          "cclib"
         ]
       },
       "resources": {
@@ -1791,7 +1810,8 @@
         "_shared/gaussian_input.py": "sha256:8ec9fc695131f46e12699d57777e250cac90a5a3356b3ede704b0c688b66e50c",
         "_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
         "_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
         "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -1806,12 +1826,12 @@
         "material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
         "material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
         "material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
-        "validation/scripts/check_cli.py": "sha256:7646bfed10b0116261ed85dad196ce1ab25dd4cb962bbb06233b9ee03a7f7594",
+        "validation/scripts/check_cli.py": "sha256:d63f373a84b29f8eff1e8042f926df559a7f31630cb631a6caadd8b9816a5b9b",
         "validation/scripts/check_common.py": "sha256:731ad2905f50457208fae4ddc4c5cf1e5e947b9c0fc0dea49a693e6b6d9f05c3",
         "validation/scripts/endpoint_identity.py": "sha256:33e533fa7200b6df00068dd6fe9742716c7f5ead78b944e4de66ec47e10145fe",
-        "validation/scripts/evidence_check.py": "sha256:7d52cf2b8cc6692154fb58e4b669e79c66232888b41a1ef534efe2b6603d34c7",
-        "validation/scripts/gaussian_evidence.py": "sha256:a303265e1b9c8b57aad1cbaf577a760636a009cb9d1821c907adbe42958d8e7b",
-        "validation/scripts/irc_check.py": "sha256:b349e9c185047e313ce3dcd03d0402e3c9c90e01566a892607af7a91135d6a2c",
+        "validation/scripts/evidence_check.py": "sha256:769a9eebfe49ba81115d54eb03e8b6b40584410704c46430eaf24ebe74d7efff",
+        "validation/scripts/gaussian_evidence.py": "sha256:b397a794e27e530358ae3c017cfeddc92a152bb80ba63ceabb0e6da6a02c1465",
+        "validation/scripts/irc_check.py": "sha256:231b15782fa4966a615acb0be28d63723962d0ff2c86afb23697e932cd0b8497",
         "validation/scripts/mode_check.py": "sha256:6cf321a29e995651a28ad5c5fdc3acac7f10d995d9a4faf236abf751390eddaf"
       },
       "module_paths": [
@@ -2191,11 +2211,13 @@
         "python": ">=3.11",
         "packages": {
           "rdkit": ">=2025.9,<2027",
-          "numpy": ">=1.26,<3"
+          "numpy": ">=1.26,<3",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
-          "numpy"
+          "numpy",
+          "cclib"
         ]
       },
       "resources": {
@@ -2227,7 +2249,8 @@
         "crest/scripts/ensemble_cli.py": "sha256:b2593f171f107e9ca83b849219a967c44659ae3c09299ccc3593f2fdbedc87f0",
         "crest/scripts/ensemble_material.py": "sha256:2a52c033bb0ca2f6f531444808098206f2d2f48d74670f5fc8f1c2c93138302a",
         "crest/scripts/ensemble_select.py": "sha256:6d891716c8e85e8eb4b0274739e55028883801ef0c38d1d5a7fb56d07785f752",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
         "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -2341,11 +2364,13 @@
         "python": ">=3.11",
         "packages": {
           "rdkit": ">=2025.9,<2027",
-          "numpy": ">=1.26,<3"
+          "numpy": ">=1.26,<3",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
-          "numpy"
+          "numpy",
+          "cclib"
         ]
       },
       "resources": {
@@ -2377,7 +2402,8 @@
         "crest/scripts/ensemble_cli.py": "sha256:b2593f171f107e9ca83b849219a967c44659ae3c09299ccc3593f2fdbedc87f0",
         "crest/scripts/ensemble_material.py": "sha256:2a52c033bb0ca2f6f531444808098206f2d2f48d74670f5fc8f1c2c93138302a",
         "crest/scripts/ensemble_select.py": "sha256:6d891716c8e85e8eb4b0274739e55028883801ef0c38d1d5a7fb56d07785f752",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
         "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -2449,11 +2475,13 @@
         "python": ">=3.11",
         "packages": {
           "rdkit": ">=2025.9,<2027",
-          "numpy": ">=1.26,<3"
+          "numpy": ">=1.26,<3",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
-          "numpy"
+          "numpy",
+          "cclib"
         ]
       },
       "resources": {
@@ -2485,7 +2513,8 @@
         "crest/scripts/ensemble_cli.py": "sha256:b2593f171f107e9ca83b849219a967c44659ae3c09299ccc3593f2fdbedc87f0",
         "crest/scripts/ensemble_material.py": "sha256:2a52c033bb0ca2f6f531444808098206f2d2f48d74670f5fc8f1c2c93138302a",
         "crest/scripts/ensemble_select.py": "sha256:6d891716c8e85e8eb4b0274739e55028883801ef0c38d1d5a7fb56d07785f752",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
         "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -2557,11 +2586,13 @@
         "python": ">=3.11",
         "packages": {
           "rdkit": ">=2025.9,<2027",
-          "numpy": ">=1.26,<3"
+          "numpy": ">=1.26,<3",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
-          "numpy"
+          "numpy",
+          "cclib"
         ]
       },
       "resources": {
@@ -2593,7 +2624,8 @@
         "crest/scripts/ensemble_cli.py": "sha256:b2593f171f107e9ca83b849219a967c44659ae3c09299ccc3593f2fdbedc87f0",
         "crest/scripts/ensemble_material.py": "sha256:2a52c033bb0ca2f6f531444808098206f2d2f48d74670f5fc8f1c2c93138302a",
         "crest/scripts/ensemble_select.py": "sha256:6d891716c8e85e8eb4b0274739e55028883801ef0c38d1d5a7fb56d07785f752",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
         "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -3245,7 +3277,7 @@
         "reaction-investigation/scripts/pathway_job.py": "sha256:39c00b9b9d273efa41abdbe2efd85dd0ec8d199527ebb50cf738bec62dd0dca7",
         "validation/scripts/check_common.py": "sha256:731ad2905f50457208fae4ddc4c5cf1e5e947b9c0fc0dea49a693e6b6d9f05c3",
         "validation/scripts/endpoint_identity.py": "sha256:33e533fa7200b6df00068dd6fe9742716c7f5ead78b944e4de66ec47e10145fe",
-        "validation/scripts/irc_check.py": "sha256:b349e9c185047e313ce3dcd03d0402e3c9c90e01566a892607af7a91135d6a2c",
+        "validation/scripts/irc_check.py": "sha256:231b15782fa4966a615acb0be28d63723962d0ff2c86afb23697e932cd0b8497",
         "validation/scripts/mode_check.py": "sha256:6cf321a29e995651a28ad5c5fdc3acac7f10d995d9a4faf236abf751390eddaf"
       },
       "module_paths": [
@@ -3298,11 +3330,13 @@
         "python": ">=3.11",
         "packages": {
           "rdkit": ">=2025.9,<2027",
-          "numpy": ">=1.26,<3"
+          "numpy": ">=1.26,<3",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
-          "numpy"
+          "numpy",
+          "cclib"
         ]
       },
       "resources": {
@@ -3339,7 +3373,8 @@
         "gaussian/scripts/electronic_cli.py": "sha256:9fac0a6b0ffae98c6fbe679d7a3f48c1d77c3f929113bda99e55a9d0060b8dbc",
         "gaussian/scripts/electronic_contract.py": "sha256:b109a3018f8321325dfe0d9ce343ab2f7d01d3f0818b1d9e41c9cf941225ffe1",
         "gaussian/scripts/electronic_parse.py": "sha256:592d033be20122f716b2d350f9230ac158a05b0b22f0e04129e99ce91491c260",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
         "gaussian/scripts/state_tracking.py": "sha256:d22ad0867715f2d0b8da4679eb276010932c7aeb44319e38d339f85b8e14d3cc",
         "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
@@ -3408,11 +3443,13 @@
         "python": ">=3.11",
         "packages": {
           "rdkit": ">=2025.9,<2027",
-          "numpy": ">=1.26,<3"
+          "numpy": ">=1.26,<3",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
-          "numpy"
+          "numpy",
+          "cclib"
         ]
       },
       "resources": {
@@ -3449,7 +3486,8 @@
         "gaussian/scripts/electronic_cli.py": "sha256:9fac0a6b0ffae98c6fbe679d7a3f48c1d77c3f929113bda99e55a9d0060b8dbc",
         "gaussian/scripts/electronic_contract.py": "sha256:b109a3018f8321325dfe0d9ce343ab2f7d01d3f0818b1d9e41c9cf941225ffe1",
         "gaussian/scripts/electronic_parse.py": "sha256:592d033be20122f716b2d350f9230ac158a05b0b22f0e04129e99ce91491c260",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
         "gaussian/scripts/state_tracking.py": "sha256:d22ad0867715f2d0b8da4679eb276010932c7aeb44319e38d339f85b8e14d3cc",
         "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
@@ -3519,11 +3557,13 @@
         "python": ">=3.11",
         "packages": {
           "rdkit": ">=2025.9,<2027",
-          "numpy": ">=1.26,<3"
+          "numpy": ">=1.26,<3",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
-          "numpy"
+          "numpy",
+          "cclib"
         ]
       },
       "resources": {
@@ -3560,7 +3600,8 @@
         "gaussian/scripts/electronic_cli.py": "sha256:9fac0a6b0ffae98c6fbe679d7a3f48c1d77c3f929113bda99e55a9d0060b8dbc",
         "gaussian/scripts/electronic_contract.py": "sha256:b109a3018f8321325dfe0d9ce343ab2f7d01d3f0818b1d9e41c9cf941225ffe1",
         "gaussian/scripts/electronic_parse.py": "sha256:592d033be20122f716b2d350f9230ac158a05b0b22f0e04129e99ce91491c260",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
         "gaussian/scripts/state_tracking.py": "sha256:d22ad0867715f2d0b8da4679eb276010932c7aeb44319e38d339f85b8e14d3cc",
         "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
@@ -3634,11 +3675,13 @@
         "python": ">=3.11",
         "packages": {
           "rdkit": ">=2025.9,<2027",
-          "numpy": ">=1.26,<3"
+          "numpy": ">=1.26,<3",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
-          "numpy"
+          "numpy",
+          "cclib"
         ]
       },
       "resources": {
@@ -3675,7 +3718,8 @@
         "gaussian/scripts/electronic_cli.py": "sha256:9fac0a6b0ffae98c6fbe679d7a3f48c1d77c3f929113bda99e55a9d0060b8dbc",
         "gaussian/scripts/electronic_contract.py": "sha256:b109a3018f8321325dfe0d9ce343ab2f7d01d3f0818b1d9e41c9cf941225ffe1",
         "gaussian/scripts/electronic_parse.py": "sha256:592d033be20122f716b2d350f9230ac158a05b0b22f0e04129e99ce91491c260",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
         "gaussian/scripts/state_tracking.py": "sha256:d22ad0867715f2d0b8da4679eb276010932c7aeb44319e38d339f85b8e14d3cc",
         "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
@@ -3750,11 +3794,13 @@
         "python": ">=3.11",
         "packages": {
           "rdkit": ">=2025.9,<2027",
-          "numpy": ">=1.26,<3"
+          "numpy": ">=1.26,<3",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
-          "numpy"
+          "numpy",
+          "cclib"
         ]
       },
       "resources": {
@@ -3797,7 +3843,8 @@
         "gaussian/scripts/electronic_cli.py": "sha256:9fac0a6b0ffae98c6fbe679d7a3f48c1d77c3f929113bda99e55a9d0060b8dbc",
         "gaussian/scripts/electronic_contract.py": "sha256:b109a3018f8321325dfe0d9ce343ab2f7d01d3f0818b1d9e41c9cf941225ffe1",
         "gaussian/scripts/electronic_parse.py": "sha256:592d033be20122f716b2d350f9230ac158a05b0b22f0e04129e99ce91491c260",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
         "gaussian/scripts/state_tracking.py": "sha256:d22ad0867715f2d0b8da4679eb276010932c7aeb44319e38d339f85b8e14d3cc",
         "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
@@ -3872,14 +3919,16 @@
           "rdkit": ">=2025.9,<2027",
           "numpy": ">=1.26,<3",
           "ase": "==3.29.0",
-          "scipy": ">=1.8.1,<2"
+          "scipy": ">=1.8.1,<2",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
           "numpy",
           "ase.mep",
           "ase.optimize",
-          "scipy"
+          "scipy",
+          "cclib"
         ]
       },
       "resources": {
@@ -3922,7 +3971,8 @@
         "gaussian/scripts/electronic_cli.py": "sha256:9fac0a6b0ffae98c6fbe679d7a3f48c1d77c3f929113bda99e55a9d0060b8dbc",
         "gaussian/scripts/electronic_contract.py": "sha256:b109a3018f8321325dfe0d9ce343ab2f7d01d3f0818b1d9e41c9cf941225ffe1",
         "gaussian/scripts/electronic_parse.py": "sha256:592d033be20122f716b2d350f9230ac158a05b0b22f0e04129e99ce91491c260",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
         "gaussian/scripts/state_tracking.py": "sha256:d22ad0867715f2d0b8da4679eb276010932c7aeb44319e38d339f85b8e14d3cc",
         "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
@@ -3997,14 +4047,16 @@
           "rdkit": ">=2025.9,<2027",
           "numpy": ">=1.26,<3",
           "ase": "==3.29.0",
-          "scipy": ">=1.8.1,<2"
+          "scipy": ">=1.8.1,<2",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
           "numpy",
           "ase.mep",
           "ase.optimize",
-          "scipy"
+          "scipy",
+          "cclib"
         ]
       },
       "resources": {
@@ -4047,7 +4099,8 @@
         "gaussian/scripts/electronic_cli.py": "sha256:9fac0a6b0ffae98c6fbe679d7a3f48c1d77c3f929113bda99e55a9d0060b8dbc",
         "gaussian/scripts/electronic_contract.py": "sha256:b109a3018f8321325dfe0d9ce343ab2f7d01d3f0818b1d9e41c9cf941225ffe1",
         "gaussian/scripts/electronic_parse.py": "sha256:592d033be20122f716b2d350f9230ac158a05b0b22f0e04129e99ce91491c260",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
         "gaussian/scripts/state_tracking.py": "sha256:d22ad0867715f2d0b8da4679eb276010932c7aeb44319e38d339f85b8e14d3cc",
         "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
@@ -4111,11 +4164,13 @@
         "python": ">=3.11",
         "packages": {
           "rdkit": ">=2025.9,<2027",
-          "numpy": ">=1.26,<3"
+          "numpy": ">=1.26,<3",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
-          "numpy"
+          "numpy",
+          "cclib"
         ]
       },
       "resources": {
@@ -4147,7 +4202,8 @@
         "crest/scripts/ensemble_cli.py": "sha256:b2593f171f107e9ca83b849219a967c44659ae3c09299ccc3593f2fdbedc87f0",
         "crest/scripts/ensemble_material.py": "sha256:2a52c033bb0ca2f6f531444808098206f2d2f48d74670f5fc8f1c2c93138302a",
         "crest/scripts/ensemble_select.py": "sha256:6d891716c8e85e8eb4b0274739e55028883801ef0c38d1d5a7fb56d07785f752",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
         "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -4217,13 +4273,15 @@
           "rdkit": ">=2025.9,<2027",
           "numpy": ">=1.26,<3",
           "matplotlib": ">=3.9,<4",
-          "pillow": ">=10,<13"
+          "pillow": ">=10,<13",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
           "numpy",
           "matplotlib",
-          "PIL.Image"
+          "PIL.Image",
+          "cclib"
         ]
       },
       "resources": {
@@ -4266,7 +4324,8 @@
         "energetics/scripts/kinetic_network.py": "sha256:c2926f3b31cf0197f206cf73cdf8df4d0f038af4adfcc1aa5b027eb0ea881c93",
         "energetics/scripts/kinetics.py": "sha256:4b5493f612c8ae27a72d5d770d48d42c9379c30bbdf7ed85b7a81429d8b24ea3",
         "energetics/scripts/thermochemistry.py": "sha256:ae3f849988f9baa1803ef35120274c5ddccfec239967e8f87fdd4a5684dd6550",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
         "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -4336,13 +4395,15 @@
           "rdkit": ">=2025.9,<2027",
           "numpy": ">=1.26,<3",
           "matplotlib": ">=3.9,<4",
-          "pillow": ">=10,<13"
+          "pillow": ">=10,<13",
+          "cclib": ">=1.8.1,<2"
         },
         "imports": [
           "rdkit.Chem",
           "numpy",
           "matplotlib",
-          "PIL.Image"
+          "PIL.Image",
+          "cclib"
         ]
       },
       "resources": {
@@ -4385,7 +4446,8 @@
         "energetics/scripts/kinetic_network.py": "sha256:c2926f3b31cf0197f206cf73cdf8df4d0f038af4adfcc1aa5b027eb0ea881c93",
         "energetics/scripts/kinetics.py": "sha256:4b5493f612c8ae27a72d5d770d48d42c9379c30bbdf7ed85b7a81429d8b24ea3",
         "energetics/scripts/thermochemistry.py": "sha256:ae3f849988f9baa1803ef35120274c5ddccfec239967e8f87fdd4a5684dd6550",
-        "gaussian/scripts/gaussian_io.py": "sha256:fa2fef9a6810c5a23681cacc4ecdd3b3e60192e201f661fb7ec3487620f3a112",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
         "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
         "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
         "material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
@@ -4526,6 +4588,195 @@
         "material-preparation/scripts/diagnostics",
         "material-preparation/scripts/tensor"
       ]
+    },
+    {
+      "id": "chemical.ts-connectivity-inputs",
+      "version": "1",
+      "skill": "validation",
+      "backend": "structure",
+      "runtime": "python",
+      "entry": "validation/scripts/connectivity.py",
+      "cli": "validation/scripts/connectivity_cli.py",
+      "argv": [
+        "{entry}",
+        "prepare",
+        "--material",
+        "{input:material}",
+        "--log",
+        "{input:log}",
+        "--coordinates",
+        "{input:coordinates}",
+        "--output-dir",
+        "results",
+        "{args}"
+      ],
+      "inputs": {
+        "material": "material.json",
+        "log": "ts.out",
+        "coordinates": "coordinates.json"
+      },
+      "outputs": [
+        {
+          "path": "results/connectivity_inputs.json",
+          "required": true,
+          "min_bytes": 2,
+          "media_type": "application/json"
+        },
+        {
+          "path": "results",
+          "recursive": true,
+          "required": true,
+          "min_bytes": 1
+        }
+      ],
+      "requirements": {
+        "python": ">=3.11",
+        "packages": {
+          "rdkit": ">=2025.9,<2027",
+          "numpy": ">=1.26,<3",
+          "cclib": ">=1.8.1,<2"
+        },
+        "imports": [
+          "rdkit.Chem",
+          "numpy",
+          "cclib"
+        ]
+      },
+      "resources": {
+        "_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
+        "_shared/gaussian_input.py": "sha256:8ec9fc695131f46e12699d57777e250cac90a5a3356b3ede704b0c688b66e50c",
+        "_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
+        "_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
+        "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
+        "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
+        "material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
+        "material-preparation/scripts/geometry/analysis.py": "sha256:014559e4f6cda4d5fd0d783ec2280c59ac69e2e6e561e45b3ce9389ad0717249",
+        "material-preparation/scripts/geometry/analysis_cli.py": "sha256:623fc520661bd7863cd0b7eb7d13545571c8a43977dbbfe7fe7efff24247e216",
+        "material-preparation/scripts/materials/analysis_material.py": "sha256:847e8b19a01646eac86b40e4541ca512a646904bd62427b241e85c6166595b3b",
+        "material-preparation/scripts/materials/material.py": "sha256:05574e99106e404f3b3a9dca3f700e14273bb6b92718613e667f7d8f603863ea",
+        "material-preparation/scripts/materials/material_cli.py": "sha256:2a943853166699daf6206211a08327444e9baf85167dbe38201ef55bbb6674ce",
+        "material-preparation/scripts/materials/name_resolution.py": "sha256:333821efd7e4c011be24460c043f0502a32995b40ba6029680841eca581267ca",
+        "material-preparation/scripts/reaction/cli.py": "sha256:22a4bda2795c61557d976ae85423d0dcc2eebf51354becadb7cd8d5cb0181d4b",
+        "material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
+        "material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
+        "material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
+        "material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
+        "validation/scripts/check_cli.py": "sha256:d63f373a84b29f8eff1e8042f926df559a7f31630cb631a6caadd8b9816a5b9b",
+        "validation/scripts/check_common.py": "sha256:731ad2905f50457208fae4ddc4c5cf1e5e947b9c0fc0dea49a693e6b6d9f05c3",
+        "validation/scripts/connectivity.py": "sha256:44931b72015186b7affc461f7ef721fe8d94e952c933aa6329ddd2ac0748ab3b",
+        "validation/scripts/connectivity_cli.py": "sha256:6e8e2111aee48e520807f42af67f65720ccc628b13c725f039b1e71cd588dcc2",
+        "validation/scripts/endpoint_identity.py": "sha256:33e533fa7200b6df00068dd6fe9742716c7f5ead78b944e4de66ec47e10145fe",
+        "validation/scripts/evidence_check.py": "sha256:769a9eebfe49ba81115d54eb03e8b6b40584410704c46430eaf24ebe74d7efff",
+        "validation/scripts/gaussian_evidence.py": "sha256:b397a794e27e530358ae3c017cfeddc92a152bb80ba63ceabb0e6da6a02c1465",
+        "validation/scripts/irc_check.py": "sha256:231b15782fa4966a615acb0be28d63723962d0ff2c86afb23697e932cd0b8497",
+        "validation/scripts/mode_check.py": "sha256:6cf321a29e995651a28ad5c5fdc3acac7f10d995d9a4faf236abf751390eddaf"
+      },
+      "module_paths": [
+        "_shared",
+        "material-preparation/scripts/materials",
+        "material-preparation/scripts/reaction",
+        "material-preparation/scripts/geometry",
+        "material-preparation/scripts/diagnostics",
+        "material-preparation/scripts/tensor"
+      ]
+    },
+    {
+      "id": "chemical.displacement-check",
+      "version": "1",
+      "skill": "validation",
+      "backend": "structure",
+      "runtime": "python",
+      "entry": "validation/scripts/connectivity.py",
+      "cli": "validation/scripts/connectivity_cli.py",
+      "argv": [
+        "{entry}",
+        "check",
+        "--material",
+        "{input:material}",
+        "--evidence",
+        "{input:evidence}",
+        "--coordinates",
+        "{input:coordinates}",
+        "--study",
+        "{input:study}",
+        "--reactant",
+        "{input:reactant}",
+        "--product",
+        "{input:product}",
+        "--output",
+        "results/result.json",
+        "{args}"
+      ],
+      "inputs": {
+        "material": "material.json",
+        "evidence": "evidence.json",
+        "coordinates": "coordinates.json",
+        "study": "study.json",
+        "reactant": "reactant.json",
+        "product": "product.json"
+      },
+      "outputs": [
+        {
+          "path": "results/result.json",
+          "required": true,
+          "min_bytes": 2,
+          "media_type": "application/json"
+        }
+      ],
+      "requirements": {
+        "python": ">=3.11",
+        "packages": {
+          "rdkit": ">=2025.9,<2027",
+          "numpy": ">=1.26,<3",
+          "cclib": ">=1.8.1,<2"
+        },
+        "imports": [
+          "rdkit.Chem",
+          "numpy",
+          "cclib"
+        ]
+      },
+      "resources": {
+        "_shared/chemical_identity.py": "sha256:14160579cc59849209b7a4424accd460aeb051e42df6c5097d2eadcc9a74f6c0",
+        "_shared/gaussian_input.py": "sha256:8ec9fc695131f46e12699d57777e250cac90a5a3356b3ede704b0c688b66e50c",
+        "_shared/geometry_safety.py": "sha256:485c451157b91dff118a690e9af7bfb9ab106a01483b0d2a4dd57b0342f6ee22",
+        "_shared/xyz.py": "sha256:40144fd8c30dac3b650a89064b49821f22a90e06f2063e5e27f1a49e3df7b1a9",
+        "gaussian/scripts/gaussian_cclib.py": "sha256:796d082809ee5e12f238d563aab9e252e60359af03a26fb99a4413740e3f1256",
+        "gaussian/scripts/gaussian_io.py": "sha256:2ecf48eb9446a57a4735985ec663fef131cd05efd4e0fa1e9005347431bf1fad",
+        "material-preparation/scripts/diagnostics/diagnostics_cli.py": "sha256:4a955b9ea8268f7f768d909c5215dcc609989d07beb66ee5867c467356850e9f",
+        "material-preparation/scripts/diagnostics/diagnostics_job.py": "sha256:432bd164afd4e12b570ca50ab4c6c8662e54afeb3fc11fe60e6b8490e4e29159",
+        "material-preparation/scripts/diagnostics/local_diagnostics.py": "sha256:e2b3c721b022060b548e0581594763148cf08fb265fcd92f50e207395301c7b2",
+        "material-preparation/scripts/geometry/analysis.py": "sha256:014559e4f6cda4d5fd0d783ec2280c59ac69e2e6e561e45b3ce9389ad0717249",
+        "material-preparation/scripts/geometry/analysis_cli.py": "sha256:623fc520661bd7863cd0b7eb7d13545571c8a43977dbbfe7fe7efff24247e216",
+        "material-preparation/scripts/materials/analysis_material.py": "sha256:847e8b19a01646eac86b40e4541ca512a646904bd62427b241e85c6166595b3b",
+        "material-preparation/scripts/materials/material.py": "sha256:05574e99106e404f3b3a9dca3f700e14273bb6b92718613e667f7d8f603863ea",
+        "material-preparation/scripts/materials/material_cli.py": "sha256:2a943853166699daf6206211a08327444e9baf85167dbe38201ef55bbb6674ce",
+        "material-preparation/scripts/materials/name_resolution.py": "sha256:333821efd7e4c011be24460c043f0502a32995b40ba6029680841eca581267ca",
+        "material-preparation/scripts/reaction/cli.py": "sha256:22a4bda2795c61557d976ae85423d0dcc2eebf51354becadb7cd8d5cb0181d4b",
+        "material-preparation/scripts/reaction/conformers.py": "sha256:a41eb92e478f57aefe34557e3898decc293847e148f59ca4f9e893ec13a7d8f0",
+        "material-preparation/scripts/reaction/correspondence.py": "sha256:db52da74e8dc54fb00baaf6b326928596427039bcd0f9e235440981089d0594b",
+        "material-preparation/scripts/reaction/prepare.py": "sha256:542858638fe0d130a85f8dfcbcb6def8ae1661daa089436fa984ade51552a5ff",
+        "material-preparation/scripts/tensor/tensor_order.py": "sha256:dd0ba1535a28cb8f4afc7178122ec074206c78a297db07f608830a21b14d058b",
+        "validation/scripts/check_cli.py": "sha256:d63f373a84b29f8eff1e8042f926df559a7f31630cb631a6caadd8b9816a5b9b",
+        "validation/scripts/check_common.py": "sha256:731ad2905f50457208fae4ddc4c5cf1e5e947b9c0fc0dea49a693e6b6d9f05c3",
+        "validation/scripts/connectivity.py": "sha256:44931b72015186b7affc461f7ef721fe8d94e952c933aa6329ddd2ac0748ab3b",
+        "validation/scripts/connectivity_cli.py": "sha256:6e8e2111aee48e520807f42af67f65720ccc628b13c725f039b1e71cd588dcc2",
+        "validation/scripts/endpoint_identity.py": "sha256:33e533fa7200b6df00068dd6fe9742716c7f5ead78b944e4de66ec47e10145fe",
+        "validation/scripts/evidence_check.py": "sha256:769a9eebfe49ba81115d54eb03e8b6b40584410704c46430eaf24ebe74d7efff",
+        "validation/scripts/gaussian_evidence.py": "sha256:b397a794e27e530358ae3c017cfeddc92a152bb80ba63ceabb0e6da6a02c1465",
+        "validation/scripts/irc_check.py": "sha256:231b15782fa4966a615acb0be28d63723962d0ff2c86afb23697e932cd0b8497",
+        "validation/scripts/mode_check.py": "sha256:6cf321a29e995651a28ad5c5fdc3acac7f10d995d9a4faf236abf751390eddaf"
+      },
+      "module_paths": [
+        "_shared",
+        "material-preparation/scripts/materials",
+        "material-preparation/scripts/reaction",
+        "material-preparation/scripts/geometry",
+        "material-preparation/scripts/diagnostics",
+        "material-preparation/scripts/tensor"
+      ]
     }
   ],
   "validators": [
@@ -4533,7 +4784,7 @@
       "id": "chemical.gaussian_frequency",
       "version": "1",
       "entry": "validation/scripts/gaussian_frequency.py",
-      "sha256": "sha256:001939152b62ebce91d66e915e3d7b96ca9f23afe0edab5890eeaf23dde31c03",
+      "sha256": "sha256:9595b426dcf0e5fdc0af0009343b6063d90c7c9c42931229087d6a8d1e08f903",
       "backend": "validation",
       "requirements": {
         "python": ">=3.11"

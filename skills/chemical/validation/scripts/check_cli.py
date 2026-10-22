@@ -24,6 +24,7 @@ def parse_arguments(argv=None):
             command.add_argument('--coordinates', type=Path, required=True)
             command.add_argument('--step', type=float, default=.05, help='Normalized Cartesian displacement length in angstrom')
         if name == 'irc':
+            command.add_argument('--policy', choices=['strict', 'endpoint_relaxation'], default='strict')
             command.add_argument('--forward', type=Path, required=True)
             command.add_argument('--reverse', type=Path, required=True)
             command.add_argument('--reactant', type=Path, required=True)

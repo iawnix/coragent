@@ -9,6 +9,7 @@ from gaussian_io import parse_log, parse_irc_log, write_irc_parse_artifacts, wri
 from science import digest, write_json, new_result, finish
 from geometry_safety import assess_gaussian_input, require_safe
 from gaussian_input import inspect_qst_structures
+from gaussian_binding import inspect_binding, check_output_origin
 
 
 def local_reference(value):
@@ -61,6 +62,10 @@ def inspect_input(path, method, basis, charge, multiplicity, threads, memory_mb)
         for ref in re.findall(r'(?m)^\s*@([^\s]+)\s*$', section): references.add(local_reference(ref))
         if re.search(r'\b(external|include)\s*=', route, re.I):
             raise ValueError('external executable and route include directives are unsupported')
+        if re.search(r'\birc\b', route, re.I):
+            size = re.search(r'\bstepsize\s*=\s*([^,\s)]+)', route, re.I)
+            if size and (not re.fullmatch(r'-?[1-9]\d*', size[1])):
+                raise ValueError('Gaussian IRC StepSize must be a nonzero integer; fractional values such as 0.5 are invalid')
     geometry_reports = assess_gaussian_input(text, profile='ts_candidate')
     for report in geometry_reports:
         require_safe(report)
@@ -72,6 +77,9 @@ def inspect_input(path, method, basis, charge, multiplicity, threads, memory_mb)
 def run_input(args):
     source = Path(args.input_gjf).resolve()
     checked = inspect_input(source, args.method, args.basis, args.charge, args.multiplicity, args.threads, args.memory_mb)
+    binding = inspect_binding(source, args.method, args.basis, args.charge, args.multiplicity)
+    if binding:
+        checked['references'] = sorted(set(checked['references']) | {binding['dependency']})
     out = Path(args.output_dir).resolve(); out.mkdir(parents=True, exist_ok=True)
     if any(out.iterdir()): raise ValueError('output directory must be empty')
     shutil.copyfile(source, out/'input.gjf')
@@ -97,22 +105,36 @@ def run_input(args):
         write_json(out/'parsed.json', parsed)
         result['parsing']['status'] = 'completed'
         summary = parsed['summary']; result['normal_termination'] = summary['normal_termination'] and not summary['error_termination']
+        result['source_binding'] = check_output_origin(binding, out/'gaussian.out') if binding else {
+            'status': 'not_assessed', 'reason': 'generic_input_without_ts_binding'}
         result['last_attempt'] = {'summary': summary, 'geometry': None}
         if parsed['atoms']:
             write_xyz(out/'last_geometry.xyz', parsed['atoms'], 'Last Gaussian geometry; see parsed.json for completion')
             result['last_attempt']['geometry'] = 'last_geometry.xyz'
+        # Retain accepted IRC points even when the following corrector fails.
+        if args.validation == 'irc':
+            try:
+                irc = parse_irc_log(out/'gaussian.out')
+                write_irc_parse_artifacts(irc, out, 'gaussian', 'gaussian.out')
+                result['irc'] = irc['summary']
+            except ValueError as exc:
+                result['irc'] = {'scientific_validation': 'not_assessed', 'parsing_error': str(exc)}
         if process.returncode or not result['normal_termination']:
             result['execution_status'] = 'failed'
             stage = 'execution'
             raise ValueError('Gaussian execution did not finish normally')
         stage = 'checks'
+        if binding and result['source_binding']['status'] != 'verified':
+            raise ValueError('Gaussian output origin differs from the bound TS/probe input')
+        if summary.get('numerical_parser', {}).get('status') == 'conflict':
+            raise ValueError('Gaussian numerical parsers disagree; review source before recalculating')
         if not summary['route_expectation'].get('matched'):
             raise ValueError('Gaussian route readback differs from the supplied input')
         result['energy_evidence'] = summary['energy_evidence']
         if parsed['atoms']: write_xyz(out/'geometry.xyz', parsed['atoms'], 'Gaussian final geometry')
         energy = require_supported_energy(summary)
         result['steps'].append({'task': args.validation, 'energy_hartree': energy, 'summary': summary})
-        if args.validation in {'opt', 'saddle'} and not summary['optimization_completed']:
+        if args.validation in {'opt', 'minimum', 'saddle'} and not summary['optimization_completed']:
             raise ValueError('missing converged stationary point evidence')
         if args.validation in {'frequency', 'minimum', 'saddle'}:
             if not summary['frequency_count']: raise ValueError('missing final frequency evidence')
@@ -120,11 +142,8 @@ def run_input(args):
             if expected is not None and summary['imaginary_frequency_count'] != expected:
                 raise ValueError(f'expected {expected} imaginary frequencies')
         if args.validation == 'irc':
-            stage = 'parsing'
-            irc = parse_irc_log(out/'gaussian.out'); write_irc_parse_artifacts(irc, out, 'gaussian', 'gaussian.out')
             stage = 'checks'
-            result['irc'] = irc['summary']
-            if not irc['points'] or not irc['atoms']: raise ValueError('IRC path/endpoint evidence missing')
+            if result['irc'].get('parsing_error'): raise ValueError('IRC path/endpoint evidence missing')
         # Numeric checks do not establish mode direction, basin identity or a mechanism.
         result['limitations'] = ['Inspect mode vectors, route readback and endpoint identities before scientific claims. Normal termination alone is not validation.']
         result['check_status'] = 'satisfied'

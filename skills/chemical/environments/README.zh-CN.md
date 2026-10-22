@@ -71,3 +71,5 @@ path.lock，提供 RDKit/NumPy、ASE、SciPy，供扫描、梯度与 ASE NEB v2�
 `command = "/opt/xtb/bin/xtb"`（需要时加 activation_script），再选择
 `--job-profile local:path`。该 profile 不默认进行原生科学计算冒烟测试；
 选定入口的环境检查与显式有界科学 Job 需要分别验收。
+
+Gaussian 数值解析还使用固定版本 cclib 1.8.1：wrapper、structure、path 配套的 `.requirements.txt` 包含锁定哈希的依赖；wrapper/structure 补充 SciPy。更新需创建新的不可变环境，不能直接覆盖正在运行的环境。cclib 只提取数值，不决定优化阶段、IRC 完整性或化学连通性。

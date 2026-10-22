@@ -1,0 +1,3 @@
+# Pinned cclib numerical parsing dependencies; installed with --no-deps.
+cclib==1.8.1 --hash=sha256:ac86cc5f013b7173c5bc62bfae0637ac83ad34de1ed57a1c7c7fb7b3e512c92f
+periodictable==2.1.0 --hash=sha256:e9155d2bf5ac10050abeff2f99096d4f04312c0c8a6bb432e28744367c5064b3

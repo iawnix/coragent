@@ -40,3 +40,5 @@ Read [transition-state validation](references/transition_state_validation.md), [
 - [gaussian validation](references/gaussian_validation.md)
 - [general checks](references/general_checks.md)
 - [irc preparation](references/irc_preparation.md)
+
+Use [source-bound TS probes and short IRC](references/ts_connectivity.md) for staged connectivity assessment. Report displacement support, short IRC plus endpoint relaxation, and complete IRC separately.

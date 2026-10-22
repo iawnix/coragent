@@ -358,7 +358,7 @@ def test_gaussian_irc_adapter_retains_coordinate_points_and_missing_basin_eviden
     assert irc_check(m, e, [parsed, paths[1]], targets)['verdict'] == 'pass'
 
 
-@pytest.mark.parametrize('executor', ['chemical.stationary-check', 'chemical.mode-check', 'chemical.irc-check', 'chemical.gaussian-evidence'])
+@pytest.mark.parametrize('executor', ['chemical.stationary-check', 'chemical.mode-check', 'chemical.irc-check', 'chemical.gaussian-evidence', 'chemical.ts-connectivity-inputs', 'chemical.displacement-check'])
 def test_independent_checks_execute_and_collect_through_real_jobs(tmp_path, executor):
     from research_agent.application.api import execute
     from research_agent.application.executors import prepare
@@ -373,7 +373,11 @@ def test_independent_checks_execute_and_collect_through_real_jobs(tmp_path, exec
     e['material_sha256'] = disk['sha256']
     for p in paths: p['material_sha256'] = disk['sha256']
     payloads = {'evidence': e}
-    if executor == 'chemical.mode-check': payloads['coordinates'] = coordinates()
+    if executor in {'chemical.mode-check', 'chemical.ts-connectivity-inputs', 'chemical.displacement-check'}: payloads['coordinates'] = coordinates()
+    if executor == 'chemical.displacement-check':
+        payloads.update(study=displacement_study(disk, e, paths), reactant=targets[0]['value'], product=targets[1]['value'])
+    if executor == 'chemical.ts-connectivity-inputs':
+        payloads.pop('evidence'); payloads['log'] = None
     if executor == 'chemical.irc-check': payloads.update(forward=paths[0], reverse=paths[1], reactant=targets[0]['value'], product=targets[1]['value'])
     inputs = {'material': source}
     for role, value in payloads.items():
@@ -381,6 +385,7 @@ def test_independent_checks_execute_and_collect_through_real_jobs(tmp_path, exec
     args = []
     if executor == 'chemical.gaussian-evidence':
         inputs['evidence'].write_text(gaussian_log()); args = ['--constraints', 'none']
+    if executor == 'chemical.ts-connectivity-inputs': inputs['log'].write_text(gaussian_log())
     prepared = prepare(Path(os.environ['CORAGENT_JOB_CONFIG']), 'local', executor, '1', inputs, args)
     job = execute('job_start', root, {**prepared, 'node_id': node['id']})
     try:
@@ -390,8 +395,144 @@ def test_independent_checks_execute_and_collect_through_real_jobs(tmp_path, exec
             time.sleep(.01)
         assert status['state'] == 'succeeded'
         assert execute('job_collect', root, {'job_id': job['job_id']})['output_validation']['complete']
-        result = json.loads((Path(job['cwd']) / 'results/result.json').read_text())
-        if executor == 'chemical.gaussian-evidence': assert result['schema_version'] == 'chemical-stationary-evidence/1'
+        output = 'connectivity_inputs.json' if executor == 'chemical.ts-connectivity-inputs' else 'result.json'
+        result = json.loads((Path(job['cwd']) / 'results' / output).read_text())
+        if executor == 'chemical.ts-connectivity-inputs': assert len(result['inputs']) == 6
+        elif executor == 'chemical.gaussian-evidence': assert result['schema_version'] == 'chemical-stationary-evidence/1'
         else: assert result['verdict'] == 'pass'
     finally:
         execute('job_cancel', root, {'job_id': job['job_id']})
+
+
+def test_short_irc_requires_endpoint_optimization_and_keeps_strict_policy():
+    m, e, paths, targets = study()
+    for p in paths:
+        p['max_points_reached'] = True
+        p['points'][-1]['coordinates'][1][0] += .03
+        p['endpoint']['minimum_evidence']['optimization']['start_coordinates'] = copy.deepcopy(p['points'][-1]['coordinates'])
+    result = irc_check(m, e, paths, targets, policy='endpoint_relaxation')
+    assert result['verdict'] == 'pass'
+    assert result['evidence_level'] == 'short_irc_with_endpoint_optimization'
+    assert not result['full_irc_complete']
+    assert irc_check(m, e, paths, targets)['verdict'] == 'fail'
+    paths[0]['endpoint']['minimum_evidence']['optimization']['start_coordinates'][1][0] += .05
+    assert irc_check(m, e, paths, targets, policy='endpoint_relaxation')['verdict'] == 'fail'
+    paths[0]['endpoint']['minimum_evidence']['optimization'].pop('start_coordinates')
+    assert irc_check(m, e, paths, targets, policy='endpoint_relaxation')['verdict'] != 'pass'
+
+
+def test_standalone_restart_cannot_certify_origin():
+    m, e, paths, targets = study()
+    paths[0]['restart_segment'] = True
+    assert irc_check(m, e, paths, targets)['verdict'] == 'fail'
+
+
+def displacement_study(m, e, paths):
+    from connectivity import probe_geometries
+    branches = []
+    for a in [.05, .1]:
+        geometries, _ = probe_geometries(m, e, coordinates(), a)
+        for i, sign in enumerate(['plus', 'minus']):
+            endpoint = copy.deepcopy(paths[i]['endpoint'])
+            endpoint['minimum_evidence']['optimization']['start_coordinates'] = geometries[sign].tolist()
+            branches.append({'direction': sign, 'amplitude_angstrom': a, 'endpoint': endpoint})
+    return {'schema_version': 'chemical-displacement-study/1', 'branches': branches}
+
+
+def test_displacement_basin_support_requires_bound_consistent_both_sides():
+    from connectivity import displacement_check
+    m, e, paths, targets = study()
+    doc = displacement_study(m, e, paths)
+    result = displacement_check(m, e, coordinates(), doc, targets)
+    assert result['verdict'] == 'pass'
+    assert result['evidence_level'] == 'mode_displacement_endpoint_support'
+    assert result['amplitude_sensitivity_assessed'] and not result['full_irc_complete']
+    wrong = copy.deepcopy(doc)
+    wrong['branches'][0]['endpoint']['minimum_evidence']['optimization']['start_coordinates'][1][0] += .01
+    assert displacement_check(m, e, coordinates(), wrong, targets)['verdict'] == 'fail'
+    for branch in doc['branches']:
+        start = branch['endpoint']['minimum_evidence']['optimization']['start_coordinates']
+        branch['endpoint'] = copy.deepcopy(paths[0]['endpoint'])
+        branch['endpoint']['minimum_evidence']['optimization']['start_coordinates'] = start
+    assert displacement_check(m, e, coordinates(), doc, targets)['verdict'] == 'inconclusive'
+
+
+def test_prepared_connectivity_inputs_bind_source_mode_and_checkpoint(tmp_path):
+    from connectivity import prepare_inputs
+    from gaussian_binding import inspect_binding
+    from input_job import inspect_input
+    m, e, _, _ = study()
+    result = prepare_inputs(m, e, coordinates(), tmp_path / 'prepared')
+    assert len(result['inputs']) == 6
+    for row in result['inputs']:
+        file = tmp_path / 'prepared' / row['path']
+        checked = inspect_input(file, 'hf', 'sto-3g', 0, 2, 1, 2000)
+        assert checked['checkpoints'] == [row['checkpoint']]
+        assert row['collect'] == ['results/' + row['checkpoint']]
+        assert inspect_binding(file, 'hf', 'sto-3g', 0, 2)['input'] == row
+        if row['kind'] == 'mode_displacement':
+            assert np.max(np.linalg.norm(np.array(row['start_coordinates']) - m['coordinates'], axis=1)) == pytest.approx(row['amplitude_angstrom'])
+        else:
+            assert 'MaxPoints=20' in file.read_text()
+            assert row['start_coordinates'] == m['coordinates'].tolist()
+    file.write_text(file.read_text().replace('StepSize=5', 'StepSize=10'))
+    with pytest.raises(ValueError, match='differs from the source-bound'):
+        inspect_binding(file, 'hf', 'sto-3g', 0, 2)
+    e['coordinates'][1][0] += .1
+    with pytest.raises(ValueError, match='Source must pass'):
+        prepare_inputs(m, e, coordinates(), tmp_path / 'seed')
+
+
+def test_later_geometry_cannot_reuse_old_normal_modes(tmp_path):
+    m = material(); log = tmp_path / 'calc.log'
+    text = gaussian_log() + ' SCF Done: E(UHF) = -1.1 A.U.\n'
+    log.write_text(text)
+    e = gaussian_evidence(m, log, constraints='none')
+    assert e['normal_modes'] is None
+    assert mode_check(m, e, coordinates())['verdict'] != 'pass'
+
+
+def test_free_text_constraints_removed_title_does_not_claim_active_constraints(tmp_path):
+    m = material(); log = tmp_path / 'calc.log'
+    log.write_text(gaussian_log().replace(' Charge =', ' All constraints removed after preoptimization\n Charge ='))
+    assert stationary(m, gaussian_evidence(m, log, constraints='none'))['verdict'] == 'pass'
+    log.write_text(gaussian_log() + ' ! R1 R(1,2) 2.0 Frozen !\n')
+    assert stationary(m, gaussian_evidence(m, log, constraints='none'))['scientific_verdict'] == 'not_assessed'
+
+
+def test_source_binding_rejects_modified_bundle_and_wrong_output_origin(tmp_path):
+    from connectivity import prepare_inputs
+    from gaussian_binding import inspect_binding, check_output_origin
+    from tests.unit.test_chemical_path_execution import orientation
+    m, e, _, _ = study()
+    root = tmp_path / 'prepared'
+    result = prepare_inputs(m, e, coordinates(), root)
+    file = root / next(r['path'] for r in result['inputs'] if r['kind'] == 'irc')
+    bound = inspect_binding(file, 'hf', 'sto-3g', 0, 2)
+    log = tmp_path / 'output.log'
+    # Proper rigid rotation and translation do not change atom identity.
+    xyz = m['coordinates'][:, [1, 0, 2]] + 2
+    log.write_text(orientation([('H', *v) for v in xyz]))
+    assert check_output_origin(bound, log)['status'] == 'verified'
+    xyz[1, 0] += .1
+    log.write_text(orientation([('H', *v) for v in xyz]))
+    assert check_output_origin(bound, log)['status'] == 'mismatch'
+    source = root / 'ts_source.json'
+    bundle = json.loads(source.read_text()); bundle['source_kind'] = 'initial_guess'
+    source.write_text(json.dumps(bundle))
+    with pytest.raises(ValueError, match='digest mismatch'):
+        inspect_binding(file, 'hf', 'sto-3g', 0, 2)
+
+
+def test_amplitude_dependent_assignment_stays_inconclusive():
+    from connectivity import displacement_check
+    m, e, paths, targets = study()
+    doc = displacement_study(m, e, paths)
+    for i in [2, 3]:
+        start = doc['branches'][i]['endpoint']['minimum_evidence']['optimization']['start_coordinates']
+        doc['branches'][i]['endpoint'] = copy.deepcopy(paths[1-(i % 2)]['endpoint'])
+        doc['branches'][i]['endpoint']['minimum_evidence']['optimization']['start_coordinates'] = start
+    result = displacement_check(m, e, coordinates(), doc, targets)
+    assert result['checks']['opposite_basins']['verdict'] == 'pass'
+    assert result['checks']['amplitude_consistency']['verdict'] == 'inconclusive'
+    assert result['verdict'] == 'inconclusive'
