@@ -1260,7 +1260,8 @@ def _validate_job_config(parsed: dict[str, object]) -> dict:
 def verify_job_bindings(args, installed, backend_configs):
     """Probe with the installed control runtime, after extension installation."""
     if getattr(args, '_prepared_job_plan', None) is not None:
-        _job_install.verify_publication(args._prepared_job_plan, installed['runtime']['python_executable'])
+        _job_install.verify_publication(args._prepared_job_plan, installed['runtime']['python_executable'],
+                                        timeout=args.job_check_timeout)
         return
     job = backend_configs.get("job", {})
     if job.get("status") == "not_configured":

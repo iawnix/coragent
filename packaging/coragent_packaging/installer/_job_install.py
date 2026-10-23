@@ -426,7 +426,7 @@ def publish(value):
             'name_resolver': {'status': 'configured' if value['resolver'] else 'not_configured', 'path': str(layout.resolver_config)}}
 
 
-def verify_publication(value, python):
+def verify_publication(value, python, *, timeout):
     if value['settings'] is None:
         return
     root = Path(value['install_root'])
@@ -439,7 +439,7 @@ def verify_publication(value, python):
     report = stage / 'published-readiness.json'
     command = [python, '-B', str(package / 'packaging/coragent_packaging/installer/_job_acceptance.py'), '--config', str(app_paths(root).job_config),
                '--package-root', str(package), '--directory', str(stage / 'published-jobs'), '--report', str(report),
-               '--targets', json.dumps(targets), '--bindings-only']
+               '--targets', json.dumps(targets), '--timeout', str(timeout), '--bindings-only']
     result = subprocess.run(command, text=True, capture_output=True, env=acceptance_environment(package, python))
     write_private(stage / 'published-acceptance.log', (result.stdout + '\n' + result.stderr).encode())
     if result.returncode:

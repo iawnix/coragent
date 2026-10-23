@@ -199,10 +199,36 @@ def test_candidate_and_published_config_work_inside_real_jobs(tmp_path):
     assert len(report['targets']['local/main']['jobs']) == 2
     assert report['external_services'] == 'not_checked'
     jobs.publish(plan)
-    jobs.verify_publication(plan, sys.executable)
+    jobs.verify_publication(plan, sys.executable, timeout=args.job_check_timeout)
     record = json.loads((app_paths(Path(args.install_root)).state/jobs.RECORD).read_text())
     result = record['publication']
     assert result['targets']['local/main']['status'] == 'execution_verified', result
+
+
+@pytest.mark.parametrize('timeout', [37, 300])
+def test_candidate_and_publication_acceptance_share_operator_timeout(tmp_path, monkeypatch, timeout):
+    config = tmp_path / 'job.toml'
+    config.write_bytes(jobs.toml_bytes({'execution': execution_config('local', {'local': {
+        'transport': 'local', 'executor': 'qrun', 'work_root': str(tmp_path / 'jobs'),
+        'bindings': {'shell': {'command': '/bin/sh'}}}})}))
+    args = options(tmp_path, '--job-config', str(config), '--job-check-timeout', str(timeout))
+    app_paths(args.install_root).initialize()
+    calls = []
+    def run(command, **kwargs):
+        calls.append(command)
+        assert Path(command[2]).name == '_job_acceptance.py'
+        assert command[command.index('--timeout') + 1] == str(timeout)
+        report = Path(command[command.index('--report') + 1])
+        report.write_text(json.dumps({'schema_version': 'coragent-job-readiness/1',
+            'targets': {'local/main': {'status': 'environment_verified'}}}))
+        return subprocess.CompletedProcess(command, 0, '', '')
+    monkeypatch.setattr(subprocess, 'run', run)
+    args._prepared_job_plan = jobs.prepare(jobs.plan(args), args, ROOT, sys.executable)
+    backend_configs = jobs.publish(args._prepared_job_plan)
+    wizard.verify_job_bindings(args, {'runtime': {'python_executable': sys.executable}}, backend_configs)
+    assert len(calls) == 2
+    assert '--bindings-only' not in calls[0]
+    assert '--bindings-only' in calls[1]
 
 
 def test_execution_publication_preserves_secret_references_and_ignores_generated_edits(tmp_path, monkeypatch):
