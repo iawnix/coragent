@@ -28,7 +28,7 @@ evidence becomes an `research note`. Conflicting assignments are also an
 research note with both source refs. research notes inform, but do not automatically
 change, research Node state or hypothesis status.
 
-Record the observations, scientific criteria, unresolved questions and next steps with research_update using the existing node_id and a note. Publish a reusable conclusion with research_result, citing collected materials and stating limitations. A completed computation does not establish a scientific conclusion.
+Use the existing node_id. Record observations, scientific criteria and next-step decisions in a research_update note, or publish a reusable conclusion with research_result, citing collected materials and limitations. Do not duplicate the same finding in both records or task progress. A completed computation does not establish a scientific conclusion or require a new Node or Result.
 
 An optimized IRC endpoint need not recover a selected Cartesian conformer. Compare
 chemical graph/state/stereo before conformer similarity, and compare separated

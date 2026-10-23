@@ -80,7 +80,9 @@
     "packaging/coragent_packaging/installer/_install_relay.py",
     "contracts/monitor/jobs/binding.schema.json",
     "contracts/monitor/jobs/event.schema.json",
-    "backend/src/research_agent/application/monitor_contracts.json"
+    "backend/src/research_agent/application/monitor_contracts.json",
+    "contracts/monitor/jobs/limits.json",
+    "backend/src/research_agent/application/monitor_limits.json"
   ],
   "generated": [
     "python-dist/*.whl"

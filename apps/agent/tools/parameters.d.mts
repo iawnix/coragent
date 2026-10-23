@@ -3,7 +3,7 @@ export interface ToolParameters {
   research_read: {
     "root"?: string;
     "ref"?: string;
-    "field"?: "goal" | "title" | "proposal" | "plan" | "progress" | "status" | "assessment_ref" | "relations" | "subjects";
+    "field"?: "goal" | "title" | "plan" | "status" | "assessment_ref" | "relations" | "subjects";
     "offset"?: number;
     "limit"?: number;
   };
@@ -21,7 +21,6 @@ export interface ToolParameters {
     "root"?: string;
     "goal": string;
     "title"?: string;
-    "proposal"?: string;
     "plan"?: string;
     "source_refs"?: Array<string>;
     "source_submission_ids"?: Array<string>;
@@ -37,9 +36,7 @@ export interface ToolParameters {
     "root"?: string;
     "node_id": string;
     "note": string;
-    "proposal"?: string;
     "plan"?: string;
-    "progress"?: string;
     "status"?: "open" | "paused" | "closed";
     "add_relations"?: Array<{
       "kind": "part_of" | "requires" | "alternative_to";
@@ -68,7 +65,6 @@ export interface ToolParameters {
     "as_assessment"?: boolean;
     "subjects"?: Record<string, string>;
     "check_refs"?: Array<string>;
-    "progress"?: string;
   };
   job_start: {
     "node_id": string;
@@ -172,7 +168,6 @@ export interface ToolParameters {
       "id": string;
       "description": string;
     }>;
-    "initial_plan": string;
     "next_action": string;
     "execution_target"?: {
       "platform": string;

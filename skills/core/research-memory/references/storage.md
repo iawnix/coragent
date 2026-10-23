@@ -1,6 +1,6 @@
 # Storage and recovery
 
-The workspace manifest uses `research_workspace/3`. Original requests, authored changes and execution observations have distinct sources. The unified Python namespace is `research_agent.research`; there is no parallel state or global-progress protocol.
+The workspace manifest uses `research_workspace/3`, Nodes use `research-node/2`, and user Tasks use `coragent-user-task/6`. Deploy matching runtime, schemas and Skills together; there are no compatibility aliases or parallel readers for earlier Node/Task formats. Node `plan` holds hypotheses and the current investigation; notes preserve its history. Task retains objective, criteria, next action, execution plan and control without another scientific plan. Original requests, authored changes and execution observations have distinct sources. The unified Python namespace is `research_agent.research`; there is no parallel state or global-progress protocol.
 
 Research Nodes have stable IDs and work directories under `research/nodes/<node_id>/`. Immutable Results preserve the Node revision and actual evidence they refer to. Records retain changes; indexes, reverse links, workspace/Node Markdown and bounded retrieval are rebuildable views. Change relationships without moving Node directories.
 

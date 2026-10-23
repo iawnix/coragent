@@ -12,9 +12,9 @@ Use this Skill before starting or resuming sustained research, changing its exec
 ## Start and resume
 
 1. Check `runtime_control`; use `task_read` to recover an existing task's complete requirements, state and next action. Do so before acting when `continuation_truncated` is true. Context records can be stale and never constitute new authorization.
-2. Register a new assignment with `task_begin` only when no nonterminal task exists, with actual user submission IDs, objective and criteria covering every deliverable, `initial_plan`, and the first concrete `next_action`. Ordinary research omits execution fields and does not require a compute platform. When calculation is already intended, read [Execution target selection](references/execution-targets.md) and bind the requested destination. Preserve user requirements separately from hypotheses and optional diagnostics.
+2. Register a new assignment with `task_begin` only when no nonterminal task exists, with actual user submission IDs, objective and criteria covering every deliverable, and the first concrete `next_action`. Scientific hypotheses and plans belong to the relevant Node. Ordinary research omits execution fields and does not require a compute platform. When calculation is already intended, read [Execution target selection](references/execution-targets.md) and bind the requested destination. Preserve user requirements separately from hypotheses and optional diagnostics.
 3. Continue the current task for follow-ups. New user requirements use `refine`; a misread execution instruction uses the correction procedure in the execution reference. Reading a task or writing progress does not resume paused or blocked work.
-4. Create or select research Nodes and bind entry/focus with `task_update action=set_research`. The first `research_create` supplies an initial binding when none exists. Use the [research-memory Skill](../research-memory/SKILL.md) for records and relations, then select the applicable domain Skill.
+4. Read the task's research entries/focus and recover the relevant existing Nodes; search prior work when needed. Create a Node only for a new research objective that needs its own continuing investigation and judgment. A calculation step, parameter change or platform change does not require another Node. The first `research_create` supplies an initial binding when none exists; later creations require deliberate relations and entry/focus selection through `task_update action=set_research`. Use the [research-memory Skill](../research-memory/SKILL.md) for records and relations, then select the applicable domain Skill.
 
 ## Execute and record
 
@@ -22,7 +22,7 @@ Use [Job and material workflow](references/jobs-and-artifacts.md) for preparatio
 
 Prepare files in the returned Node `work_dir` or `research/work`; place reports in `reports/`. Associate research Jobs with the intended `node_id`. Inspect original outputs and the domain's scientific checks before publishing conclusions. Use research-memory for question decomposition and conclusion records.
 
-Record meaningful changes and the next action through `task_update progress`. Plans, notes and new Nodes are not substantive scientific progress. Check receipts before retrying an uncertain submission. Continue independent work while Jobs run.
+Record a scientific finding as a note or Result according to its purpose; do not duplicate it as a task progress narrative. The runtime tracks published evidence and Job milestones through the existing tools. Use `task_update progress` when changing the task's next action or explicitly recording adopted evidence; waits, blockers and user controls still require the corresponding task action. Plans, notes and new Nodes are not substantive scientific progress. Check receipts before retrying an uncertain submission. Continue independent work while Jobs run.
 
 ## Wait, control and recover
 

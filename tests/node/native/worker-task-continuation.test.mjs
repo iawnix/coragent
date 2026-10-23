@@ -92,7 +92,8 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
           assert.deepEqual(snapshot.scope.entry_node_ids, [node.id]);
           assert.deepEqual(snapshot.scope.focus_node_ids, [node.id]);
           assert.equal(task.revision, 1);
-          assert.ok(researchPayload.task.initial_plan && researchPayload.task.next_action);
+          assert.ok(researchPayload.task.next_action);
+          assert.equal("initial_plan" in researchPayload.task, false);
         }
         if (snapshot.scope.focus_node_ids?.length) {
           assert.ok(snapshot.findings.some(item => snapshot.scope.focus_node_ids.includes(item.ref)));
@@ -106,7 +107,6 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
         const singleSteps = [
           { name: "task_begin", arguments: { title: "Fixture research", objective: "Record a reproducible fixture finding without external delivery.",
             source_submission_ids: userIds, criteria: [{ id: "finding", description: "Publish the fixture finding and report it." }],
-            initial_plan: "Create the fixture Node, record the finding and deliver the evidence-backed result.",
             next_action: "Create the fixture research Node." } },
           { name: "research_create", arguments: { goal: "Verify continued analysis", plan: "Record a local deterministic observation." } },
           { name: "task_read", arguments: {} },
@@ -125,7 +125,6 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
         const branchSteps = [
           { name: "task_begin", arguments: { title: "Compare derivations", objective: "Compare independent derivations and retain their limitations without external delivery.",
             source_submission_ids: userIds, criteria: [{ id: "comparison", description: "Retain both findings, approximation bounds and the comparison." }],
-            initial_plan: "Create the comparison and bounds Nodes, test both derivations, and publish the supported comparison with limitations.",
             next_action: "Create the comparison root Node." } },
           { name: "research_create", arguments: { title: "Compare derivations", goal: "Which derivation satisfies the boundary condition?", plan: "Compare independent candidates against shared approximation bounds." } },
           { name: "research_create", arguments: { title: "Approximation bounds", goal: "What is the approximation error?", plan: "Bound the neglected terms." } },
@@ -329,7 +328,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
     }
     const count = requests;
     const research = await backend.monitor("monitor/task/read", { ...scope, user_task_id: overview.task.user_task_id });
-    assert.equal(research.task.schema_version, "coragent-user-task/5");
+    assert.equal(research.task.schema_version, "coragent-user-task/6");
     assert.equal(research.task.execution_target, null);
     assert.equal(research.task.execution_selection, null);
     assert.equal(research.task.execution_policy, null);

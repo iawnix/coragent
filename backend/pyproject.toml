@@ -28,5 +28,5 @@ include = ["research_agent", "research_agent.*"]
 version = {attr = "research_agent._version.__version__"}
 
 [tool.setuptools.package-data]
-"research_agent.application" = ["command_catalog.json", "execution_schema.json", "monitor_contracts.json"]
+"research_agent.application" = ["command_catalog.json", "execution_schema.json", "monitor_contracts.json", "monitor_limits.json"]
 "research_agent.foundation" = ["protocol.json"]

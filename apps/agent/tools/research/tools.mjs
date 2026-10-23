@@ -52,8 +52,8 @@ function researchToolView(result, name, params) {
     }
   }
   const value = {content_omitted: true,
-    message: "The response exceeds the tool output budget. Read the listed references in smaller pages. For a large Node, select one field, for example field=proposal. Omitted Node fields have not been acknowledged as read.",
-    ...Object.fromEntries(["schema_version", "accepted", "result_saved", "assessment_selected", "conflict", "ref"].filter(key => key in result).map(key => [key, result[key]])),
+    message: "The response exceeds the tool output budget. Read the listed references in smaller pages. For a large Node, select one field, for example field=plan. Omitted Node fields have not been acknowledged as read.",
+    ...Object.fromEntries(["schema_version", "accepted", "result_saved", "assessment_selected", "ref"].filter(key => key in result).map(key => [key, result[key]])),
     ...(result.node ? {node: {id: result.node.id, revision: result.node.revision}} : {}),
     ...(result.task_research_binding ? {task_research_binding: result.task_research_binding} : {}),
     ...(result.result ? {result: {id: result.result.id, node_id: result.result.node_id}} : {}), read};

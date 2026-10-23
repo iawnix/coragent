@@ -81,16 +81,22 @@ def _native_check(selected, expected=None):
 
 
 def _capture(command, *, env=None, timeout):
+    from .command_scope import observation_timeout, remaining_timeout
+    timeout = remaining_timeout(command, timeout)
     with subprocess.Popen(command, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                           start_new_session=True) as process:
         try:
             stdout, stderr = process.communicate(timeout=timeout)
-        except subprocess.TimeoutExpired:
+        except BaseException as error:
+            # Cancellation of a monitoring CLI must also stop its SSH/handler
+            # process group, which deliberately has a separate session.
             try:
                 os.killpg(process.pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
             process.communicate()
+            if isinstance(error, subprocess.TimeoutExpired):
+                raise observation_timeout(error) from None
             raise
         return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 

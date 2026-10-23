@@ -2,7 +2,7 @@
 import json
 import re
 from pathlib import Path
-from .records import journal, record, digest
+from .records import journal, record, digest, recent_notes
 from . import relations, basis
 from research_agent.foundation.transactions import read_json
 from research_agent.foundation.path_safety import path_has_symlink
@@ -141,21 +141,40 @@ def build_snapshot(root, *, max_bytes=16000, session_id=None, entry_node_ids=(),
     def add_node(node):
         from .context import result_notices
         from .results import get_result
-        assessment = node.get('assessment_ref')
-        notices = result_notices(root, get_result(root, assessment), graph) if assessment and assessment.startswith('result_') else []
-        if _size(node) < 2400:
+        assessment_ref = node.get('assessment_ref')
+        assessment = (get_result(root, assessment_ref) if assessment_ref.startswith('result_') else record(root, assessment_ref)) if assessment_ref else None
+        notices = result_notices(root, assessment, graph) if assessment_ref and assessment_ref.startswith('result_') else []
+        complete = _size(node) < 2400
+        if complete:
             outputs = [r for r in published if r['node_id'] == node['id']]
             card = {**node, 'recent_results': [{'id': r['id'], 'summary': r['summary'][:240], 'content_omitted': len(r['summary']) > 240, 'read': {'ref': r['id']}} for r in outputs[-2:]], 'ranking_reason': priority.get(node['id'], (6, 'recent_research'))[1], 'read': {'ref': node['id']}}
-            card.update(review_notices=notices[:3], review_notice_count=len(notices))
-            if add('nodes', card):
-                full_nodes.append(node)
+            card.update(review_notices=notices[:3], review_notice_count=len(notices), content_omitted=False)
         else:
             card = {k: node[k] for k in ('id', 'revision', 'status', 'assessment_ref')}
             card.update(title=_excerpt(node['title'], 100), goal=_excerpt(node['goal'], 300),
-                        progress=_excerpt(node.get('progress') or '', 300), plan=_excerpt(node['plan'], 240),
+                        plan=_excerpt(node['plan'], 240),
                         content_omitted=True, read={'ref': node['id']})
             card.update(review_notices=notices[:1], review_notice_count=len(notices))
-            add('nodes', card)
+        if not add('nodes', card):
+            return
+        if complete:
+            full_nodes.append(node)
+        details = {'assessment': None}
+        if assessment:
+            content = assessment.get('conclusion') if assessment_ref.startswith('result_') else assessment['content']
+            excerpt = _excerpt(content, 360)
+            details['assessment'] = {'ref': assessment_ref, 'content': excerpt,
+                                     'content_omitted': excerpt != content, 'read': {'ref': assessment_ref}}
+        notes = recent_notes(root, [node['id']])[node['id']]
+        details['recent_notes'] = {'total': notes['total'], 'records': [
+            {'ref': note['ref'], 'sequence': note['sequence'], 'content': _excerpt(note['content'], 240),
+             'content_omitted': len(note['content'].encode()) > 240, 'read': {'ref': note['ref']}}
+            for note in notes['records']]}
+        for key, value in details.items():
+            card[key] = value
+            if _size(view) > allowance:
+                del card[key]
+                card['content_omitted'] = True
     for node in ordered:
         add_node(node)
     for row in reversed(index['records'][-40:]):
@@ -176,16 +195,59 @@ def documents(root):
     from .results import publication_order
     published = publication_order(root, graph)
     output = {}
-    overview = ['# Research Memory', '', 'Generated from immutable research records.']
+    overview = ['# Research Memory', '', 'Generated from research records. Use the existing questions below before creating another Node.', '']
     history = journal(root)['records']
+    notes = recent_notes(root, graph['nodes'])
+    children, contained = {}, set()
+    for edge in graph['relations'].values():
+        if edge['active'] and edge['kind'] == 'part_of':
+            children.setdefault(edge['target'], []).append(edge['source'])
+            contained.add(edge['source'])
+    expanded = set()
+    def branch(ref, depth):
+        node = graph['nodes'][ref]
+        overview.append('  ' * depth + f"- [{node['title']}](nodes/{ref}/README.md) — {node['status']}")
+        if ref in expanded:
+            return
+        expanded.add(ref)
+        for child in children.get(ref, []):
+            branch(child, depth + 1)
+    for ref in graph['nodes']:
+        if ref not in contained:
+            branch(ref, 0)
+    def link(ref):
+        if ref in graph['nodes']:
+            return f"[{graph['nodes'][ref]['title']}](../{ref}/README.md)"
+        if ref in graph['results']:
+            result = graph['results'][ref]
+            return f"[{ref}](../{result['node_id']}/results/{ref}.json)"
+        return f'`{ref}`'
     for node in graph['nodes'].values():
-        overview.append(f"- [{node['title']}](nodes/{node['id']}/README.md) — {node['status']}")
-        lines = ['# ' + node['title'], '', 'Generated view; use research tools to change canonical memory.']
-        for key in ('goal', 'proposal', 'plan', 'progress', 'assessment_ref'):
+        lines = ['# ' + node['title'], '', f"{node['id']} — {node['status']}", '',
+                 'Generated view; use research tools to change canonical memory.']
+        for key in ('goal', 'plan'):
             lines.extend(['', '## ' + key, '', node.get(key) or '(not recorded)'])
         lines.extend(['', '## Subjects', '', json.dumps(node.get('subjects', {}), ensure_ascii=False)])
+        lines.extend(['', '## Current assessment', ''])
+        assessment_ref = node['assessment_ref']
+        if assessment_ref:
+            from .results import get_result
+            assessment = get_result(root, assessment_ref) if assessment_ref.startswith('result_') else record(root, assessment_ref)
+            content = assessment['conclusion'] if assessment_ref.startswith('result_') else assessment['content']
+            target = f'results/{assessment_ref}.json' if assessment_ref.startswith('result_') else f'../../records/{assessment_ref}.json'
+            lines.extend([f'[{assessment_ref}]({target})', '', _excerpt(content, 1200)])
+        else:
+            lines.append('No assessment selected.')
+        lines.extend(['', '## Recent notes', '',
+                      f"Showing {len(notes[node['id']]['records'])} of {notes[node['id']]['total']} notes."])
+        for note in notes[node['id']]['records']:
+            lines.extend(['', f"[{note['ref']}](../../records/{note['ref']}.json) — {note['created_at']}", '',
+                          _excerpt(note['content'], 600)])
+        lines.extend(['', '## Jobs', '',
+                      f"Read current linked Jobs with `research_read {{\"ref\":\"{node['id']}\"}}`; use each returned Job ID with `job_status`."])
         lines.extend(['', '## Relations', ''])
-        lines.extend(f"- {e['source']} {e['kind']} {e['target']} ({e['id']})" for e in graph['relations'].values() if e['active'] and node['id'] in (e['source'], e['target']))
+        lines.extend(f"- {link(e['source'])} → {e['kind']} → {link(e['target'])} ({e['id']})" + (f" — {e['reason']}" if e['reason'] else '')
+                     for e in graph['relations'].values() if e['active'] and node['id'] in (e['source'], e['target']))
         lines.extend(['', '## Results', ''])
         from .context import result_notices
         from .results import get_result

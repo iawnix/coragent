@@ -23,13 +23,13 @@ The `research_agent.research` namespace is the sole research implementation. Run
 
 ## Research model
 
-A Node is a persistent local research question. `goal` states the question, `proposal` the current hypothesis or approach, `plan` the investigation, and `progress` the current explanation. Hypotheses are optional. Repeated parameters, geometries and failures stay within the same Node unless an independently tracked question emerges. No model-maintained Attempt entity is required.
+A Node is a persistent research question. `goal` states the question and `plan` holds its current hypotheses and investigation approach. Append-only notes preserve observations, decisions and changes of direction; Results fix conclusions worth citing. Restore and reuse the relevant existing question before creating another Node. Calculation steps, parameter or platform changes, geometries and failures stay within that question unless a new research objective needs its own continuing investigation and judgment. No model-maintained Attempt entity is required.
 
-Compound studies use independently interpretable questions and existing `part_of`, `requires` and `alternative_to` relations. A root Node is optional; shared questions can have multiple parents. The research scope of `coragent-user-task/5` consists of `research.entry_node_ids` and `research.focus_node_ids`, set together through `task_update` action `set_research`. These are navigation references, not ownership, a schedule or a second plan. Node and Result schemas remain unchanged.
+Compound studies use existing `part_of`, `requires` and `alternative_to` relations when distinct research objectives emerge. A root Node is optional; shared questions can have multiple parents. The research scope of `coragent-user-task/6` consists of `research.entry_node_ids` and `research.focus_node_ids`, set together through `task_update` action `set_research`. These are navigation references, not ownership, a schedule or a second plan. The first Node can supply an initial binding; later Nodes are related and selected deliberately, rather than automatically added to both lists. Nodes use `research-node/2`; Result schema remains unchanged.
 
 Node status is `open`, `paused` or `closed`. Closing means stopping active work on that question; it does not imply scientific success or cancel a Job. The authored revision changes when Node content changes, independently of background execution observations. Concurrent content changes require a new reading and explicit merge; append-only notes do not replace another author's judgment.
 
-A Result fixes a useful observation and conclusion, limitations, actual input versions, evidence and files. It is immutable and may be negative or inconclusive. Explicit `supersedes` preserves the old version. A Node's selected assessment is a deliberate synthesis, not simply its latest result or latest Job failure. Upstream correction creates an exact review notice; it never silently replaces downstream inputs or reruns science.
+A Result fixes a useful observation and conclusion, limitations, actual input versions, evidence and files. It is immutable and may be negative or inconclusive. A finding is recorded as a process note or a reusable Result according to its purpose; it need not be copied into both or repeated as task progress. Explicit `supersedes` preserves the old version. A Node's selected assessment is a deliberate synthesis, not simply its latest result or latest Job failure. Publishing with `as_assessment=true` saves the Result and selects it in one transaction; a stale read saves neither. Ordinary publication leaves the current assessment unchanged. Upstream correction creates an exact review notice; it never silently replaces downstream inputs or reruns science.
 
 ## Relations and provenance
 
@@ -47,7 +47,7 @@ Actual `uses` and `cites` connections require recorded material inputs or explic
 | research_update | `{node_id, note}` |
 | research_result | `{node_id, conclusion}` |
 
-Updates may change proposal, plan, progress, status or assessment and add/withdraw explicit relations. Result files refer to registered Artifacts. Session, workspace, request identity, read basis and revisions are supplied by the trusted adapter. Models do not maintain transaction metadata, reverse edges or a global progress object. There is no lifecycle checkpoint or yield-repair prompt.
+Updates append a note and may change the Node's title, goal, plan, subjects, status or selected assessment and add/withdraw explicit relations. Result files refer to registered Artifacts. Session, workspace, request identity, read basis and revisions are supplied by the trusted adapter. Models do not maintain transaction metadata, reverse edges or a global progress object. There is no lifecycle checkpoint or yield-repair prompt.
 
 ## Workspace and storage
 
@@ -57,7 +57,7 @@ Research objects use workspace-scoped numeric IDs (`task_1`, `node_1`, `job_1`, 
 
 `runs/jobs/` owns execution working directories. `operations/` owns durable intents, observations, collection/delivery receipts and exact short references. `artifacts/<id>/payload` and `manifest.json` own fixed file versions. Mutable Node work files must be registered before a Result cites them as published material. Reports remain ordinary user-facing files with fixed delivered versions.
 
-Transactions publish coherent research updates and recover interrupted commits. Old graph and notebook workspaces are rejected without migration or mutation. Create a new workspace and explicitly import useful materials; no dual reader or compatibility writer is supported.
+Transactions publish coherent research updates and recover interrupted commits. Runtime, contracts and Skills must be deployed together for `research-node/2` and `coragent-user-task/6`. Earlier Node/Task formats and old graph/notebook workspaces are rejected without migration or mutation. Create a new workspace and explicitly import useful materials; no dual reader or compatibility writer is supported.
 
 ## Context and next_run
 
@@ -65,7 +65,7 @@ A bounded model context preserves original user intent and the authenticated tri
 
 Research Context is an internal part of the Agent Runtime. At each generation boundary it reads the deterministic `research_read view=brief` projection and compares scoped facts with the last committed context anchor. Initial context, scope changes and relevant fact changes append a passive `pi.context` entry atomically with the request cutoff. Unrelated activity and duplicate events do not add another entry. Input producer identity does not decide freshness. Reads and no-change decisions are memoized for recovery; failed reads are explicit and retried at a new input boundary.
 
-Research Brief (`research-brief/1`) contains bounded facts, contradictions, uncertainties, limitations and source references. Its state digest covers candidate records, including those omitted for size, rather than the global journal sequence. The view normally targets 2,000 tokens, up to 4,000 for contradictions. Projection completeness and optional model synthesis success are separate statuses. A tool-free synthesis may summarize results, terminal Jobs or contradictions; failure retains the deterministic brief. Neither projection nor synthesis grants read/write authority or proves scientific validity. Original evidence remains accessible through research_read and job_status.
+Research Brief (`research-brief/1`) contains bounded facts, recent research notes, counts, contradictions, uncertainties, limitations and source references. Its state digest covers scoped candidate records, including relevant notes omitted for size, rather than the global journal sequence. The view normally targets 2,000 tokens, up to 4,000 for contradictions. Projection completeness and optional model synthesis success are separate statuses. A tool-free synthesis may summarize results, terminal Jobs or contradictions; failure retains the deterministic brief. Note excerpts and summaries are derived reading aids: they do not publish Results, select assessments, grant read/write authority or prove scientific validity. Original evidence remains accessible through research_read and job_status.
 
 `CompactionTask.prepareSummary` supplies instructions and metadata from the selected immutable historical prefix only. Supplements are pinned before the native summary call and preserved over retry/recovery. The resulting summary retains the scope anchor as non-model metadata. Later retained context entries supersede it. No live research read is backdated into a checkpoint, and no summary establishes authorization or field-read grants. Pi retains safe tool boundaries, summary calls, retries, usage accounting and atomic/stale-aware placement. A reset deliberately starts a new orientation.
 
@@ -79,9 +79,25 @@ Managed research Jobs explicitly bind node_id and the inspected Node revision at
 
 `next_run` is a real scheduling mode: persist an authenticated execution event, wait while its owning session is busy or automatic execution is paused, then submit one idempotent Pi input. Event persistence, Pi consumption and scientific interpretation are distinct facts. Lost replies reuse the same request identity; a fixed batch does not absorb later events while retrying. New notes, Node status and Memory sequence do not trigger or suppress delivery. An open Node does not create an automatic turn. A separately registered active user task can continue without a new Job event.
 
+Job observation and event delivery advance independently. Observations interleave
+workspaces, with at most four concurrent queries globally and one per named
+platform across its scheduler entries. Each observation shares a 30-second
+subprocess budget and a 35-second supervising CLI timeout; shutdown waits for
+Python and its local query process group to finish. Observation timeout preserves
+the recorded Job state. Health reports observation and delivery success and errors
+separately.
+
+The shared [Monitor limit](../contracts/monitor/jobs/limits.json) caps fixed batches
+at 256 events. Batch creation, claim and completion are transactional; each session
+delivers its earliest pending batch first. Durable consumption removes the Task's
+pending event references in the same Pi transaction, including successor
+consumption after recovery. Existing oversized batches require explicit maintenance
+after verifying that Pi never accepted their original request; upgrade does not
+silently change an existing batch identity.
+
 ## Persistent user tasks and Monitor
 
-The request-only task facts share the research context budget; the bounded browsing projection still points omitted details to `task_read`. A user task spans Pi runs and compute Jobs. `task_begin`, `task_read` and `task_update` record the authorized objective, cited user submissions, delivery criteria, progress evidence and explicit waits or blockers. Ordinary questions do not create tasks. A session has at most one nonterminal user task. Its control state lives only in Pi durable documents; Host does not store a duplicate task lifecycle or control receipt.
+The request-only task facts share the research context budget; the bounded browsing projection still points omitted details to `task_read`. A user task spans Pi runs and compute Jobs. `task_begin`, `task_read` and `task_update` record the authorized objective, cited user submissions, delivery criteria, next action, execution plan, progress evidence and explicit waits or blockers. Scientific hypotheses and plans belong to Nodes; Tasks do not retain another initial scientific plan. Existing tools expose published evidence and Job milestones to task tracking; the Agent explicitly changes the next action, waits and controls when needed. Ordinary questions do not create tasks. A session has at most one nonterminal user task. Its control state lives only in Pi durable documents; Host does not store a duplicate task lifecycle or control receipt.
 
 Workspace, Research Memory, Task and context management remain a cohesive research core. An ordinary
 Task starts with null execution target, selection and policy, without resolving a platform. When calculation

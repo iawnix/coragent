@@ -9,8 +9,9 @@ import { TODO_CONTEXT as context } from "@earendil-works/chord/context";
 import { pinnedPiSource } from "./test-environment.mjs";
 import { createInputAdmission } from "../../../apps/agent/runtime/admission/input.mjs";
 import { createJobAdmission } from "../../../apps/agent/runtime/admission/jobs.mjs";
-import { createTaskController } from "../../../apps/agent/tasks/controller.mjs";
+import { createTaskController, UserTask } from "../../../apps/agent/tasks/controller.mjs";
 import { createMonitorService } from "../../../apps/agent/tasks/service.mjs";
+import { JOB_EVENT_IDS_LIMIT } from "../../../apps/agent/contracts/monitor.mjs";
 
 const { admitSubmission } = await import(pathToFileURL(join(pinnedPiSource(), "packages/durable/src/harness/submissions.ts")).href);
 const gate = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
@@ -267,6 +268,145 @@ test("an event interrupted before consumption is delivered through resumed task 
   assert.ok((await env.admission.origin(original, context)).successor_consumption);
   assert.deepEqual((await env.controller.current(context)).event_inputs, []);
   assert.equal(env.requests, 2, "only the resumed successor consumes the deferred event");
+});
+
+test("an interrupted full event batch is consumed before a later full batch", async t => {
+  const env = await fixture(t), entered = gate(), proceed = gate();
+  const eventIds = Array.from({ length: JOB_EVENT_IDS_LIMIT }, (_, index) => `event_${index + 1}`);
+  const first = { requestId: "full-first", eventIds, token: "fixture-token", mode: "next_run" };
+  const second = { ...first, requestId: "full-second",
+    eventIds: eventIds.map((_, index) => `event_${index + JOB_EVENT_IDS_LIMIT + 1}`) };
+  env.setBeforeAutomatic(async () => { entered.resolve(); await proceed.promise; });
+  env.faux.setResponses([fauxAssistantMessage("Recovered first batch"), fauxAssistantMessage("Consumed second batch")]);
+  await env.monitor.admit(first, context); await entered.promise;
+  let task = await env.controller.current(context);
+  await env.controller.control({ user_task_id: task.user_task_id, action: "pause", request_id: "pause-full", expected_revision: task.revision }, context);
+  proceed.resolve(); await env.conversation.waitForIdle(context);
+  task = await env.controller.current(context);
+  await env.controller.control({ user_task_id: task.user_task_id, action: "resume", request_id: "resume-full", expected_revision: task.revision }, context);
+  env.setBeforeAutomatic(async () => {});
+  const deferred = await env.monitor.admit(second, context);
+  assert.equal(deferred.pending, true);
+  assert.equal(deferred.deferred.code, "task_events_pending");
+  assert.equal(await env.admission.status(second.requestId, context), null);
+  assert.equal((await env.controller.current(context)).event_inputs.flatMap(input => input.event_ids).length, JOB_EVENT_IDS_LIMIT);
+  await env.controller.reconcile(context); await env.conversation.waitForIdle(context);
+  assert.equal((await env.monitor.admit(first, context)).consumed, true);
+  assert.deepEqual((await env.controller.current(context)).event_inputs, []);
+  assert.equal((await env.monitor.admit(second, context)).accepted, true);
+  await env.conversation.waitForIdle(context);
+  assert.equal((await env.monitor.admit(second, context)).consumed, true);
+  assert.deepEqual((await env.controller.current(context)).event_inputs, []);
+  assert.equal(env.requests, 3);
+});
+
+test("concurrent event batches recheck pending Task events inside the admission commit", async t => {
+  const env = await fixture(t), bothPrepared = gate(), commitSecond = gate();
+  const first = { requestId: "concurrent-first", token: "fixture-token", mode: "next_run",
+    eventIds: Array.from({ length: JOB_EVENT_IDS_LIMIT }, (_, index) => `event_${index + 1}`) };
+  const second = { ...first, requestId: "concurrent-second",
+    eventIds: first.eventIds.map((_, index) => `event_${index + JOB_EVENT_IDS_LIMIT + 1}`) };
+  const submitInternal = env.admission.submitInternal;
+  let prepared = 0;
+  env.admission.submitInternal = async (draft, ctx) => {
+    if (++prepared === 2) bothPrepared.resolve();
+    await bothPrepared.promise;
+    if (draft.requestId === second.requestId) await commitSecond.promise;
+    return submitInternal(draft, ctx);
+  };
+  env.setBeforeAutomatic(async () => { throw new Error("Interrupted before Job event consumption"); });
+  const firstAdmission = env.monitor.admit(first, context);
+  const secondAdmission = env.monitor.admit(second, context);
+  try {
+    await bothPrepared.promise;
+    assert.equal((await firstAdmission).accepted, true);
+    await env.conversation.waitForIdle(context);
+    const original = await env.admission.status(first.requestId, context);
+    assert.equal(original.status, "unanswered");
+    assert.equal((await env.admission.origin(original, context)).consumption, undefined);
+    const before = await env.controller.current(context);
+    assert.equal(before.event_inputs.length, 1);
+    assert.equal(before.event_inputs[0].event_ids.length, JOB_EVENT_IDS_LIMIT);
+    commitSecond.resolve();
+    const deferred = await secondAdmission;
+    assert.equal(deferred.accepted, true);
+    assert.equal(deferred.pending, true);
+    assert.equal(deferred.deferred.code, "task_events_pending");
+    assert.equal(await env.admission.status(second.requestId, context), null);
+    assert.deepEqual((await env.controller.current(context)).event_inputs, before.event_inputs);
+    assert.equal(env.requests, 1, "neither unconsumed event batch reached the model");
+  } finally {
+    bothPrepared.resolve(); commitSecond.resolve();
+    await Promise.allSettled([firstAdmission, secondAdmission]);
+    env.admission.submitInternal = submitInternal;
+  }
+});
+
+test("consumption clears Task events atomically and a retry repairs a retained stale pointer", async t => {
+  const env = await fixture(t);
+  const original = env.controller.completeJobEventConsumption;
+  env.controller.completeJobEventConsumption = async () => { throw new Error("interrupted after consumption commit"); };
+  const draft = { requestId: "consumption-commit", eventIds: ["event_1"], token: "fixture-token", mode: "next_run" };
+  await env.monitor.admit(draft, context); await env.conversation.waitForIdle(context);
+  const record = await env.admission.status(draft.requestId, context);
+  assert.ok((await env.admission.origin(record, context)).consumption);
+  let task = await env.controller.current(context);
+  assert.deepEqual(task.event_inputs, [], "the consumption commit already removed the Task pointer");
+  // Reproduce a retained pointer from the former two-commit consumption path.
+  await env.conversation.commit(async tx => {
+    const stored = await tx.doc(UserTask, env.conversation.id, task.user_task_id, null);
+    stored.event_inputs.push({ submission_id: record.id, request_id: draft.requestId, event_ids: draft.eventIds });
+  }, context);
+  env.controller.completeJobEventConsumption = original;
+  assert.equal((await env.monitor.admit(draft, context)).consumed, true);
+  task = await env.controller.current(context);
+  assert.deepEqual(task.event_inputs, []);
+  assert.equal(env.requests, 1, "retrying the consumed identity does not create a model request");
+});
+
+for (const consumption of ["direct", "successor"]) test(`Task reconcile clears retained ${consumption} consumption without replaying the old batch`, async t => {
+  const env = await fixture(t);
+  const first = { requestId: `retained-${consumption}`, eventIds: ["event_1"], token: "fixture-token", mode: "next_run" };
+  if (consumption === "successor") env.setBeforeAutomatic(async () => { throw new Error("Interrupted before consumption"); });
+  env.faux.setResponses([fauxAssistantMessage("Consumed first batch")]);
+  await env.monitor.admit(first, context);
+  await env.conversation.waitForIdle(context);
+  if (consumption === "successor") {
+    const task = await env.controller.current(context);
+    await env.controller.control({ user_task_id: task.user_task_id, action: "resume", request_id: "resume-retained",
+      expected_revision: task.revision }, context);
+    env.setBeforeAutomatic(async () => {});
+    await env.controller.reconcile(context);
+    await env.conversation.waitForIdle(context);
+  }
+  const record = await env.admission.status(first.requestId, context);
+  assert.ok((await env.admission.origin(record, context))[consumption === "direct" ? "consumption" : "successor_consumption"]);
+  let task = await env.controller.current(context);
+  assert.deepEqual(task.event_inputs, []);
+  env.jobs.set("job_wait", "running");
+  task = await env.controller.update({ expected_revision: task.revision, action: "wait",
+    wait: { job_ids: ["job_wait"], mode: "all" } }, "wait-after-first", context);
+  await env.conversation.commit(async tx => {
+    const stored = await tx.doc(UserTask, env.conversation.id, task.user_task_id, null);
+    stored.event_inputs.push({ submission_id: record.id, request_id: first.requestId, event_ids: first.eventIds });
+  }, context);
+  const execute = env.kernel.execute_command, assessed = [];
+  env.kernel.execute_command = async (method, params) => {
+    if (method === "job_manager_assess") assessed.push(params.event_id);
+    return execute(method, params);
+  };
+  const second = { ...first, requestId: `after-retained-${consumption}`, eventIds: ["event_2"] };
+  assert.equal((await env.monitor.admit(second, context)).deferred.code, "task_events_pending");
+  await env.controller.reconcile(context);
+  assert.deepEqual((await env.controller.current(context)).event_inputs, []);
+  env.jobs.set("job_wait", "succeeded");
+  env.faux.setResponses([fauxAssistantMessage("Consumed second batch")]);
+  assert.equal((await env.monitor.admit(second, context)).accepted, true);
+  await env.conversation.waitForIdle(context);
+  assert.ok((await env.admission.origin(await env.admission.status(second.requestId, context), context)).consumption);
+  assert.ok(assessed.length > 0 && assessed.every(id => id === "event_2"), "the old batch is never assessed or retried");
+  assert.deepEqual((await env.controller.current(context)).event_inputs, []);
+  assert.equal(env.requests, 3);
 });
 
 test("pause while the consumption assessment is pending prevents the model request", async t => {

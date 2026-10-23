@@ -4,6 +4,8 @@
 
 原始输入保留在 `inputs/`，保留运行时管理的 Job/Artifact 文件，不移动历史请求和证据。避免在工作区根目录散落生成文件。SSH 或远程 Job 使用配置的远程工作、scratch 目录或用户指定目标，本地 `work_dir` 不能当作远程路径。scp/rsync 应区分本地与远程两端，本地下载和重定向输出放入本地草稿或报告目录。这些约定指导 agent 选择文件位置，不增加文件系统隔离，也不改变已有工具权限。
 
+准备、优化、验证、分析和重试复用所属研究问题的 Node；执行文件用普通子目录和 Job 身份区分。新目录、新 Job 或换平台都不要求新 Node。
+
 活动 Task 已有持久化计算位置后，按已安装领域 Skill 准备请求；位置为 null 时先用 `task_update action=bind_execution` 或创建执行计划，有计划时还须选中可执行项。把返回的 request_file 和 request_sha256 交给 job_start；用 node_id 明确研究归属。其它执行字段已固定在请求文件中。直接 argv 提交需声明实际输入、输出和 execution_target。准备允许不关联研究 Node，这与 Task 的计算位置绑定是不同事项；普通 bash 和平台诊断不要求该绑定。
 
 自定义科学脚本通过配置的执行准备入口使用 `--script <file.py> --backend <binding>`。直接 argv 提交不会选择科学 Python 或软件后端。准备请求和报告排版使用原生工具，科学计算使用受管 Job。
@@ -18,7 +20,7 @@ artifact_create 保存新文本，artifact_register 导入文件，artifact_read
 2. `job_start({"node_id":"<node_id>","request_file":"<request_file>","request_sha256":"<request_sha256>"})`。不要添加请求中已固定的执行字段；需要修改时重新准备。`prepared_ref` 可以替代文件与摘要组合，不能同时传。Job 的 `timeout_seconds` 控制计算时限，bash 的 timeout 控制准备时限。
 3. `job_status({"job_id":"<job_start 返回的 job_id>"})` 查看执行状态，不收集文件，也不确认科学有效性。继续使用同一 Job ID，直到执行结束。实际返回的监控 event_id 也可用于选择对应 Job。
 4. `job_collect({"job_id":"<同一 job_id>"})` 保存可用产物与日志，包括失败 Job 的输出。检查 output_validation 和 result_receipt.collection_state，部分收集不等于完整证据。使用 `artifact_read({"artifact_id":"<所选 artifacts 条目的 artifact_id>"})` 或其返回的 artifact_ref 读取相关材料。
-5. 检查实际输出后发布：`research_result({"node_id":"<node_id>","conclusion":"<有依据的结论及局限>","evidence_refs":["<job_id>","<result_receipt.receipt_id>"],"files":[{"name":"<产物名称>","artifact_ref":"<所选 artifacts 条目的 artifact_ref>"}]})`。特定检查的回执也可以放入 check_refs。inputs 只填写实际采用的固定 Result/Artifact；Job ID 或回执不能作为结果输入或文件附件。
+5. 检查实际输出后，观察或思路调整用 `research_update` 的 note；形成值得固定并引用的结论时，改用 `research_result({"node_id":"<node_id>","conclusion":"<有依据的结论及局限>","evidence_refs":["<job_id>","<result_receipt.receipt_id>"],"files":[{"name":"<产物名称>","artifact_ref":"<所选 artifacts 条目的 artifact_ref>"}]})`。一个 Job 不要求一个 Result，同一发现不必在两种记录里重复写。特定检查的回执也可以放入 check_refs。inputs 只填写实际采用的固定 Result/Artifact；Job ID 或回执不能作为结果输入或文件附件。
 
 撰写报告时，用 artifact_create 的 name 和实际文本 content 创建材料；导入已有文件时，用 artifact_register 的工作区文件 path。两者都会返回 artifact_id 和 artifact_ref，但登记本身不证明计算已执行。不要把 Job 原始输出重写成文本或去掉生产来源后登记，以绕过 job_collect。artifact_read 的 offset/limit 以字节计，继续读取时使用 next_offset。
 

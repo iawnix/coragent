@@ -189,6 +189,12 @@ Monitor 统一用户任务控制与计算作业观察。Task Controller 在 Pi S
 | `/monitor run <id>` | 有界读取 generation/tool 执行详情 |
 | `/monitor health` | Task Controller 与共享 Job Manager worker 健康信息 |
 
+`/monitor health` 分别展示 worker 最近成功观测与事件投递的时间
+（`last_successful_observation`、`last_successful_delivery`），以及对应错误
+（`last_observation_error`、`last_delivery_error`）。成功时间为 null 表示 worker 启动后
+尚未记录成功。查询超时保留最近观测到的 Job 状态，不表示作业失败；某个平台查询缓慢时，
+已有待投递事件仍可继续处理。
+
 任务详情展示研究入口、当前关注问题、局部方案摘录、问题原始状态、assessment/Result
 引用和相关 Job。只有当前会话归属的 Job 提供 `/monitor job` 命令；其它 Job 保持可见，
 并标注 `Outside this session`（不属于当前会话）。共享问题只展示一次，关系通过 ID 引用同一问题。`closed` 显示为

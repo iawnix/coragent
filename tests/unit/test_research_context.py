@@ -34,21 +34,22 @@ def test_subjects_and_uncertain_checks_survive_publication_and_read(tmp_path):
         execute('research_result', tmp_path, {'node_id': node['node']['id'], 'conclusion': 'No', 'subjects': {'target': node['node']['id']}})
 
 
-def test_atomic_correction_stale_read_does_not_publish_or_change_progress(tmp_path):
+def test_atomic_correction_stale_read_does_not_publish_or_select_assessment(tmp_path):
     workspace(tmp_path)
     initial = execute('research_create', tmp_path, {'goal': 'Study'})
     node_id = initial['node']['id']
     old = execute('research_result', tmp_path, {'node_id': node_id, 'conclusion': 'Initial'})['result']
     latest = execute('research_update', tmp_path, {'node_id': node_id, 'note': 'New evidence',
-        'progress': 'New observation', 'read_basis': initial['read_basis']})
+        'plan': 'Check the newly observed discrepancy', 'read_basis': initial['read_basis']})
     request = {'node_id': node_id, 'conclusion': 'Correction', 'supersedes': old['id'], 'as_assessment': True,
-               'progress': 'Identity unresolved', 'read_basis': initial['read_basis']}
+               'read_basis': initial['read_basis']}
     with pytest.raises(ValueError, match='revision_conflict'):
         execute('research_result', tmp_path, request)
     assert len(relations.graph(tmp_path)['results']) == 1
-    assert nodes.get_node(tmp_path, node_id)['progress'] == 'New observation'
+    assert nodes.get_node(tmp_path, node_id) == latest['node']
     saved = execute('research_result', tmp_path, {**request, 'read_basis': latest['read_basis']})
-    assert saved['assessment_selected'] and saved['node']['progress'] == 'Identity unresolved'
+    assert saved['assessment_selected'] and saved['node']['assessment_ref'] == saved['result']['id']
+    assert 'progress' not in saved['node'] and 'conflict' not in saved
     assert results.get_result(tmp_path, old['id']) == old
     assert execute('research_read', tmp_path, {'ref': saved['result']['id']})['review_notices'] == []
     assert execute('research_read', tmp_path, {'ref': old['id']})['review_notice_count'] > 0
@@ -109,11 +110,11 @@ def test_brief_refresh_depends_on_scoped_facts_not_global_activity(tmp_path):
     other = execute('research_create', tmp_path, {'goal': 'Unrelated'})
     params = {'view': 'brief', 'focus_node_ids': [selected['node']['id']], 'limit': 8000}
     initial = execute('research_read', tmp_path, params)
-    execute('research_update', tmp_path, {'node_id': other['node']['id'], 'note': 'Change other progress',
-        'progress': 'Unrelated progress', 'read_basis': other['read_basis']})
+    execute('research_update', tmp_path, {'node_id': other['node']['id'], 'note': 'Change other plan',
+        'plan': 'Investigate another question', 'read_basis': other['read_basis']})
     assert execute('research_read', tmp_path, params)['state_digest'] == initial['state_digest']
     execute('research_update', tmp_path, {'node_id': selected['node']['id'], 'note': 'Change focus',
-        'progress': 'Relevant progress', 'read_basis': selected['read_basis']})
+        'plan': 'Test the current question', 'read_basis': selected['read_basis']})
     assert execute('research_read', tmp_path, params)['state_digest'] != initial['state_digest']
 
 
@@ -143,7 +144,7 @@ def test_brief_tracks_candidates_that_do_not_fit_in_context(tmp_path):
     assert selection['bounds']['omitted']['nodes'] > 0
     first = build_review(tmp_path, max_bytes=4096, focus_node_ids=focus)
     execute('research_update', tmp_path, {'node_id': omitted['node']['id'], 'note': 'New evidence',
-        'progress': 'Changed omitted dependency', 'read_basis': omitted['read_basis']})
+        'plan': 'Test the changed dependency', 'read_basis': omitted['read_basis']})
     second = build_review(tmp_path, max_bytes=4096, focus_node_ids=focus)
     assert first['state_digest'] != second['state_digest']
 

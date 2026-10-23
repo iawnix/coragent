@@ -154,7 +154,7 @@ uninstall that environment.
 
 Flat target configuration and process/systemd executors are rejected. There is no automatic migration,
 legacy selector alias, or second editable target table. The durable Task and dispatch-intent versions are
-`coragent-user-task/5` and `job_intent/4`; deploy matching runtime/configuration together after settling
+`coragent-user-task/6` and `job_intent/4`; deploy matching runtime/configuration together after settling
 work under the previous version. New-version Jobs preserve original routes; this is not conversion of old receipts.
 
 The [execution-platforms skill](../skills/core/execution-platforms/SKILL.md) owns selection, environments,

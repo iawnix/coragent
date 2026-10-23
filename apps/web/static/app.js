@@ -29,7 +29,7 @@ async function refresh() {
   const data=await api(route("snapshot"));
   if (generation !== state.generation) return;
   const view=data.snapshot;
-  $("progress").innerHTML="<h2>研究问题</h2>"+view.nodes.map(node=>`<article class="record"><h3>${esc(node.title)}</h3><p class="meta">${esc(node.status)}</p><pre>${esc(node.goal)}</pre><p>${esc(node.progress)}</p><button data-ref="${esc(node.id)}">查看思路、结果与关系</button></article>`).join("");
+  $("progress").innerHTML="<h2>研究问题</h2>"+view.nodes.map(node=>`<article class="record"><h3>${esc(node.title)}</h3><p class="meta">${esc(node.status)}</p><pre>${esc(node.goal)}</pre>${node.assessment ? `<p>当前判断：${esc(node.assessment.content)}</p>` : ""}${(node.recent_notes?.records || []).map(note=>`<p>过程笔记：${esc(note.content)} <button data-ref="${esc(note.ref)}">查看笔记</button></p>`).join("")}<button data-ref="${esc(node.id)}">查看思路、结果与关系</button></article>`).join("");
   $("tasks").innerHTML="<h2>原始任务</h2>"+view.tasks.map(recordCard).join("");
   $("jobs").innerHTML="<h2>运行中或待收集的计算</h2>"+[...view.running_jobs,...view.uncollected_jobs].map(job=>`<p><code>${esc(job.job_id)}</code> · ${esc(job.state)} · ${esc(job.collection_state)}</p>`).join("");
   $("status").className=""; $("status").textContent=Object.keys(view.bounds.omitted).length ? "当前为部分进度快照。请检索下方记录查看完整历史。" : "已读取最新进度";
@@ -53,7 +53,12 @@ async function detail(ref,offset=0) {
     $("detail-links")?.remove();
     if(result.node) {
       const navigation=document.createElement("div"); navigation.id="detail-links";
-      navigation.innerHTML=[...(result.relations || []).map(link=>({id:link.source===ref ? link.target : link.source,title:link.kind})),...(result.results || []).map(item=>({id:item.id,title:item.summary}))].map(item=>`<button data-ref="${esc(item.id)}">${esc(item.title)}</button>`).join("");
+      const titles=new Map((result.related_nodes || []).map(node=>[node.id,node.title]));
+      const owned=new Set([ref,...(result.results || []).map(item=>item.id)]);
+      const links=[...(result.related_nodes || []),...(result.relations || []).flatMap(link=>
+        [link.source,link.target].filter(id=>!owned.has(id)).map(id=>({id,title:`${link.kind} · ${titles.get(id) || id}`}))),
+        ...(result.results || []).map(item=>({id:item.id,title:item.summary}))];
+      navigation.innerHTML=[...new Map(links.map(item=>[item.id,item])).values()].map(item=>`<button data-ref="${esc(item.id)}">${esc(item.title)}</button>`).join("");
       $("detail-content").before(navigation);
     }
   }

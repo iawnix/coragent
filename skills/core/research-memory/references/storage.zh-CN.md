@@ -1,6 +1,6 @@
 # 存储与恢复
 
-工作区 manifest 使用 `research_workspace/3`。原始要求、研究修改和执行观察区分来源。Python 命名空间统一为 `research_agent.research`，没有并行 state 或全局 progress 协议。
+工作区 manifest 使用 `research_workspace/3`，Node 使用 `research-node/2`，用户 Task 使用 `coragent-user-task/6`。运行时、schema 与 Skill 必须同步部署；旧 Node/Task 格式没有兼容别名或并行读取路径。Node 的 plan 保存假设和当前调查，note 留存过程；Task 保留目标、条件、下一步、执行计划和控制，不再保存另一份科学计划。原始要求、研究修改和执行观察区分来源。Python 命名空间统一为 `research_agent.research`，没有并行 state 或全局 progress 协议。
 
 Node 身份稳定，工作目录位于 `research/nodes/<node_id>/`。不可变 Result 固定它所对应的 Node 版本和实际依据。记录保存历史；索引、反向关系、工作区/Node Markdown 与预算内检索都是可重建视图。修改组织关系不移动目录。
 

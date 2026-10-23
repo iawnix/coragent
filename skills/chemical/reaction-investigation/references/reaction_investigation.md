@@ -9,7 +9,7 @@ the Agent retains responsibility for interpreting the result and continuing.
 
 ## Keep a working scientific decision
 
-In the existing Node proposal/plan/note, retain the current elementary-step hypothesis,
+In the existing Node plan/notes, retain the current elementary-step hypothesis,
 mapped species and electronic state, source materials, alternatives, observed evidence,
 and the next calculation with its purpose and bounded settings. For each attempt,
 record what changed from the previous attempt and which observation would select the
@@ -18,7 +18,7 @@ per-turn checklist is required. Read current assessments before repeating old wo
 
 ## Operation handoffs
 
-| Unresolved question | Operation and usable output | Decision after inspection |
+| Investigation need within the current question | Operation and usable output | Decision after inspection |
 | --- | --- | --- |
 | What structures were requested? | [material-preparation](../../material-preparation/SKILL.md): original identity, graph/state, explicit-H order, mapped materials and source geometries | Establish graph identities and full atom correspondence before seed generation or optimization; carry them through calculations and reuse suitable existing geometries |
 | What elementary step is being tested? | reaction-investigation: proposed bond changes, conformers/sites/states, alternatives and falsifiers | If endpoints span multiple steps, investigate intermediates; a failed input is not a falsifier of the reaction |

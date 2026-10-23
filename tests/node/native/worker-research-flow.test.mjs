@@ -27,7 +27,7 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
   const saved = { ...process.env };
   let closeQueue;
   let completed = false;
-  let backend, server, monitorRequest;
+  let backend, server, monitorRequest, host, jobWorker, jobWorkerController, jobWorkerError;
   let nodeId, outputArtifact;
   const requests = [];
   let stage = "prepare";
@@ -146,25 +146,34 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     stage = "send-input";
     await backend.sendInput({ workspace_id: "flow", session_id, request_id: "fixture_request", client_message_id: "fixture_message",
       text: "Exercise the local fixture without sending mail.", mode: "auto" });
-    const {deliverJobEvent} = await import(pathToFileURL(join(packageRoot,"apps/agent/host/jobs/worker.mjs")));
+    const {runJobWorker} = await import(pathToFileURL(join(packageRoot,"apps/agent/host/jobs/worker.mjs")));
+    const {startCoRAgentHost} = await import(pathToFileURL(join(packageRoot,"apps/agent/host/server.mjs")));
     const runJson = async (command, root, extra=[]) => JSON.parse((await execute(python,[join(packageRoot,"apps/cli/job_manager.py"),command,"--root",root,...extra])).stdout);
     let read, restarted=false, monitorDelivered=false;
     stage = "wait-flow";
     for (let i = 0; i < 250; i++) {
       read = await backend.readSession("flow", session_id);
       if (!read.session.is_streaming && existsSync(join(workspace, `operations/jobs/${fixtureJobId}.json`)) && !monitorDelivered) {
-        if (!restarted) { await backend.close(); backend = await createCoRAgentHarnessBackend(backendOptions); restarted=true; }
-        await runJson("tick",workspace);
-        const pending=await runJson("pending",workspace);
-        if (pending.deliveries.length) {
-          const delivery=pending.deliveries[0];
-          const errors=await deliverJobEvent({workspace,delivery,runJson,sendWake:params=>{monitorRequest=params;return backend.sendInput(params);}});
-          assert.deepEqual(errors,[]);
-          assert.deepEqual(await deliverJobEvent({workspace,delivery,runJson,sendWake:params=>backend.sendInput(params)}),[]);
-          monitorDelivered=(await runJson("pending",workspace)).deliveries.length===0;
+        if (!restarted) {
+          await backend.close(); backend = await createCoRAgentHarnessBackend(backendOptions); restarted=true;
+          const sendInput = backend.sendInput.bind(backend);
+          backend.sendInput = params => {
+            if (params.source === 'job_manager') monitorRequest = params;
+            return sendInput(params);
+          };
+          const jobToken = 'local-job-worker-fixture';
+          host = await startCoRAgentHost({ socketPath: join(socketRoot, 'host.sock'), workspaceRoot,
+            stateRoot: join(root, 'state'), sessionBackend: backend, jobToken, monitorPollMs: 0 });
+          process.env.CORAGENT_INTERNAL_JOB_TOKEN = jobToken;
+          jobWorkerController = new AbortController();
+          jobWorker = runJobWorker({ workspaceRoot, hostSocket: host.socketPath, stateRoot: join(root, 'state'),
+            intervalMs: 100, once: false }, jobWorkerController.signal).catch(error => { jobWorkerError = error; });
         }
+        assert.ifError(jobWorkerError);
+        const status = await runJson('status', workspace);
+        monitorDelivered = Boolean(monitorRequest) && status.pending_deliveries.length === 0;
       }
-      if (requests.length >= steps.length && !read.session.is_streaming) break;
+      if (requests.length >= steps.length && !read.session.is_streaming && monitorDelivered) break;
       await new Promise(done => setTimeout(done, 100));
     }
     assert.equal(read.session.is_streaming, false);
@@ -238,6 +247,9 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     assert.equal(existsSync(join(workspace, "reports/email/deliveries")), false);
     assert.equal(requests.at(-1).messages.some(message => JSON.stringify(message.content).includes("Research turn ended")), false);
     assert.equal(existsSync(join(workspace, "lifecycle")), false);
+    jobWorkerController.abort();
+    await jobWorker;
+    assert.ifError(jobWorkerError);
     const monitorRecord = await backend.inputStatus(monitorRequest);
     assert.ok(monitorRecord.operation_id);
     // Forget all process memory and recover by Pi's durable business ID.
@@ -245,7 +257,8 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     read = await backend.readSession("flow", session_id);
     const activityBeforeRestart = (await backend.listSessions("flow"))[0].updated_at;
     assert.equal(Date.parse(activityBeforeRestart), Math.max(...read.snapshot.messages.map(message => message.timestamp)));
-    await backend.close();
+    await host.close();
+    host = undefined;
     backend = await createCoRAgentHarnessBackend(backendOptions);
     assert.equal((await backend.listSessions("flow"))[0].updated_at, activityBeforeRestart);
     const recovered = await backend.sendInput(monitorRequest);
@@ -262,7 +275,12 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     }
     throw error;
   } finally {
-    try { await backend?.close(); }
+    try {
+      jobWorkerController?.abort();
+      await jobWorker;
+      await host?.close();
+      await backend?.close();
+    }
     finally {
       await closeQueue?.();
       if (server) { server.closeAllConnections(); await new Promise(done => server.close(done)); }

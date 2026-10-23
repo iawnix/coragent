@@ -3,6 +3,7 @@ from pathlib import Path
 from research_agent.foundation.transactions import read_json, write_json, workspace_transaction, TransactionCoordinator
 from .workspace import validate_workspace_manifest
 from .records import record, digest
+from .nodes import validate_node
 from research_agent.foundation.path_safety import path_has_symlink
 
 
@@ -23,8 +24,7 @@ def _replay(root):
         headers.append({k: item[k] for k in ('ref','sequence','origin','kind','title','node_id','created_at')})
         if item['data'].get('node'):
             node = item['data']['node']
-            if node.get('workspace_id') != workspace_id or node.get('id') != item['node_id'] or node.get('schema_version') != 'research-node/1':
-                raise ValueError('node_identity_invalid')
+            validate_node(node, item['node_id'], workspace_id)
             graph['nodes'][node['id']] = node
         if item['data'].get('relation'):
             edge = item['data']['relation']

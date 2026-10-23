@@ -17,7 +17,7 @@ description: 从物种和机理假设开始，经过候选搜索、验证、能�
 
 工作流合同位于 [references/reaction_investigation.zh-CN.md](references/reaction_investigation.zh-CN.md)，英文版在同目录。它放在本 Skill 内，因为它描述反应研究的状态机和交接；通用 CoRAgent runtime 只保存 Node、Job、Artifact 和证据。
 
-每个基元步骤都维护物种身份、原子映射、电荷、多重度/电子态、环境、键变化、候选几何、验证状态、能量状态和下一项未解决问题。计算只有在读取输出并把它转成记录中的观察或决定后才算完成。
+在所属问题已有的 plan、note 和 Result 中，保留相关基元步骤的物种身份、原子映射、电荷、多重度/电子态、环境、键变化、候选几何、验证状态、能量状态和下一项待调查内容。基元步骤、候选和验证阶段不自动要求另建 Node。检查计算输出后，有用观察或决策用 note，可复用结论用 Result；同一发现不必重复写。
 
 ## 闭环步骤
 
@@ -34,7 +34,7 @@ description: 从物种和机理假设开始，经过候选搜索、验证、能�
 
 ## 决策习惯
 
-把物种身份、基元步骤连通性、鞍点证据、能量学、动力学和稳健性分开记录。失败搜索若揭示姿态、端点、电子态或机理错误，应保留并用于改变下一步。机理结论由这些记录的收敛证据共同支持。
+在当前问题的证据中区分物种身份、基元步骤连通性、鞍点证据、能量学、动力学和稳健性；这种区分不要求每项检查都另建 Node 或 Result。失败搜索若揭示姿态、端点、电子态或机理错误，应保留并用于改变下一步。机理结论由这些记录的收敛证据共同支持。
 
 多步或竞争解释研究可阅读[路径模型](references/pathway_model.zh-CN.md)、[分子准备](references/molecular_preparation.zh-CN.md)、[路径执行](references/pathway_execution.zh-CN.md)和[机理反思](references/mechanism_reflection.zh-CN.md)。
 

@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { protocolError, MAX_FRAME_BYTES } from "../transport/host-client.mjs";
 import { validateId, cleanRequest } from "./validation.mjs";
+import { JOB_EVENT_IDS_LIMIT } from "../contracts/monitor.mjs";
 
 const SESSION_EVENT_HISTORY_LIMIT = 256;
 const SESSION_EVENT_HISTORY_BYTES = MAX_FRAME_BYTES / 4;
@@ -128,7 +129,7 @@ export function createHostSessions({ sessionBackend, workspace, deduplicate, cli
       validateId(params.request_id, "request_id");
       validateId(params.client_message_id, "client_message_id");
       if (!internal && (typeof params.text !== "string" || params.text.length === 0 || params.text.length > 1_000_000)) throw protocolError("invalid_input", "Input must contain text within the size limit");
-      if (internal && (!Array.isArray(params.event_ids) || !params.event_ids.length || params.event_ids.length > 256
+      if (internal && (!Array.isArray(params.event_ids) || !params.event_ids.length || params.event_ids.length > JOB_EVENT_IDS_LIMIT
         || params.event_ids.some(id => typeof id !== "string" || !JOB_EVENT_ID.test(id)))) {
         throw protocolError("invalid_job_events", "Job Manager requires structured event_ids");
       }

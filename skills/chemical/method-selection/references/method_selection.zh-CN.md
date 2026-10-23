@@ -18,5 +18,6 @@ Gaussian 显式输入 runner 可执行已提供的 TS、扫描、QST 输入与�
 通过通用 Job Manager 执行。先检查共享 runner 与安装软件，再判断能力是否不可用，
 根据研究问题决定使用顺序。
 
-在 Researchresearch conclusion 中记录方法选择及其可证伪目的。方法变化时保留之前的 intent；
-若科学目标变化，使用 recalculation record 或新研究 Node。
+在已有 Node 的 plan 中记录方法选择及其可证伪目的，思路变化保留在 note 中。
+换后端或重算仍属于同一问题。只有新研究目标需要独立持续调查和判断时才另建 Node；
+形成值得引用的结论时再发布 Result。

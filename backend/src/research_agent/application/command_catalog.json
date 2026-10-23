@@ -78,15 +78,7 @@
                   },
                   {
                     "type": "string",
-                    "const": "proposal"
-                  },
-                  {
-                    "type": "string",
                     "const": "plan"
-                  },
-                  {
-                    "type": "string",
-                    "const": "progress"
                   },
                   {
                     "type": "string",
@@ -166,7 +158,7 @@
                   "type": "object",
                   "properties": {
                     "schema_version": {
-                      "const": "research-node/1"
+                      "const": "research-node/2"
                     },
                     "id": {
                       "type": "string"
@@ -180,27 +172,7 @@
                     "goal": {
                       "type": "string"
                     },
-                    "proposal": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
                     "plan": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "progress": {
                       "anyOf": [
                         {
                           "type": "string"
@@ -340,6 +312,100 @@
                     },
                     "review_notice_count": {
                       "type": "integer"
+                    },
+                    "recent_notes": {
+                      "type": "object",
+                      "properties": {
+                        "records": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "ref": {
+                                "type": "string"
+                              },
+                              "content": {
+                                "type": "string"
+                              },
+                              "content_omitted": {
+                                "type": "boolean"
+                              },
+                              "read": {
+                                "type": "object",
+                                "properties": {
+                                  "ref": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "ref"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "sequence": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "ref",
+                              "content",
+                              "content_omitted",
+                              "read",
+                              "sequence"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "records",
+                        "total"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "assessment": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "ref": {
+                              "type": "string"
+                            },
+                            "content": {
+                              "type": "string"
+                            },
+                            "content_omitted": {
+                              "type": "boolean"
+                            },
+                            "read": {
+                              "type": "object",
+                              "properties": {
+                                "ref": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "ref"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "ref",
+                            "content",
+                            "content_omitted",
+                            "read"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -349,7 +415,6 @@
                     "assessment_ref",
                     "title",
                     "goal",
-                    "progress",
                     "read"
                   ],
                   "additionalProperties": false
@@ -683,7 +748,7 @@
                 "type": "object",
                 "properties": {
                   "schema_version": {
-                    "const": "research-node/1"
+                    "const": "research-node/2"
                   },
                   "id": {
                     "type": "string"
@@ -697,27 +762,7 @@
                   "goal": {
                     "type": "string"
                   },
-                  "proposal": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
                   "plan": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "progress": {
                     "anyOf": [
                       {
                         "type": "string"
@@ -802,9 +847,7 @@
                   "workspace_id",
                   "title",
                   "goal",
-                  "proposal",
                   "plan",
-                  "progress",
                   "status",
                   "assessment_ref",
                   "source_refs",
@@ -812,7 +855,8 @@
                   "revision",
                   "created_at",
                   "updated_at",
-                  "author"
+                  "author",
+                  "subjects"
                 ],
                 "additionalProperties": false
               },
@@ -1123,6 +1167,66 @@
               "work_dir": {
                 "type": "string",
                 "description": "Absolute directory for this Node’s mutable drafts, geometry, scripts and prepared Job requests. Suggested location only; use in file paths or an explicit shell cd. Does not change native tool arguments or cwd. Derived from the active workspace; not an immutable Artifact."
+              },
+              "recent_notes": {
+                "type": "object",
+                "properties": {
+                  "records": {
+                    "type": "array",
+                    "items": {
+                      "x-typescript-type": "JsonValue"
+                    }
+                  },
+                  "total": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "records",
+                  "total"
+                ],
+                "additionalProperties": false
+              },
+              "related_nodes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "enum": [
+                        "open",
+                        "paused",
+                        "closed"
+                      ]
+                    },
+                    "read": {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "ref"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "status",
+                    "read"
+                  ],
+                  "additionalProperties": false
+                }
               }
             },
             "required": [
@@ -1465,7 +1569,6 @@
       "allowed": [
         "goal",
         "title",
-        "proposal",
         "plan",
         "source_refs",
         "source_submission_ids",
@@ -1498,28 +1601,13 @@
             "description": "Maximum 1000 Unicode characters (code points), not UTF-8 bytes.",
             "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
           },
-          "proposal": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 0,
-                "maxLength": 16000,
-                "description": "Maximum 16000 Unicode characters (code points), not UTF-8 bytes.",
-                "pattern": "^[\\s\\S]{0,16000}(?![\\s\\S])",
-                "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "plan": {
             "anyOf": [
               {
                 "type": "string",
                 "minLength": 0,
                 "maxLength": 16000,
-                "description": "Maximum 16000 Unicode characters (code points), not UTF-8 bytes.",
+                "description": "Current research approach, including hypotheses, intended comparisons and validation. Record observations and intermediate reasoning as notes; publish supported conclusions as Results. Maximum 16000 Unicode characters (code points).",
                 "pattern": "^[\\s\\S]{0,16000}(?![\\s\\S])",
                 "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
               },
@@ -1646,7 +1734,7 @@
             "type": "object",
             "properties": {
               "schema_version": {
-                "const": "research-node/1"
+                "const": "research-node/2"
               },
               "id": {
                 "type": "string"
@@ -1660,27 +1748,7 @@
               "goal": {
                 "type": "string"
               },
-              "proposal": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
               "plan": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "progress": {
                 "anyOf": [
                   {
                     "type": "string"
@@ -1765,9 +1833,7 @@
               "workspace_id",
               "title",
               "goal",
-              "proposal",
               "plan",
-              "progress",
               "status",
               "assessment_ref",
               "source_refs",
@@ -1775,7 +1841,8 @@
               "revision",
               "created_at",
               "updated_at",
-              "author"
+              "author",
+              "subjects"
             ],
             "additionalProperties": false
           },
@@ -1862,9 +1929,7 @@
         "note",
         "goal",
         "title",
-        "proposal",
         "plan",
-        "progress",
         "status",
         "assessment_ref",
         "add_relations",
@@ -1911,43 +1976,13 @@
             "description": "Maximum 1000 Unicode characters (code points), not UTF-8 bytes.",
             "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
           },
-          "proposal": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 0,
-                "maxLength": 16000,
-                "description": "Maximum 16000 Unicode characters (code points), not UTF-8 bytes.",
-                "pattern": "^[\\s\\S]{0,16000}(?![\\s\\S])",
-                "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "plan": {
             "anyOf": [
               {
                 "type": "string",
                 "minLength": 0,
                 "maxLength": 16000,
-                "description": "Maximum 16000 Unicode characters (code points), not UTF-8 bytes.",
-                "pattern": "^[\\s\\S]{0,16000}(?![\\s\\S])",
-                "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "progress": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 0,
-                "maxLength": 16000,
-                "description": "Maximum 16000 Unicode characters (code points), not UTF-8 bytes.",
+                "description": "Current research approach, including hypotheses, intended comparisons and validation. Record observations and intermediate reasoning as notes; publish supported conclusions as Results. Maximum 16000 Unicode characters (code points).",
                 "pattern": "^[\\s\\S]{0,16000}(?![\\s\\S])",
                 "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
               },
@@ -2082,7 +2117,7 @@
             "type": "object",
             "properties": {
               "schema_version": {
-                "const": "research-node/1"
+                "const": "research-node/2"
               },
               "id": {
                 "type": "string"
@@ -2096,27 +2131,7 @@
               "goal": {
                 "type": "string"
               },
-              "proposal": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
               "plan": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "progress": {
                 "anyOf": [
                   {
                     "type": "string"
@@ -2201,9 +2216,7 @@
               "workspace_id",
               "title",
               "goal",
-              "proposal",
               "plan",
-              "progress",
               "status",
               "assessment_ref",
               "source_refs",
@@ -2211,7 +2224,8 @@
               "revision",
               "created_at",
               "updated_at",
-              "author"
+              "author",
+              "subjects"
             ],
             "additionalProperties": false
           },
@@ -2308,8 +2322,7 @@
         "request_id",
         "read_basis",
         "subjects",
-        "check_refs",
-        "progress"
+        "check_refs"
       ],
       "required": [
         "node_id",
@@ -2444,7 +2457,7 @@
           },
           "as_assessment": {
             "type": "boolean",
-            "description": "Set true only to select this Result as the Node current synthesis using the Node revision last read. Defaults to false. Without progress, a selection conflict still saves the Result; with progress, a conflict saves neither."
+            "description": "Set true only to explicitly select this Result as the Node current assessment using the Node revision last read. Publication and assessment selection are atomic: a stale read basis rejects both. Defaults to false; publication alone does not change the current assessment."
           },
           "session_id": {
             "type": [
@@ -2480,14 +2493,6 @@
               "type": "string"
             },
             "description": "Evidence for scoped checks: verified Artifact or Job collection receipt references only. Use the exact receipt returned by job_collect, not a job_id. A check may be inconclusive; citation does not certify a pass verdict."
-          },
-          "progress": {
-            "type": "string",
-            "description": "Requires as_assessment=true. Atomically revise the current assessment and progress using the last read Node. Maximum 16000 Unicode characters (code points), not UTF-8 bytes.",
-            "maxLength": 16000,
-            "minLength": 1,
-            "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,16000}(?![\\s\\S])",
-            "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
           }
         },
         "required": [
@@ -2506,7 +2511,7 @@
             "type": "object",
             "properties": {
               "schema_version": {
-                "const": "research-node/1"
+                "const": "research-node/2"
               },
               "id": {
                 "type": "string"
@@ -2520,27 +2525,7 @@
               "goal": {
                 "type": "string"
               },
-              "proposal": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
               "plan": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "progress": {
                 "anyOf": [
                   {
                     "type": "string"
@@ -2625,9 +2610,7 @@
               "workspace_id",
               "title",
               "goal",
-              "proposal",
               "plan",
-              "progress",
               "status",
               "assessment_ref",
               "source_refs",
@@ -2635,7 +2618,8 @@
               "revision",
               "created_at",
               "updated_at",
-              "author"
+              "author",
+              "subjects"
             ],
             "additionalProperties": false
           },
@@ -2898,16 +2882,6 @@
           "assessment_selected": {
             "type": "boolean"
           },
-          "conflict": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "work_dir": {
             "type": "string",
             "description": "Absolute directory for this Node’s mutable drafts, geometry, scripts and prepared Job requests. Suggested location only; use in file paths or an explicit shell cd. Does not change native tool arguments or cwd. Derived from the active workspace; not an immutable Artifact."
@@ -2920,8 +2894,7 @@
           "read_basis",
           "result",
           "result_saved",
-          "assessment_selected",
-          "conflict"
+          "assessment_selected"
         ],
         "additionalProperties": false
       }

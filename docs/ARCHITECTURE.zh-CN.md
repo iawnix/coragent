@@ -22,13 +22,13 @@ CoRAgent 只使用 Pi 原生 Harness 循环。Workspace 是跨会话存在的研
 
 ## 研究模型
 
-Node 承载持续推进的局部问题。goal 是问题，proposal 是当前假设或思路，plan 是调查方案，progress 是进展说明。假设可为空；调参数、换构型、同目标重试通常留在原 Node。独立问题才另建 Node，不要求模型创建 Attempt 对象。
+Node 承载持续研究的问题，goal 保存问题，plan 统一保存当前假设和调查思路。追加式 note 留存观察、决策和思路变化，Result 固定值得引用的结论。先恢复并复用相关已有问题，再考虑创建 Node；计算步骤、调参数、换平台、换构型和失败重试都留在所属问题，只有新研究目标需要独立持续调查和判断时才另建 Node。不要求模型创建 Attempt 对象。
 
-复杂研究以可独立解释的问题及现有 `part_of`、`requires`、`alternative_to` 关系组织。根节点可选，共享问题可以有多个父节点。`coragent-user-task/5` 的研究范围由 `research.entry_node_ids` 与 `research.focus_node_ids` 组成，通过 `task_update` 的 `set_research` 动作一起替换。这些是导航引用，不是所有权、执行顺序或第二份计划。Node 与 Result schema 保持不变。
+出现独立研究目标后，以现有 `part_of`、`requires`、`alternative_to` 关系组织复杂研究。根节点可选，共享问题可以有多个父节点。`coragent-user-task/6` 的研究范围由 `research.entry_node_ids` 与 `research.focus_node_ids` 组成，通过 `task_update` 的 `set_research` 动作一起替换。这些是导航引用，不是所有权、执行顺序或第二份计划。首个 Node 可以提供初始绑定，后续 Node 应明确关联与选择，不会自动加入两份列表。Node 使用 `research-node/2`，Result schema 保持不变。
 
 Node 状态为 open / paused / closed。关闭表示停止主动推进，不表示科学成功，也不取消 Job。内容修订号独立于后台执行观察；并发修改需要重新读取并明确合并，单纯追加笔记不覆盖其他人的判断。
 
-Result 固定有价值的观察、判断、限制、输入版本、证据和文件，可为否定或证据不足。Result 不可变；用 supersedes 明确修正并保留旧版。Node 的 assessment 是明确选定的综合判断，不默认采用最近结果或失败。上游修正产生精确复核提示，不暗中替换下游输入或重新计算。
+Result 固定有价值的观察、判断、限制、输入版本、证据和文件，可为否定或证据不足。同一发现按用途写为过程 note 或可复用 Result，不要求两处重复写，也不再抄成任务进展。Result 不可变；用 supersedes 明确修正并保留旧版。Node 的 assessment 是明确选定的综合判断，不默认采用最近结果或失败。`as_assessment=true` 将 Result 发布与选定放在同一事务中，读取过期时两者均不保存；普通发布不改当前判断。上游修正产生精确复核提示，不暗中替换下游输入或重新计算。
 
 ## 关系与来源
 
@@ -46,7 +46,7 @@ uses / cites 必须来自确证材料输入或明确结果引用。文件名相�
 | research_update | `{node_id, note}` |
 | research_result | `{node_id, conclusion}` |
 
-更新可按需修改思路、方案、进展、状态、综合判断及关系。结果文件引用已登记 Artifact。Session、工作区、请求身份、读取依据和版本由可信适配层提供；模型不维护事务字段、反向边或全局 progress。没有回合末 checkpoint 或强制 disposition 补写。
+更新追加 note，并可按需修改 Node 的 title、goal、plan、subjects、status、综合判断及关系。结果文件引用已登记 Artifact。Session、工作区、请求身份、读取依据和版本由可信适配层提供；模型不维护事务字段、反向边或全局 progress。没有回合末 checkpoint 或强制 disposition 补写。
 
 ## 工作区与存储
 
@@ -56,7 +56,7 @@ uses / cites 必须来自确证材料输入或明确结果引用。文件名相�
 
 `runs/jobs/` 是执行工作目录；`operations/` 保存意图、观察、收集/投递回执和精确短引用；`artifacts/<id>/payload` 及 manifest 保存固定文件及来源。可变工作文件登记后才能成为正式结果材料。报告仍是面向用户的文件，实际交付版本固定。
 
-事务保证完整更新和中断恢复。旧图与 notebook 工作区均明确拒绝，不迁移、不改写。新建工作区并显式导入材料，没有双协议读写层。
+事务保证完整更新和中断恢复。`research-node/2` 与 `coragent-user-task/6` 要求运行时、合同和 Skill 同步部署。旧 Node/Task 格式及旧图、notebook 工作区均明确拒绝，不迁移、不改写。新建工作区并显式导入材料，没有双协议读写层。
 
 ## 上下文与 next_run
 
@@ -64,7 +64,7 @@ uses / cites 必须来自确证材料输入或明确结果引用。文件名相�
 
 Research Context 是 Agent Runtime 内部的上下文准备模块。每个 generation 边界通过 `research_read view=brief` 读取本地确定性概览，比较当前范围和相关事实指纹；首次进入、范围变化或事实变化才追加 pi.context，并与请求截止位置原子提交。无关研究变化和重复事件不重复注入。输入来自哪个组件不决定刷新。读取和无变化判断通过 memo 固定，失败在新输入边界重试。
 
-Research Brief（research-brief/1）整理范围内事实、矛盾、未知项、限制和原始引用，指纹包含因大小限制而省略的候选记录。通常以 2,000 tokens 为目标，出现矛盾可扩至 4,000。运行事件同步是否完整与模型综合摘要是否成功分别记录；结果、终态 Job 或矛盾可触发无工具的模型综合，失败保留基础概览。概览和摘要均不授予写权限，也不证明科学有效性。完整证据通过 research_read、job_status 等工具读取。详见[研究上下文](RESEARCH_CONTEXT.zh-CN.md)。
+Research Brief（research-brief/1）整理范围内事实、近期研究 note、计数、矛盾、未知项、限制和原始引用，指纹包含因大小限制而省略的相关候选记录与 note，不以全局 journal 序号判定变化。通常以 2,000 tokens 为目标，出现矛盾可扩至 4,000。运行事件同步是否完整与模型综合摘要是否成功分别记录；结果、终态 Job 或矛盾可触发无工具的模型综合，失败保留基础概览。note 摘录与摘要都是派生阅读视图，不发布 Result、不选定综合判断、不授予写权限，也不证明科学有效性。完整证据通过 research_read、job_status 等工具读取。详见[研究上下文](RESEARCH_CONTEXT.zh-CN.md)。
 
 `CompactionTask.prepareSummary` 只从选定的不可变旧历史范围生成指引和元数据。补充材料在原生摘要调用前固定，重试和恢复保持一致；摘要记录保留非模型可见的范围标记，后续完整历史中的新背景优先。不读取最新研究状态并倒填到旧摘要，不从摘要推导授权或读取凭据。Pi 继续负责安全切分、摘要调用、重试、用量记录以及原子提交和过期判断；reset 会重新建立背景。
 
@@ -78,9 +78,19 @@ Research Brief（research-brief/1）整理范围内事实、矛盾、未知项�
 
 next_run 是实际调度模式：持久化认证执行事件，会话忙或自动执行暂停时保留；可接收时幂等提交一次 Pi 输入。事件保存、Pi 消费和科学解释是不同事实。回复丢失沿用请求身份；固定批次重试时不吸收新事件。普通笔记、Node 状态和 Memory sequence 不触发或抑制投递；Node open 本身不产生自动输入；另行登记的活跃用户任务即使没有新 Job 事件也可以继续推进。
 
+Job 观测与事件投递分别推进。观测交错处理工作区，全局最多并发四个查询，同一命名平台下的
+所有调度器共用一个查询名额。每个 Job 的观测命令共享 30 秒子进程预算，外层 CLI 另有
+35 秒超时保护；停止时等待 Python 退出并清理本机查询进程组。观测超时保留已记录的
+Job 状态，健康信息分别记录观测与投递的成功时间及错误。
+
+固定批次遵循唯一的 [Monitor 限额](../contracts/monitor/jobs/limits.json)，每批最多 256 个事件。
+批次生成、领取和确认通过事务落盘，同一会话先投递最早的待确认批次。持久化消费凭据与
+清除 Task 待消费事件引用在同一 Pi 事务中完成，恢复时的后继消费也遵循该规则。
+已有超大批次需要先核实 Pi 从未接收原请求，再明确维护修复；升级不会自动改写其批次身份。
+
 ## 持久用户任务与 Monitor
 
-请求阶段的任务事实与研究内容共用预算；有界浏览投影仍将省略详情指向 `task_read`。用户任务跨越多个 Pi run 和计算 Job。`task_begin`、`task_read`、`task_update` 保存已授权目标、用户提交来源、交付条件、进展证据和具体等待/阻塞。普通问答不自动建立任务；每个 session 最多一个非终态用户任务。任务控制状态只存在 Pi durable 文档中，Host 不另存任务状态机或控制回执。
+请求阶段的任务事实与研究内容共用预算；有界浏览投影仍将省略详情指向 `task_read`。用户任务跨越多个 Pi run 和计算 Job。`task_begin`、`task_read`、`task_update` 保存已授权目标、用户提交来源、交付条件、下一步、执行计划、进展证据和具体等待/阻塞；科学假设和计划属于 Node，Task 不另存初始科学计划。现有工具向任务跟踪提供已发布证据和 Job 里程碑，下一步、等待和控制仍由 Agent 按需明确变更。普通问答不自动建立任务；每个 session 最多一个非终态用户任务。任务控制状态只存在 Pi durable 文档中，Host 不另存任务状态机或控制回执。
 
 Workspace、Research Memory、Task 与上下文管理保留完整研究核心的内聚。普通 Task 的计算目标、
 选择与策略初始均为 null，不解析平台。实际需要计算时，task_update action=bind_execution 与明确

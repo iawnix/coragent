@@ -18,7 +18,7 @@ def subjects(root, value, external):
 
 def node_context(node):
     return digest({key: node.get(key, {} if key == 'subjects' else None)
-                   for key in ('title', 'goal', 'proposal', 'plan', 'progress', 'status', 'subjects')})
+                   for key in ('title', 'goal', 'plan', 'status', 'subjects')})
 
 
 def result_notices(root, result, graph=None):

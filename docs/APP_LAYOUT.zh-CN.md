@@ -63,7 +63,8 @@
 缺少可选设置不会阻止研究启动，也不会创建队列或名称解析服务。
 
 Host Python 基础环境和 wheel overlay 位于
-`<env_root>/<installation-id>/{base,kernels}/<hash>`。
+`<env_root>/{base,kernels}/<hash>`。
+存储目录的安装归属单独记录在 `<env_root>/installation-owner.json`。
 `runtime.env_root` 可指定专属存储目录；安装器也接受 `CORAGENT_HOST_ENV_ROOT`。
 科学解释器和程序通过 `config.toml` 的 `execution.platforms.<platform>.schedulers.<entry>.bindings` 单独配置。
 

@@ -17,7 +17,7 @@ Use this Skill for a reaction mechanism or transition-state study. It coordinate
 
 The workflow contract is [references/reaction_investigation.md](references/reaction_investigation.md). It belongs inside this Skill because it describes the state machine and handoffs for a reaction study; the generic CoRAgent runtime only stores Nodes, Jobs, Artifacts, and evidence.
 
-For every elementary step, keep a current record containing species identity, atom mapping, charge, multiplicity/electronic state, environment, proposed bond changes, candidate geometries, validation status, energetic status, and the next unresolved question. A calculation is complete only when its output has been inspected and converted into an observation or decision in that record.
+Within the owning question's existing plan, notes and Results, retain each relevant elementary step's species identity, atom mapping, charge, multiplicity/electronic state, environment, proposed bond changes, candidate geometries, validation status, energetic status, and next unresolved investigation. Elementary steps, candidates and validation stages do not automatically require separate Nodes. Inspect calculation outputs and retain useful observations or decisions as notes, or reusable conclusions as Results; the same finding need not be written twice.
 
 ## Closed loop
 
@@ -34,7 +34,7 @@ Use `chemical.pathway-check@1` for an independent audit of an explicit multistep
 
 ## Decision habits
 
-Separate species identity, elementary-step connectivity, saddle evidence, energetics, kinetics, and robustness so each result contributes its own evidence. Preserve failed searches when they reveal a wrong pose, endpoint, electronic state, or reaction hypothesis. Convergent evidence across these records supports the mechanism conclusion.
+Distinguish species identity, elementary-step connectivity, saddle evidence, energetics, kinetics, and robustness within the evidence for the current question. This distinction does not prescribe separate Nodes or Results for each check. Preserve failed searches when they reveal a wrong pose, endpoint, electronic state, or reaction hypothesis. Convergent evidence across these records supports the mechanism conclusion.
 
 Read [pathway model](references/pathway_model.md), [molecular preparation](references/molecular_preparation.md), [pathway execution](references/pathway_execution.md), and [mechanism reflection](references/mechanism_reflection.md) when the study contains several steps or competing explanations.
 

@@ -165,16 +165,6 @@
           "title": {
             "$ref": "shared.json#/tools/research_create/properties/title"
           },
-          "proposal": {
-            "anyOf": [
-              {
-                "$ref": "shared.json#/tools/research_create/properties/proposal"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "plan": {
             "anyOf": [
               {
@@ -249,30 +239,10 @@
           "title": {
             "$ref": "shared.json#/tools/research_create/properties/title"
           },
-          "proposal": {
-            "anyOf": [
-              {
-                "$ref": "shared.json#/tools/research_update/properties/proposal"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "plan": {
             "anyOf": [
               {
                 "$ref": "shared.json#/tools/research_update/properties/plan"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "progress": {
-            "anyOf": [
-              {
-                "$ref": "shared.json#/tools/research_update/properties/progress"
               },
               {
                 "type": "null"
@@ -411,9 +381,6 @@
           },
           "check_refs": {
             "$ref": "shared.json#/tools/research_result/properties/check_refs"
-          },
-          "progress": {
-            "$ref": "shared.json#/tools/research_result/properties/progress"
           }
         },
         "required": [

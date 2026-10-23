@@ -17,7 +17,26 @@ def test_commit_files_is_idempotent_and_replays_same_result(tmp_path: Path) -> N
         writes={"research_map/context.json": {"revision": 1}}, result={"revision": 1},
     )
     assert first["state"] == second["state"] == "committed"
+    assert first == second
+    assert "writes" not in first
+    assert first["writes_digest"] == _digest({"research_map/context.json": {"revision": 1}})
     assert (tmp_path / "research_map/context.json").is_file()
+
+
+def test_committed_receipt_does_not_retain_large_public_writes(tmp_path: Path) -> None:
+    coordinator = TransactionCoordinator(tmp_path)
+    writes = {"large.json": {"body": "x" * (128 * 1024)}}
+    receipt = coordinator.commit_files("large-write", "test", {"revision": 1},
+                                       writes=writes, result={"revision": 1})
+    assert coordinator._receipt_path("large-write").stat().st_size < 2048
+    assert receipt["writes_digest"] == _digest(writes)
+    assert receipt["result"] == {"revision": 1}
+    assert "writes" not in receipt
+    original_mtime = (tmp_path / "large.json").stat().st_mtime_ns
+    retry = coordinator.commit_files("large-write", "test", {"revision": 1}, writes={}, result={})
+    assert retry == receipt
+    assert (tmp_path / "large.json").stat().st_mtime_ns == original_mtime
+    assert transactions.read_json(tmp_path / "large.json") == writes["large.json"]
 
 
 def test_request_reuse_with_different_payload_is_rejected(tmp_path: Path) -> None:
@@ -88,8 +107,54 @@ def test_recovery_replays_partially_applied_decision(tmp_path: Path, monkeypatch
     restarted = TransactionCoordinator(tmp_path)
     receipt = restarted.get("request-1")
     assert receipt["state"] == "committed"
+    assert "writes" not in receipt
+    assert receipt["writes_digest"] == _digest(writes)
     assert transactions.read_json(tmp_path / "second.json") == {"revision": 1}
     assert not restarted._recovery_pointer(restarted._receipt_path("request-1")).exists()
+    assert restarted.commit("request-1") == receipt
+
+
+@pytest.mark.parametrize("receipt_published", [False, True])
+def test_interruption_at_compact_receipt_publication_is_recoverable(tmp_path: Path, monkeypatch, receipt_published) -> None:
+    coordinator = TransactionCoordinator(tmp_path)
+    writes = {"result.json": {"body": "x" * (128 * 1024)}}
+    coordinator.prepare("request-1", "test", {}, writes=writes, result={"ok": True})
+    receipt_path = coordinator._receipt_path("request-1")
+
+    def interrupted_receipt(path, value):
+        if path == receipt_path and value.get("state") == "committed":
+            if receipt_published:
+                _atomic_json(path, value)
+            raise OSError("interrupted committed receipt publication")
+        _atomic_json(path, value)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(transactions, "_atomic_json", interrupted_receipt)
+        with pytest.raises(OSError, match="committed receipt publication"):
+            coordinator.commit("request-1")
+    stored = transactions.read_json(receipt_path)
+    assert stored["state"] == ("committed" if receipt_published else "committing")
+    assert ("writes" in stored) is not receipt_published
+    assert transactions.read_json(tmp_path / "result.json") == writes["result.json"]
+    assert coordinator._recovery_pointer(receipt_path).is_file()
+    replayed = []
+
+    def counted_write(path, value):
+        if path == tmp_path / "result.json":
+            replayed.append(path)
+        _atomic_json(path, value)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(transactions, "_atomic_json", counted_write)
+        restarted = TransactionCoordinator(tmp_path)
+        receipt = restarted.get("request-1")
+    assert receipt["state"] == "committed"
+    assert receipt["result"] == {"ok": True}
+    assert receipt["writes_digest"] == _digest(writes)
+    assert "writes" not in receipt
+    assert receipt_path.stat().st_size < 2048
+    assert replayed == ([] if receipt_published else [tmp_path / "result.json"])
+    assert not coordinator._recovery_pointer(receipt_path).exists()
     assert restarted.commit("request-1") == receipt
 
 

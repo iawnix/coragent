@@ -4,8 +4,8 @@ import sqlite3
 from pathlib import Path
 from research_agent.foundation.transactions import TransactionCoordinator, read_json
 from research_agent.foundation.path_safety import path_has_symlink
-from .records import workspace, journal, record, digest
-from .nodes import get_node
+from .records import workspace, journal, record, digest, recent_notes
+from .nodes import get_node, validate_node
 from .results import get_result, publication_order
 from . import relations, basis
 
@@ -40,6 +40,8 @@ def research_neighborhood(graph, entry_node_ids=(), focus_node_ids=()):
 
 
 def _index(root):
+    relations.graph(root)
+    workspace_id = read_json(Path(root) / 'workspace_manifest.json')['workspace_id']
     directory = Path(root) / 'research/search'
     if path_has_symlink(directory / 'index.sqlite'):
         raise ValueError('search_path_symlink')
@@ -63,6 +65,7 @@ def _index(root):
         items = [(value['ref'], value['kind'], value['title'], value['content'])]
         if value['data'].get('node'):
             node = value['data']['node']
+            validate_node(node, value['node_id'], workspace_id)
             items.append((node['id'], 'node', node['title'], json.dumps(node, ensure_ascii=False)))
         if value['data'].get('result_id'):
             result = get_result(root, value['data']['result_id'])
@@ -121,7 +124,13 @@ def node_detail(root, node_id, *, jobs=()):
     if assessment and assessment.get('schema_version') == 'research-result/1':
         from .context import result_notices
         reviews.extend(result_notices(root, assessment, graph))
+    owners = {ref: result['node_id'] for ref, result in graph['results'].items()}
+    endpoints = (owners.get(ref, ref) for edge in links for ref in (edge['source'], edge['target']))
+    neighbors = {ref for ref in endpoints if ref in graph['nodes'] and ref != node_id}
+    related = [{key: graph['nodes'][ref][key] for key in ('id', 'title', 'status')}
+               | {'read': {'ref': ref}} for ref in sorted(neighbors)]
     return {'node': node, 'relations': links, 'results': results, 'assessment': assessment,
+            'related_nodes': related, 'recent_notes': recent_notes(root, [node_id])[node_id],
             'review_notices': reviews, 'diagnostics': [d for d in relations.diagnostics(root) if node_id in d.get('node_ids', [])], 'jobs': [j for j in jobs if j.get('node_id') == node_id],
             'history': {'tool': 'research_search', 'node_id': node_id}}
 

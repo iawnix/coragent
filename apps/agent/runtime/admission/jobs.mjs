@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { JOB_EVENT_IDS_LIMIT } from "../../contracts/monitor.mjs";
 
 export const JOB_ADMISSION_SERVICE_ID = "coragent.job-admission";
 const fail = (code, message) => Object.assign(new Error(`${code}: ${message}`), { code });
@@ -24,19 +25,27 @@ export function createJobAdmission({ admission, kernel, sessionId, producerToken
     return result;
   };
   function eventIdentity(ids) {
-    if (!Array.isArray(ids) || !ids.length || ids.length > 256 || ids.some(id => typeof id !== "string" || !/^event_[1-9][0-9]*$/u.test(id))) {
+    if (!Array.isArray(ids) || !ids.length || ids.length > JOB_EVENT_IDS_LIMIT || ids.some(id => typeof id !== "string" || !/^event_[1-9][0-9]*$/u.test(id))) {
       throw fail("invalid_job_events", "Job Manager input requires structured eventIds");
     }
     return { event_ids: [...new Set(ids)].sort() };
   }
   const response = async action => {
     try { return await action(); }
-    catch (error) { return { accepted: false, error: { code: error.code || "internal_admission_failed", message: error.message } }; }
+    catch (error) {
+      const detail = { code: error.code || "internal_admission_failed", message: error.message };
+      return error.code === "task_events_pending"
+        ? { accepted: true, pending: true, deferred: detail }
+        : { accepted: false, error: detail };
+    }
   };
   const accepted = record => ({ accepted: true, operation_id: String(record.id) });
   async function jobEventResult(record, identity, context) {
     const origin = await admission.origin(record, context);
-    if (origin?.consumption || origin?.successor_consumption) return { ...accepted(record), consumed: true };
+    if (origin?.consumption || origin?.successor_consumption) {
+      await taskController.completeJobEventConsumption(record, context);
+      return { ...accepted(record), consumed: true };
+    }
     if (record.status === "unanswered") {
       const prepared = await taskController.prepareJobEvents(await Promise.all(identity.event_ids.map(assess)), context);
       if (prepared.deferred) return { ...accepted(record), pending: true, deferred: prepared.deferred };

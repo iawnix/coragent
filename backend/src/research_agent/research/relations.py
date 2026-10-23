@@ -8,7 +8,12 @@ DECLARED = frozenset({'part_of', 'requires', 'alternative_to'})
 
 
 def graph(root):
-    return read_json(Path(root) / 'research/map.json')
+    from .nodes import validate_node
+    value = read_json(Path(root) / 'research/map.json')
+    workspace_id = read_json(Path(root) / 'workspace_manifest.json')['workspace_id']
+    for ref, node in value['nodes'].items():
+        validate_node(node, ref, workspace_id)
+    return value
 
 
 def links(root, node_id):

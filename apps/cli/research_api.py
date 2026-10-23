@@ -21,7 +21,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="research_api")
     parser.add_argument("command", choices=sorted(COMMANDS))
     parser.add_argument("--root", required=True)
-    for field in ("ref", "query", "origin", "job-id", "artifact-id", "content", "title", "goal", "note", "proposal", "plan", "progress", "status", "node-id", "conclusion", "summary", "observation", "limitations", "field", "event-id", "request-id", "session-id", "read-basis"):
+    for field in ("ref", "query", "origin", "job-id", "artifact-id", "content", "title", "goal", "note", "plan", "status", "node-id", "conclusion", "summary", "observation", "limitations", "field", "event-id", "request-id", "session-id", "read-basis"):
         parser.add_argument("--" + field)
     for field in ("limit", "offset", "after-sequence"):
         parser.add_argument("--" + field, type=int)

@@ -74,7 +74,7 @@ test("Memory and Task recover their original identities without a calculation pl
     await conversation.waitForIdle(context);
     const task = await controller.begin({ title: "Derivation", objective: "Retain the derivation and limitations",
       source_submission_ids: [String(source.id)], criteria: [{ id: "derivation", description: "A recorded derivation" }] }, "begin", context);
-    assert.equal(task.schema_version, "coragent-user-task/5");
+    assert.equal(task.schema_version, "coragent-user-task/6");
     assert.equal(task.execution_target, null);
     assert.equal(task.execution_selection, null);
     assert.equal(task.execution_policy, null);

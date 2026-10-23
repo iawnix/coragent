@@ -104,7 +104,7 @@ Qrun 有未结束作业时拒绝移除，除非明确要求取消。多个入口
 删除配置入口本身不会卸载该环境。
 
 旧的平铺 targets、process／systemd 执行器被拒绝；没有自动迁移、旧选择别名或第二份可编辑目标表。
-持久化版本为 `coragent-user-task/5`、`job_intent/4`。部署前应先用旧版本处理完在途工作，
+持久化版本为 `coragent-user-task/6`、`job_intent/4`。部署前应先用旧版本处理完在途工作，
 再同步切换配置和运行时；新版本记录原路由不代表转换旧回执。
 
 新增 [execution-platforms skill](../skills/core/execution-platforms/SKILL.zh-CN.md) 负责选择、环境、

@@ -16,6 +16,7 @@ from research_agent.research.operational_ids import allocate_id
 
 _CONTRACTS = json.loads(files(__package__).joinpath('monitor_contracts.json').read_text())
 _VALIDATORS = {name: Draft202012Validator(schema) for name, schema in _CONTRACTS.items()}
+JOB_EVENT_IDS_LIMIT = json.loads(files(__package__).joinpath('monitor_limits.json').read_text())['max_event_ids']
 
 
 def validate_record(kind, value):
@@ -79,6 +80,18 @@ def _command(root,base,action,args):
     manifest=read(root/'workspace_manifest.json');workspace_id=manifest['workspace_id']
     bindings=sorted(base.glob('*/binding.json'))
     if args.get('monitor_id'):bindings=[p for p in bindings if p.parent.name==args['monitor_id']]
+    if action == 'observations':
+        observations, errors = [], []
+        for path in bindings:
+            try:
+                binding = read_binding(path)
+                intent = read(root / 'operations/jobs' / (binding['job_id'] + '.json'))
+                if intent['schema_version'] != 'job_intent/4' or intent['job_id'] != binding['job_id']:
+                    raise ValueError('monitor_job_intent_mismatch')
+                observations.append({'monitor_id': binding['monitor_id'], 'platform': intent['platform']})
+            except Exception as error:
+                errors.append(f'{path.parent.name}: {error}')
+        return {'observations': observations, 'registration_errors': errors}
     if action in {'list','status'}:
         result = {'workspace_id':workspace_id,'monitors':[monitor_view(p) for p in bindings]}
         if action == 'status':
@@ -96,6 +109,7 @@ def _command(root,base,action,args):
 
 
 def _tick(root, base, args):
+    from research_agent.jobs.command_scope import observation_deadline
     bindings=sorted(base.glob('*/binding.json'))
     if args.get('monitor_id'):bindings=[p for p in bindings if p.parent.name==args['monitor_id']]
     errors=[];observed=[]
@@ -103,12 +117,13 @@ def _tick(root, base, args):
         try:
             row=read_binding(p)
             receipt = None
-            try:
-                runtime = _recorded_job_manager(root, row['job_id'])
-                receipt=_receipt(root,{'job_id':row['job_id']}, runtime=runtime)
-                status=runtime.job_status(receipt)
-            except FileNotFoundError:
-                status=SimpleNamespace(state=JobState.UNKNOWN,exit_code=None,error='dispatch intent has no receipt; reconcile required')
+            with observation_deadline(args.get('timeout_seconds', 30)):
+                try:
+                    runtime = _recorded_job_manager(root, row['job_id'])
+                    receipt=_receipt(root,{'job_id':row['job_id']}, runtime=runtime)
+                    status=runtime.job_status(receipt)
+                except FileNotFoundError:
+                    status=SimpleNamespace(state=JobState.UNKNOWN,exit_code=None,error='dispatch intent has no receipt; reconcile required')
             status_value={key:getattr(status,key,None) for key in ('exit_code','started_at','finished_at','error','diagnostics')}
             status_value['state']=status.state.value
             observed.append(_commit_observation(root, {'monitor_id':row['monitor_id'],
@@ -172,30 +187,106 @@ def _delivery_command(root,base,action,args):
             if not row.get('batch_event_ids'):
                 sessions.setdefault(row.get('session_id'), []).append((path, row))
         for rows in sessions.values():
-            ids = sorted(row['event_id'] for _, row in rows)
-            request_id = 'job-wake-batch:' + hashlib.sha256(':'.join(ids).encode()).hexdigest()
-            for path, row in rows:
-                row.update(request_id=request_id, batch_event_ids=ids)
-                write(path, row)
+            rows.sort(key=lambda item: _event_number(item[1]['event_id']))
+            for offset in range(0, len(rows), JOB_EVENT_IDS_LIMIT):
+                _assign_batch(root, rows[offset:offset + JOB_EVENT_IDS_LIMIT])
         # Task Controller owns admission policy; the outbox retains facts only.
-        return {'deliveries': [row for _, row in pending]}
+        # Keep a partially acknowledged batch ahead of newer events by using
+        # its full immutable membership, including already delivered members.
+        return {'deliveries': sorted((row for _, row in pending), key=_delivery_order)}
+    if action in {'claim', 'complete'}:
+        return _batch_delivery(root, deliveries, action, args)
     eid=args.get('event_id')
     path=next((p for p in deliveries if p.stem==eid),None)
     if path is None:raise ValueError('unknown monitor event')
     if action=='event':
         return validate_event(read(path.parent.parent/'events'/f'{eid}.json'))
-    row=read_delivery(path)
-    if args.get('channel')!='wake':return {'claimed':False}
-    if action=='claim':
-        read_binding(path.parent.parent / 'binding.json')
-        if row.get('delivered') or row.get('lease_until',0)>time.time():return {'claimed':False}
-        row.update(claim_token=uuid.uuid4().hex,lease_until=time.time()+60)
-        write(path,row);return {**row,'claimed':True}
-    if action=='complete':
-        if row.get('claim_token')!=args.get('claim_token'):raise ValueError('stale wake claim')
-        row.update(delivered=bool(args.get('delivered')),error=args.get('error'),lease_until=0)
-        write(path,row);return {'ok':True}
     raise ValueError('unknown monitor command')
+
+
+def _batch_delivery(root, paths, action, args):
+    if args.get('channel') != 'wake':
+        return {'claimed': False}
+    request_id = args.get('request_id')
+    if not isinstance(request_id, str) or not request_id:
+        raise ValueError('monitor_request_id_required: claim and complete select a fixed batch')
+    rows = [(path, row) for path in paths if (row := read_delivery(path))['request_id'] == request_id]
+    if not rows:
+        raise ValueError('unknown monitor batch')
+    for path, _ in rows:
+        read_binding(path.parent.parent / 'binding.json')
+    first = rows[0][1]
+    members = first.get('batch_event_ids')
+    if (not members or set(members) != {row['event_id'] for _, row in rows}
+            or any(row['session_id'] != first['session_id'] or row.get('batch_event_ids') != members
+                   for _, row in rows)):
+        raise ValueError('monitor_batch_membership_invalid')
+    pending = [(path, row) for path, row in rows if not row['delivered']]
+    coordinator = TransactionCoordinator(root)
+    if action == 'claim':
+        if not pending:
+            return {'claimed': False}
+        if len(members) > JOB_EVENT_IDS_LIMIT:
+            raise ValueError('monitor_batch_too_large: preserve the original request; '
+                             'verify that Pi never accepted it before repairing the batch')
+        if any(row.get('lease_until', 0) > time.time() for _, row in pending):
+            return {'claimed': False}
+        events = []
+        for path, row in sorted(rows, key=lambda item: item[1]['event_id']):
+            event = validate_event(read(path.parent.parent / 'events' / path.name))
+            if event['event_id'] != row['event_id'] or event['session_id'] != row['session_id']:
+                raise ValueError('monitor_delivery_binding_mismatch')
+            events.append(event)
+        token, lease_until = uuid.uuid4().hex, time.time() + 60
+        writes = {str(path.relative_to(root)): {**row, 'claim_token': token, 'lease_until': lease_until}
+                  for path, row in pending}
+        result = {'claimed': True, 'request_id': request_id, 'session_id': first['session_id'],
+                  'claim_token': token, 'lease_until': lease_until}
+        committed = coordinator.commit_files('monitor-claim:' + token, 'job.monitor_claim',
+            {'request_id': request_id, 'claim_token': token}, writes=writes, result=result)['result']
+        # Immutable events and membership already live in the outbox. Return
+        # them to the caller without copying them into every retry receipt.
+        return {**committed, 'batch_event_ids': members, 'events': events}
+    token = args.get('claim_token')
+    if not isinstance(token, str) or not token:
+        raise ValueError('stale wake claim')
+    transaction_id = 'monitor-complete:' + token
+    payload = {'request_id': request_id, 'claim_token': token,
+               'delivered': bool(args.get('delivered')), 'error': args.get('error')}
+    if coordinator.get(transaction_id):
+        return coordinator.commit_files(transaction_id, 'job.monitor_complete', payload,
+                                        writes={}, result={})['result']
+    if not pending or any(row.get('claim_token') != token or row.get('lease_until', 0) <= time.time()
+                          for _, row in pending):
+        raise ValueError('stale wake claim')
+    writes = {str(path.relative_to(root)): {**row, 'delivered': payload['delivered'],
+              'error': payload['error'], 'lease_until': 0} for path, row in pending}
+    return coordinator.commit_files(transaction_id, 'job.monitor_complete', payload,
+                                    writes=writes, result={'ok': True})['result']
+
+
+def _event_number(event_id):
+    return int(event_id.removeprefix('event_'))
+
+
+def _delivery_order(row):
+    members = row.get('batch_event_ids') or [row['event_id']]
+    return row['session_id'], min(map(_event_number, members)), _event_number(row['event_id'])
+
+
+def _assign_batch(root, rows):
+    ids = sorted(row['event_id'] for _, row in rows)
+    batch_digest = hashlib.sha256(':'.join(ids).encode()).hexdigest()
+    request_id = 'job-wake-batch:' + batch_digest
+    writes = {str(path.relative_to(root)): {**row, 'request_id': request_id, 'batch_event_ids': ids}
+              for path, row in rows}
+    # One redo decision owns every member. A crash during file replacement is
+    # recovered before the next pending/claim observes this batch.
+    TransactionCoordinator(root).commit_files('monitor-batch:' + batch_digest, 'job.monitor_batch',
+        {'session_id': rows[0][1]['session_id'], 'event_ids': ids}, writes=writes,
+        result={'request_id': request_id, 'event_ids': ids})
+    for path, row in rows:
+        row.update(writes[str(path.relative_to(root))])
 
 
 def validate_event(event):

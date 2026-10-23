@@ -68,7 +68,9 @@ This status file is diagnostic output, not configuration. Missing optional setti
 do not prevent research startup and do not create queue or resolver services.
 
 Host Python bases and wheel overlays use
-`<env_root>/<installation-id>/{base,kernels}/<hash>`.
+`<env_root>/{base,kernels}/<hash>`.
+The store's installation ownership is recorded separately in
+`<env_root>/installation-owner.json`.
 `runtime.env_root` selects a dedicated store; the installer also accepts
 `CORAGENT_HOST_ENV_ROOT`. Scientific interpreters and programs are configured
 separately under `execution.platforms.<platform>.schedulers.<entry>.bindings` in `config.toml`.

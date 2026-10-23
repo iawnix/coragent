@@ -51,6 +51,7 @@ def _state_digest(graph, selection, jobs, projection, source_bindings):
         "relations": basis['relations'],
         "diagnostics": basis['diagnostics'],
         "notices": basis['notices'],
+        "notes": basis['notes'],
         "jobs": [
             {k: job.get(k) for k in ("job_id", "node_id", "state", "collection_state", "error", "execution_conflict", "latest_result_receipt_ref")}
             for job in sorted(jobs, key=lambda item: item.get("job_id", ""))
@@ -88,9 +89,11 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         source_refs.append(ref)
         status = node.get("status")
         assessment = node.get("assessment") or {}
-        summary = assessment.get("conclusion") or node.get("progress") or node.get("goal") or node.get("title")
-        findings.append(_source(ref, "node", summary, status=status,
-                                assessment_ref=node.get("assessment_ref")))
+        summary = node.get("goal") or node.get("title")
+        finding = _source(ref, "node", summary, status=status, assessment_ref=node.get("assessment_ref"))
+        if node.get("plan"):
+            finding['plan'] = _text(node['plan'])
+        findings.append(finding)
         if node.get("review_notice_count"):
             codes = sorted({notice.get("code", "review_required") for notice in node.get("review_notices", [])})
             contradictions.append(_source(ref, "node_review", "; ".join(codes), codes=codes))
@@ -100,25 +103,43 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
                               "reason": "The research question remains unresolved."})
         if node.get("assessment_ref"):
             source_refs.append(node["assessment_ref"])
+            if assessment:
+                refs = list(dict.fromkeys(assessment.get('evidence_refs', []) + assessment.get('inputs', [])))
+                source_refs.extend(refs)
+                findings.append(_source(node['assessment_ref'],
+                    assessment['kind'] if assessment['kind'] in {'result', 'note'} else 'record',
+                    assessment.get('conclusion'), node_id=ref, selected_assessment=True,
+                    references=refs, content_omitted=assessment.get('content_omitted', False)
+                    or _text(assessment.get('conclusion')) != assessment.get('conclusion')))
             if assessment.get("limitations"):
                 limitations.append(_source(node["assessment_ref"], "result_limitation", assessment["limitations"]))
+        for note in node.get('recent_notes', {}).get('records', []):
+            if note['ref'] == node.get('assessment_ref'):
+                continue
+            source_refs.append(note['ref'])
+            source_refs.extend(note['references'])
+            findings.append(_source(note['ref'], 'note', note['content'], node_id=ref,
+                sequence=note['sequence'], created_at=note['created_at'], references=note['references'],
+                reference_count=note['reference_count'], selected_assessment=False,
+                content_omitted=note['content_omitted'] or _text(note['content']) != note['content']))
 
-    # A brief cites every published Result attached to the selected Nodes,
-    # including preliminary results that were not selected as assessments.
-    # The result body remains available through research_read; only its bounded
-    # summary is projected here.
+    # Published Results remain distinct from the selected assessment. Their
+    # summaries and explicit citations compete for the same bounded context.
     for result in publication_order(root, graph):
         if result.get("node_id") not in selected:
             continue
         source_refs.append(result["id"])
         full_result = get_result(root, result["id"])
-        source_refs.extend(full_result.get("inputs", []))
-        source_refs.extend(full_result.get("evidence_refs", []))
-        source_refs.extend(item.get("artifact_ref") for item in full_result.get("files", [])
-                           if isinstance(item, dict) and item.get("artifact_ref"))
+        refs = list(dict.fromkeys(full_result.get('inputs', []) + full_result.get('evidence_refs', [])
+                    + [item['artifact_ref'] for item in full_result.get('files', [])
+                       if isinstance(item, dict) and item.get('artifact_ref')]))
+        source_refs.extend(refs[:4])
         if result["id"] not in {item.get("ref") for item in findings}:
-            findings.append(_source(result["id"], "result", result.get("summary") or result.get("conclusion"),
-                                    node_id=result.get("node_id"), supersedes=result.get("supersedes")))
+            summary = result.get("summary") or result.get("conclusion") or ''
+            findings.append(_source(result["id"], "result", summary,
+                                    node_id=result.get("node_id"), supersedes=result.get("supersedes"),
+                                    references=refs[:4], reference_count=len(refs),
+                                    content_omitted=_text(summary) != summary or len(refs) > 4))
         if result.get("limitations"):
             limitations.append(_source(result["id"], "result_limitation", result["limitations"]))
 
@@ -144,9 +165,10 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         ids = diagnostic.get("node_ids", [])
         contradictions.append(_source(ids[0] if ids else code, "diagnostic", code,
                                       node_ids=ids, node_count=diagnostic.get("node_count", len(ids))))
+        source_refs.extend(ids)
 
     omitted = selection.get("bounds", {}).get("omitted", {})
-    if any(value for key, value in omitted.items() if key in {"nodes", "jobs", "relations", "diagnostics"}):
+    if any(omitted.values()):
         limitations.append(_source("research-brief", "bounded_view", "Some scoped records were omitted; read current records before deciding."))
     if projection and projection.get("pending"):
         limitations.append(_source("runtime-projection", "pending_projection", "Runtime Job events still need reconciliation."))
@@ -162,27 +184,64 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         "user_sources": list(source_bindings),
         "coverage": {"nodes": len(selected),
                      "jobs": len(selected_jobs), "results": sum(r.get('node_id') in selected for r in graph['results'].values()),
-                     "events": len(events), "omitted": omitted},
+                     "notes": 0, "events": len(events), "omitted": dict(omitted)},
         "findings": findings,
         "contradictions": contradictions,
         "uncertainties": uncertainties,
         "limitations": limitations,
         "follow_up": follow_up,
         "source_refs": list(dict.fromkeys(source_refs)),
-        "read_more": {"research": {"tool": "research_read"}, "jobs": {"tool": "job_status"}},
-        "guidance": "This is a derived brief of recorded evidence. It does not certify scientific validity, authorize writes, schedule a run, or declare completion.",
+        "read_more": {"research": {"tool": "research_read"}, "jobs": {"tool": "job_status"},
+                      "history": {"tool": "research_search", "kind": "note"}},
+        "guidance": "This is a derived brief of recorded evidence. Notes are process records; only an explicit assessment_ref selects a current assessment. It does not certify scientific validity, authorize writes, schedule a run, or declare completion.",
         "projection_status": "incomplete" if projection and projection.get('pending') else "complete",
     }
-    brief["brief_digest"] = "sha256:" + digest({key: value for key, value in brief.items() if key != "brief_digest"})
+    scoped = set(selection['_basis']['node_ids'])
+    totals = {'nodes': len(scoped), 'jobs': len(selection['_basis']['job_ids']),
+              'results': sum(result.get('node_id') in scoped for result in graph['results'].values()),
+              'notes': sum(item['total'] for item in selection['_basis']['notes'].values())}
+    known_refs = set(source_refs)
+
+    def refresh():
+        # Citations name actual visible facts or their explicit references;
+        # truncating prose must not leave an unbounded hidden citation list.
+        refs = []
+        for item in sum((brief[key] for key in ('findings', 'contradictions', 'uncertainties', 'limitations', 'follow_up')), []):
+            refs.extend([item.get('ref'), item.get('assessment_ref'), item.get('node_id')])
+            refs.extend(item.get('references', []))
+            refs.extend(item.get('node_ids', []))
+        brief['source_refs'] = list(dict.fromkeys(ref for ref in refs if ref in known_refs))
+        for category, kind in [('nodes', 'node'), ('jobs', 'job'), ('results', 'result'), ('notes', 'note')]:
+            included = len({item['ref'] for item in brief['findings'] if item['kind'] == kind})
+            brief['coverage'][category] = included
+            brief['coverage']['omitted'][category] = max(0, totals[category] - included)
+        brief['brief_digest'] = 'sha256:' + digest({key: value for key, value in brief.items() if key != 'brief_digest'})
+
+    refresh()
+    # Keep at least each question's latest note ahead of older process detail.
+    note_nodes = set()
+    older_notes = []
+    for item in findings:
+        if item['kind'] == 'note' and not item.get('selected_assessment'):
+            if item['node_id'] in note_nodes:
+                older_notes.append(item)
+            note_nodes.add(item['node_id'])
+    optional = list(reversed(older_notes)) + [item for item in reversed(findings)
+                if item['kind'] == 'result' and not item.get('selected_assessment')]
+    for item in optional:
+        if _size(brief) <= max_bytes:
+            break
+        brief['findings'].remove(item)
+        refresh()
+    for item in brief['findings']:
+        if _size(brief) <= max_bytes:
+            break
+        if item.pop('plan', None) is not None:
+            refresh()
+    for key in ('uncertainties', 'limitations', 'follow_up', 'findings', 'contradictions'):
+        while brief[key] and _size(brief) > max_bytes:
+            brief[key].pop()
+            refresh()
     if _size(brief) > max_bytes:
-        # Keep the report useful under a tight transport budget.  Counts and
-        # source references remain explicit when prose findings are truncated.
-        for key in ("findings", "uncertainties", "limitations"):
-            while brief[key] and _size(brief) > max_bytes:
-                brief[key].pop()
-        if _size(brief) > max_bytes:
-            brief["follow_up"] = brief["follow_up"][:4]
-        if _size(brief) > max_bytes:
-            raise ValueError("brief_budget_too_small")
-        brief["brief_digest"] = "sha256:" + digest({key: value for key, value in brief.items() if key != "brief_digest"})
+        raise ValueError('brief_budget_too_small')
     return brief

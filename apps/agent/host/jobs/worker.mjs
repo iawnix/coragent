@@ -5,47 +5,47 @@ import { promisify } from "node:util";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validate_workspace_manifest } from "../workspace.mjs";
+import { createObservationScheduler, firstSessionBatches, interleaveWorkspaces, mapConcurrent } from "./scheduling.mjs";
 
 
 const executeFile = promisify(execFile);
 import { packageRoot } from "../../platform/resources.mjs";
 const python = process.env.CORAGENT_PYTHON || "python3";
+const OBSERVATION_TIMEOUT_SECONDS = 30;
+const WORKER_CONCURRENCY = 4;
 
 // Job Manager only wakes the owning Agent; notification decisions belong to email Skill.
-export async function deliverJobEvent({ workspace, delivery, deliveries = [delivery], runJson, sendWake }) {
+export async function deliverJobEvent({ workspace, delivery, deliveries = [delivery], runJson, sendWake, onDelivered }) {
   const errors = [];
-  const claims = [];
+  const requestId = deliveries[0].request_id;
+  let claim;
+  let result = [];
   try {
-    for (const row of deliveries) {
-      const claimed = await runJson("claim", workspace, ["--event-id", row.event_id, "--channel", "wake"]);
-      if (claimed.claimed) claims.push({ claimed, completion: ["--event-id", row.event_id, "--channel", "wake", "--claim-token", claimed.claim_token] });
+    claim = await runJson("claim", workspace, ["--request-id", requestId, "--channel", "wake"]);
+    if (!claim.claimed) return errors;
+    const hostWorkspaceId = await jobHostWorkspaceId(workspace, claim.events[0]);
+    if (claim.events.some(event => event.workspace_id !== hostWorkspaceId)) {
+      throw new Error("monitor event belongs to another workspace");
     }
-    if (!claims.length) return errors;
-    let hostWorkspaceId;
-    for (const { claimed } of claims) {
-      const event = await runJson("event", workspace, ["--event-id", claimed.event_id]);
-      hostWorkspaceId = await jobHostWorkspaceId(workspace, event);
-      if (!claimed.session_id) throw new Error("monitor has no owning session; wake remains pending");
+    if (!claim.session_id) throw new Error("monitor has no owning session; wake remains pending");
+    // Admission and retries use the immutable batch identity from the claim.
+    const response = await sendWake({ workspace_id: hostWorkspaceId, session_id: claim.session_id,
+      request_id: claim.request_id, client_message_id: claim.request_id, source: "job_manager", mode: "next_run",
+      event_ids: claim.batch_event_ids });
+    if (response?.error?.code === "busy" || response?.pending === true) return errors;
+    if (response?.accepted !== true || response?.state === "uncertain") {
+      throw new Error(response?.error?.message || "Host returned an uncertain monitor wake");
     }
-    {
-      const first = claims[0].claimed;
-      const ids = first.batch_event_ids || claims.map(claim => claim.claimed.event_id);
-      // The Worker authenticates this producer and assesses immutable events
-      // before its short Pi admission transaction.
-      const response = await sendWake({ workspace_id: hostWorkspaceId, session_id: first.session_id,
-        request_id: first.request_id, client_message_id: first.request_id, source: "job_manager", mode: "next_run",
-        event_ids: ids });
-      if (response?.error?.code === "busy" || response?.pending === true) return errors;
-      if (response?.accepted !== true || response?.state === "uncertain") {
-        throw new Error(response?.error?.message || "Host returned an uncertain monitor wake");
-      }
-      for (const claim of claims) claim.result = ["--delivered"];
-    }
+    result = ["--delivered"];
   } catch (error) {
     errors.push(`wake: ${errorMessage(error)}`);
-    for (const claim of claims) if (!claim.result) claim.result = ["--error", errorMessage(error)];
+    result = ["--error", errorMessage(error)];
   } finally {
-    for (const claim of claims) await runJson("complete", workspace, [...claim.completion, ...(claim.result || [])]);
+    if (claim?.claimed) {
+      await runJson("complete", workspace,
+        ["--request-id", requestId, "--channel", "wake", "--claim-token", claim.claim_token, ...result]);
+      if (result[0] === "--delivered") onDelivered?.();
+    }
   }
   return errors;
 }
@@ -76,53 +76,176 @@ export async function runJobWorker(options, signal) {
   const token = process.env.CORAGENT_INTERNAL_JOB_TOKEN;
   delete process.env.CORAGENT_INTERNAL_JOB_TOKEN;
   if (!token) throw new Error("Job Manager must be started by the installation Host");
-  let client;
+  let connection;
   const catalog = createWorkspaceCatalog(options.workspaceRoot, { python });
-  let lastSuccessfulPoll = null;
   const sendWake = async (params) => {
+    const pending = connection ??= connectHost({ socketPath: options.hostSocket });
     try {
-      client ??= await connectHost({ socketPath: options.hostSocket });
+      const client = await pending;
+      if (signal.aborted) { client.close(); throw signal.reason; }
       return await client.request("internal/job-event", { ...params, token });
-    } catch (error) { client?.close(); client = undefined; throw error; }
+    } catch (error) {
+      if (connection === pending) connection = undefined;
+      void pending.then(client => client.close(), () => {});
+      throw error;
+    }
   };
-  const runJson = (command, workspace, extra) => runJobManagerJson(command, workspace, extra, signal);
+  const closeConnection = () => { void connection?.then(client => client.close(), () => {}); };
+  signal.addEventListener("abort", closeConnection, { once: true });
+  const runJson = (command, workspace, extra, commandSignal = signal) => runJobManagerJson(command, workspace, extra, commandSignal);
   try {
-    do {
-      const errors = [];
-      let pollFailed = false;
-      for (const { source_root: workspace } of await catalog.list()) {
-        if (signal.aborted) break;
-        try {
-          const tick = await runJson("tick", workspace);
-          const pending = await runJson("pending", workspace);
-          const pollErrors = [...(tick.registration_errors || []), ...(tick.monitors || []).map((row) => row.error).filter(Boolean)];
-          if (pollErrors.length) pollFailed = true;
-          const deliveryErrors = [...pollErrors];
-          const batches = new Map();
-          for (const delivery of pending.deliveries || []) {
-            const key = `${delivery.session_id}:${delivery.request_id}`;
-            if (!batches.has(key)) batches.set(key, []);
-            batches.get(key).push(delivery);
-          }
-          for (const deliveries of batches.values()) {
-            if (signal.aborted) break;
-            deliveryErrors.push(...await deliverJobEvent({ workspace, deliveries, runJson, sendWake }));
-          }
-          await runJson("health", workspace, deliveryErrors.length ? ["--error", deliveryErrors.join("; ")] : []);
-          errors.push(...deliveryErrors);
-        } catch (error) {
-          pollFailed = true;
-          errors.push(errorMessage(error));
-          if (!signal.aborted) await runJson("health", workspace, ["--error", errorMessage(error)]).catch(() => {});
-        }
+    await runJobWorkerLoops(options, signal, { listWorkspaces: () => catalog.list(), runJson, sendWake,
+      publishHealth: value => writeHealth(options.stateRoot, value) });
+  } finally {
+    signal.removeEventListener("abort", closeConnection);
+    closeConnection();
+    await catalog.close();
+  }
+}
+
+/** Observation and delivery share durable records, but never await each other's work. */
+export async function runJobWorkerLoops(options, signal, { listWorkspaces, runJson, sendWake, publishHealth }) {
+  const controller = new AbortController();
+  signal = AbortSignal.any([signal, controller.signal]);
+  const executeJson = runJson;
+  runJson = (command, workspace, extra = []) => executeJson(command, workspace, extra, signal);
+  const health = { pid: process.pid, poll_interval_ms: options.intervalMs,
+    last_successful_poll: null, last_successful_observation: null, last_successful_delivery: null,
+    last_observation_error: null, last_delivery_error: null, last_error: null };
+  const observationErrors = new Map();
+  const deliveryErrors = new Map();
+  let observationKeys = new Set();
+  const observedSincePoll = new Set();
+  let healthWrite = Promise.resolve();
+  const recordErrors = (records, workspace, key, errors) => {
+    const identity = JSON.stringify([workspace, key]);
+    if (errors.length) records.set(identity, { workspace, key, message: errors.join("; ") });
+    else records.delete(identity);
+  };
+  const messages = records => [...records.values()].map(row => row.message);
+  const publish = () => {
+    health.last_observation_error = messages(observationErrors).join("; ") || null;
+    health.last_delivery_error = messages(deliveryErrors).join("; ") || null;
+    health.last_error = [health.last_observation_error, health.last_delivery_error].filter(Boolean).join("; ") || null;
+    const snapshot = { ...health, updated_at: new Date().toISOString() };
+    // Both loops publish to one file; serialize its atomic rename.
+    healthWrite = healthWrite.catch(() => {}).then(() => publishHealth(snapshot));
+    return healthWrite;
+  };
+  const scheduler = createObservationScheduler({ signal, intervalMs: options.once ? Infinity : options.intervalMs,
+    concurrency: WORKER_CONCURRENCY,
+    observe: item => runJson("tick", item.workspace,
+      ["--monitor-id", item.monitor_id, "--timeout-seconds", String(OBSERVATION_TIMEOUT_SECONDS)]),
+    onResult(item, result, error) {
+      if (signal.aborted) return;
+      const errors = error ? [monitorCommandError(error)] : [
+        ...(result.registration_errors || []), ...(result.monitors || []).map(row => row.error).filter(Boolean)];
+      const key = JSON.stringify([item.workspace, item.monitor_id]);
+      if (!observationKeys.has(key)) return;
+      recordErrors(observationErrors, item.workspace, `monitor:${item.monitor_id}`, errors);
+      if (!errors.length) {
+        health.last_successful_observation = new Date().toISOString();
+        observedSincePoll.add(key);
+      } else observedSincePoll.delete(key);
+      if (!observationErrors.size && [...observationKeys].every(identity => observedSincePoll.has(identity))) {
+        health.last_successful_poll = health.last_successful_observation;
+        observedSincePoll.clear();
       }
-      if (!pollFailed && !signal.aborted) lastSuccessfulPoll = new Date().toISOString();
-      await writeHealth(options.stateRoot, { pid: process.pid, poll_interval_ms: options.intervalMs, updated_at: new Date().toISOString(),
-        last_successful_poll: lastSuccessfulPoll, last_error: errors.length ? errors.join("; ") : null });
+    },
+  });
+  const observeLoop = async () => {
+    const inventory = new Map();
+    do {
+      try {
+        const workspaces = await listWorkspaces();
+        const roots = new Set(workspaces.map(row => row.source_root));
+        for (const root of inventory.keys()) if (!roots.has(root)) inventory.delete(root);
+        for (const [key, row] of observationErrors) if (row.workspace && !roots.has(row.workspace)) observationErrors.delete(key);
+        recordErrors(observationErrors, null, "catalog", []);
+        await mapConcurrent(workspaces, WORKER_CONCURRENCY, async ({ source_root: workspace }) => {
+          if (signal.aborted) return;
+          try {
+            const result = await runJson("observations", workspace);
+            inventory.set(workspace, result.observations.map(row => ({ ...row, workspace })));
+            const monitors = new Set(result.observations.map(row => `monitor:${row.monitor_id}`));
+            for (const [key, row] of observationErrors) {
+              if (row.workspace === workspace && row.key.startsWith("monitor:") && !monitors.has(row.key)) observationErrors.delete(key);
+            }
+            recordErrors(observationErrors, workspace, "inventory", result.registration_errors || []);
+          } catch (error) { recordErrors(observationErrors, workspace, "inventory", [monitorCommandError(error)]); }
+        });
+        const observations = [...inventory.values()].flat();
+        observationKeys = new Set(observations.map(row => JSON.stringify([row.workspace, row.monitor_id])));
+        for (const key of observedSincePoll) if (!observationKeys.has(key)) observedSincePoll.delete(key);
+        scheduler.update(observations);
+        if (!observationKeys.size && !observationErrors.size) health.last_successful_poll = new Date().toISOString();
+        if (options.once) await scheduler.drain();
+      } catch (error) { recordErrors(observationErrors, null, "catalog", [monitorCommandError(error)]); }
+      if (!signal.aborted) await publish();
       if (options.once || signal.aborted) break;
       await delay(options.intervalMs, signal);
     } while (!signal.aborted);
-  } finally { client?.close(); await catalog.close(); }
+  };
+  const deliverOnce = async () => {
+      try {
+        const workspaces = await listWorkspaces();
+        const roots = new Set(workspaces.map(row => row.source_root));
+        for (const [key, row] of deliveryErrors) if (row.workspace && !roots.has(row.workspace)) deliveryErrors.delete(key);
+        recordErrors(deliveryErrors, null, "catalog", []);
+        const batches = (await mapConcurrent(workspaces, WORKER_CONCURRENCY, async ({ source_root: workspace }) => {
+          if (signal.aborted) return [];
+          try {
+            const pending = await runJson("pending", workspace);
+            recordErrors(deliveryErrors, workspace, "pending", []);
+            const batches = firstSessionBatches(pending.deliveries || []);
+            const sessions = new Set(batches.map(rows => `session:${rows[0].session_id}`));
+            for (const [key, row] of deliveryErrors) {
+              if (row.workspace === workspace && row.key.startsWith("session:") && !sessions.has(row.key)) deliveryErrors.delete(key);
+            }
+            return batches.map(deliveries => ({ workspace, deliveries }));
+          } catch (error) {
+            recordErrors(deliveryErrors, workspace, "pending", [monitorCommandError(error)]);
+            return [];
+          }
+        })).flat();
+        await mapConcurrent(interleaveWorkspaces(batches), WORKER_CONCURRENCY, async ({ workspace, deliveries }) => {
+          if (signal.aborted) return;
+          let errors;
+          try {
+            errors = await deliverJobEvent({ workspace, deliveries, runJson, sendWake,
+              onDelivered() { health.last_successful_delivery = new Date().toISOString(); } });
+          }
+          catch (error) { errors = [monitorCommandError(error)]; }
+          recordErrors(deliveryErrors, workspace, `session:${deliveries[0].session_id}`, errors);
+        });
+        await mapConcurrent(workspaces, WORKER_CONCURRENCY, async ({ source_root: workspace }) => {
+          if (signal.aborted) return;
+          const errors = [...observationErrors.values(), ...deliveryErrors.values()]
+            .filter(row => row.workspace === workspace).map(row => row.message);
+          try {
+            await runJson("health", workspace, errors.length ? ["--error", errors.join("; ")] : []);
+            recordErrors(deliveryErrors, workspace, "health", []);
+          } catch (error) { recordErrors(deliveryErrors, workspace, "health", [monitorCommandError(error)]); }
+        });
+      } catch (error) { recordErrors(deliveryErrors, null, "catalog", [monitorCommandError(error)]); }
+      if (!signal.aborted) await publish();
+  };
+  const deliveryLoop = async () => {
+    do {
+      await deliverOnce();
+      if (options.once || signal.aborted) break;
+      await delay(options.intervalMs, signal);
+    } while (!signal.aborted);
+  };
+  const loops = [observeLoop(), deliveryLoop()].map(operation => operation.catch(error => { controller.abort(error); throw error; }));
+  try {
+    const results = await Promise.allSettled(loops);
+    const failure = results.find(result => result.status === "rejected");
+    if (failure) throw failure.reason;
+    // Include events emitted after the concurrent delivery pass began.
+    if (options.once && !signal.aborted) await deliverOnce();
+  }
+  finally { scheduler.stop(); await scheduler.drain(); await healthWrite; }
 }
 
 async function writeHealth(stateRoot, value) {
@@ -134,8 +257,14 @@ async function writeHealth(stateRoot, value) {
 }
 
 async function runJobManagerJson(command, workspace, extra = [], signal) {
-  const completed = await executeFile(python, [join(packageRoot, "apps/cli/job_manager.py"), command, "--root", workspace, ...extra], {
-    cwd: workspace, env: { ...process.env, PYTHONNOUSERSITE: "1" }, maxBuffer: 8 * 1024 * 1024, timeout: 60_000, signal });
+  const operation = executeFile(python, [join(packageRoot, "apps/cli/job_manager.py"), command, "--root", workspace, ...extra], {
+    cwd: workspace, env: { ...process.env, PYTHONNOUSERSITE: "1" }, maxBuffer: 8 * 1024 * 1024,
+    timeout: command === "tick" ? (OBSERVATION_TIMEOUT_SECONDS + 5) * 1000 : 10_000, killSignal: "SIGTERM", signal });
+  // AbortSignal rejects execFile before Python's SIGTERM cleanup has completed.
+  const closed = new Promise(resolvePromise => operation.child.once("close", resolvePromise));
+  let completed;
+  try { completed = await operation; }
+  finally { await closed; }
   const value = JSON.parse(completed.stdout.trim());
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`invalid monitor JSON for ${command}`);
   return value;

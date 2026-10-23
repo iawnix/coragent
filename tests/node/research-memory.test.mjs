@@ -222,16 +222,20 @@ test('an oversized committed Node reply cannot silently advance its read revisio
     bridge=create_python_runtime_bridge({workspace_root:root,workspace_id:'large'});
     const tools=createResearchTools({commandBridge:bridge});
     const run=async(name,args,callId)=>(await tools.find(t=>t.name===name).execute(args,{callId,coragent:{workspace_root:root,session_id:'large-session',operation_id:callId,principal:'root_agent'}})).details.result;
-    const created=await run('research_create',{goal:'g'.repeat(7900),proposal:'研'.repeat(5300),plan:'究'.repeat(5300)},'create');
+    const created=await run('research_create',{goal:'g'.repeat(7900),plan:'究'.repeat(5300)},'create');
     assert.ok(created.read_basis);
     const nodeId=created.node.id;
-    const expanded=await run('research_update',{node_id:nodeId,note:'Record a substantial progress analysis.',progress:'果'.repeat(5300)},'expand');
+    const expanded=await run('research_update',{node_id:nodeId,note:'Revise the research approach after evaluating alternatives.',plan:'果'.repeat(15000)},'expand');
     assert.equal(expanded.accepted,true);
     assert.equal(expanded.content_omitted,true);
     assert.equal(expanded.read_basis,undefined);
     await assert.rejects(run('research_update',{node_id:nodeId,note:'Cannot replace a field without seeing its current revision.',plan:'New plan'},'unseen'),/node_revision_conflict/);
-    const field=await run('research_read',{ref:nodeId,field:'plan',limit:32000},'field');
-    assert.ok(field.read_basis);
+    let offset=0;
+    do {
+      const field=await run('research_read',{ref:nodeId,field:'plan',offset,limit:4000},`field-${offset}`);
+      assert.ok(field.read_basis);
+      offset=field.next_offset;
+    } while (offset!==null);
     const updated=await run('research_update',{node_id:nodeId,note:'Read the current plan before revising it.',plan:'New plan'},'seen');
     assert.equal(updated.accepted,true);
   } finally {await bridge?.close();await rm(root,{recursive:true,force:true});}

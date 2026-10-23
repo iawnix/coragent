@@ -26,9 +26,11 @@ CF22D doctor 在错误处理范围内加载依赖，区分依赖缺失与方法�
 
 ## 修订与需复核提示
 
-发布 Result 时同时提供 as_assessment=true 和 progress，即把新结果、当前判断选择及进度作为一个原子修订。必须读过对应 Node 字段；冲突时全部不保存。普通发布不带 progress 时保持既有语义：结果可保存，而当前判断选择单独报告冲突。supersedes 显式标记纠正对象，不改写历史记录。
+发布 Result 时，`as_assessment=true` 将保存新结果与选定当前综合判断作为一个原子修订。必须读过对应 Node 字段；读取冲突时两者均不保存，重新读取并判断后再重试。普通发布不修改当前判断；最新 Result 或 supersedes 关系都不自动选定综合判断。需要选定已有 Result 或同 Node 的作者记录时，使用 research_update.assessment_ref。supersedes 显式标记纠正对象，不改写历史记录。
 
-新 Result 保存发布时的节点上下文摘要，已有 basis_refs 保留引用来源版本。读取 Result、当前判断卡片与生成的 Markdown 时派生需复核提示：节点上下文变化、引用结果被替代、外部节点来源版本变化。单独追加笔记不会替换进度，也不会据此判定旧结果错误。
+Node 的 plan 统一保存当前假设和调查思路，note 留存过程决策；Result 不接受 progress 参数。同一发现按用途记录为 note 或 Result，不要求重复写入两者或 Task 进展。执行事实与发布证据由现有工具追踪，任务下一步、等待和控制仍需 Agent 明确选择。Node 使用 research-node/2，Task 使用 coragent-user-task/6，运行时、合同和 Skill 必须同步升级，不保留旧字段别名或双协议。
+
+新 Result 保存发布时的节点上下文摘要，已有 basis_refs 保留引用来源版本。读取 Result、当前判断卡片与生成的 Markdown 时派生需复核提示：节点上下文变化、引用结果被替代、外部节点来源版本变化。单独追加笔记不会替换当前综合判断，也不会据此判定旧结果错误；Brief 纳入近期 note 只用于恢复过程，不晋升为结论。
 
 报告作为 Result 保存其 files 与 inputs/evidence_refs，使用相同的时间、来源和需复核机制；普通散落的 Markdown 文件不会被框架自动解析或重写。旧 Result 没有上下文摘要时不会伪造一个历史版本，只能根据已有引用发现替代关系。
 

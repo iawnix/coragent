@@ -209,7 +209,10 @@ class TransactionCoordinator:
             _safe_write_path(self.root, relative)
         for relative, value in writes.items():
             _atomic_json(_safe_write_path(self.root, relative), value)
-        committed = {**record, "state": "committed", "committed_at": _now()}
+        # Every public write is durable now. Retries need the receipt and
+        # digests, while only an unfinished redo decision needs the write set.
+        committed = {key: value for key, value in record.items() if key != "writes"}
+        committed.update(state="committed", committed_at=_now())
         _atomic_json(path, committed)
         self._clear_recovery_pointer(path)
         return committed

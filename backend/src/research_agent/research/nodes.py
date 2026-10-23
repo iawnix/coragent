@@ -9,6 +9,19 @@ from .records import workspace, append_record, record, now
 from . import basis, relations
 
 
+NODE_SCHEMA = 'research-node/2'
+NODE_FIELDS = frozenset({'schema_version', 'id', 'workspace_id', 'title', 'goal', 'plan', 'status',
+                        'assessment_ref', 'source_refs', 'input_refs', 'subjects', 'revision',
+                        'created_at', 'updated_at', 'author'})
+
+
+def validate_node(value, node_id, workspace_id):
+    if (not isinstance(value, dict) or value.get('id') != node_id or value.get('schema_version') != NODE_SCHEMA
+            or value.get('workspace_id') != workspace_id or set(value) != NODE_FIELDS):
+        raise ValueError('node_identity_invalid')
+    return value
+
+
 def text(value, name, *, required=False, limit=16000):
     if value is None and not required:
         return None
@@ -25,11 +38,8 @@ def get_node(root, node_id):
     path = Path(root) / 'research/nodes' / node_id / 'node.json'
     if path_has_symlink(path):
         raise ValueError('node_path_symlink')
-    value = read_json(path)
-    if (value.get('id') != node_id or value.get('schema_version') != 'research-node/1'
-            or value.get('workspace_id') != read_json(Path(root) / 'workspace_manifest.json')['workspace_id']):
-        raise ValueError('node_identity_invalid')
-    return value
+    return validate_node(read_json(path), node_id,
+                         read_json(Path(root) / 'workspace_manifest.json')['workspace_id'])
 
 
 def save(root, node):
@@ -84,10 +94,9 @@ def create(root, request):
     input_refs = validate_refs(root, request.get('input_refs', []), request.get('_reference_details'))
     from .context import subjects
     subject_refs = subjects(root, request.get('subjects', {}), request.get('_reference_details', {}))
-    node = dict(schema_version='research-node/1', id=allocate_id(root, 'node'),
+    node = dict(schema_version=NODE_SCHEMA, id=allocate_id(root, 'node'),
                 workspace_id=read_json(root / 'workspace_manifest.json')['workspace_id'],
-                title=title, goal=goal, proposal=text(request.get('proposal'), 'proposal'),
-                plan=text(request.get('plan'), 'plan'), progress='', status='open', assessment_ref=None,
+                title=title, goal=goal, plan=text(request.get('plan'), 'plan'), status='open', assessment_ref=None,
                 source_refs=source_refs, input_refs=input_refs, subjects=subject_refs, revision=1, created_at=now(), updated_at=now(),
                 author={'session_id': request.get('session_id')})
     save(root, node)

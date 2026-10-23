@@ -24,6 +24,6 @@
 
 ## 修订与复核
 
-Result 发布后不可覆盖。纠正时发布新的 Result，通过 `supersedes` 指向同一 Node 的旧结论，并说明证据或解释变化。新 Result 不会自动取代当前综合判断；按需设置 `as_assessment`。检查 `result_saved` 与 `assessment_selected`，区分发布成功和综合判断选择成功。沿依赖引用复核下游结论，保留仍有效的材料与竞争解释。
+Result 发布后不可覆盖。纠正时发布新的 Result，通过 `supersedes` 指向同一 Node 的旧结论，并说明证据或解释变化。普通发布不改变当前综合判断；最新或替代某个 Result 都不自动选定它。新结论确实代表 Node 当前判断时，先读取当前 Node，再以 `as_assessment=true` 发布。保存 Result 和选定它是一个原子操作，读取过期时两者均不保存；重新读取并判断后再重试。选择已发布的同 Node Result 或作者记录使用 `research_update.assessment_ref`。沿依赖引用复核下游结论，保留仍有效的材料与竞争解释。
 
 Job 输出的生产来源通过 `job_collect` 保存；不要将原始输出重写为无来源文本。准备、提交和收集见[Job 与材料流程](../../research-workflow/references/jobs-and-artifacts.zh-CN.md)。

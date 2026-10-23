@@ -36,10 +36,11 @@ a valid scientific result; retain unsupported checks and failed attempts as evid
 
 ## Recording
 
-Continue the existing Node for this question, or create an independent branch with research_create. Put the question in goal and the candidate hypothesis in proposal.
+Read and continue the existing Node for this question. Put candidate hypotheses and the investigation approach in its plan, and preserve changes in notes. Create another Node only for a new research objective needing its own continuing investigation and judgment, not for each candidate or calculation step.
 Bind all seeds through logical artifact IDs. Link every immutable compute intent
 and preserve method/parameters. After collection, record candidate coordinates,
-energies, constraints, and provenance as separate research notes when useful.
+energies, constraints, and provenance when useful; distinguish these evidence types within
+the same note or Result rather than requiring a record for each item.
 
 Use research notes for distorted geometry, atom-map ambiguity, fragment collapse,
 unexpected bonding, electronic-state concern, or missing conformers.
@@ -47,14 +48,14 @@ unexpected bonding, electronic-state concern, or missing conformers.
 ## Follow-Up
 
 A candidate still requires scientifically appropriate optimization and
-characterization. For a classical TS this normally separates:
+characterization. For a classical TS, distinguish these evidence types:
 
-- stationary-point/convergence research notes;
-- imaginary-mode/reaction-coordinate assignment research notes;
-- bidirectional connectivity and endpoint identity research notes;
+- stationary-point/convergence evidence;
+- imaginary-mode/reaction-coordinate assignment;
+- bidirectional connectivity and endpoint identity;
 - additional state, robustness, stereochemical, or thermochemical checks.
 
-Record the observations, scientific criteria, unresolved questions and next steps with research_update using the existing node_id and a note. Publish a reusable conclusion with research_result, citing collected materials and stating limitations. A completed computation does not establish a scientific conclusion.
+Use the existing node_id. Record observations, scientific criteria and next-step decisions in a research_update note, or publish a reusable conclusion with research_result, citing collected materials and limitations. Do not duplicate the same finding in both records or task progress. A completed computation does not establish a scientific conclusion or require a new Node or Result.
 
 Supplied material endpoints can use `chemical.qst-prepare@1`; bounded scan and
 xTB NEB recipes are documented in [path operations](path_search.md). These

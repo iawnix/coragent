@@ -70,7 +70,6 @@ async function fixture(t, storage = new MemoryStorage(), controllerOptions = {},
     await conversation.waitForIdle(context);
     const task = await controller.begin({ title: "Research mechanism", objective: "Deliver the mechanism report",
       source_submission_ids: [String(source.id)], criteria: [{ id: "report", description: "Report supported by evidence" }],
-      initial_plan: "Investigate the mechanism and deliver a report supported by evidence.",
       next_action: "Inspect the available mechanism inputs.", ...overrides }, "begin", context);
     return task;
   };
@@ -91,10 +90,10 @@ test("idle active tasks continue beyond three evidence-free runs and explicit bl
   const { controller, conversation, faux, begin, admission } = await fixture(t);
   const task = await begin();
   assert.match(task.user_task_id, /^task_/);
-  assert.equal(task.schema_version, "coragent-user-task/5");
+  assert.equal(task.schema_version, "coragent-user-task/6");
   assert.deepEqual(task.research, { entry_node_ids: [], focus_node_ids: [] });
   assert.match(task.sources[0].text, /evidence-backed/);
-  assert.equal(task.initial_plan, "Investigate the mechanism and deliver a report supported by evidence.");
+  assert.equal("initial_plan" in task, false);
   assert.equal(projectUserTask(task).next_action, "Inspect the available mechanism inputs.");
   for (let round = 0; round < 4; round++) {
     faux.setResponses([fauxAssistantMessage("Another partial summary")]);
@@ -214,7 +213,7 @@ test("a Node creation finishing after task replacement cannot bind the new task"
     await controller.control({ user_task_id: task.user_task_id, action: "cancel", expected_revision: task.revision,
       request_id: "cancel-before-create", jobs: "keep" }, context);
     await controller.begin({ title: "New study", objective: "Investigate another route", source_submission_ids: [task.sources[0].submission_id],
-      criteria: [{ id: "report", description: "Deliver the new study" }], initial_plan: "Inspect the new inputs and report.",
+      criteria: [{ id: "report", description: "Deliver the new study" }],
       next_action: "Read the new inputs." }, "replace-before-create", context);
   } finally { finish.resolve({ node: { id: "node_1", revision: 1 } }); }
   const reply = await pending;
@@ -466,8 +465,10 @@ test("automatic observation skips historical Jobs while crediting current eviden
 test("old task schema is rejected rather than initialized or migrated", async t => {
   const { controller, begin, conversation } = await fixture(t);
   const task = await begin();
-  await conversation.commit(async tx => { const stored = await tx.doc(UserTask, conversation.id, task.user_task_id, null); stored.schema_version = "coragent-user-task/1"; delete stored.research; }, context);
-  await assert.rejects(controller.current(context), { code: "task_schema_unsupported" });
+  for (const version of [1,5]) {
+    await conversation.commit(async tx => { const stored = await tx.doc(UserTask, conversation.id, task.user_task_id, null); stored.schema_version = `coragent-user-task/${version}`; }, context);
+    await assert.rejects(controller.current(context), { code: "task_schema_unsupported" });
+  }
 });
 
 test("concrete Job waits do not generate inputs and reconcile already finished Jobs", async t => {
@@ -563,7 +564,7 @@ test("canonical task tools run through the trusted Harness envelope", async t =>
   const [begin, read] = createTaskTools(() => controller).map(tool => wrapToolForHarness(tool, { toolContext,
     invocation: api => ({ workspaceRoot: "/workspace", sessionId: "session", operationId: String(api.taskId) }) }));
   const result = await begin.execute({ title: "Work", objective: "Complete research", source_submission_ids: [String(input.id)],
-    criteria: [{ id: "report", description: "Deliver a report" }], initial_plan: "Collect evidence and deliver the report.",
+    criteria: [{ id: "report", description: "Deliver a report" }],
     next_action: "Read the requirements and collect the first evidence." }, { taskId: 99, callId: "begin" }, context);
   assert.equal(result.isError, undefined);
   assert.equal(result.details.envelope.ok, true);
@@ -576,7 +577,7 @@ test("task context bounds original requirements, waits, progress and escaped tex
   const task = await begin();
   const long = "\u0001中文😀".repeat(10000);
   const projected = projectUserTask({ ...task, title: long, objective: long, reason: long,
-    initial_plan: long, next_action: long,
+    next_action: long,
     block_details: { kind: "scientific_dead_end", resume_when: long, evidence_refs: Array(1000).fill(long) },
     sources: Array.from({ length: 1000 }, (_, id) => ({ submission_id: String(id), entry_id: id, text: long })),
     criteria: Array.from({ length: 1000 }, (_, id) => ({ id: String(id), description: long })),

@@ -45,14 +45,16 @@ def test_all_command_results_match_actual_api_replies(command_workspace):
     created = call('research_create', goal='Investigate', session_id='fixture', source_refs=[source['source_ref']])
     node = created['node']['id']
     call('research_observe', session_id='fixture', read_basis=created['read_basis'])
-    call('research_update', node_id=node, note='Progress recorded', session_id='fixture',
-         progress='Prepared local test', read_basis=created['read_basis'])
-    call('research_result', node_id=node, conclusion='Observed a deterministic result', session_id='fixture')
+    updated = call('research_update', node_id=node, note='Prepared validation inputs', session_id='fixture',
+                   plan='Prepare a local validation', read_basis=created['read_basis'])
+    call('research_result', node_id=node, conclusion='Observed a deterministic result', session_id='fixture',
+         as_assessment=True, read_basis=updated['read_basis'])
     call('research_search', query='Investigate')
     call('research_read', session_id='fixture')
     call('research_read', ref=node, session_id='fixture')
     call('research_read', ref=node, field='goal', session_id='fixture')
     call('research_read', ref=node, limit=10, session_id='fixture')
+    call('research_read', view='brief', entry_node_ids=[node], focus_node_ids=[node], session_id='fixture')
     material = call('artifact_create', name='fixture.txt', content='fixture evidence')
     call('artifact_read', artifact_id=material['artifact_id'])
     (root / 'input.txt').write_text('local fixture')

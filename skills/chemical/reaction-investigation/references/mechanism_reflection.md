@@ -1,6 +1,6 @@
 # Hypothesis reflection
 
-State the hypothesis in the relevant Node proposal and describe predictions, falsifiers and scientific assumptions in its plan. No separate hypothesis object is required. Link independently compared approaches with alternative_to; explain scientific support or conflict in a Result with cited evidence.
+State the hypothesis, predictions, falsifiers and scientific assumptions in the relevant existing Node's plan; preserve changes of reasoning in notes. No separate hypothesis object is required. When a competing approach becomes a distinct research objective needing its own continuing judgment, connect the questions with alternative_to. Explain scientific support or conflict in a Result when there is a conclusion worth citing.
 
 For each hypothesis, ask:
 
@@ -15,4 +15,4 @@ A failed search may show method inadequacy, bad candidate
 construction, missing conformers, or a false hypothesis; keep those possibilities
 separate until the artifacts decide.
 
-Record the observations, scientific criteria, unresolved questions and next steps with research_update using the existing node_id and a note. Publish a reusable conclusion with research_result, citing collected materials and stating limitations. A completed computation does not establish a scientific conclusion.
+Use the existing node_id. Record observations, scientific criteria and next-step decisions in a research_update note, or publish a reusable conclusion with research_result, citing collected materials and limitations. Do not duplicate the same finding in both records or task progress. A completed computation does not establish a scientific conclusion or require a new Node or Result.

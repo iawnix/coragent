@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { projectDecisionTask, projectTaskContinuation } from "../tasks/projection.mjs";
+import { JOB_EVENT_IDS_LIMIT } from "../contracts/monitor.mjs";
 
 const KEY = "coragent.research-context/2";
 const PROJECTION_MAX_BYTES = 16000;
@@ -86,7 +87,7 @@ export function createContextManager({ bridge, coordinator, sessionId, estimateC
       const scopeId = hash(scope);
       const previous = contextAnchor(view.entries);
       const eventIds = [...new Set([...event_ids, ...(task?.event_inputs || []).flatMap(item => item?.event_ids || [])])].sort();
-      if (eventIds.length > 256 || eventIds.some(id => typeof id !== "string" || !/^event_[1-9][0-9]*$/u.test(id))) {
+      if (eventIds.length > JOB_EVENT_IDS_LIMIT || eventIds.some(id => typeof id !== "string" || !/^event_[1-9][0-9]*$/u.test(id))) {
         throw new Error("invalid_job_events: research context requires authenticated event references");
       }
       const inputKey = hash(input_ids);

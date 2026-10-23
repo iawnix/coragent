@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {mkdtemp, rm} from 'node:fs/promises';
+import {mkdtemp, mkdir, rm} from 'node:fs/promises';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {Harness, MemoryStorage, createRegistry, defineExtension, hook, GenerationTask, CompactionTask, LiveDoc} from '@earendil-works/pi-durable';
@@ -8,6 +8,9 @@ import {createModels, fauxProvider, fauxAssistantMessage} from '@earendil-works/
 import {TODO_CONTEXT as context} from '@earendil-works/chord/context';
 import {openNodeSqliteStorage} from '@earendil-works/pi-durable/storage/sqlite/node';
 import {createContextManager, contextAnchor, contextPolicy, contextInputBudget} from '../../../apps/agent/context/manager.mjs';
+import {create_workspace_initializer} from '../../../apps/agent/host/workspace.mjs';
+import {create_python_runtime_bridge} from '../../../apps/agent/bridge/client.mjs';
+import {createResearchTools} from '../../../apps/agent/tools/research/tools.mjs';
 import {pinnedPiSource, TEST_ROOT} from './test-environment.mjs';
 const {estimateContextTokens} = await import(pathToFileURL(join(pinnedPiSource(),'packages/ai/src/utils/estimate.ts')));
 const snapshot = () => ({schema_version:'research-brief/1',brief_id:'brief_fixture',state_digest:'sha256:state',brief_digest:'sha256:review',status:'oriented',projection_status:'complete',scope:{},coverage:{},findings:[],contradictions:[],uncertainties:[],limitations:[],follow_up:[],source_refs:[],read_more:{},guidance:'review'});
@@ -173,7 +176,7 @@ test('unchanged scoped facts are checked without duplicate injection; scope chan
 test('latest action and blocker survive compaction without refreshing the historical review', async () => {
   let reads = 0;
   const manager = fixtureManager({bridge:{async execute_command(){reads++;return snapshot();}}});
-  const task = {...fullTask(),initial_plan:'Compare both routes.',next_action:'Inspect route A.'};
+  const task = {...fullTask(),next_action:'Inspect route A.'};
   const first = await manager.prepare({entries:[]},memoApi(),context,{task});
   const metadata = manager.prepareSummary({entries:[committed(first)],firstKept:3}).metadata;
   const view = {entries:[{id:4,kind:'pi.compaction',data:{metadata:[metadata]}}]};
@@ -233,6 +236,40 @@ test('scoped fact changes refresh on ordinary inputs and repeated events do not 
   const changed = await manager.prepare(view,memoApi(),context,{task,input_ids:[4]});
   assert.equal(changed.data.refresh_reason,'facts_changed');
   assert.equal(calls,2);
+});
+
+test('persisted process notes refresh restored context without changing Node revision or selecting an assessment', async t => {
+  await mkdir(TEST_ROOT,{recursive:true});
+  const root=await mkdtemp(join(TEST_ROOT,'note-context-'));
+  const workspaces=create_workspace_initializer();
+  await workspaces.initialize_workspace({workspace_root:root,workspace_id:'note-context'});
+  await workspaces.admit_workspace(root);
+  const bridge=create_python_runtime_bridge({workspace_root:root,workspace_id:'note-context'});
+  t.after(async()=>{await bridge.close();await rm(root,{recursive:true,force:true});});
+  const tools=createResearchTools({commandBridge:bridge});
+  const run=async(name,args,callId)=>(await tools.find(tool=>tool.name===name).execute(args,
+    {callId,coragent:{workspace_root:root,session_id:'note-context',operation_id:callId,principal:'root_agent'}})).details.result;
+  const created=await run('research_create',{goal:'Compare two routes'},'create');
+  const unrelated=await run('research_create',{goal:'An independent study'},'independent');
+  const nodeId=created.node.id;
+  const task={...fullTask(),sources:[],research:{entry_node_ids:[nodeId],focus_node_ids:[nodeId]}};
+  const manager=fixtureManager({bridge,sessionId:'note-context'});
+  const first=await manager.prepare({entries:[]},memoApi(),context,{task});
+  assert.equal(first.data.availability,'available');
+  const metadata=manager.prepareSummary({entries:[committed(first)],firstKept:3}).metadata;
+  const view={entries:[{id:4,kind:'pi.compaction',data:{metadata:[metadata]}}]};
+  await run('research_update',{node_id:unrelated.node.id,note:'Unrelated observation'},'other-note');
+  assert.equal(await manager.prepare(view,memoApi(),context,{task}),undefined);
+  const noted=await run('research_update',{node_id:nodeId,note:'Route A requires a tighter convergence check.'},'note');
+  assert.equal(noted.node.revision,created.node.revision);
+  assert.equal(noted.node.assessment_ref,null);
+  const refreshed=await manager.prepare(view,memoApi(),context,{task});
+  assert.equal(refreshed.data.refresh_reason,'facts_changed');
+  const note=decode(refreshed.messages[0]).research_brief.findings.find(row=>row.ref===noted.ref);
+  assert.equal(note.kind,'note');
+  assert.equal(note.selected_assessment,false);
+  assert.match(note.summary,/tighter convergence/);
+  assert.equal(await manager.prepare({entries:[...view.entries,committed(refreshed,5)]},memoApi(),context,{task}),undefined);
 });
 
 test('projection failures do not request synthesis and synthesis failures preserve deterministic facts', async () => {

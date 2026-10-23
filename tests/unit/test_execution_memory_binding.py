@@ -23,13 +23,13 @@ def finish(root, job):
 
 def test_job_binds_one_node_revision_and_retries_do_not_rebind(tmp_path):
     workspace(tmp_path)
-    created = create(tmp_path, {'goal':'Validate candidate', 'proposal':'First proposal'})
+    created = create(tmp_path, {'goal':'Validate candidate', 'plan':'First plan'})
     node = created['node']
     request = {'root':str(tmp_path), 'request_id':'job_bound', 'node_id':node['id'], 'session_id':'original',
         'command':[sys.executable,'-c',"print('evidence')"]}
     first = dispatch('start', request)
     update(tmp_path, {'node_id':node['id'], 'note':'Revise after new information',
-        'proposal':'Second proposal', 'status':'closed', 'read_basis':created['read_basis']})
+        'plan':'Second plan', 'status':'closed', 'read_basis':created['read_basis']})
     second = dispatch('start', request)
     assert first['job_id'] == second['job_id']
     assert second['metadata']['research_binding'] == {'node_id':node['id'], 'node_revision':1}

@@ -24,7 +24,7 @@
       "type": "object",
       "properties": {
         "schema_version": {
-          "const": "research-node/1"
+          "const": "research-node/2"
         },
         "id": {
           "type": "string"
@@ -38,27 +38,7 @@
         "goal": {
           "type": "string"
         },
-        "proposal": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "plan": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "progress": {
           "anyOf": [
             {
               "type": "string"
@@ -127,9 +107,7 @@
         "workspace_id",
         "title",
         "goal",
-        "proposal",
         "plan",
-        "progress",
         "status",
         "assessment_ref",
         "source_refs",
@@ -137,7 +115,8 @@
         "revision",
         "created_at",
         "updated_at",
-        "author"
+        "author",
+        "subjects"
       ],
       "additionalProperties": false
     },
@@ -437,16 +416,6 @@
         "assessment_selected": {
           "type": "boolean"
         },
-        "conflict": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "work_dir": {
           "type": "string",
           "description": "Absolute directory for this Node’s mutable drafts, geometry, scripts and prepared Job requests. Suggested location only; use in file paths or an explicit shell cd. Does not change native tool arguments or cwd. Derived from the active workspace; not an immutable Artifact."
@@ -459,8 +428,7 @@
         "read_basis",
         "result",
         "result_saved",
-        "assessment_selected",
-        "conflict"
+        "assessment_selected"
       ],
       "additionalProperties": false
     },
@@ -689,6 +657,66 @@
         "work_dir": {
           "type": "string",
           "description": "Absolute directory for this Node’s mutable drafts, geometry, scripts and prepared Job requests. Suggested location only; use in file paths or an explicit shell cd. Does not change native tool arguments or cwd. Derived from the active workspace; not an immutable Artifact."
+        },
+        "recent_notes": {
+          "type": "object",
+          "properties": {
+            "records": {
+              "type": "array",
+              "items": {
+                "x-typescript-type": "JsonValue"
+              }
+            },
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "records",
+            "total"
+          ],
+          "additionalProperties": false
+        },
+        "related_nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "open",
+                  "paused",
+                  "closed"
+                ]
+              },
+              "read": {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "ref"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "status",
+              "read"
+            ],
+            "additionalProperties": false
+          }
         }
       },
       "required": [
@@ -1767,7 +1795,7 @@
       "type": "object",
       "properties": {
         "schema_version": {
-          "const": "research-node/1"
+          "const": "research-node/2"
         },
         "id": {
           "type": "string"
@@ -1781,27 +1809,7 @@
         "goal": {
           "type": "string"
         },
-        "proposal": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "plan": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "progress": {
           "anyOf": [
             {
               "type": "string"
@@ -1925,6 +1933,100 @@
         },
         "review_notice_count": {
           "type": "integer"
+        },
+        "recent_notes": {
+          "type": "object",
+          "properties": {
+            "records": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "content_omitted": {
+                    "type": "boolean"
+                  },
+                  "read": {
+                    "type": "object",
+                    "properties": {
+                      "ref": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "ref"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "sequence": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "ref",
+                  "content",
+                  "content_omitted",
+                  "read",
+                  "sequence"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "records",
+            "total"
+          ],
+          "additionalProperties": false
+        },
+        "assessment": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "content_omitted": {
+                  "type": "boolean"
+                },
+                "read": {
+                  "type": "object",
+                  "properties": {
+                    "ref": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ref"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "ref",
+                "content",
+                "content_omitted",
+                "read"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -1934,7 +2036,6 @@
         "assessment_ref",
         "title",
         "goal",
-        "progress",
         "read"
       ],
       "additionalProperties": false

@@ -1,23 +1,27 @@
 # Planning and revisiting research questions
 
-Use this reference for compound research or when evidence changes the next useful action. Node relations organize questions; local plans describe methods. User Task control remains in the task tools.
+Use this reference for compound research or when evidence changes the next useful action. Node relations organize questions; the Node's plan holds current hypotheses and methods, while notes preserve observations and decisions. User Task control remains in the task tools.
 
 ## Choose a useful question size
 
-A question deserves its own Node when it can have an independently interpreted conclusion, be pursued separately, or supply evidence to several other questions. A different command, parameter or initial structure alone is not a new question. Build the known useful questions now; expand the graph when a distinct question emerges.
+First read the current task's research entries/focus and the relevant existing questions; search prior work when needed. Reuse the question that owns the intended investigation. Create a Node only when a new research objective needs its own continuing investigation and judgment. Being executable separately or producing a reusable intermediate Result is insufficient by itself. A different command, parameter, initial structure or platform is not a new question.
 
-| Study | Useful organization | Attempts within a question |
+A useful check is whether the goal still holds after changing the program, geometry or next calculation. If so, continue the same Node. "Run frequencies" and "collect outputs" are actions in a plan or Job workflow. Expand the question graph as distinct research objectives emerge; do not prebuild a Node for every calculation step.
+
+| Study | Initial question | Work within that question |
 | --- | --- | --- |
-| Molecular property | One property question | Input preparation, convergence repair, repeat calculation |
-| Competing reaction paths | Separately investigated paths, shared method checks, comparison | Initial geometries, optimization retries and path validation |
-| Periodic DFT | Numerical convergence and the physical comparison when independently useful | k-point/cutoff samples; retain the parameter set and table as materials |
-| MD/free energy | Equilibration, sampling adequacy or state comparison when separately interpretable | Replicate trajectories and statistical windows |
-| Model fitting | Shared data assessment and independently compared models | Parameter searches and repeated fits |
-| Theory/derivation | Independently useful lemmas or approximation checks | Algebra, symbolic manipulation and local revisions; Jobs are optional |
+| Molecular property | What property does this system have under the stated conditions? | Input preparation, convergence repair, repeat calculation |
+| Competing reaction paths | Which path is favored under the stated conditions, and is the evidence sufficient? | Candidate structures, optimization, frequency/IRC checks, energies and retries |
+| Periodic DFT | What physical difference does the comparison establish? | k-point/cutoff convergence and parameter tables |
+| MD/free energy | What state difference or free-energy estimate is supported? | Equilibration, sampling checks, replicate trajectories and statistical windows |
+| Model fitting | Which model supports the intended prediction? | Data checks, parameter searches and repeated fits |
+| Theory/derivation | Does the proposed conclusion follow under the stated assumptions? | Lemmas, approximation checks and local revisions; Jobs are optional |
+
+Split out a path mechanism or method-validity study when it becomes a distinct objective needing its own ongoing judgment. A bounded comparison may remain one Node with multiple Jobs and Results; neither one Node per Task nor one Node per path is mandatory.
 
 A root question is optional. Several task entries can represent independent questions. Use `part_of` from a subquestion to its broader question; a shared question can have several parents. `requires` records an actual research dependency, not the order in which tool calls occurred. Use `alternative_to` when approaches really are alternatives. Comparisons cite exact input Results.
 
-After creating or choosing the relevant Nodes, read the current task and bind its entries and focus:
+The first Node can supply an initial task binding. Later creations do not automatically enter the task scope. When an additional question is warranted, declare its actual relation and deliberately choose stable task entries and the current focus; do not add every new Node to both lists. Read the current task and replace the complete lists when they need to change:
 
 ```json
 {
@@ -25,7 +29,7 @@ After creating or choosing the relevant Nodes, read the current task and bind it
   "expected_revision": 3,
   "research": {
     "entry_node_ids": ["node_returned_for_the_study"],
-    "focus_node_ids": ["node_returned_for_path_A", "node_returned_for_path_B"]
+    "focus_node_ids": ["node_returned_for_the_study"]
   }
 }
 ```
@@ -38,12 +42,12 @@ On recovery, relate the current findings and pending Jobs to the user's objectiv
 
 An execution error warrants diagnosis; it does not by itself refute the scientific idea. Update the existing question's method after inspecting the failure. A candidate-specific negative finding is useful evidence and need not terminate the broader question or assignment.
 
-To revisit a closed question, read its current fields, reopen it with `research_update`, and record the reason and evidence in the note. Create another Node only for an independent question or separately pursued branch. Preserve old Jobs, files and Results. Reuse exact prior evidence where applicable; repeating an external action requires checking its original receipt.
+To revisit a closed question, read its current fields, reopen it with `research_update`, and record the reason and evidence in the note. Create another Node only for a distinct research objective needing its own continuing investigation and judgment. Preserve old Jobs, files and Results. Reuse exact prior evidence where applicable; repeating an external action requires checking its original receipt.
 
 Correct a published conclusion with a new Result and `supersedes`. Select it as the current assessment when appropriate. Review affected comparisons and reports using the supplied notices. A notice requests scientific review; it does not automatically invalidate every downstream conclusion or launch recalculations.
 
 ## Retain progress and finish the assignment
 
-Plans and notes explain decisions. New Results, fixed materials and actual Job milestones provide recoverable progress. Editing a plan, making more Nodes or citing the same evidence in a different combination does not establish new substantive progress. The no-progress count is an advisory replanning signal, not a fixed stopping threshold; continue within the user's compute, cost, time and retry limits. For derivation or planning assignments, retain the useful derivation or plan itself as a Result/material.
+Plans and notes explain decisions; a Result fixes a conclusion worth citing. Record a finding in the appropriate place without copying the same account into a note, Result and task progress. The runtime observes published evidence and actual Job milestones; the Agent still selects the task's next action and explicit waits. Editing a plan, making more Nodes or citing the same evidence in a different combination does not establish new substantive progress. The no-progress count is an advisory replanning signal, not a fixed stopping threshold; continue within the user's compute, cost, time and retry limits. For derivation or planning assignments, retain the useful derivation or plan itself as a Result/material.
 
 Finish against the user's delivery criteria, with the relevant immutable evidence and limitations. A negative or inconclusive conclusion may satisfy the actual assignment; it does not authorize weakening a requested claim. Closed Nodes and successful processes are not completion evidence by themselves. Stop repeated uninformative attempts within the stated limits, and distinguish a local failed method from a task-wide blocker.

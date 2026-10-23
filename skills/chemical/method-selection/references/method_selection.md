@@ -24,6 +24,7 @@ CREST, NEB and external crossing tools need a verified installed command or
 concrete script through generic Job Manager. Check shared runners and installed
 tools before declaring a capability unavailable. Choose their order from the research question.
 
-Record the method choice and falsifiable purpose in the Researchresearch conclusion. If a
-method changes, preserve the prior intent and use a recalculation record or a
-new research Node when the scientific objective changes.
+Record the method choice and falsifiable purpose in the existing Node's plan and preserve
+changes of approach in notes. A different backend or recalculation stays within the same
+question. Create another Node only for a new research objective needing its own continuing
+investigation and judgment; publish a Result when there is a conclusion worth citing.

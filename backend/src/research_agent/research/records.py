@@ -42,6 +42,19 @@ def record(root, ref):
     return value
 
 
+def recent_notes(root, node_ids, limit_per_node=3):
+    """Read ordinary process notes without promoting them to assessments."""
+    selected = {node_id: {'records': [], 'total': 0} for node_id in dict.fromkeys(node_ids)}
+    headers = [header for header in journal(root)['records']
+               if header.get('node_id') in selected and header['origin'] == 'agent' and header['kind'] == 'note']
+    for header in sorted(headers, key=lambda item: item['sequence'], reverse=True):
+        notes = selected[header['node_id']]
+        notes['total'] += 1
+        if len(notes['records']) < limit_per_node:
+            notes['records'].append(record(root, header['ref']))
+    return selected
+
+
 def append_record(root, *, origin, kind, title, content, references=(), data=None,
                   identity=None, node_id=None, node_revision=None):
     root = Path(root)

@@ -7,6 +7,27 @@ Research Memory 是持久研究记录。Research Context 是 Agent Runtime 内�
 上下文读取只组合本地研究事实和已记录的 Job 观察，不解析平台或连接队列。Job Manager 负责
 刷新外部状态；本地事件投影负责将已持久化事实同步到研究记录，两者不另建一份 Job 状态。
 
+## 恢复时提供什么
+
+Node 用 `goal` 保存研究问题，用 `plan` 保存当前调查方法，用 `assessment_ref` 显式选择
+当前判断。Node 第 2 版删除 `proposal` 与 `progress`，不要求把普通记录再复制成一份进度字段。
+普通 note 记录尝试、观察和后续想法；Result 保持不可变发布。关系和索引视图继续用于导航与复用。
+
+Brief 分别提供当前问题、显式 assessment、近期过程 notes 和待处理 Jobs。
+普通 note 的 finding 是 `kind="note"`、`selected_assessment=false`；只有 `assessment_ref`
+明确选中它时，后者才为 true。选中的其他历史记录使用 `kind="record"`，发布结果使用
+`kind="result"`。新增 note 或 Job 完成不会自动发布 Result、替换判断或证明科学正确。
+
+每个范围内 Node 最多提供 3 条近期过程 note，按不可变记录的 sequence 从新到旧选择。
+被显式选为 assessment 的旧 note 可以另外作为当前判断展示，也计入 note 覆盖数量。
+正文摘录和引用共同受 Brief 字节预算限制；`content_omitted`、`coverage.notes` 和
+`coverage.omitted.notes` 明确显示摘录、纳入数量及省略数量。通过 `research_read(ref=...)`
+读取确切原记录，通过 `research_search(node_id=..., kind="note", limit=..., offset=...)`
+分页获取完整历史和总数。
+
+引用只能来自真实记录身份和显式引用字段，不能从 note 正文中猜测引用。
+即使 note 写得很肯定或包含初步结论，它仍是过程记录，不能因此获得科学验证或发布状态。
+
 ## 选择与刷新
 
 选择当前 Task 的焦点、事件涉及的节点、等待 Job 的节点和任务入口，再扩展直接的
@@ -17,7 +38,10 @@ Research Memory 是持久研究记录。Research Context 是 Agent Runtime 内�
 入口是 `apps/agent/runtime/setup.mjs` 的 `prepareContext` hook；已认证的输入事件引用
 也会在没有顶层 Task 时传入选择器。筛选和摘取由 Python 完成，不调用模型决定读哪些记录。
 范围包括任务身份、要求版本、入口、焦点、要求来源和等待 Job；事实包括候选节点与结果、
-相关关系、诊断和 Job 状态。省略的候选记录也参与版本判断，无关研究的活动不改变该版本。
+相关关系、诊断和 Job 状态，以及范围内全部普通 note 的身份与 sequence、各 Node 近期 3 条
+note 的内容指纹。不会为了计算版本而加载全部历史 note 正文。
+追加范围内普通 note 即使不改变 Node revision，也会刷新概览；无关 Node 的 note 不改变
+显式范围的版本。受显示预算省略的候选记录同样参与版本判断。
 首次进入、范围变化或相关事实变化才追加新的 pi.context，相同事实不重复注入。
 输入来自用户、Job Manager 或 Task Controller 不影响这个判断。
 
@@ -55,5 +79,5 @@ Research Memory 是持久研究记录。Research Context 是 Agent Runtime 内�
 ## 单一合同
 
 当前只接受 view="brief" 和 research-brief/1，旧 view="review" 与调用方指定的
-trigger 不再接受。Task 的上下文指针属于 coragent-user-task/5，记录实际注入版本，
+trigger 不再接受。Task 的上下文指针记录实际注入版本，
 不声称记录已经被科学审查。旧会话协议不自动翻译，不创建双接口或双写记录。

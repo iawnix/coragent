@@ -9,7 +9,7 @@ export interface CommandParameters {
     "session_id"?: string | null;
     "event_ids"?: Array<string>;
     "focus_node_ids"?: Array<string>;
-    "field"?: "goal" | "title" | "proposal" | "plan" | "progress" | "status" | "assessment_ref" | "relations" | "subjects" | null;
+    "field"?: "goal" | "title" | "plan" | "status" | "assessment_ref" | "relations" | "subjects" | null;
     "entry_node_ids"?: Array<string>;
     "source_submission_ids"?: Array<string>;
     "view"?: "brief";
@@ -28,7 +28,6 @@ export interface CommandParameters {
   "research_create": {
     "goal": string;
     "title"?: string;
-    "proposal"?: string | null;
     "plan"?: string | null;
     "source_refs"?: Array<string>;
     "source_submission_ids"?: Array<string>;
@@ -48,9 +47,7 @@ export interface CommandParameters {
     "note": string;
     "goal"?: string;
     "title"?: string;
-    "proposal"?: string | null;
     "plan"?: string | null;
-    "progress"?: string | null;
     "status"?: "open" | "paused" | "closed";
     "assessment_ref"?: string | null;
     "add_relations"?: Array<{
@@ -84,7 +81,6 @@ export interface CommandParameters {
     "read_basis"?: string | null;
     "subjects"?: Record<string, string>;
     "check_refs"?: Array<string>;
-    "progress"?: string;
   };
   "research_source": {
     "session_id": string | null;
@@ -261,14 +257,12 @@ export interface CommandResults {
     "workspace_id": string;
     "sequence": number;
     "nodes": Array<{
-      "schema_version"?: "research-node/1";
+      "schema_version"?: "research-node/2";
       "id": string;
       "workspace_id"?: string;
       "title": string;
       "goal": string;
-      "proposal"?: string | null;
       "plan"?: string | null;
-      "progress": string | null;
       "status": "open" | "paused" | "closed";
       "assessment_ref": string | null;
       "source_refs"?: Array<string>;
@@ -295,6 +289,26 @@ export interface CommandResults {
       "subjects"?: Record<string, string>;
       "review_notices"?: Array<JsonValue>;
       "review_notice_count"?: number;
+      "recent_notes"?: {
+        "records": Array<{
+          "ref": string;
+          "content": string;
+          "content_omitted": boolean;
+          "read": {
+            "ref": string;
+          };
+          "sequence": number;
+        }>;
+        "total": number;
+      };
+      "assessment"?: {
+        "ref": string;
+        "content": string;
+        "content_omitted": boolean;
+        "read": {
+          "ref": string;
+        };
+      } | null;
     }>;
     "tasks": Array<JsonValue>;
     "new_records": Array<JsonValue>;
@@ -363,14 +377,12 @@ export interface CommandResults {
     "value"?: JsonValue;
     "read_basis"?: string;
     "node"?: {
-      "schema_version": "research-node/1";
+      "schema_version": "research-node/2";
       "id": string;
       "workspace_id": string;
       "title": string;
       "goal": string;
-      "proposal": string | null;
       "plan": string | null;
-      "progress": string | null;
       "status": "open" | "paused" | "closed";
       "assessment_ref": string | null;
       "source_refs": Array<string>;
@@ -381,7 +393,7 @@ export interface CommandResults {
       "author": {
         "session_id": string | null;
       };
-      "subjects"?: Record<string, string>;
+      "subjects": Record<string, string>;
     };
     "relations"?: Array<{
       "id": string;
@@ -439,6 +451,18 @@ export interface CommandResults {
     "review_notices"?: Array<JsonValue>;
     "review_notice_count"?: number;
     "work_dir"?: string;
+    "recent_notes"?: {
+      "records": Array<JsonValue>;
+      "total": number;
+    };
+    "related_nodes"?: Array<{
+      "id": string;
+      "title": string;
+      "status": "open" | "paused" | "closed";
+      "read": {
+        "ref": string;
+      };
+    }>;
     [key: string]: unknown;
   } | {
     "schema_version": "research-brief/1";
@@ -484,14 +508,12 @@ export interface CommandResults {
   "research_create": {
     "accepted": true;
     "node": {
-      "schema_version": "research-node/1";
+      "schema_version": "research-node/2";
       "id": string;
       "workspace_id": string;
       "title": string;
       "goal": string;
-      "proposal": string | null;
       "plan": string | null;
-      "progress": string | null;
       "status": "open" | "paused" | "closed";
       "assessment_ref": string | null;
       "source_refs": Array<string>;
@@ -502,7 +524,7 @@ export interface CommandResults {
       "author": {
         "session_id": string | null;
       };
-      "subjects"?: Record<string, string>;
+      "subjects": Record<string, string>;
     };
     "relations": Array<{
       "id": string;
@@ -523,14 +545,12 @@ export interface CommandResults {
   "research_update": {
     "accepted": true;
     "node": {
-      "schema_version": "research-node/1";
+      "schema_version": "research-node/2";
       "id": string;
       "workspace_id": string;
       "title": string;
       "goal": string;
-      "proposal": string | null;
       "plan": string | null;
-      "progress": string | null;
       "status": "open" | "paused" | "closed";
       "assessment_ref": string | null;
       "source_refs": Array<string>;
@@ -541,7 +561,7 @@ export interface CommandResults {
       "author": {
         "session_id": string | null;
       };
-      "subjects"?: Record<string, string>;
+      "subjects": Record<string, string>;
     };
     "relations": Array<{
       "id": string;
@@ -562,14 +582,12 @@ export interface CommandResults {
   "research_result": {
     "accepted": true;
     "node": {
-      "schema_version": "research-node/1";
+      "schema_version": "research-node/2";
       "id": string;
       "workspace_id": string;
       "title": string;
       "goal": string;
-      "proposal": string | null;
       "plan": string | null;
-      "progress": string | null;
       "status": "open" | "paused" | "closed";
       "assessment_ref": string | null;
       "source_refs": Array<string>;
@@ -580,7 +598,7 @@ export interface CommandResults {
       "author": {
         "session_id": string | null;
       };
-      "subjects"?: Record<string, string>;
+      "subjects": Record<string, string>;
     };
     "relations": Array<{
       "id": string;
@@ -629,7 +647,6 @@ export interface CommandResults {
     };
     "result_saved": true;
     "assessment_selected": boolean;
-    "conflict": string | null;
     "work_dir"?: string;
   };
   "research_source": {

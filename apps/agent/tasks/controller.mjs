@@ -9,7 +9,7 @@ import shared from "../tools/tool-schemas.json" with { type: "json" };
 export const UserTasks = defineDoc({ kind: "coragent.user-tasks", version: 1,
   scope: "conversation", history: "latest", fork: "initial",
   initial: () => ({ current: null, ids: [], cancellation_tasks: [], job_cancellations: [], automatic_suppressed: false, user_epoch: 0, latest_user_submission_id: null }) });
-export const UserTask = defineDocFamily({ kind: "coragent.user-task", version: 5, family: true,
+export const UserTask = defineDocFamily({ kind: "coragent.user-task", version: 6, family: true,
   scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
 const ControlReceipt = defineDocFamily({ kind: "coragent.task-control-receipt", version: 1, family: true,
   scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
@@ -50,8 +50,15 @@ const contextProjection = data => {
     refresh_reason: data.refresh_reason, updated_at: stamp() };
 };
 const taskRecord = task => {
-  if (task) requireValue(task.schema_version === "coragent-user-task/5", "task_schema_unsupported", "User tasks require coragent-user-task/5");
+  if (task) requireValue(task.schema_version === "coragent-user-task/6", "task_schema_unsupported", "User tasks require coragent-user-task/6");
   return task;
+};
+const pendingJobEvents = (task, eventIds) => {
+  const pending = new Set((task?.event_inputs || []).flatMap(input => input.event_ids));
+  return pending.size && eventIds.some(id => !pending.has(id)) ? {
+    code: "task_events_pending",
+    message: "The task must consume its earlier Job events before admitting another batch",
+  } : null;
 };
 const resultIdentity = ref => `result:${ref}`;
 const artifactIdentity = artifact => {
@@ -277,6 +284,8 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           "task_superseded", "Task event assessment changed before admission");
         const owners = basis.task_owners;
         requireValue(owners.every(owner => owner === task.user_task_id), "task_event_obsolete", "Events belong to a different user task");
+        const deferred = pendingJobEvents(task, identity.event_ids);
+        if (deferred) throw taskError(deferred.code, deferred.message);
         task.state = "active"; task.wait = null;
       }
       if (task?.continuation.reservation) {
@@ -322,9 +331,16 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       && attempt.recovery_submission_id === task.execution_recovery.submission_id) attempt.progressed = true;
   }
 
-  async function settleUserRecovery(ctx) {
+  async function settleInputRecovery(ctx) {
     await conversation.commit(async tx => {
       const { task } = await currentTx(tx);
+      if (task?.event_inputs.length) {
+        const pending = [];
+        for (const input of task.event_inputs) {
+          if (!await admission.isConsumed(tx, input.request_id)) pending.push(input);
+        }
+        task.event_inputs = pending;
+      }
       if (!task?.execution_recovery || !["active", "waiting"].includes(task.state)) return;
       const attempt = await tx.doc(UserRecoveryAttempt, conversation.id, task.user_task_id, null);
       if (!attempt.submission_id || attempt.control_epoch !== task.control_epoch
@@ -438,6 +454,8 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         ? event.event.user_task_id === task.user_task_id
         : !task && !event.event.user_task_id);
       if (!eligible.length) return { events: [], basis: {} };
+      const deferred = pendingJobEvents(task, eligible.map(event => event.event_id));
+      if (deferred) return { events: [], basis: {}, deferred };
       if (task?.state === "waiting") {
         const statuses = await Promise.all(task.wait.job_ids.map(job_id => kernel.execute_command("job_status", { job_id })));
         const ready = task.wait.mode === "any" ? statuses.some(job => jobFinished.has(job.state)) : statuses.every(job => jobFinished.has(job.state));
@@ -523,13 +541,12 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         requireValue(!existing || terminal.has(existing.state), "task_already_exists", "This conversation already has a nonterminal user task; update it");
         const { identifier: id } = await kernel.execute_command("research_allocate_task", { session_id: sessionId, request_id: requestId });
         const task = await tx.doc(UserTask, conversation.id, id, null);
-        Object.assign(task, { schema_version: "coragent-user-task/5", user_task_id: id,
+        Object.assign(task, { schema_version: "coragent-user-task/6", user_task_id: id,
           workspace_id: workspaceId, session_id: sessionId, conversation_id: conversation.id,
           title: params.title, objective: params.objective, sources, criteria: params.criteria,
           execution_target: execution?.selection.target ?? null,
           execution_selection: execution?.selection ?? null, execution_policy: execution?.policy ?? null,
           execution_plan: null, active_execution_item: null, requirements_revision: 1,
-          initial_plan: params.initial_plan || "Preserve the user's deliverables, establish the research scope, and produce evidence for the first decision before choosing the next action.",
           next_action: params.next_action || "Read the current requirements and perform the first concrete evidence-producing action.",
           state: "active", reason: null, revision: 1, control_epoch: 1, wait: null,
           progress: null, progress_version: 0, completion: null, completion_outcome: null, completion_stop_basis: null, execution_recovery: null, block_details: null,
@@ -826,18 +843,12 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       const inheritedEvents = inherited?.length ? await Promise.all(inherited.flatMap(input => input.event_ids).map(event_id =>
         kernel.execute_command("job_manager_assess", { event_id, session_id: sessionId }))) : [];
       requireValue(inheritedEvents.every(event => event.obsolete || event.admitted), "job_events_paused", "Deferred event delivery is paused");
-      await admission.recordConsumption(record, consumptionBasis, ctx, tx => assertExecution(tx, record, origin));
-      for (const input of inherited || []) {
-        await admission.recordSuccessorConsumption(await admission.status(input.request_id, ctx), record.id,
-          { event_ids: input.event_ids }, ctx);
-      }
-      if (inherited?.length) {
-        const consumedIds = inherited.map(input => input.submission_id);
-        await conversation.commit(async tx => {
-          const { task } = await currentTx(tx);
-          if (task) task.event_inputs = task.event_inputs.filter(input => !consumedIds.includes(input.submission_id));
-        }, ctx);
-      }
+      const consumedIds = new Set([record.id, ...(inherited || []).map(input => input.submission_id)]);
+      await admission.recordConsumption(record, consumptionBasis, ctx, async tx => {
+        await assertExecution(tx, record, origin);
+        const { task } = await currentTx(tx);
+        if (task) task.event_inputs = task.event_inputs.filter(input => !consumedIds.has(input.submission_id));
+      }, inherited || []);
     },
     async completeJobEventConsumption(record, ctx) {
       await conversation.commit(async tx => {
@@ -858,7 +869,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       // A queued compaction write is safe to flush at the next boundary. Only
       // queued user/steering inputs should hold back internal task recovery.
       if (live?.run || hasPendingInput(inbox?.items)) return;
-      await settleUserRecovery(ctx);
+      await settleInputRecovery(ctx);
       task = await getCurrent(ctx);
       if (!enabled) return;
       if (task.state === "completing") {

@@ -15,7 +15,6 @@ export function formatTask(task) {
     `Task: ${task.title} · ${taskStateLabel(task.state)}`,
     `Goal: ${task.objective}`,
     `Progress: ${text(task.progress?.summary)}`,
-    ...(task.initial_plan ? [`Plan: ${task.initial_plan}`] : []),
     ...(task.next_action && !['completed', 'partial', 'cancelled'].includes(task.state) ? [`Next: ${task.next_action}`] : []),
     ...(task.block_details?.resume_when ? [`To resume: ${task.block_details.resume_when}`] : []),
     ...(task.execution_recovery ? [

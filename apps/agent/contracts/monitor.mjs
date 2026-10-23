@@ -1,3 +1,7 @@
+import limits from "../../../contracts/monitor/jobs/limits.json" with { type: "json" };
+
+export const JOB_EVENT_IDS_LIMIT = limits.max_event_ids;
+
 /** Canonical Monitor methods shared by Host transports and clients. */
 export const MONITOR_METHODS = Object.freeze([
   "monitor/overview", "monitor/tasks", "monitor/task/read", "monitor/task/pause",

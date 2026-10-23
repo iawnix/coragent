@@ -38,6 +38,6 @@ Job 运行期间继续独立的已授权工作。遵循 `job_status` 返回的�
 
 ## 登记进展与关联研究
 
-通过 `task_update action=progress` 记录已采用的固定 Result/Artifact 或当前任务 Job，以及下一项行动；笔记本身不是实质科学进展，收集回执不能直接充当任务进展引用。`progress` 不恢复暂停或阻塞任务。需要新要求或解除阻塞时，`refine` 引用实际新用户提交。
+运行时通过现有工具观察已发布证据和当前任务 Job 里程碑，不必把研究 note 或 Result 再抄成任务进展。改变下一项行动或明确记录采用的固定 Result/Artifact、当前任务 Job 时，使用 `task_update action=progress`。科学假设和计划保留在 Node 的 plan 与 note 中。笔记本身不是实质科学进展，收集回执不能直接充当任务进展引用。`progress` 不恢复暂停或阻塞任务。需要新要求或解除阻塞时，`refine` 引用实际新用户提交。
 
 用 `action=set_research` 设置任务入口和焦点，完整提供 `entry_node_ids` 与 `focus_node_ids`；数组整体替换，空数组清空相应列表。研究关系与问题拆分见 research-memory。始终使用 Task 的当前 revision；Node revision 属于另一个对象。完成与部分交付见[验收说明](acceptance.zh-CN.md)，执行目标纠错见[目标选择](execution-targets.zh-CN.md)。

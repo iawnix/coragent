@@ -17,6 +17,10 @@ Pi generation/tool task 只在诊断中称为内部执行单元，不是用户 T
 记录进展、等待 Job 或提出完成。普通问答不自动建立任务。每个会话至多有一个
 非终态任务，状态保存在 SessionWorker 的 Pi durable 文档中。
 
+Task 保存 objective、criteria、next_action、execution_plan、进展依据和控制状态。
+科学假设与调查方案只写在对应 Node 的 plan，过程决策写入 note；Task 不保存第二份
+科学计划。同一发现按用途记录为 note 或 Result，不必再重复成任务进展说明。
+
 | 状态 | 含义 |
 | --- | --- |
 | active | 可以继续推进 |
@@ -30,7 +34,8 @@ Pi generation/tool task 只在诊断中称为内部执行单元，不是用户 T
 控制器在执行变化和周期核对时检查任务；没有新的 Job 事件也能续接活跃任务。
 用户输入优先。暂停允许当前回复和已有 Job 收尾；取消任务明确选择保留或请求取消 Job。
 临时执行故障可触发有限自动重试，需人工处理的故障保存在恢复记录中。
-进展按 Result、Artifact 和归属 Job 里程碑记录，单纯改计划或重复查询不计为新证据。
+运行时通过现有工具观察 Result、Artifact 和归属 Job 里程碑并记录进展，单纯改计划或
+重复查询不计为新证据；下一步、等待和控制仍由 Agent 明确维护。
 
 任务控制与作业取消通过同一 Monitor 界面操作，具体命令见[终端](TERMINAL.zh-CN.md)。
 研究入口和焦点见[研究规划](RESEARCH_PLANNING.zh-CN.md)。
@@ -68,9 +73,10 @@ producer 与 reason 都由运行时验证，参与幂等身份。Monitor 的执�
 ## 升级边界
 
 当前 Host 使用 `coragent-host/3`，旧客户端必须同步更新：旧 producer=monitor、旧内部 monitor-wake、旧 JobRuntime 导入、
-旧研究 Review 接口不提供别名。未完成的旧输入不接受无来源或无原因的恢复；旧 Task 文档需要
-匹配当前版本，否则明确拒绝；旧协议没有隐式转换。
-升级前应结束旧执行，保留原研究记录，并在新会话中显式绑定既有研究节点。
+旧研究 Review 接口不提供别名。Task 使用 `coragent-user-task/6`，Node 使用 `research-node/2`；
+运行时、合同与 Skill 必须同步部署。未完成的旧输入不接受无来源或无原因的恢复；旧 Task/Node
+格式明确拒绝，没有字段别名、隐式转换或并行协议。升级前应结束旧执行并保留原研究记录；
+旧格式不自动迁移，需新建工作区并显式导入有用材料，不能直接绑定旧格式节点。
 Job 观察的持久登记与投递格式保持原有唯一合同，不引入另一套作业状态库。
 
 源码验证入口见[测试运行器](../tools/test/README.md)。重点覆盖输入来源、重复投递、

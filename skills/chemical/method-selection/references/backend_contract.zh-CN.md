@@ -14,7 +14,7 @@ job_probe 只检查平台可达，不证明科学方法可用。command 和 acti
 
 ## 证据
 
-job_start 返回 job_id；研究笔记引用真实 Job。job_collect 返回退出事实、output_validation，以及研究 Job 登记的 Artifact。退出 0、文件齐全、科学验证通过是不同事实；记录研究笔记 前读取 Skill result.json 和日志。
+job_start 返回 job_id；研究笔记引用真实 Job。job_collect 返回退出事实、output_validation，以及研究 Job 登记的 Artifact。退出 0、文件齐全、科学验证通过是不同事实；记录前读取 Skill result.json 和日志。复用已有 node_id，用 note 留存观察与下一步决策，或用 Result 发布可复用结论；同一发现不在两者或任务进展中重复抄写。一次计算不要求新 Node 或 Result。
 
 artifact_derive 只记录派生描述，不执行分析。通过 Skill 脚本执行后登记真实结果，artifact_link 持久关联证据。科学输入/设置改变需新 Job；不确定提交用 job_reconcile 恢复，不能自动重提。
 

@@ -22,6 +22,15 @@ test("canonical command adapters reject obsolete fields instead of dropping them
   for (const params of [{ node_ref: "node_1" }, { storage_operation: "status" }]) {
     assert.throws(() => service.execute("research_read", "/unused", params), /schema_field_invalid/);
   }
+  for (const [command,params] of [
+    ["research_create",{goal:"Compare routes",proposal:"Retired field"}],
+    ["research_update",{node_id:"node_1",note:"Update",progress:"Retired field"}],
+    ["research_update",{node_id:"node_1",note:"Update",proposal:"Retired field"}],
+    ["research_result",{node_id:"node_1",conclusion:"Finding",progress:"Retired field"}],
+  ]) assert.throws(()=>commandArguments(command,params),/schema_field_invalid/);
+  for (const field of ["proposal","progress"]) {
+    assert.throws(()=>commandArguments("research_read",{ref:"node_1",field}));
+  }
   assert.equal(called, false);
   assert.deepEqual(commandArguments("job_collect", { job_id: "job_1" }), ["--job-id", "job_1"]);
 });
@@ -92,9 +101,10 @@ test('task action contracts require their own payloads and reject ignored fields
   }
   assert.throws(()=>check('task_update',{...cancel,reason:'ignored'}));
   assert.throws(()=>check('task_update',{...cancel,source_submission_ids:[]}));
-  const begin={title:'Research',objective:'Compare candidates',criteria:[{id:'c1',description:'Evidence collected'}],initial_plan:'Compare the candidates and record evidence.',next_action:'Read the candidate inputs and perform the first comparison.'};
+  const begin={title:'Research',objective:'Compare candidates',criteria:[{id:'c1',description:'Evidence collected'}],next_action:'Read the candidate inputs and perform the first comparison.'};
   check('task_begin',{...begin,source_submission_ids:['12']});
-  for (const field of ['initial_plan','next_action']) {
+  assert.throws(()=>check('task_begin',{...begin,source_submission_ids:['12'],initial_plan:'Duplicate research plan'}));
+  for (const field of ['next_action']) {
     const args = {...begin,source_submission_ids:['12']}; delete args[field];
     assert.throws(()=>check('task_begin',args));
     assert.throws(()=>check('task_begin',{...begin,source_submission_ids:['12'],[field]:' \n\t'}));

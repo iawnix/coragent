@@ -4,7 +4,7 @@ import re
 
 from . import relations
 from .context import result_notices
-from .records import journal, record
+from .records import journal, record, recent_notes
 from .results import get_result, publication_order
 
 
@@ -78,11 +78,17 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
     candidates.sort(key=lambda j: (j['job_id'] not in event_jobs, j['job_id'] not in waited,
                                    not bool(j.get('execution_conflict')), j.get('state') in running, j['job_id']))
     diagnostics = [d for d in relations.diagnostics(root) if any(ref in reasons for ref in d['node_ids'])]
+    notes = recent_notes(root, reasons)
+    note_identities = {ref: [] for ref in reasons}
+    for header in index['records']:
+        if header.get('node_id') in reasons and header['origin'] == 'agent' and header['kind'] == 'note':
+            note_identities[header['node_id']].append({'ref': header['ref'], 'sequence': header['sequence']})
     view = {'scope': {'selection': selection},
             'nodes': [], 'jobs': [], 'relations': [],
             'wake_events': {'requested': len(events), 'included': 0, 'omitted': len(events)},
             'bounds': {'max_bytes': max_bytes, 'omitted': {'nodes': len(reasons), 'jobs': len(candidates),
-                                                        'relations': len(edges), 'diagnostics': len(diagnostics)}},
+                                                        'relations': len(edges), 'diagnostics': len(diagnostics),
+                                                        'notes': sum(item['total'] for item in notes.values())}},
             'read_more': {'nodes': {'tool': 'research_read'}, 'history': {'tool': 'research_search'}}}
     # Scope counts are fixed even if a small transport budget cannot fit a card.
     view['scope'].update(entry_count=len(entries), focus_count=len(focus))
@@ -133,8 +139,11 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         card = {'id': ref, 'revision': node['revision'], 'status': node['status'], 'title': title,
                 'assessment_ref': assessment_ref, 'selection': reason,
                 'review_notice_count': len(notices), 'other_result_count': len(other_results.get(ref, [])),
-                'omitted_fields': ['goal', 'progress', 'plan']}
-        card['omitted_fields'].extend(name for name in ('proposal', 'subjects') if node.get(name))
+                'omitted_fields': ['goal', 'plan']}
+        card['omitted_fields'].extend(name for name in ('subjects',) if node.get(name))
+        if notes[ref]['total']:
+            card['recent_notes'] = {'records': [], 'total': notes[ref]['total'], 'omitted': notes[ref]['total'],
+                                    'read': {'tool': 'research_search', 'node_id': ref, 'kind': 'note'}}
         if title != node['title']:
             card['omitted_fields'].append('title')
         if assessment:
@@ -172,6 +181,11 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
     # A modest per-field allowance distributes detail across multiple focuses.
     text_budget = max(96, min(720, (max_bytes - size(view)) // max(1, len(cards) * 6)))
     for ref, card in cards.items():
+        original = graph['nodes'][ref]['goal']
+        value = excerpt(original, text_budget)
+        if field(card, 'goal', value) and value == original:
+            card['omitted_fields'].remove('goal')
+    for ref, card in cards.items():
         assessment, notices = assessments[ref]
         if notices and field(card, 'review_notices', notices):
             card['omitted_fields'].remove('review_notices')
@@ -180,16 +194,37 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
             content = assessment.get('conclusion', '') if is_result else assessment['content']
             limitations = assessment.get('limitations') or ''
             judgment = {'ref': card['assessment_ref'], 'conclusion': excerpt(content, text_budget),
+                        'kind': 'result' if is_result else assessment['kind'],
                         'limitations': excerpt(limitations, text_budget),
-                        'evidence_refs': assessment.get('evidence_refs', [])[:4]}
+                        'evidence_refs': assessment.get('evidence_refs', assessment.get('references', []))[:4]}
             if assessment.get('inputs'):
                 judgment['inputs'] = assessment['inputs'][:4]
             judgment['content_omitted'] = (judgment['conclusion'] != content or judgment['limitations'] != limitations
-                                           or len(assessment.get('evidence_refs', [])) > 4 or len(assessment.get('inputs', [])) > 4)
+                                           or len(assessment.get('evidence_refs', assessment.get('references', []))) > 4
+                                           or len(assessment.get('inputs', [])) > 4)
             if field(card, 'assessment', judgment):
                 card['omitted_fields'].remove('assessment')
 
-    for name in ('goal', 'progress', 'plan'):
+    # Give each selected question its newest note before adding older notes.
+    for index in range(max((len(item['records']) for item in notes.values()), default=0)):
+        for ref, card in cards.items():
+            records = notes[ref]['records']
+            if index >= len(records):
+                continue
+            note = records[index]
+            value = {'ref': note['ref'], 'sequence': note['sequence'], 'created_at': note['created_at'],
+                     'content': excerpt(note['content'], text_budget), 'references': note['references'][:4],
+                     'content_omitted': False, 'reference_count': len(note['references'])}
+            value['content_omitted'] = value['content'] != note['content'] or len(note['references']) > 4
+            card['recent_notes']['records'].append(value)
+            card['recent_notes']['omitted'] -= 1
+            view['bounds']['omitted']['notes'] -= 1
+            if not fits():
+                card['recent_notes']['records'].pop()
+                card['recent_notes']['omitted'] += 1
+                view['bounds']['omitted']['notes'] += 1
+
+    for name in ('plan',):
         for ref, card in cards.items():
             original = graph['nodes'][ref].get(name)
             value = excerpt(original, text_budget) if isinstance(original, str) else original
@@ -215,5 +250,9 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
     # It is consumed by the brief builder, never included in model context.
     view['_basis'] = {'node_ids': sorted(reasons), 'job_ids': sorted({j['job_id'] for j in candidates}),
                       'relations': edges, 'diagnostics': diagnostics,
-                      'notices': [(ref, notices) for ref, (_, notices) in sorted(assessments.items())]}
+                      'notices': [(ref, notices) for ref, (_, notices) in sorted(assessments.items())],
+                      'notes': {ref: {'total': notes[ref]['total'],
+                                      'identities': sorted(note_identities[ref], key=lambda item: item['sequence']),
+                                      'recent': [{'ref': item['ref'], 'content_digest': item['content_digest']}
+                                                 for item in notes[ref]['records']]} for ref in sorted(notes)}}
     return view

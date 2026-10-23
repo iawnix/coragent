@@ -107,6 +107,10 @@ export function createInputAdmission({ harness, conversation, LiveDoc, InboxDoc,
   return {
     setPolicy(value) { policy = value; },
     status, origin,
+    async isConsumed(tx, requestId) {
+      const provenance = await tx.doc(InputProvenance, conversation.id, keyFor(requestId), null);
+      return Boolean(provenance.consumption || provenance.successor_consumption);
+    },
     async checkRecovery(context) {
       const pending = (await harness.inspect(context)).submissions.filter(record => record.conversationId === conversation.id && record.type === "input");
       for (const record of pending) {
@@ -116,7 +120,7 @@ export function createInputAdmission({ harness, conversation, LiveDoc, InboxDoc,
         }
       }
     },
-    async recordConsumption(record, basis, context, guard) {
+    async recordConsumption(record, basis, context, guard, predecessors = []) {
       return conversation.commit(async tx => {
         await guard?.(tx);
         const provenance = await tx.doc(InputProvenance, conversation.id, keyFor(record.requestId), null);
@@ -124,14 +128,12 @@ export function createInputAdmission({ harness, conversation, LiveDoc, InboxDoc,
         // Append an evidence fact once. Generation tasks change between tool
         // rounds, but this consumed input remains owned by the same Pi run.
         provenance.consumption ??= { submission_id: record.id, basis };
+        for (const predecessor of predecessors) {
+          const previous = await tx.doc(InputProvenance, conversation.id, keyFor(predecessor.request_id), null);
+          if (!previous.fingerprint) throw fail("input_origin_unavailable", "Input has no verified provenance");
+          previous.successor_consumption ??= { submission_id: record.id, basis: { event_ids: predecessor.event_ids } };
+        }
         return provenance.consumption;
-      }, context);
-    },
-    async recordSuccessorConsumption(record, successorId, basis, context) {
-      return conversation.commit(async tx => {
-        const provenance = await tx.doc(InputProvenance, conversation.id, keyFor(record.requestId), null);
-        if (!provenance.fingerprint) throw fail("input_origin_unavailable", "Input has no verified provenance");
-        provenance.successor_consumption ??= { submission_id: successorId, basis };
       }, context);
     },
     async latest(context) {

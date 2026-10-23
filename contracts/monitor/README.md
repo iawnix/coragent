@@ -68,14 +68,13 @@ type ExecutionSelection = {
   resolved_at: string;
 };
 type UserTask = {
-  schema_version: "coragent-user-task/5";
+  schema_version: "coragent-user-task/6";
   user_task_id: string;
   workspace_id: string;
   session_id: string;
   conversation_id: string;
   title: string;
   objective: string;
-  initial_plan?: string; // Initial plan, included when populated.
   next_action?: string; // Current next action, included when populated.
   sources: { submission_id: string; entry_id: unknown; text: string }[];
   criteria: Criterion[];
@@ -279,10 +278,15 @@ Job lifecycle. Missing collection or scientific-analysis evidence must not be
 presented as successful analysis merely because execution succeeded.
 
 A session without registered tasks returns no current task. This protocol requires
-`coragent-user-task/5` and `research-snapshot/3`. Run indexes
+`coragent-user-task/6` and `research-snapshot/3`. Run indexes
 cover execution observed by the Task Controller; runs without an index are not
 invented from the active task graph. The diagnostic view presents
 structured execution summaries, not model reasoning or secret tool arguments.
+
+Task keeps the user objective, criteria, next action, execution plan, progress evidence and
+control state. Scientific hypotheses and plans belong to `research-node/2` Nodes and their
+notes; Monitor does not project another initial scientific plan. Deploy runtime, contracts
+and Skills together; earlier Task/Node formats have no compatibility aliases or migration.
 
 A research Task without calculations has null `execution_target`, `execution_selection` and
 `execution_policy`. Creating, reading and resuming it does not resolve an execution platform. The first

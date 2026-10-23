@@ -97,7 +97,7 @@ export function projectUserTask(task) {
       selection_mode: task.execution_selection.selection_mode,
     } : null,
     requirements_revision: task.requirements_revision, completion_outcome: task.completion_outcome ?? null,
-    initial_plan: text(task.initial_plan ?? null, 2048), next_action: text(task.next_action ?? null, 1024),
+    next_action: text(task.next_action ?? null, 1024),
     state: task.state, reason: text(task.reason, 512), revision: task.revision, control_epoch: task.control_epoch,
     research: { entry_node_ids: task.research.entry_node_ids.slice(0, 8), focus_node_ids: task.research.focus_node_ids.slice(0, 8),
       entry_nodes_omitted: Math.max(0, task.research.entry_node_ids.length - 8),
@@ -145,7 +145,6 @@ export function projectDecisionTask(task) {
   const result = { user_task_id, revision, state, objective, criteria, requirements_revision: task.requirements_revision,
     completion_outcome: task.completion_outcome ?? null, completion: task.completion?.map(({ criterion_id, status, assessment_ref }) => ({ criterion_id, status, assessment_ref })) ?? null,
     execution_target: task.execution_target ?? null,
-    ...(task.initial_plan ? { initial_plan: task.initial_plan } : {}),
     ...(task.next_action ? { next_action: task.next_action } : {}) };
   if (task.title !== objective) result.title = task.title;
   if (task.reason) result.reason = task.reason;

@@ -245,6 +245,13 @@ Research Memory stores scientific evidence and conclusions.
 | `/monitor run <id>` | Bounded generation/tool execution details |
 | `/monitor health` | Task Controller and shared Job Manager worker health |
 
+`/monitor health` separates the worker's last successful observation and event
+delivery (`last_successful_observation`, `last_successful_delivery`) and their
+errors (`last_observation_error`, `last_delivery_error`). A null success time means
+no success has been recorded since worker startup. A query timeout retains the
+last observed Job state; it does not establish that the Job failed. Pending events
+can still be delivered while another platform's query is slow.
+
 Task details include research entry points, current focus, local plan excerpts,
 original problem status, assessment/Result references, and related Jobs. Only
 Jobs owned by the current session have `/monitor job` links; other Jobs remain

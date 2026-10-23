@@ -41,9 +41,11 @@ Python 测试按 `tests/unit/`、`tests/contract/` 和 `tests/integration/` 分�
 
 ## 研究记忆与执行边界
 
-`workspace_manifest.json` 使用 `research_workspace/3`。唯一命名空间是 `research_agent.research`，没有旧 state 或全局 progress 双协议。原始消息、Node 内容修订和运行事实来源分开；Node 目录保持稳定，多次尝试保留历史，不可变 Result 固定依据。
+`workspace_manifest.json` 使用 `research_workspace/3`，Node 使用 `research-node/2`，Task 使用 `coragent-user-task/6`。运行时、合同和 Skill 必须同步部署，旧 Node/Task 格式没有兼容读取或字段别名。唯一命名空间是 `research_agent.research`，没有旧 state 或全局 progress 双协议。原始消息、Node 内容修订和运行事实来源分开；Node 目录保持稳定，多次尝试保留历史，不可变 Result 固定依据。
 
-Agent 使用 research_read / research_search / research_create / research_update / research_result。创建只要求 goal，记事只要求 node_id 与 note，发布只要求 node_id 与 conclusion。身份、读取依据、修订号和事务由适配层提供。后台 Job 不修改 Node 内容版本。显式关系单次存储，反向查询自动生成；实际 uses 需要确证输入，搜索不是采用证据。
+Agent 使用 research_read / research_search / research_create / research_update / research_result。创建只要求 goal，记事只要求 node_id 与 note，发布只要求 node_id 与 conclusion。创建前先恢复并复用相关问题；假设和科学方法属于 plan，过程决策属于 note，可复用结论属于 Result，不要求再抄成任务进展。Task 保留目标、条件、下一步、执行计划和控制，不保存第二份科学计划。身份、读取依据、修订号和事务由适配层提供。后台 Job 不修改 Node 内容版本。显式关系单次存储，反向查询自动生成；实际 uses 需要确证输入，搜索不是采用证据。
+
+`as_assessment=true` 将 Result 发布与 Node 当前判断选定原子提交，读取过期时均不保存；普通发布与 supersedes 不自动选定最新结果。Brief 纳入范围内近期 note 和计数作为派生阅读视图，摘要不创建 Result 或选定综合判断。
 
 Job Manager 拥有执行回执，Artifact Store 拥有文件和来源。Job Manager 的 next_run 投递 只依赖事件及投递身份，不读取 Memory sequence，也不要求 checkpoint。邮件去重属于发送回执，Memory 失败不能触发重发。新旧工作区不迁移或混写。
 

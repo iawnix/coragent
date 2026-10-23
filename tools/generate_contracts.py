@@ -77,6 +77,7 @@ def ts_type(schema, depth=0):
 def outputs():
     monitors = {name: json.loads((ROOT / f'contracts/monitor/jobs/{name}.schema.json').read_text())
                 for name in ('binding', 'event', 'delivery')}
+    monitor_limits = json.loads((ROOT / 'contracts/monitor/jobs/limits.json').read_text())
     documents = {path.name: json.loads(path.read_text()) for path in SOURCE.glob('*.json')}
     if documents['results.json']['schema_version'] != 'coragent-command-results/1':
         raise ValueError('invalid command result schemas')
@@ -165,6 +166,7 @@ export function slashCompletions(name: string, prefix?: string): Array<{ value: 
     index.extend('| `' + item['id'] + '` | ' + ', '.join('`' + key + '`' for key in item['required']) + ' | ' + item.get('effect', '') + ' |' for item in commands)
     return {
         ROOT / 'backend/src/research_agent/application/monitor_contracts.json': encoded(monitors),
+        ROOT / 'backend/src/research_agent/application/monitor_limits.json': encoded(monitor_limits),
         ROOT / 'backend/src/research_agent/application/command_catalog.json': encoded(catalog),
         ROOT / 'apps/agent/tools/command-catalog.json': encoded(catalog),
         ROOT / 'apps/agent/tools/parameters.d.mts': tool_types,

@@ -88,7 +88,7 @@ def test_repaired_job_dedup_and_late_failure_cannot_replace_selected_evidence(re
         'conclusion': 'The repaired geometry produced the requested energy; reaction connectivity remains unverified.',
         'limitations': 'No transition-state or connectivity validation was performed.',
         'evidence_refs': [repaired['job_id'], repaired_receipt], 'supersedes': old['id'],
-        'as_assessment': True, 'progress': 'Energy obtained; connectivity analysis remains.', 'read_basis': initial['read_basis']})
+        'as_assessment': True, 'read_basis': initial['read_basis']})
     assert corrected['assessment_selected']
     stable_node = nodes.get_node(root, node_id)
     observe_execution(root, SimpleNamespace(job_id=failed['job_id']),
@@ -102,11 +102,14 @@ def test_repaired_job_dedup_and_late_failure_cannot_replace_selected_evidence(re
     assert snapshot['nodes'][0]['status'] == 'open'
     assert any(notice['code'] == 'result_superseded' for notice in execute('research_read', root, {'ref': old['id']})['review_notices'])
 
-    stale = execute('research_result', root, {'node_id': node_id,
-        'conclusion': 'An earlier draft describes only the first failure.', 'evidence_refs': [failed_receipt],
-        'as_assessment': True, 'read_basis': initial['read_basis']})
-    assert stale['result_saved'] and not stale['assessment_selected']
-    assert 'revision_conflict' in stale['conflict']
+    published = relations.graph(root)['results']
+    result_files = sorted((root / 'research/nodes' / node_id / 'results').glob('*.json'))
+    with pytest.raises(ValueError, match='revision_conflict'):
+        execute('research_result', root, {'node_id': node_id,
+            'conclusion': 'An earlier draft describes only the first failure.', 'evidence_refs': [failed_receipt],
+            'as_assessment': True, 'read_basis': initial['read_basis']})
+    assert relations.graph(root)['results'] == published
+    assert sorted((root / 'research/nodes' / node_id / 'results').glob('*.json')) == result_files
     assert nodes.get_node(root, node_id)['assessment_ref'] == corrected['result']['id']
     assert results.get_result(root, corrected['result']['id'])['evidence_refs'] == [repaired['job_id'], repaired_receipt]
     conflict = observe_execution(root, SimpleNamespace(job_id=repaired['job_id']), {'state': 'failed', 'exit_code': 23})
