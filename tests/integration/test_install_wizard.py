@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from research_agent.foundation.layout import paths as app_paths
-from research_agent.foundation.layout import paths as layout_paths
+from research_agent.bootstrap.layout import paths as app_paths
+from research_agent.bootstrap.layout import paths as layout_paths
 
 import json
 import os
@@ -14,9 +14,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from scripts import install_wizard as wizard
-from scripts import _terminal_ui as terminal_ui
-from scripts.install_from_github import install_uninstaller
+from coragent_packaging.installer import install_wizard as wizard
+from coragent_packaging.installer import _terminal_ui as terminal_ui
+from coragent_packaging.installer.install_from_github import install_uninstaller
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -434,8 +434,8 @@ def test_explicit_phone_link_uses_discovered_relay_url(
         "discover_link_relay",
         lambda _root: {
             "root": str(relay_root),
-            "service_root": str(relay_root / "current/services/relay"),
-            "cli": str(relay_root / "current/services/relay/cli.mjs"),
+            "service_root": str(relay_root / "current/apps/relay"),
+            "cli": str(relay_root / "current/apps/relay/cli.mjs"),
             "state": str(tmp_path / "relay.db"),
             "relay_url": "https://relay.example.test",
         },
@@ -725,7 +725,7 @@ def test_remote_terminal_profile_is_written_private_and_reloaded(tmp_path: Path)
     document = json.loads(path.read_text(encoding="utf-8"))
     assert document["ssh_host"] == "pi.example"
     assert document["ssh_options"] == ["-i", "/home/test/.ssh/id_ed25519"]
-    from scripts._configuration import publish
+    from coragent_packaging.installer._configuration import publish
     app_paths(args.install_root).initialize()
     publish(args)
 
@@ -743,7 +743,7 @@ def test_prepare_app_server_runtime_uses_installed_release_script(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root = tmp_path / "install"
-    installer = root / "releases/test/agent/scripts/prepare_pi_source.py"
+    installer = root / "releases/test/agent/packaging/coragent_packaging/pi/prepare.py"
     installer.parent.mkdir(parents=True)
     installer.write_text("# fixture\n", encoding="utf-8")
     (root / "current").symlink_to("releases/test")
@@ -770,7 +770,7 @@ def test_prepare_app_server_runtime_reports_installer_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root = tmp_path / "install"
-    installer = root / "releases/test/agent/scripts/prepare_pi_source.py"
+    installer = root / "releases/test/agent/packaging/coragent_packaging/pi/prepare.py"
     installer.parent.mkdir(parents=True)
     installer.write_text("# fixture\n", encoding="utf-8")
     (root / "current").symlink_to("releases/test")
@@ -789,7 +789,7 @@ def test_prepare_app_server_runtime_prefers_stable_current_release(
 ) -> None:
     root = tmp_path / "install"
     suite = root / "releases" / "release-new"
-    installer = suite / "agent/scripts/prepare_pi_source.py"
+    installer = suite / "agent/packaging/coragent_packaging/pi/prepare.py"
     installer.parent.mkdir(parents=True)
     installer.write_text("# fixture\n", encoding="utf-8")
     (suite / "agent/config").mkdir(parents=True)
@@ -1160,7 +1160,8 @@ def test_invalid_scientific_binding_is_rejected_before_install_copy(tmp_path):
 
 
 def test_configured_install_checks_science_before_relay_or_secret_copy(tmp_path, monkeypatch):
-    from scripts import _install_inputs, _install_relay
+    from coragent_packaging.installer import _install_inputs
+    from coragent_packaging.installer import _install_relay
     source = tmp_path / "config"; source.mkdir()
     (source / "job.toml").write_text('[execution]\nschema_version = 2\ndefault_platform="local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n[execution.platforms.local.bindings.xtb]\ncommand="xtb"\n')
     def unexpected(*args):
@@ -1171,7 +1172,8 @@ def test_configured_install_checks_science_before_relay_or_secret_copy(tmp_path,
 
 
 def _configured_email_fixture(tmp_path):
-    from scripts import _install_inputs, _install_relay
+    from coragent_packaging.installer import _install_inputs
+    from coragent_packaging.installer import _install_relay
     config = tmp_path / "config"
     config.mkdir()
     for name in ("models.json", "auth.json"):
@@ -1187,7 +1189,8 @@ def _configured_email_fixture(tmp_path):
 
 
 def test_configured_email_uses_explicit_file_and_private_password_copy(tmp_path):
-    from scripts import _install_inputs, _install_relay
+    from coragent_packaging.installer import _install_inputs
+    from coragent_packaging.installer import _install_relay
     config, root, args = _configured_email_fixture(tmp_path)
     (config / "email.toml").write_text((ROOT / "config/email.example.toml").read_text())
     (config / "smtp-password").write_text("synthetic-smtp-authorization-code\n")
@@ -1211,7 +1214,8 @@ def test_configured_email_uses_explicit_file_and_private_password_copy(tmp_path)
 
 @pytest.mark.parametrize("disabled", [False, True])
 def test_configured_install_without_email_does_not_require_smtp_password(tmp_path, disabled):
-    from scripts import _install_inputs, _install_relay
+    from coragent_packaging.installer import _install_inputs
+    from coragent_packaging.installer import _install_relay
     config, root, args = _configured_email_fixture(tmp_path)
     if disabled:
         (config / "email.toml").write_text('[notifications.email]\nenabled=false\n')
@@ -1221,7 +1225,8 @@ def test_configured_install_without_email_does_not_require_smtp_password(tmp_pat
 
 
 def test_configured_email_can_reference_service_environment(tmp_path):
-    from scripts import _install_inputs, _install_relay
+    from coragent_packaging.installer import _install_inputs
+    from coragent_packaging.installer import _install_relay
     config, root, args = _configured_email_fixture(tmp_path)
     text = (ROOT / "config/email.example.toml").read_text()
     text = text.replace('password_file = "smtp-password"', 'password_env = "EXAMPLE_SMTP_PASSWORD"')
@@ -1239,7 +1244,8 @@ def test_configured_email_can_reference_service_environment(tmp_path):
     '[notifications.email]\nprovider="smtp"\nport="465"\n',
 ])
 def test_configured_invalid_email_fails_before_relay_or_secret_copy(tmp_path, monkeypatch, email):
-    from scripts import _install_inputs, _install_relay
+    from coragent_packaging.installer import _install_inputs
+    from coragent_packaging.installer import _install_relay
     config, root, _ = _configured_email_fixture(tmp_path)
     (config / "email.toml").write_text(email)
     monkeypatch.setattr(wizard, "_validate_job_config", lambda value: value)
@@ -1361,15 +1367,15 @@ def test_install_uninstaller_copies_recovery_files_and_marks_ownership(tmp_path:
     uninstaller = install_uninstaller(root, ROOT)
     assert uninstaller == root / "uninstall.sh"
     assert uninstaller.is_file()
-    assert (root / "runtimes/maintenance/uninstall.py").is_file()
-    assert (root / "runtimes/maintenance/_qrun_install.py").is_file()
-    assert (root / "runtimes/maintenance/qrun.py").is_file()
+    assert (root / "runtimes/maintenance/packaging/coragent_packaging/installer/uninstall.py").is_file()
+    assert (root / "runtimes/maintenance/packaging/coragent_packaging/installer/_qrun_install.py").is_file()
+    assert (root / "runtimes/maintenance/backend/src/research_agent/jobs/qrun.py").is_file()
     marker = json.loads((app_paths(root).marker).read_text(encoding="utf-8"))
     assert marker["schema_version"] == "coragent-installation/3"
 
 
 def test_configured_update_preserves_existing_relay_host_enrollment(tmp_path, monkeypatch):
-    from scripts import _install_relay
+    from coragent_packaging.installer import _install_relay
     root = tmp_path / 'install'
     state = app_paths(root).state / 'host'
     state.mkdir(parents=True)
@@ -1379,7 +1385,7 @@ def test_configured_update_preserves_existing_relay_host_enrollment(tmp_path, mo
     (state / 'host.token').write_text('existing-token')
     (state / 'link.json').write_text(json.dumps({'schema_version':'coragent-link/1','relay_url':relay_url,'host_id':host_id}))
     monkeypatch.setattr(_install_relay, 'discover_link_relay', lambda path: {
-        'service_root': str(root / 'runtimes/link-relay/current/services/relay'), 'relay_url':relay_url,
+        'service_root': str(root / 'runtimes/link-relay/current/apps/relay'), 'relay_url':relay_url,
         'state': str(app_paths(root).state / 'link-relay/relay.db')})
     def unexpected(*args, **kwargs):
         pytest.fail('must not create another enrollment for an enrolled Host')

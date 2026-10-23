@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from research_agent.foundation.layout import paths as app_paths
+from research_agent.bootstrap.layout import paths as app_paths
 
 import json
 from pathlib import Path

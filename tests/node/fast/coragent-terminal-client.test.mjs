@@ -23,7 +23,7 @@ test("default starts fresh even with online sessions; continue uses durable acti
 test("terminal model flags reach creation and resumption as one identity", { timeout: 20_000 }, async t => {
   const root = await mkdtemp(join(tmpdir(), "t-"));
   const resolverDirectory = join(root, "packages/coding-agent/src/experimental");
-  const clientDirectory = join(root, "apps/agent/pi");
+  const clientDirectory = join(root, "apps/agent/runtime");
   await mkdir(resolverDirectory, { recursive: true });
   await mkdir(clientDirectory, { recursive: true });
   await writeFile(join(resolverDirectory, "source-resolver.ts"), "");

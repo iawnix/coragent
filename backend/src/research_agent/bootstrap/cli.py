@@ -8,7 +8,7 @@ import os
 import sys
 from pathlib import Path
 
-from research_agent.foundation.env import (
+from research_agent.bootstrap.env import (
     DISABLE_REEXEC,
     ENV_OVERRIDE,
     ENV_ROOT_OVERRIDE,

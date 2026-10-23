@@ -44,7 +44,7 @@ RDKit、Job 内的解析器配置路径和乙醇结构生成；其他环境执�
 仅在选择准备该目标或显式传入 `--verify-job-target cluster` 时验证。
 
 管理员维护时仍可使用底层目标端工具：
-`python3 scripts/install_job_environment.py --config /absolute/job.toml --backend structure`。
+`python3 packaging/coragent_packaging/installer/install_job_environment.py --config /absolute/job.toml --backend structure`。
 它要求已有显式绑定，不负责统一安装器的版本切换或 Job 验收。结构与验证可以共用
 前缀；CF22D 不需要自定义激活脚本或 `LD_PRELOAD` 补丁。
 

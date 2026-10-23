@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from research_agent.foundation.layout import paths as app_paths
+from research_agent.bootstrap.layout import paths as app_paths
 
 import json
 from pathlib import Path
@@ -9,7 +9,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from scripts import installer, install_from_github, install_wizard, _install_inputs, _install_relay
+from coragent_packaging.installer import installer
+from coragent_packaging.installer import install_from_github
+from coragent_packaging.installer import install_wizard
+from coragent_packaging.installer import _install_inputs
+from coragent_packaging.installer import _install_relay
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -52,7 +56,7 @@ def test_local_selection_never_downloads_and_pins_actual_head(tmp_path, monkeypa
     monkeypatch.setattr(installer, "local_source", local)
     monkeypatch.setattr(install_from_github, "checkout_github", lambda *args: pytest.fail("local source must not download"))
     def run(command, **kwargs):
-        assert command[2] == str(selected / "scripts/install_wizard.py")
+        assert command[2] == str(selected / "packaging/coragent_packaging/installer/install_wizard.py")
         assert command[command.index("--coragent-commit") + 1] == COMMIT
         assert command[command.index("--coragent-ref") + 1] == COMMIT
         return SimpleNamespace(returncode=0)
@@ -73,7 +77,7 @@ def test_package_source_uses_the_shared_wizard_without_fetching_sources(tmp_path
 def test_standalone_relay_routes_to_its_installer(tmp_path, monkeypatch):
     monkeypatch.setattr(installer, "local_source", lambda *args, **kwargs: (tmp_path, COMMIT))
     def run(command, **kwargs):
-        assert command[2] == str(tmp_path / "scripts/install_link_relay.py")
+        assert command[2] == str(tmp_path / "packaging/coragent_packaging/installer/install_link_relay.py")
         assert "--coragent-commit" not in command
         assert command[command.index("--source-root") + 1] == str(tmp_path)
         return SimpleNamespace(returncode=0)
@@ -84,7 +88,7 @@ def test_standalone_relay_routes_to_its_installer(tmp_path, monkeypatch):
 
 def test_failed_install_cleans_only_the_new_owned_relay(tmp_path, monkeypatch):
     # Exercise rollback with the actual Relay release layout; the old wrapper
-    # incorrectly passed current/services/relay as the installation root.
+    # incorrectly passed current/apps/relay as the installation root.
     root = tmp_path / "install"
     relay = root / "runtimes/link-relay"
     state = app_paths(root).state / 'link-relay'
@@ -100,7 +104,7 @@ def test_failed_install_cleans_only_the_new_owned_relay(tmp_path, monkeypatch):
         assert "--purge-state" in command
         return SimpleNamespace(returncode=0)
     monkeypatch.setattr(_install_relay.subprocess, "run", run)
-    _install_relay.rollback(args, {"install_root": str(relay), "service_root": str(relay / "current/services/relay"),
+    _install_relay.rollback(args, {"install_root": str(relay), "service_root": str(relay / "current/apps/relay"),
                                  "state_dir": str(state)})
     assert len(calls) == 1
     assert not marker.exists()
@@ -143,7 +147,7 @@ def test_configuration_cli_overrides_directory_and_email_secrets_wait_for_confir
 
 
 def test_private_config_does_not_affect_local_source_provenance(tmp_path):
-    from scripts._source_capture import REQUIRED_SOURCE_PATHS
+    from coragent_packaging.build._source_capture import REQUIRED_SOURCE_PATHS
     for raw in REQUIRED_SOURCE_PATHS:
         path = tmp_path / raw.decode()
         path.parent.mkdir(parents=True, exist_ok=True)

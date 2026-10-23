@@ -1,5 +1,5 @@
 import catalog from "./command-catalog.json" with { type: "json" };
-import { Value } from "../pi/typebox.mjs";
+import { Value } from "../runtime/typebox.mjs";
 
 if (catalog.schema_version !== "coragent-command-catalog/2" || !Array.isArray(catalog.commands)) {
   throw new Error("invalid CoRAgent command catalog");

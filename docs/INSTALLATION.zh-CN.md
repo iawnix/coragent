@@ -83,7 +83,7 @@ password = "credential:smtp_password"
 激活前失败恢复原配置和版本；激活后失败保留新状态，重新运行安装器修复。
 
 ```sh
-python3 scripts/app_layout_doctor.py --config /absolute/path/config.toml --json
+python3 packaging/coragent_packaging/installer/app_layout_doctor.py --config /absolute/path/config.toml --json
 ```
 
 ## TRI 与共享计算环境

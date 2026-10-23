@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from research_agent.foundation.layout import paths as app_paths
+from research_agent.bootstrap.layout import paths as app_paths
 
 import stat
 from pathlib import Path
 
 import pytest
 
-from scripts._credentials import provision_service_credentials
+from coragent_packaging.installer._credentials import provision_service_credentials
 
 
 def test_web_credential_is_created_once_and_preserved(tmp_path: Path) -> None:

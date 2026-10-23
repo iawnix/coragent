@@ -71,15 +71,6 @@ export async function jobHostWorkspaceId(workspace, event) {
   return identity.workspace_id;
 }
 
-export function wakeMessage(event) {
-  return ["A compute monitor event requires attention.", `event_id=${event.event_id}`, `monitor_id=${event.monitor_id}`,
-    `job_id=${event.job_id}`, event.node_id ? `node_id=${event.node_id}` : undefined, `state=${event.state}`, event.status?.reason ? `reason=${event.status.reason}` : undefined,
-    `program_status=${event.program_status || "unknown"}`, event.error_class ? `error_class=${event.error_class}` : undefined,
-    "Read research_read and inspect the Job result before deciding what to do.",
-    "Use job_status, job_collect, or job_reconcile to reconcile status. A completed scheduler job is not a parsed result; register its raw outputs as Artifacts and check evidence before publishing a research result.",
-  ].filter(Boolean).join("\n");
-}
-
 export async function runJobWorker(options, signal) {
   const { connectHost } = await import("../../transport/host-client.mjs");
   const token = process.env.CORAGENT_INTERNAL_JOB_TOKEN;
@@ -143,7 +134,7 @@ async function writeHealth(stateRoot, value) {
 }
 
 async function runJobManagerJson(command, workspace, extra = [], signal) {
-  const completed = await executeFile(python, [join(packageRoot, "apps", "agent-cli", "job_manager.py"), command, "--root", workspace, ...extra], {
+  const completed = await executeFile(python, [join(packageRoot, "apps/cli/job_manager.py"), command, "--root", workspace, ...extra], {
     cwd: workspace, env: { ...process.env, PYTHONNOUSERSITE: "1" }, maxBuffer: 8 * 1024 * 1024, timeout: 60_000, signal });
   const value = JSON.parse(completed.stdout.trim());
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`invalid monitor JSON for ${command}`);

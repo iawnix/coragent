@@ -7,8 +7,8 @@ import { Harness, MemoryStorage, createRegistry, defineExtension, hook, Generati
 import { createModels, fauxProvider, fauxAssistantMessage } from "@earendil-works/pi-ai";
 import { TODO_CONTEXT as context } from "@earendil-works/chord/context";
 import { pinnedPiSource } from "./test-environment.mjs";
-import { createInputAdmission, bindUserInputConversation } from "../../../apps/agent/host/admission/input.mjs";
-import { createSessionAdmission } from "../../../apps/agent/host/admission/session.mjs";
+import { createInputAdmission, bindUserInputConversation } from "../../../apps/agent/runtime/admission/input.mjs";
+import { createSessionAdmission } from "../../../apps/agent/runtime/admission/session.mjs";
 import { createTaskController, UserTask } from "../../../apps/agent/tasks/controller.mjs";
 import { createMonitorService } from "../../../apps/agent/tasks/service.mjs";
 import { createTaskTools } from "../../../apps/agent/tasks/tools.mjs";

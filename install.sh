@@ -7,7 +7,7 @@ SCRIPT_ROOT=""
 if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
   SCRIPT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 fi
-for candidate in "${SCRIPT_ROOT}/scripts/installer.py" "${SCRIPT_ROOT}/runtimes/maintenance/installer.py"; do
+for candidate in "${SCRIPT_ROOT}/packaging/coragent_packaging/installer/installer.py" "${SCRIPT_ROOT}/runtimes/maintenance/packaging/coragent_packaging/installer/installer.py"; do
   if [[ -f "${candidate}" ]]; then
     if [[ ! -t 0 ]] && { true </dev/tty; } 2>/dev/null; then
       exec python3 -B "${candidate}" install "$@" </dev/tty
@@ -25,4 +25,4 @@ trap 'exit 143' TERM
 git clone --quiet --depth 1 --no-checkout -- "${CORAGENT_INSTALL_REPO:-https://github.com/iawnix/coragent.git}" "${bootstrap_root}/source"
 git -C "${bootstrap_root}/source" fetch --quiet --depth 1 origin "${CORAGENT_INSTALL_REF:-main}"
 git -C "${bootstrap_root}/source" checkout --quiet --detach FETCH_HEAD
-python3 -B "${bootstrap_root}/source/scripts/installer.py" install "$@"
+python3 -B "${bootstrap_root}/source/packaging/coragent_packaging/installer/installer.py" install "$@"

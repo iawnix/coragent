@@ -41,7 +41,7 @@ export async function startCoRAgentHost(options) {
   if ((await lstat(workspaceRoot)).isSymbolicLink()) throw protocolError("invalid_workspace_root", "Workspace container must not be a symlink");
   const physicalRoot = await realpath(workspaceRoot);
   const epoch = randomUUID();
-  const monitorAvailable = existsSync(join(packageRoot, "apps", "agent-cli", "job_manager.py"));
+  const monitorAvailable = existsSync(join(packageRoot, "apps/cli/job_manager.py"));
   const capabilities = [...BASE_CAPABILITIES, ...MONITOR_METHODS, ...FILE_METHODS];
   const clients = new Set();
   for (const marker of [

@@ -8,7 +8,9 @@ import subprocess
 
 import pytest
 
-from scripts import _component_release, check_package, package_inventory
+from coragent_packaging.manifests import _component_release
+from coragent_packaging.build import check_package
+from coragent_packaging.manifests import package_inventory
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -46,12 +48,12 @@ def test_required_release_members_are_in_the_npm_allowlist() -> None:
 
     assert package_inventory.REQUIRED_TARBALL_FILES <= allowlisted
     assert package_inventory.REQUIRED_RUNTIME_FILES <= allowlisted
-    assert "scripts/package_inventory.py" in allowlisted
+    assert "packaging/coragent_packaging/manifests/package_inventory.py" in allowlisted
     assert "environment.lock.txt" in allowlisted
     assert "contracts/coragent-web/provider-response.schema.json" in allowlisted
     assert "contracts/monitor/jobs/binding.schema.json" in allowlisted
     assert not any(path.startswith("tests/") for path in allowlisted)
-    assert "apps/agent/pi/prompt.mjs" in allowlisted
+    assert "apps/agent/runtime/prompt.mjs" in allowlisted
     assert manifest["pi"]["extensions"] == []
     assert not any("local_debug" in Path(path).parts for path in allowlisted)
     assert not any(path.startswith(package_inventory.RETIRED_RUNTIME_PATHS) for path in allowlisted)

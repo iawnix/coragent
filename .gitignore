@@ -16,7 +16,8 @@ __pycache__/
 /config/smtp-password
 /config/secrets/
 *.egg-info/
-build/
+/build/
+/backend/build/
 /python-dist/
 .pytest_cache/
 .runtime/

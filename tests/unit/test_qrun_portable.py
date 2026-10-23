@@ -10,7 +10,7 @@ import time
 import pytest
 
 from research_agent.jobs import qrun
-from scripts import _qrun_install
+from coragent_packaging.installer import _qrun_install
 from tests.unit.test_qrun import request
 
 

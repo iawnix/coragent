@@ -12,7 +12,7 @@ exclude = ["tests/unit/test_local_job_isolation.py", "tests/contract/test_system
 kind = "pytest"
 environment = "locked Python source runtime"
 description = "Deterministic unit and public contract tests."
-globs = ["tests/unit/test_*.py", "tests/contract/test_*.py", "backend/tests/test_*.py"]
+globs = ["tests/unit/test_*.py", "tests/contract/test_*.py"]
 requires = ["python", "node"]
 timeout = 900
 
@@ -52,7 +52,7 @@ exclude = ["tests/unit/test_local_job_isolation.py", "tests/contract/test_system
 kind = "pytest-managed"
 environment = "wheel overlay built from this snapshot"
 description = "All Python tests against the built wheel."
-globs = ["tests/unit/test_*.py", "tests/contract/test_*.py", "tests/integration/test_*.py", "backend/tests/test_*.py"]
+globs = ["tests/unit/test_*.py", "tests/contract/test_*.py", "tests/integration/test_*.py"]
 aggregate = true
 requires = ["node", "python", "pi"]
 timeout = 2400

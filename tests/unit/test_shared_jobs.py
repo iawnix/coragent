@@ -242,8 +242,8 @@ def test_shared_config_schema_and_runtime_agree(queue, mode):
 
 @pytest.mark.parametrize('interrupted', [False, True])
 def test_shared_acceptance_retains_failed_or_interrupted_workspace(queue, tmp_path, monkeypatch, interrupted):
-    from scripts import _job_acceptance as acceptance
-    from scripts._job_install import toml_bytes
+    from coragent_packaging.installer import _job_acceptance as acceptance
+    from coragent_packaging.installer._job_install import toml_bytes
     config, _ = queue
     target = {**config, 'file_mode':'shared', 'bindings':{'shell':{'command':'/bin/true'}}}
     path = tmp_path / 'job.toml'

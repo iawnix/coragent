@@ -33,8 +33,8 @@ Each script-owning Skill links its local operation entrypoints and contracts. [T
 
 ## System prompt
 
-`apps/agent/pi/setup.mjs` assembles the working directory, `prompts/coragent.md`,
-and discovered Skill descriptions into the system prompt. `prompts/coragent.zh-CN.md`
+`apps/agent/runtime/setup.mjs` assembles the working directory, `apps/agent/prompts/coragent.md`,
+and discovered Skill descriptions into the system prompt. `apps/agent/prompts/coragent.zh-CN.md`
 is a translation for maintenance; it is not injected alongside English or selected by
 conversation language. `/sys-prompt` inspects the current worker's actual prompt and sources.
 
@@ -90,12 +90,12 @@ submission, collection, and recovery.
 
 ## Maintenance
 
-`config/resources.json` records bundled Skill, reference, script, and prompt
+`packaging/coragent_packaging/manifests/resources.json` records bundled Skill, reference, script, and prompt
 digests; the execution catalog also pins its script dependencies. After editing resources:
 
 ```bash
-python3 scripts/update_resources.py
-python3 scripts/update_resources.py --check
+python3 tools/update_resources.py
+python3 tools/update_resources.py --check
 python3 tools/lint_skills.py
 ```
 

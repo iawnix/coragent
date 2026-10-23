@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from research_agent.jobs import qrun
-from scripts import _qrun_install as installer
+from coragent_packaging.installer import _qrun_install as installer
 from tests.unit.test_qrun import Runtime, request
 
 REPO = Path(__file__).resolve().parents[2]

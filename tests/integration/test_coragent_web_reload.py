@@ -8,13 +8,13 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "components" / "coragent-web"))
+sys.path.insert(0, str(ROOT / "apps/web"))
 from coragent_web import reloader
 from coragent_web.reloader import ReleaseWatcher, exec_selected_release
 
 
 def _release(root: Path, name: str) -> Path:
-    script = root / "releases" / name / "components" / "coragent-web" / "bin" / "coragent-web"
+    script = root / "releases" / name / "apps/web/bin/coragent-web"
     script.parent.mkdir(parents=True)
     script.write_text(f"# {name}\n", encoding="utf-8")
     return script
@@ -25,7 +25,7 @@ def test_release_watcher_detects_atomic_stable_entrypoint_switch(tmp_path: Path)
     second = _release(tmp_path, "release-b")
     current = tmp_path / "current"
     current.symlink_to("releases/release-a", target_is_directory=True)
-    stable_entrypoint = current / "components" / "coragent-web" / "bin" / "coragent-web"
+    stable_entrypoint = current / "apps/web/bin/coragent-web"
     changed = threading.Event()
     watcher = ReleaseWatcher(
         stable_entrypoint,
@@ -52,7 +52,7 @@ def test_release_watcher_ignores_transient_missing_target(tmp_path: Path) -> Non
     current.symlink_to("releases/release-a", target_is_directory=True)
     changed = threading.Event()
     watcher = ReleaseWatcher(
-        current / "components" / "coragent-web" / "bin" / "coragent-web",
+        current / "apps/web/bin/coragent-web",
         loaded_entrypoint=first,
         poll_interval=0.01,
     )
@@ -76,7 +76,7 @@ def test_release_watcher_waits_until_selected_runtime_is_ready(tmp_path: Path) -
     changed = threading.Event()
     ready = threading.Event()
     watcher = ReleaseWatcher(
-        current / "components" / "coragent-web" / "bin" / "coragent-web",
+        current / "apps/web/bin/coragent-web",
         loaded_entrypoint=first,
         poll_interval=0.01,
         ready=lambda selected: selected == second.resolve() and ready.is_set(),
@@ -102,7 +102,7 @@ def test_exec_selected_release_preserves_stable_path_and_arguments(
     _release(tmp_path, "release-a")
     current = tmp_path / "current"
     current.symlink_to("releases/release-a", target_is_directory=True)
-    stable_entrypoint = current / "components" / "coragent-web" / "bin" / "coragent-web"
+    stable_entrypoint = current / "apps/web/bin/coragent-web"
     captured = {}
 
     def fake_execv(executable: str, arguments: list[str]) -> None:

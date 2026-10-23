@@ -3,8 +3,8 @@ from tests.support.platforms import execution_config
 import json
 from pathlib import Path
 import pytest
-from research_agent.foundation.layout import paths, inspect_installation
-from research_agent.foundation.configuration import Configuration, toml_text
+from research_agent.bootstrap.layout import paths, inspect_installation
+from research_agent.configuration.configuration import Configuration, toml_text
 
 
 @pytest.fixture
@@ -134,7 +134,7 @@ def test_unsupported_model_thinking_levels_survive_configuration_and_projection(
 
 
 def test_install_preview_uses_one_config_without_writing_runtime_files(layout, capsys):
-    from scripts.install_wizard import parse_args, show_dry_run
+    from coragent_packaging.installer.install_wizard import parse_args, show_dry_run
     layout.configuration.update(execution=execution_config('local', {
         'local': {'executor': 'qrun', 'bindings': {}, 'transport': 'local', 'work_root': '/fixture/qrun/jobs'}}),
         web={'enabled':False}, notifications={'email':{'enabled':False}})
@@ -158,7 +158,7 @@ def test_generated_state_cannot_escape_through_internal_symlink(layout):
 
 
 def test_core_config_purge_preserves_sibling_files_and_cluster_software(layout):
-    from scripts.uninstall import parse_args, uninstall
+    from coragent_packaging.installer.uninstall import parse_args, uninstall
     layout.initialize()
     sibling = layout.config/'unrelated.txt'; sibling.write_text('keep')
     cluster = layout.root.parent/'cluster-software'; cluster.mkdir()
@@ -173,7 +173,7 @@ def test_core_config_purge_preserves_sibling_files_and_cluster_software(layout):
 
 
 def test_explicit_service_options_override_unified_config(layout):
-    from scripts.install_wizard import parse_args
+    from coragent_packaging.installer.install_wizard import parse_args
     layout.configuration.update(web={'enabled':True, 'host':'127.0.0.2', 'port':8767}, service={'scope':'user'})
     args = parse_args(['--config',str(layout.config_file),'--without-web','--web-host','127.0.0.3', '--service-scope','none'])
     assert args.with_web is False
@@ -195,7 +195,7 @@ def test_disabled_notification_needs_no_recipient_or_credentials(layout, monkeyp
 
 
 def test_invalid_notification_configuration_is_rejected_before_install(layout):
-    from scripts.install_wizard import parse_args
+    from coragent_packaging.installer.install_wizard import parse_args
     layout.configuration.update(notifications={'email':{'enabled':'true'}})
     with pytest.raises(ValueError, match='boolean'):
         parse_args(['--config', str(layout.config_file), '--dry-run'])
@@ -204,7 +204,7 @@ def test_invalid_notification_configuration_is_rejected_before_install(layout):
 
 def test_install_prepare_preserves_live_component_inputs_until_cutover(layout):
     from types import SimpleNamespace
-    from scripts._configuration import prepare
+    from coragent_packaging.installer._configuration import prepare
     layout.initialize()
     layout.job_config.write_text('live configuration')
     layout.configuration.update(execution=execution_config('local', {
@@ -214,7 +214,7 @@ def test_install_prepare_preserves_live_component_inputs_until_cutover(layout):
 
 
 def test_uninstall_can_purge_configuration_with_missing_credentials(layout):
-    from scripts.uninstall import parse_args, uninstall
+    from coragent_packaging.installer.uninstall import parse_args, uninstall
     layout.initialize()
     layout.configuration.update(models={'providers':{'test':{'apiKey':'credential:missing'}}})
     args = parse_args(['--config',str(layout.config_file),'--service-scope','none',
@@ -231,11 +231,11 @@ def test_runtime_store_cannot_overlap_operator_data(layout, monkeypatch, name):
 
 
 def test_installer_reads_email_from_main_config_without_generated_files(layout):
-    from scripts.install_wizard import parse_args, _load_existing_email_defaults, validate_email_options
+    from coragent_packaging.installer.install_wizard import parse_args, _load_existing_email_defaults, validate_email_options
     layout.configuration.update(notifications={'email':{'provider':'smtp', 'preset':'custom',
         'host':'smtp.example.test', 'username':'sender@example.test', 'recipient':'recipient@example.test',
         'password':'credential:smtp'}})
-    from research_agent.foundation.configuration import atomic_write
+    from research_agent.configuration.configuration import atomic_write
     atomic_write(layout.credentials, json.dumps({'models':{},'secrets':{'smtp':'fake-password'}}))
     args = parse_args(['--config',str(layout.config_file)])
     _load_existing_email_defaults(args, layout.root)
@@ -248,8 +248,8 @@ def test_installer_reads_email_from_main_config_without_generated_files(layout):
 
 
 def test_execution_import_preserves_unchanged_secret_references_and_accepts_replacements(layout):
-    from scripts._configuration import publish
-    from scripts.install_wizard import parse_args
+    from coragent_packaging.installer._configuration import publish
+    from coragent_packaging.installer.install_wizard import parse_args
     layout.initialize()
     layout.credentials.write_text(json.dumps({'models':{},'secrets':{'tri':'fake-original'}}))
     execution = execution_config('cluster', {'cluster':{'executor': 'external', 'transport': 'local', 'handler_environment': {'TRI_AUTH_TOKEN': 'credential:tri'}}})

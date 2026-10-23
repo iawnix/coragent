@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { TEST_ROOT } from "./test-environment.mjs";
 import { loadProductSkills } from "../../../apps/agent/resources/skills.mjs";
-import { createSystemPromptManifest } from "../../../apps/agent/pi/prompt.mjs";
+import { createSystemPromptManifest } from "../../../apps/agent/runtime/prompt.mjs";
 
 test("installed core works alone and chemical uses the same discovery without duplicate Skills", async t => {
   const source = fileURLToPath(new URL("../../../", import.meta.url));
@@ -14,16 +14,16 @@ test("installed core works alone and chemical uses the same discovery without du
     const root = await mkdtemp(join(TEST_ROOT, "skill-groups-"));
     t.after(() => rm(root, { recursive: true, force: true }));
     await mkdir(join(root, "skills"));
-    await mkdir(join(root, "config"));
+    await mkdir(join(root, "packaging/coragent_packaging/manifests"), { recursive: true });
     for (const group of groups) await cp(join(source, "skills", group), join(root, "skills", group), { recursive: true });
-    await cp(join(source, "prompts"), join(root, "prompts"), { recursive: true });
+    await cp(join(source, "apps/agent/prompts"), join(root, "apps/agent/prompts"), { recursive: true });
     const manifest = JSON.parse(await readFile(join(source, "package.json"), "utf8"));
     manifest.pi.skills = groups.map(group => `./skills/${group}`);
     await writeFile(join(root, "package.json"), JSON.stringify(manifest));
-    const inventory = JSON.parse(await readFile(join(source, "config/resources.json"), "utf8"));
+    const inventory = JSON.parse(await readFile(join(source, "packaging/coragent_packaging/manifests/resources.json"), "utf8"));
     inventory.files = Object.fromEntries(Object.entries(inventory.files).filter(([path]) =>
-      path.startsWith("prompts/") || groups.some(group => path.startsWith(`skills/${group}/`))));
-    await writeFile(join(root, "config/resources.json"), JSON.stringify(inventory));
+      path.startsWith("apps/agent/prompts/") || groups.some(group => path.startsWith(`skills/${group}/`))));
+    await writeFile(join(root, "packaging/coragent_packaging/manifests/resources.json"), JSON.stringify(inventory));
     const loaded = await loadProductSkills({ packageRoot: root });
     const names = loaded.skills.map(skill => skill.name);
     assert.equal(new Set(names).size, names.length);
@@ -35,7 +35,7 @@ test("installed core works alone and chemical uses the same discovery without du
     assert.equal(names.includes("report"), false);
     assert.equal(names.includes("tri-operations"), false);
     assert.equal(names.includes("_shared"), false);
-    const prompt = createSystemPromptManifest({ native: { source: "product", text: await readFile(join(root, "prompts/coragent.md"), "utf8") },
+    const prompt = createSystemPromptManifest({ native: { source: "product", text: await readFile(join(root, "apps/agent/prompts/coragent.md"), "utf8") },
       skills: { source: root, items: loaded.skills } });
     for (const skill of loaded.skills) assert.ok(prompt.effective.includes(skill.filePath));
     const workflowBody = await readFile(join(root, "skills/core/research-workflow/SKILL.md"), "utf8");
@@ -47,17 +47,17 @@ async function fixture(t) {
   const root = await mkdtemp(join(TEST_ROOT, "r-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   await mkdir(join(root, "skills", "demo"), { recursive: true });
-  await mkdir(join(root, "prompts")); await mkdir(join(root, "config"));
+  await mkdir(join(root, "apps/agent/prompts"), { recursive: true }); await mkdir(join(root, "packaging/coragent_packaging/manifests"), { recursive: true });
   const files = {
     "skills/demo/SKILL.md": "---\nname: demo\ndescription: Test a managed resource.\n---\nRead references relative to this directory.\n",
     "skills/demo/example.txt": "resource\n",
-    "prompts/coragent.md": "Product principles.\n",
+    "apps/agent/prompts/coragent.md": "Product principles.\n",
   };
   for (const [name, content] of Object.entries(files)) await writeFile(join(root, name), content);
   await writeFile(join(root, "package.json"), JSON.stringify({ pi: { skills: ["./skills"] } }));
   const inventory = { schema_version: "coragent-resources/1", files: Object.fromEntries(Object.entries(files)
     .map(([name, content]) => [name, `sha256:${createHash("sha256").update(content).digest("hex")}`])) };
-  await writeFile(join(root, "config/resources.json"), JSON.stringify(inventory));
+  await writeFile(join(root, "packaging/coragent_packaging/manifests/resources.json"), JSON.stringify(inventory));
   return root;
 }
 
@@ -84,7 +84,7 @@ test("managed Skill modifications and unlisted resources fail integrity validati
 
 test("managed Skill roots cannot escape or redirect through symlinks", async t => {
   const root = await fixture(t);
-  await symlink(join(root, "prompts/coragent.md"), join(root, "skills/demo/linked.md"));
+  await symlink(join(root, "apps/agent/prompts/coragent.md"), join(root, "skills/demo/linked.md"));
   await assert.rejects(loadProductSkills({ packageRoot: root }), /symlink/);
   await rm(join(root, "skills/demo/linked.md"));
   await writeFile(join(root, "package.json"), JSON.stringify({ pi: { skills: ["../outside"] } }));
@@ -101,10 +101,10 @@ test("Skills remain independent of scientific execution catalog discovery", asyn
 
 test("the permanent system prompt is required even if omitted from the inventory", async t => {
   const root = await fixture(t);
-  await rm(join(root, "prompts/coragent.md"));
-  const path = join(root, "config/resources.json");
+  await rm(join(root, "apps/agent/prompts/coragent.md"));
+  const path = join(root, "packaging/coragent_packaging/manifests/resources.json");
   const inventory = JSON.parse(await readFile(path));
-  delete inventory.files["prompts/coragent.md"];
+  delete inventory.files["apps/agent/prompts/coragent.md"];
   await writeFile(path, JSON.stringify(inventory));
   await assert.rejects(loadProductSkills({ packageRoot: root }), /system prompt is missing/);
 });

@@ -22,6 +22,7 @@
 | 需求 | 文档 |
 | --- | --- |
 | 运行时和存储职责 | [架构](ARCHITECTURE.zh-CN.md)、[执行边界（英文）](ARCHITECTURE_BOUNDARIES.md) |
+| 源码目录、依赖与发行归属 | [目录与职责](SOURCE_LAYOUT.zh-CN.md) |
 | Task Controller、Job Manager 和输入接纳 | [任务与作业架构](TASK_JOB_ARCHITECTURE.zh-CN.md) |
 | Research Memory 的选择、注入和模型摘要 | [研究上下文](RESEARCH_CONTEXT.zh-CN.md) |
 | Node 划分、规划和修正 | [研究规划](RESEARCH_PLANNING.zh-CN.md) |
@@ -37,7 +38,7 @@
 ## 待实施提案
 
 [Pi 1.3.0 升级审查](PI_1_3_MIGRATION.zh-CN.md)是注明日期的上游对照和未实施建议。
-当前 `config/pi-source.json` 仍固定 Pi 1.1.0，不能把该审查当作可直接执行的升级步骤。
+当前 `packaging/coragent_packaging/pi/source.json` 仍固定 Pi 1.1.0，不能把该审查当作可直接执行的升级步骤。
 
 ## 文档维护
 

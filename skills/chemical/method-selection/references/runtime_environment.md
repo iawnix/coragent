@@ -49,7 +49,7 @@ science in the Host interpreter or silently choose another method.
 
 Record the unmet requirement and report the concrete missing binding. An
 operator can install a versioned prefix from the shipped lock with
-`scripts/install_job_environment.py`; a research task must not modify shared
+`packaging/coragent_packaging/installer/install_job_environment.py`; a research task must not modify shared
 environments. Existing jobs retain their original identities after maintenance.
 
 A native prerequisite probe resolves and hashes the configured executable; it

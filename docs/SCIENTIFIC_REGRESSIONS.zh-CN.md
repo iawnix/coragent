@@ -95,6 +95,6 @@ python3 -B tools/test/runner.py check --files \
   tests/integration/test_repaired_job_evidence.py
 ```
 
-领域脚本有内容摘要；修改后先运行 `python3 -B scripts/update_resources.py`。完整回归使用 `python3 -B tools/test/runner.py verify`，wheel 安装环境使用 `source` 套件。
+领域脚本有内容摘要；修改后先运行 `python3 -B tools/update_resources.py`。完整回归使用 `python3 -B tools/test/runner.py verify`，wheel 安装环境使用 `source` 套件。
 
 这组测试验证软件实现的判据、数值算法和证据流，不替代真实 Gaussian/集群计算、方法精度校准或真实模型自主研究验收。CoRHub 客户端互操作由独立 `phone` 套件覆盖，范围见[测试运行器](../tools/test/README.md)。

@@ -1,0 +1,488 @@
+#!/usr/bin/env python3
+"""Safely remove a CoRAgent installation and its optional runtime state."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+if __name__ == "__main__":
+    package_root = Path(__file__).resolve().parents[3]
+    sys.path[:0] = [str(package_root / "packaging"), str(package_root / "backend/src"), str(package_root)]
+
+
+from research_agent.bootstrap.layout import paths as app_paths
+
+import argparse
+import json
+import os
+import shutil
+import stat
+import subprocess
+import sys
+import fcntl
+from contextlib import ExitStack
+from pathlib import Path
+
+from coragent_packaging.installer._installation_metadata import read_installation_metadata, read_workspace_root
+from coragent_packaging.installer._terminal_ui import Spinner, ask_text as ask, ask_yes_no, failure, field, note, section, success, title
+from coragent_packaging.installer import _job_install
+from coragent_packaging.installer import _qrun_install
+
+
+SERVICE_NAMES = (
+    "coragent.service",
+    "coragent@.service",
+    "coragent-web.service",
+    "coragent-relay.service",
+)
+LINK_RELAY_MARKER = "link-relay.json"
+ENTRYPOINTS = ("coragent", "coragent-web")
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--install-root")
+    parser.add_argument("--config", help="Single CoRAgent config.toml.")
+    parser.add_argument("--service-scope", choices=("auto", "user", "system", "none"), default="auto")
+    parser.add_argument("--purge-workspaces", action="store_true", help="Delete research workspaces and Pi session files.")
+    parser.add_argument("--purge-config", action="store_true", help="Delete installation configuration and Phone/Web credentials.")
+    parser.add_argument("--purge-runtime", action="store_true", help="Delete managed Conda/venv runtime state.")
+    parser.add_argument("--purge-relay-state", action="store_true", help="Delete Relay state and enrolled credentials owned by this installation.")
+    parser.add_argument("--keep-link-relay", action="store_true", help="Keep an installation-owned Link Relay running and preserve its marker.")
+    parser.add_argument("--remove-root", action="store_true", help="Remove the installation directory after cleanup.")
+    parser.add_argument("--cancel-qrun-jobs", action="store_true", help="Cancel unfinished Jobs in installation-owned local and SSH Qrun pools before removal.")
+    parser.add_argument("--purge-qrun-state", action="store_true", help="Delete owned Qrun queue state after stopping its services; never deletes calculation work roots.")
+    parser.add_argument("--purge-all", action="store_true", help="Enable all purge and root removal options.")
+    parser.add_argument("--non-interactive", action="store_true")
+    parser.add_argument("--yes", action="store_true")
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+    from coragent_packaging.installer._configuration import apply
+    apply(args, validate_credentials=False)
+    return args
+
+
+def installation_identity(root: Path) -> dict[str, str | None]:
+    metadata = read_installation_metadata(root, require_ownership=True, strict_package_state=False)
+    ownership = metadata["ownership"]
+    release_id = metadata["release_id"]
+    state_error = metadata["state_error"]
+    return {
+        "ownership": str(ownership) if ownership is not None else None,
+        "release_id": str(release_id) if release_id is not None else None,
+        "state_error": str(state_error) if state_error is not None else None,
+    }
+
+
+def validate_root(path: Path) -> Path:
+    if not path.is_absolute():
+        raise ValueError("--install-root must be absolute")
+    if path.expanduser().is_symlink():
+        raise ValueError(f"installation root cannot be a symbolic link: {path.expanduser()}")
+    resolved = path.expanduser().resolve()
+    if resolved == Path("/") or resolved == Path.home() or resolved == Path.home().parent:
+        raise ValueError(f"refusing to remove broad path: {resolved}")
+    for relative in ("releases", "runtimes"):
+        if (resolved / relative).is_symlink():
+            raise ValueError(f"installation state directory cannot be a symbolic link: {resolved / relative}")
+    installation_identity(resolved)
+    return resolved
+
+
+def choose_options(args: argparse.Namespace, root: Path) -> None:
+    keep_relay = getattr(args, "keep_link_relay", False)
+    purge_relay_state = getattr(args, "purge_relay_state", False)
+    if keep_relay and (getattr(args, "purge_all", False) or purge_relay_state):
+        raise ValueError("--keep-link-relay cannot be combined with --purge-relay-state or --purge-all")
+    if getattr(args, "purge_all", False):
+        args.purge_workspaces = args.purge_config = args.purge_runtime = args.remove_root = True
+        args.purge_relay_state = True
+        args.purge_qrun_state = True
+    if args.remove_root and not (args.purge_workspaces and args.purge_config and args.purge_runtime):
+        raise ValueError("--remove-root requires --purge-workspaces, --purge-config, and --purge-runtime")
+    if args.non_interactive:
+        if not args.yes:
+            raise ValueError("--non-interactive requires --yes")
+        return
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        raise RuntimeError("interactive uninstall requires a TTY; use --non-interactive --yes")
+
+    identity = installation_identity(root)
+    section("Installation")
+    field("Target", root, tone="accent")
+    field("Ownership", identity["ownership"], tone="success")
+    if identity["state_error"]:
+        field("Package state", "damaged; application files will still be removed", tone="warning")
+    else:
+        field("Active release", identity["release_id"] or "application already removed")
+
+    section("Data cleanup")
+    note("Application releases and matching services are always removed.")
+    args.purge_workspaces = args.purge_workspaces or ask_yes_no("Delete workspaces and Pi session files", False)
+    args.purge_config = args.purge_config or ask_yes_no("Delete installation config and Phone/Web credentials", False)
+    args.purge_runtime = args.purge_runtime or ask_yes_no("Delete managed Python runtime state", False)
+    pools = _qrun_install.registry(root)['pools']
+    if pools:
+        args.cancel_qrun_jobs = getattr(args, 'cancel_qrun_jobs', False) or ask_yes_no("Cancel unfinished Jobs in managed Qrun queues", False)
+        args.purge_qrun_state = getattr(args, 'purge_qrun_state', False) or ask_yes_no("Delete managed Qrun queue history (calculation files are kept)", False)
+    all_data_selected = args.purge_workspaces and args.purge_config and args.purge_runtime
+    if not args.remove_root and all_data_selected:
+        args.remove_root = ask_yes_no("Remove the installation directory", False)
+
+    section("Removal plan")
+    field("Target", root, tone="accent")
+    field("Application", "Remove", tone="warning")
+    if pools:
+        field("Qrun services", "Remove owned local and SSH queue services", tone="warning")
+        field("Qrun unfinished Jobs", "Cancel" if args.cancel_qrun_jobs else "Block uninstall until drained",
+              tone="warning")
+        field("Qrun history", "Delete" if args.purge_qrun_state else "Keep",
+              tone="danger" if args.purge_qrun_state else "success")
+    field("Workspaces", "Delete" if args.purge_workspaces else "Keep",
+          tone="danger" if args.purge_workspaces else "success")
+    field("Config and secrets", "Delete" if args.purge_config else "Keep",
+          tone="danger" if args.purge_config else "success")
+    field("Python runtime", "Delete" if args.purge_runtime else "Keep",
+          tone="danger" if args.purge_runtime else "success")
+    field("Link Relay", "Keep" if keep_relay else ("Delete state" if purge_relay_state else "Remove service and code"),
+          tone="success" if keep_relay else "warning")
+    root_state = "Delete" if args.remove_root else "Keep"
+    if not all_data_selected:
+        root_state += " (requires all data cleanup options)"
+    field("Installation root", root_state, tone="danger" if args.remove_root else "success")
+    if not args.yes and not ask_yes_no("Proceed with uninstall", True):
+        note("Uninstall cancelled.", tone="warning")
+        raise SystemExit(0)
+
+
+def systemctl_args(scope: str) -> list[str]:
+    if scope == "user":
+        return ["systemctl", "--user"]
+    return ["systemctl"]
+
+
+def service_belongs_to_root(name: str, root: Path, scope: str) -> bool:
+    directory = Path.home() / ".config/systemd/user" if scope == "user" else Path("/etc/systemd/system")
+    path = directory / name
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    root_value = str(root).replace("%", "%%")
+    relay_root_value = str(root / "runtimes/link-relay" / "current" / "apps/relay").replace("%", "%%")
+    for line in content.splitlines():
+        key, _, value = line.partition("=")
+        value = value.strip().strip('"')
+        if key == "WorkingDirectory" and value in {root_value, relay_root_value}:
+            return True
+    return False
+
+
+def stop_services(args: argparse.Namespace, root: Path) -> list[str]:
+    if args.service_scope == "none" or shutil.which("systemctl") is None:
+        return []
+    scopes = [args.service_scope] if args.service_scope in {"user", "system"} else ["user", "system"]
+    stopped: list[str] = []
+    for scope in scopes:
+        scope_stopped = False
+        command = systemctl_args(scope)
+        for name in SERVICE_NAMES:
+            if name == "coragent-relay.service" and getattr(args, "keep_link_relay", False):
+                continue
+            if not service_belongs_to_root(name, root, scope):
+                continue
+            if name == "coragent@.service":
+                for instance in app_server_instances(command):
+                    subprocess.run(
+                        [*command, "disable", "--now", instance],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=False,
+                    )
+                    stopped.append(f"{scope}:{instance}")
+                    scope_stopped = True
+                continue
+            probe = subprocess.run([*command, "is-enabled", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            active = subprocess.run([*command, "is-active", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            if probe.returncode != 0 and active.returncode != 0:
+                continue
+            subprocess.run([*command, "disable", "--now", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            stopped.append(f"{scope}:{name}")
+            scope_stopped = True
+        if scope_stopped:
+            subprocess.run([*command, "daemon-reload"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    return stopped
+
+
+def _owned_relay(root: Path) -> dict[str, object] | None:
+    marker = app_paths(root).generated / LINK_RELAY_MARKER
+    try:
+        value = json.loads(marker.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(value, dict) or value.get("schema") != "coragent-install-link-relay/1" or value.get("owned") is not True:
+        return None
+    if value.get("install_root") != str(root):
+        return None
+    relay_root = value.get("relay_install_root")
+    state_dir = value.get("state_dir")
+    scope = value.get("service_scope")
+    if not all(isinstance(item, str) and item for item in (relay_root, state_dir, scope)):
+        return None
+    if scope not in {"none", "user", "system"}:
+        return None
+    return value
+
+
+def remove_owned_relay(args: argparse.Namespace, root: Path) -> dict[str, object] | None:
+    if getattr(args, "keep_link_relay", False):
+        return None
+    metadata = _owned_relay(root)
+    if metadata is None:
+        return None
+    command = [
+        sys.executable,
+        str(Path(__file__).with_name("uninstall_link_relay.py")),
+        "--install-root", str(metadata["relay_install_root"]),
+        "--state-dir", str(metadata["state_dir"]),
+        "--service-scope", str(metadata["service_scope"]),
+        "--non-interactive", "--yes", "--json",
+    ]
+    if getattr(args, "purge_relay_state", False):
+        command.append("--purge-state")
+    completed = subprocess.run(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    if completed.returncode != 0:
+        raise RuntimeError(completed.stderr.strip() or "owned Link Relay uninstall failed")
+    try:
+        result = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        result = {"ok": True, "output": completed.stdout[-4096:]}
+    (app_paths(root).generated / LINK_RELAY_MARKER).unlink(missing_ok=True)
+    return result
+
+
+def app_server_instances(command: list[str]) -> list[str]:
+    completed = subprocess.run(
+        [*command, "list-units", "--all", "--plain", "--no-legend", "coragent@*.service"],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return []
+    names = []
+    for line in completed.stdout.splitlines():
+        name = line.split(None, 1)[0] if line.strip() else ""
+        if name.startswith("coragent@") and name.endswith(".service") and "/" not in name:
+            names.append(name)
+    return names
+
+
+def remove_service_units(args: argparse.Namespace, root: Path) -> list[str]:
+    locations: list[Path] = []
+    if args.service_scope in {"auto", "user"}:
+        locations.append(Path.home() / ".config/systemd/user")
+    if args.service_scope in {"auto", "system"}:
+        locations.append(Path("/etc/systemd/system"))
+    removed: list[str] = []
+    for directory in locations:
+        changed = False
+        for name in SERVICE_NAMES:
+            path = directory / name
+            scope = "user" if directory == Path.home() / ".config/systemd/user" else "system"
+            if path.is_file() and not path.is_symlink() and service_belongs_to_root(name, root, scope):
+                path.unlink()
+                removed.append(str(path))
+                changed = True
+        if changed and shutil.which("systemctl"):
+            scope = "user" if directory == Path.home() / ".config/systemd/user" else "system"
+            subprocess.run([*systemctl_args(scope), "daemon-reload"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    return removed
+
+
+def remove_entrypoints(root: Path) -> list[str]:
+    removed: list[str] = []
+    current = root / "current"
+    if current.is_symlink():
+        current.unlink()
+        removed.append(str(current))
+    for name in ENTRYPOINTS:
+        path = root / name
+        if path.is_symlink() or (path.is_file() and name in ENTRYPOINTS):
+            path.unlink()
+            removed.append(str(path))
+    return removed
+
+
+def make_tree_removable(root: Path) -> None:
+    """Restore owner-write permission on directories without following links."""
+    for current, _, _ in os.walk(root, followlinks=False):
+        directory = Path(current)
+        mode = stat.S_IMODE(directory.stat().st_mode)
+        if not mode & stat.S_IWUSR:
+            directory.chmod(mode | stat.S_IWUSR)
+
+
+def remove_paths(paths: list[Path]) -> list[str]:
+    removed: list[str] = []
+    for path in paths:
+        if path.is_symlink() or path.is_file():
+            path.unlink()
+            removed.append(str(path))
+        elif path.is_dir():
+            make_tree_removable(path)
+            shutil.rmtree(path)
+            removed.append(str(path))
+    return removed
+
+
+def prune_empty_parents(root: Path) -> None:
+    for relative in (
+        "runtimes",
+    ):
+        directory = root / relative
+        if not directory.is_dir():
+            continue
+        try:
+            directory.rmdir()
+        except OSError:
+            pass
+
+
+def uninstall(args: argparse.Namespace, *, show_progress: bool = False) -> dict[str, object]:
+    root = validate_root(Path(args.install_root))
+    choose_options(args, root)
+    workspace_root = read_workspace_root(root)
+    if args.purge_workspaces:
+        workspace_root = _validated_workspace_purge_target(root, workspace_root)
+    activity = Spinner("Stopping CoRAgent services", stream=sys.stderr, enabled=show_progress)
+    guards = ExitStack()
+    lock = app_paths(root).state / 'installation/maintenance.lock'
+    lock.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if lock.is_symlink():
+        raise ValueError('maintenance lock cannot be a symlink')
+    try:
+        operation = guards.enter_context(lock.open('a'))
+        os.chmod(lock, 0o600)
+        fcntl.flock(operation, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BaseException:
+        guards.close()
+        raise
+    activity.start()
+    try:
+        qrun_result = _qrun_install.remove(root, args, Path(__file__).resolve().parents[3])
+        stopped = stop_services(args, root)
+        relay_result = remove_owned_relay(args, root)
+        activity.update("Removing service registrations")
+        service_units = remove_service_units(args, root)
+        activity.update("Removing installed application files")
+        removed = remove_entrypoints(root)
+        managed = [root / "releases", root / "runtimes/pi", app_paths(root).cache,
+                   app_paths(root).install_state,
+                   app_paths(root).state / 'installation/source-provenance.json']
+        retained_job_environments = []
+        if args.purge_runtime:
+            # Cluster software and scientific environments have independent ownership.
+            # External environments require a matching installation ownership receipt.
+            config = json.loads((app_paths(root).marker).read_text())
+            env_root = Path(config["env_root"])
+            receipt = env_root / "installation-owner.json"
+            if receipt.is_file() and json.loads(receipt.read_text()).get("install_root") == str(root):
+                managed.append(env_root)
+            managed.append(app_paths(root).state / 'installation/python')
+        if args.purge_config:
+            managed.extend([app_paths(root).pi_config, app_paths(root).marker, app_paths(root).locator, app_paths(root).config_file, app_paths(root).credentials, app_paths(root).generated, root / "runtimes/maintenance", root / "uninstall.sh", app_paths(root).state / 'host/link.json', app_paths(root).state / 'host/host.token'])
+        if args.purge_workspaces:
+            managed.extend([
+                workspace_root,
+                app_paths(root).state / 'pi/sessions',
+                app_paths(root).state / 'host',
+            ])
+        removed.extend(remove_paths(managed))
+        prune_empty_parents(root)
+        if args.remove_root:
+            activity.update("Removing the installation directory")
+            removed.extend(remove_paths([root]))
+        removed.extend(service_units)
+        activity.succeed("CoRAgent application files removed")
+        return {"ok": True, "install_root": str(root), "workspace_root": str(workspace_root), "stopped_services": stopped, "removed": removed,
+                "preserved_workspaces": not args.purge_workspaces, "preserved_config": not args.purge_config,
+                "preserved_runtime": not args.purge_runtime, "link_relay": relay_result,
+                'retained_job_environments': retained_job_environments, 'qrun': qrun_result}
+    except BaseException:
+        activity.fail("CoRAgent uninstall failed")
+        raise
+    finally:
+        guards.close()
+
+
+def _validated_workspace_purge_target(root: Path, configured: Path) -> Path:
+    marker = app_paths(root).marker
+    recorded = json.loads(marker.read_text()).get('workspace_root') if marker.is_file() else None
+    if not recorded or Path(recorded).resolve() != configured.resolve():
+        raise ValueError('workspace_root differs from the installation ownership record')
+    if not configured.is_absolute() or configured.is_symlink():
+        raise ValueError(f"configured workspace root is unsafe: {configured}")
+    resolved = configured.resolve()
+    home = Path.home().resolve()
+    if (
+        resolved.parent == Path("/")
+        or resolved == home
+        or resolved in home.parents
+        or resolved == root
+        or resolved in root.parents
+    ):
+        raise ValueError(f"refusing to purge broad workspace root: {resolved}")
+    for protected in (app_paths(root).generated, app_paths(root).state, root / "runtimes", root / "releases"):
+        if resolved == protected or protected in resolved.parents:
+            raise ValueError(f"refusing to purge workspace root inside installation state: {resolved}")
+    return resolved
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    try:
+        if not args.non_interactive:
+            if not sys.stdin.isatty() or not sys.stdout.isatty():
+                raise RuntimeError("interactive uninstall requires a TTY; use --non-interactive --yes")
+            title("CoRAgent Uninstaller", "Remove CoRAgent while keeping research data by default.", tone="warning")
+        if not args.install_root and not args.non_interactive:
+            bundled = Path(__file__).resolve()
+            default = str(bundled.parents[5]) if bundled.parents[3].name == "maintenance" and bundled.parents[4].name == "runtimes" else str(Path.home() / "soft/coragent")
+            args.install_root = ask("CoRAgent installation directory", default)
+        if not args.install_root:
+            raise ValueError("--install-root is required")
+        result = uninstall(args, show_progress=not args.json)
+        if args.json:
+            print(json.dumps(result, indent=2, sort_keys=True))
+        else:
+            success("Uninstall complete")
+            section("Summary")
+            field("Installation", result["install_root"], tone="accent")
+            field("Paths removed", len(result["removed"]))
+            field("Services stopped", len(result["stopped_services"]))
+            preserved = []
+            if result["preserved_workspaces"]:
+                preserved.append("workspaces")
+            if result["preserved_config"]:
+                preserved.append("config and secrets")
+            if result["preserved_runtime"]:
+                preserved.append("Python runtime")
+            field("Preserved", ", ".join(preserved) if preserved else "nothing", tone="success" if preserved else "muted")
+            section("Removed paths")
+            for item in result["removed"]:
+                note(item)
+            for item in result["stopped_services"]:
+                note(f"Stopped service: {item}")
+        return 0
+    except SystemExit as error:
+        return int(error.code or 0)
+    except (OSError, RuntimeError, ValueError) as error:
+        failure(f"CoRAgent uninstall failed: {error}")
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

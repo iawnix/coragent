@@ -17,10 +17,10 @@ import {
   encodeHostData,
 } from "../../../packages/link/protocol.mjs";
 import { createWebSocketForwarder } from "../../../packages/link/backpressure.mjs";
-import { createRelayServer } from "../../../services/relay/server.mjs";
-import { RelayStore } from "../../../services/relay/store.mjs";
+import { createRelayServer } from "../../../apps/relay/server.mjs";
+import { RelayStore } from "../../../apps/relay/store.mjs";
 
-const requireRelayDependency = createRequire(new URL("../../../services/relay/package.json", import.meta.url));
+const requireRelayDependency = createRequire(new URL("../../../apps/relay/package.json", import.meta.url));
 const WebSocket = requireRelayDependency("ws");
 
 const cleanups = [];

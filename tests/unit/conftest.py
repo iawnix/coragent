@@ -27,7 +27,7 @@ def execution_target_fixture(tmp_path, monkeypatch):
     conda.write_text("#!/bin/sh\nset -eu\nif [ \"$1\" = list ]; then cat " + shlex.quote(str(lock)) +
                      "; else shift 5; exec " + shlex.quote(str(prefix / 'bin/python')) + ' "$@"; fi\n')
     conda.chmod(0o700)
-    install = runpy.run_path(str(Path(__file__).resolve().parents[2] / 'scripts/install_job_environment.py'))['install']
+    install = runpy.run_path(str(Path(__file__).resolve().parents[2] / 'packaging/coragent_packaging/installer/install_job_environment.py'))['install']
     install({'manager': 'conda', 'conda_executable': str(conda), 'prefix': str(prefix), 'lock_ref': str(lock)}, adopt=True)
     config.write_text(
         '[execution]\nschema_version = 2\ndefault_platform = "local"\n\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n\n[execution.platforms.local.bindings.validation]\n[execution.platforms.local.bindings.validation.python]\nmanager = "conda"\nconda_executable = CONDA_PATH\nprefix = PYTHON_PREFIX\nlock_ref = LOCK_PATH\n\n[execution.platforms.local.bindings.structure.python]\nmanager = "conda"\nconda_executable = CONDA_PATH\nprefix = PYTHON_PREFIX\nlock_ref = LOCK_PATH\n\n[execution.platforms.local.bindings.gaussian]\ncommand = "g16"\n\n[execution.platforms.local.bindings.xtb]\ncommand = "xtb"\n\n[execution.platforms.local.bindings.crest]\ncommand = "crest"\n\n[execution.platforms.local.bindings.ase_neb_xtb]\ncommand = "xtb"\n'.replace("CONDA_PATH", json.dumps(str(conda))).replace("PYTHON_PREFIX", json.dumps(str(prefix)))

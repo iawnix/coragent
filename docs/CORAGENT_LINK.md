@@ -54,7 +54,7 @@ The standalone installer prints a ten-minute, single-use enrollment code. To
 create another code later, run the installed CLI:
 
 ```bash
-node /opt/coragent-relay/current/services/relay/cli.mjs enrollment create \
+node /opt/coragent-relay/current/apps/relay/cli.mjs enrollment create \
   --state /var/lib/coragent-relay/relay.db
 ```
 

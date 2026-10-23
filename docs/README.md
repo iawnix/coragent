@@ -39,7 +39,7 @@ platform/entry configuration, shared environments, storage, task plans and insta
 
 [Pi 1.3.0 migration audit (Chinese)](PI_1_3_MIGRATION.zh-CN.md) is a dated upstream
 comparison and unimplemented proposal. The current runtime remains pinned to Pi
-1.1.0 in `config/pi-source.json`; the audit is not an upgrade procedure.
+1.1.0 in `packaging/coragent_packaging/pi/source.json`; the audit is not an upgrade procedure.
 
 ## Documentation maintenance
 

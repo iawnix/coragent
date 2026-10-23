@@ -12,20 +12,21 @@ import pytest
 
 import research_agent
 
-from scripts.check_package import (
+from coragent_packaging.build.check_package import (
     PACKAGE_VERSION,
     validate_python_project,
     validate_version_surfaces,
 )
-from scripts._wheel import build_wheel, inspect_wheel, source_payload_sha256 as wheel_source_payload_sha256
-from research_agent.foundation.env import python_payload_sha256
+from coragent_packaging.build.wheel import build_wheel
+from coragent_packaging.manifests._wheel import inspect_wheel, source_payload_sha256 as wheel_source_payload_sha256
+from research_agent.bootstrap.env import python_payload_sha256
 
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_runtime_resources_resolve_to_the_captured_package() -> None:
-    from research_agent.foundation.env import resolve_package_root
+    from research_agent.bootstrap.env import resolve_package_root
 
     # Installed Python lives in a separate wheel overlay. Resource discovery
     # must still use this snapshot, not a coincidental ancestor checkout.

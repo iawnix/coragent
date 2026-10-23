@@ -11,7 +11,7 @@ Research Memory 是持久研究记录。Research Context 是 Agent Runtime 内�
 本会话创建的节点中最近活动的一个节点。完整证据仍通过 research_read、research_search 和 job_status 获取。
 
 每次 generation 准备时，运行本地确定性读取，并比较范围和相关事实的指纹。
-入口是 `apps/agent/pi/setup.mjs` 的 `prepareContext` hook；已认证的输入事件引用
+入口是 `apps/agent/runtime/setup.mjs` 的 `prepareContext` hook；已认证的输入事件引用
 也会在没有顶层 Task 时传入选择器。筛选和摘取由 Python 完成，不调用模型决定读哪些记录。
 范围包括任务身份、要求版本、入口、焦点、要求来源和等待 Job；事实包括候选节点与结果、
 相关关系、诊断和 Job 状态。省略的候选记录也参与版本判断，无关研究的活动不改变该版本。

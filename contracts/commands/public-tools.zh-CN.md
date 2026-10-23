@@ -1,6 +1,6 @@
 # 模型工具索引
 
-由 scripts/update_public_contract.mjs 生成。名称、描述和参数由运行时直接提供给模型；此索引不注册工具。模型工具与后端命令使用同一名称，内部命令不自动对模型开放。终端 slash command 是独立的用户入口。
+由 tools/update_public_contract.mjs 生成。名称、描述和参数由运行时直接提供给模型；此索引不注册工具。模型工具与后端命令使用同一名称，内部命令不自动对模型开放。终端 slash command 是独立的用户入口。
 
 ```text
 task_begin

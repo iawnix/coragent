@@ -5,9 +5,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from scripts import install_link_relay as installer
-from scripts import uninstall as package_uninstaller
-from scripts import uninstall_link_relay as uninstaller
+from coragent_packaging.installer import install_link_relay as installer
+from coragent_packaging.installer import uninstall as package_uninstaller
+from coragent_packaging.installer import uninstall_link_relay as uninstaller
 
 
 @pytest.mark.parametrize(
@@ -45,7 +45,7 @@ def test_link_relay_unit_is_independent_from_research_agent_host(tmp_path: Path)
     )
     unit = installer.systemd_unit(
         args,
-        tmp_path / "current" / "services/relay",
+        tmp_path / "current" / "apps/relay",
         tmp_path / "state",
         None,
         "/usr/bin/node",
@@ -67,7 +67,7 @@ def test_link_relay_unit_escapes_path_directives_for_systemd(tmp_path: Path) -> 
     )
     unit = installer.systemd_unit(
         args,
-        tmp_path / "relay install" / "current" / "services/relay",
+        tmp_path / "relay install" / "current" / "apps/relay",
         tmp_path / "relay state",
         None,
         "/usr/bin/node",
@@ -75,14 +75,14 @@ def test_link_relay_unit_escapes_path_directives_for_systemd(tmp_path: Path) -> 
 
     assert "WorkingDirectory=" in unit
     assert "WorkingDirectory=\"" not in unit
-    assert "relay\\x20install/current/services/relay" in unit
+    assert "relay\\x20install/current/apps/relay" in unit
     assert "ReadWritePaths=" in unit
     assert "ReadWritePaths=\"" not in unit
 
 
 def test_link_relay_uninstaller_removes_code_and_can_purge_state(tmp_path: Path) -> None:
     install_root = tmp_path / "relay"
-    releases = install_root / "releases" / "commit" / "services/relay"
+    releases = install_root / "releases" / "commit" / "apps/relay"
     releases.mkdir(parents=True)
     (install_root / "current").symlink_to("releases/commit")
     state = tmp_path / "state"
@@ -116,7 +116,7 @@ def test_link_relay_uninstaller_removes_unit_when_code_root_is_missing(tmp_path:
     unit_dir.mkdir(parents=True)
     unit = unit_dir / "coragent-relay.service"
     unit.write_text(
-        """[Service]\nDescription=CoRAgent Link Relay\nWorkingDirectory=%s\n""" % (install_root / "current" / "services/relay"),
+        """[Service]\nDescription=CoRAgent Link Relay\nWorkingDirectory=%s\n""" % (install_root / "current" / "apps/relay"),
         encoding="utf-8",
     )
     monkeypatch.setattr(uninstaller, "service_directory", lambda _scope: unit_dir)
@@ -154,7 +154,7 @@ def test_package_uninstaller_recognizes_installation_owned_relay_unit(tmp_path: 
     unit_dir.mkdir(parents=True)
     unit = unit_dir / "coragent-relay.service"
     unit.write_text(
-        """[Service]\nDescription=CoRAgent Link Relay\nWorkingDirectory=%s\n""" % (root / "runtimes/link-relay/current/services/relay"),
+        """[Service]\nDescription=CoRAgent Link Relay\nWorkingDirectory=%s\n""" % (root / "runtimes/link-relay/current/apps/relay"),
         encoding="utf-8",
     )
     monkeypatch.setattr(package_uninstaller.Path, "home", classmethod(lambda _cls: home))

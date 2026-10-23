@@ -2,7 +2,7 @@
 
 from tests.support.platforms import execution_config
 
-from research_agent.foundation.layout import paths as app_paths
+from research_agent.bootstrap.layout import paths as app_paths
 import json
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -12,8 +12,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from scripts import install_wizard as wizard
-from research_agent.foundation.installation_maintenance import InstallationMaintenance, assert_installation_available
+from coragent_packaging.installer import install_wizard as wizard
+from research_agent.bootstrap.installation_maintenance import InstallationMaintenance, assert_installation_available
 
 CONFIG = '[execution]\nschema_version = 2\ndefault_platform = "local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n'
 
@@ -85,7 +85,7 @@ def installation(tmp_path, monkeypatch):
     credentials.chmod(0o600)
     job_config = app_paths(root).job_config
     job_config.parent.mkdir(parents=True, exist_ok=True)
-    from research_agent.foundation.configuration import Configuration
+    from research_agent.configuration.configuration import Configuration
     Configuration(app_paths(root).config_file).update(execution=execution_config('local', {'local':{'executor': 'qrun', 'transport': 'local', 'work_root': '/fixture/qrun/jobs'}}))
     job_config.write_text('# original fixture configuration\n'+CONFIG)
     (workspace/'research_map').mkdir(parents=True)
@@ -146,8 +146,8 @@ def installation(tmp_path, monkeypatch):
     monkeypatch.setattr(wizard,'_prepare_installation',prepare)
     monkeypatch.setattr(wizard,'stop_installation_services',lambda _args:events.append('stop'))
     monkeypatch.setattr(wizard,'run_install',install)
-    from scripts import install_package
-    from scripts import _qrun_install
+    from coragent_packaging.installer import install_package
+    from coragent_packaging.installer import _qrun_install
     def prepare_qrun(*_args):
         if state.get('qrun'):
             assert events[-1] == 'stop'

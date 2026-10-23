@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from research_agent.foundation.layout import paths as app_paths
-from research_agent.foundation.layout import paths as layout_paths
+from research_agent.bootstrap.layout import paths as app_paths
+from research_agent.bootstrap.layout import paths as layout_paths
 
 import json
 import os
@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from research_agent.foundation.env import (
+from research_agent.bootstrap.env import (
     PACKAGE_ROOT_OVERRIDE,
     RUNTIME_PROBE_VERSION,
     RuntimeEnvironmentError,
@@ -36,8 +36,8 @@ from research_agent.foundation.env import (
 )
 import research_agent.bootstrap.cli as runtime_cli
 from research_agent.bootstrap.probe import probe_runtime_capabilities
-from scripts import _runtime_install as runtime_install
-from scripts._bootstrap import bootstrap_python_package
+from coragent_packaging.installer import _runtime_install as runtime_install
+from apps.cli._bootstrap import bootstrap_python_package
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -77,9 +77,9 @@ def test_package_root_detection_uses_identity_marker_without_skills(tmp_path: Pa
     source_file = package / "packages" / "agent-runtime" / "agents" / "compute" / "runtime.ts"
     source_file.parent.mkdir(parents=True)
     source_file.write_text("export {};\n", encoding="utf-8")
-    (package / "scripts").mkdir()
-    (package / "config").mkdir()
-    (package / "config/identity.json").write_text("{}\n")
+    (package / "apps/cli").mkdir(parents=True)
+    (package / "packaging/coragent_packaging/manifests").mkdir(parents=True)
+    (package / "packaging/coragent_packaging/manifests/identity.json").write_text("{}\n")
     (package / "package.json").write_text("{}\n", encoding="utf-8")
 
     assert package_root_from_file(source_file) == package
@@ -286,7 +286,7 @@ def test_runtime_path_seed_preserves_explicit_configuration_and_ignores_authored
     }
 
     authored_environment: dict[str, str] = {}
-    authored = tmp_path / "checkout" / "components" / "coragent-web" / "bin" / "coragent-web"
+    authored = tmp_path / "checkout" / "apps/web/bin/coragent-web"
     assert seed_installation_runtime_from_entrypoint(
         authored,
         environ=authored_environment,
@@ -606,7 +606,7 @@ def test_install_env_dry_run_reports_hashed_prefix(tmp_path: Path, monkeypatch: 
     completed = subprocess.run(
         [
             sys.executable,
-            str(ROOT / "scripts" / "install_env.py"),
+            str(ROOT / "packaging/coragent_packaging/installer/install_env.py"),
             "--package-root",
             str(ROOT),
             "--env-root",
@@ -641,7 +641,7 @@ def test_install_env_dry_run_accepworkspace_runtime_home(tmp_path: Path) -> None
     completed = subprocess.run(
         [
             sys.executable,
-            str(ROOT / "scripts" / "install_env.py"),
+            str(ROOT / "packaging/coragent_packaging/installer/install_env.py"),
             "--package-root",
             str(ROOT),
             "--workspace-root",
@@ -674,7 +674,7 @@ def test_install_env_accepts_user_conda_root(tmp_path: Path) -> None:
     completed = subprocess.run(
         [
             sys.executable,
-            str(ROOT / "scripts" / "install_env.py"),
+            str(ROOT / "packaging/coragent_packaging/installer/install_env.py"),
             "--package-root",
             str(ROOT),
             "--env-root",
@@ -742,7 +742,7 @@ def test_install_env_reuses_control_base_and_isolates_kernel_overlay(tmp_path: P
     runtime_home = tmp_path / "runtime"
     command = [
         sys.executable,
-        str(ROOT / "scripts" / "install_env.py"),
+        str(ROOT / "packaging/coragent_packaging/installer/install_env.py"),
         "--package-root",
         str(ROOT),
         "--env-root",
@@ -862,7 +862,7 @@ def test_ts_runtime_isolated_run_cannot_modify_workspace_manifest(tmp_path: Path
     completed = subprocess.run(
         [
             sys.executable,
-                str(ROOT / "apps" / "agent-cli" / "runtime.py"),
+                str(ROOT / "apps/cli/runtime.py"),
             "run-isolated",
             "-c",
             "print('isolated-runtime-ok')",
@@ -884,7 +884,7 @@ def test_ts_runtime_script_passes_dash_m_arguments() -> None:
     completed = subprocess.run(
         [
             sys.executable,
-                str(ROOT / "apps" / "agent-cli" / "runtime.py"),
+                str(ROOT / "apps/cli/runtime.py"),
             "run",
             "-c",
             "print('runtime-ok')",
@@ -913,7 +913,7 @@ def test_ts_runtime_resolve_reports_external_manifest_path(tmp_path: Path) -> No
     completed = subprocess.run(
         [
             sys.executable,
-            str(ROOT / "apps" / "agent-cli" / "runtime.py"),
+            str(ROOT / "apps/cli/runtime.py"),
             "resolve",
             "--workspace-root",
             str(workspace),

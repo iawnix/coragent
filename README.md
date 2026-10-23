@@ -72,6 +72,8 @@ for session controls and [CoRAgent Link](docs/CORAGENT_LINK.md) for phone access
 
 ## Development
 
+See [source ownership](docs/SOURCE_LAYOUT.md) for directory responsibilities, dependency boundaries and release ownership.
+
 From the source checkout:
 
 ```bash

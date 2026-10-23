@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.package_inventory import RETIRED_RUNTIME_PATHS, release_files
+from coragent_packaging.manifests.package_inventory import RETIRED_RUNTIME_PATHS, release_files
 from tests.unit.test_chemical_path_execution import SPEC, helper, irc_helper
 from tests.unit.test_chemical_geometry_regressions import REACTANTS, PRODUCT
 from reaction_checks import reaction

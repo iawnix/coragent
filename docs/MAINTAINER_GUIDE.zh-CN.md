@@ -52,9 +52,9 @@ Job Manager 拥有执行回执，Artifact Store 拥有文件和来源。Job Mana
 先检查工作区，再按诊断重建可派生视图：
 
 ```bash
-"$CORAGENT_PYTHON" apps/agent-cli/workspace.py doctor --root /absolute/workspace
-"$CORAGENT_PYTHON" apps/agent-cli/workspace.py rebuild --root /absolute/workspace
-"$CORAGENT_PYTHON" apps/agent-cli/workspace.py doctor --root /absolute/workspace
+"$CORAGENT_PYTHON" apps/cli/workspace.py doctor --root /absolute/workspace
+"$CORAGENT_PYTHON" apps/cli/workspace.py rebuild --root /absolute/workspace
+"$CORAGENT_PYTHON" apps/cli/workspace.py doctor --root /absolute/workspace
 ```
 
 重建以不可变记录和结果为依据，恢复 Node/map 索引、搜索索引与可读视图；不生成科学结果、不修改执行或邮件回执，也不迁移旧格式工作区。原始记录缺失或不一致需要修复真实来源，不能用重建伪造。研究更新通过公开工具进行；CLI 不接受旧 expected-version / observed-sequence 全局进度参数。
@@ -70,7 +70,7 @@ Job Manager 拥有执行回执，Artifact Store 拥有文件和来源。Job Mana
 独立分析由 Skill 脚本通过通用 Job 执行。注册验证器和验收 profile 在 `skills/chemical/execution.json`
 中声明，`backend/src/research_agent/application/validators.py` 验证并暂存声明的验证器和输入。
 Python 独立核验执行目录；Pi 按 `package.json.pi.skills` 发现产品与领域 Skill。
-修改资源后使用 `scripts/update_resources.py` 更新摘要，再用 `--check` 检查。
+修改资源后使用 `tools/update_resources.py` 更新摘要，再用 `--check` 检查。
 默认发现英文 `SKILL.md`，中文入口为对照资料，须同步维护；详见 [Skill 与执行目录](EXTENSIONS.zh-CN.md)。
 新增算法必须声明适用条件、反例、可重放候选，并在确定性输出语义变化时提升版本。
 不要加入科学 successor routing。
@@ -101,7 +101,7 @@ session owner。
 | 科学软件 | Skill 脚本/解析器、环境配置、对应 Skill 参考、测试 |
 | 科学分析 | 脚本、适用时的验证器/profile manifest、输入输出验证、科学反例、扩展资源摘要 |
 | Job 执行与恢复 | 派发与回执事务、原生工具、重启和协调测试 |
-| 包清单 | `package.json`、`scripts/package_inventory.py`、布局测试 |
+| 包清单 | `package.json`、`packaging/coragent_packaging/manifests/package_inventory.py`、布局测试 |
 | 安装或 service 路径 | installer、卸载逻辑、安装文档 |
 
 ## 发布与回滚

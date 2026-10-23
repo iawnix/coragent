@@ -29,7 +29,7 @@ npm run test:package
 ```
 
 Use the managed test environment selected by the test runner. Native Pi tests
-require a prepared checkout matching `config/pi-source.json`; remote and live
+require a prepared checkout matching `packaging/coragent_packaging/pi/source.json`; remote and live
 model scenarios are opt-in. Stop any service started by a test and remove its
 temporary state before the test process exits.
 

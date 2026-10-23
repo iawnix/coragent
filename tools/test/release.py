@@ -10,8 +10,8 @@ import subprocess
 import sys
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
-from scripts.install_package import install_package
-from scripts._wheel import release_wheel
+from coragent_packaging.installer.install_package import install_package
+from coragent_packaging.manifests._wheel import release_wheel
 from tools.test.supervisor import write_json
 
 
@@ -47,14 +47,14 @@ def main():
     # Seed only the verified third-party cache. The installed preparation and
     # binding code must validate and wire it; source code cannot repair the
     # first-party payload under test.
-    pin=json.loads((package/'config/pi-source.json').read_text())
+    pin=json.loads((package/'packaging/coragent_packaging/pi/source.json').read_text())
     pi_root=install/'runtimes/pi'/pin['commit']
     pi_root.mkdir(parents=True)
     subprocess.run(['cp','--reflink=auto','-a',str(Path(environment['CORAGENT_TEST_PI_RUNTIME_ROOT']))+'/.',str(pi_root)],check=True)
-    subprocess.run([str(python),str(package/'scripts/prepare_pi_source.py'),'--install',str(install)],cwd=external,env=clean,check=True)
+    subprocess.run([str(python),str(package/'packaging/coragent_packaging/pi/prepare.py'),'--install',str(install)],cwd=external,env=clean,check=True)
     binding=('import sys;from pathlib import Path;'
-             f"sys.path.insert(0,{str(package / 'scripts')!r});"
-             'from install_wizard import bind_pi_runtime_node_modules;'
+             f"sys.path.insert(0,{str(package / 'packaging')!r});"
+             'from coragent_packaging.installer.install_wizard import bind_pi_runtime_node_modules;'
              f'bind_pi_runtime_node_modules(Path({str(install)!r}),Path({str(pi_root)!r}))')
     subprocess.run([str(python),'-c',binding],cwd=external,env=clean,check=True)
     clean.update({'CORAGENT_TEST_INSTALLED_ROOT':str(install),
@@ -81,7 +81,7 @@ def main():
             'native_worker':'passed','seven_tools':'passed','task_continuation':'passed','native_counts':counts,'phone':'not-run','live_model':'not-authorized','remote_platform':'not-authorized'}
     # Always use the installed uninstaller; the source checkout must not repair
     # omissions in the installation under test.
-    uninstaller=package/'scripts/uninstall.py'
+    uninstaller=package/'packaging/coragent_packaging/installer/uninstall.py'
     subprocess.run([str(python),str(uninstaller),'--install-root',str(install),'--service-scope','none',
                     '--purge-all','--non-interactive','--yes','--json'],cwd=external,env=clean,check=True)
     if install.exists(): raise RuntimeError('Uninstall left the installation root behind')

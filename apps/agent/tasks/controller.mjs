@@ -4,7 +4,7 @@ import { resolveExecutionPolicy, resolveExecutionPlan, executionItemContext, pro
 import { resolveTaskSelection } from "./execution-selection.mjs";
 import { verifyAssessment, checkCompletion } from "./assessment.mjs";
 import { taskRecoveryPolicy, retryableSubmission, recoveryReady } from "./recovery.mjs";
-import { hasPendingInput } from "../host/admission/input.mjs";
+import { hasPendingInput } from "../runtime/admission/input.mjs";
 import shared from "../tools/tool-schemas.json" with { type: "json" };
 
 export const UserTasks = defineDoc({ kind: "coragent.user-tasks", version: 1,

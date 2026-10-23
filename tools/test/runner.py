@@ -16,6 +16,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
+sys.path[:0] = [str(ROOT / 'packaging'), str(ROOT / 'backend/src')]
 from tools.test import environment
 from tools.test.manifest import audit,load_manifest,suite_paths
 from tools.test.supervisor import Supervisor,alive,reap,write_json
@@ -68,9 +69,9 @@ def select(args) -> tuple[list[str],list[dict]]:
         (('docs/','README','LICENSE'),[], 'documentation'),
         (('backend/src/research_agent/research/','research'),['integration','native-pi'],'research behavior'),
         (('backend/src/research_agent/jobs/','backend/src/research_agent/artifacts/','jobs','artifacts'),['integration','native-pi'],'scientific lifecycle'),
-        (('apps/agent/pi/','apps/agent/tools/','pi','tools'),['integration','native-pi','source'],'Pi and tool boundary'),
-        (('apps/agent/','packages/link/','services/relay/','host','transport','terminal'),['integration','native-pi','source'],'product integration'),
-        (('skills/','prompts/','skills'),['integration','native-pi'],'resources and execution declarations'),
+        (('apps/agent/runtime/','apps/agent/tools/','pi','tools'),['integration','native-pi','source'],'Pi and tool boundary'),
+        (('apps/agent/','packages/link/','apps/relay/','host','transport','terminal'),['integration','native-pi','source'],'product integration'),
+        (('skills/','apps/agent/prompts/','skills'),['integration','native-pi'],'resources and execution declarations'),
     ]
     if not paths and not scopes:
         return DETERMINISTIC.copy(),[{'reason':'no bounded change scope; full validation'}]
@@ -140,7 +141,7 @@ def child_environment(root: Path, run: Path, dependencies: dict[str,Path]) -> di
     tri_root = run / 'data' / 'tri'
     tri_root.mkdir(parents=True, exist_ok=True)
     env={name:os.environ[name] for name in ('PATH','LANG','LC_ALL','TERM','CI','GITHUB_ACTIONS','CORAGENT_TEST_CONDA') if name in os.environ}
-    env.update({'HOME':str(run/'config/home'),'CORAGENT_HOST_ENV_ROOT':str(run/'install/host-envs'),'PYTHONNOUSERSITE':'1','PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(run/'source/backend/src')+os.pathsep+str(run/'source'),
+    env.update({'HOME':str(run/'config/home'),'CORAGENT_HOST_ENV_ROOT':str(run/'install/host-envs'),'PYTHONNOUSERSITE':'1','PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(run/'source/backend/src')+os.pathsep+str(run/'source/packaging')+os.pathsep+str(run/'source'),
         'TMPDIR':str((run/'tmp').resolve()),'XDG_CONFIG_HOME':str(run/'config'),'XDG_CACHE_HOME':str(run/'cache'),
         'XDG_DATA_HOME':str(run/'data'),'XDG_RUNTIME_DIR':str((run/'sockets').resolve()),
         # TRI defaults to ./data when unset; pin its state inside this private
@@ -173,7 +174,7 @@ def command_for(name: str, run: Path, dependencies: dict[str,Path], extra: list[
         return [node,*imports,'--test',f'--test-concurrency={min(workers,2) if kind=="node-native" else workers}','--test-reporter=tap',*extra,*paths]
     if kind=='pytest-managed':
         return [python,str(source/'tools/test/installed.py'),'--workers',str(workers),'--files',*paths,'--',*extra]
-    if kind=='package-check': return [python,str(source/'scripts/check_package.py'),*extra]
+    if kind=='package-check': return [python,str(source/'packaging/coragent_packaging/build/check_package.py'),*extra]
     if kind=='static': return [python,str(source/'tools/test/static.py')]
     if kind=='release':
         artifact=json.loads((run/'run.json').read_text())['artifact']
@@ -274,7 +275,7 @@ def execute(args, root: Path, replay: Path | None = None) -> int:
     if 'python' in required and not environment.probe(dependencies['python']/'bin/python'):
         raise RuntimeError('The selected managed Python failed its dependency probe')
     if 'pi' in required:
-        verification=subprocess.run([sys.executable,str(run/'source/scripts/prepare_pi_source.py'),'--verify',str(dependencies['pi'])],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        verification=subprocess.run([sys.executable,str(run/'source/packaging/coragent_packaging/pi/prepare.py'),'--verify',str(dependencies['pi'])],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         if verification.returncode: raise RuntimeError('The selected Pi source failed pin and patch verification')
     record['toolchain']={'node':subprocess.check_output(['node','--version'],text=True).strip(),'python':subprocess.check_output([str(dependencies['python']/'bin/python'),'--version'],text=True).strip() if 'python' in required else None,'platform':sys.platform}
     write_json(run/'run.json',record)

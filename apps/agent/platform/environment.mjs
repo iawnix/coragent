@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { packagePath } from "./resources.mjs";
 
 const manifest = JSON.parse(readFileSync(packagePath("package.json"), "utf8"));
-const pi = JSON.parse(readFileSync(packagePath("config/pi-source.json"), "utf8"));
+const pi = JSON.parse(readFileSync(packagePath("packaging/coragent_packaging/pi/source.json"), "utf8"));
 
 /** Describes the process serving the connection, independent of client metadata. */
 export const hostIdentity = Object.freeze({

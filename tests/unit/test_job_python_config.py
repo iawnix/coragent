@@ -85,7 +85,7 @@ def test_installer_refuses_unverified_prefix_and_does_not_publish_bad_receipt(tm
     import runpy
     from types import SimpleNamespace
     root = Path(__file__).resolve().parents[2]
-    installer = runpy.run_path(str(root / 'scripts/install_job_environment.py'))['install']
+    installer = runpy.run_path(str(root / 'packaging/coragent_packaging/installer/install_job_environment.py'))['install']
     prefix = tmp_path / 'science'; prefix.mkdir()
     lock = tmp_path / 'science.lock'; lock.write_text('@EXPLICIT\nhttps://example.test/python.conda\n')
     b = {**binding(str(prefix)), 'lock_ref': str(lock)}
@@ -111,7 +111,7 @@ def test_installer_cli_uses_selected_target(tmp_path, adopt):
     receipt = tmp_path / 'target-python/coragent-environment.json'
     if adopt:
         receipt.unlink()
-    result = subprocess.run([sys.executable, '-B', str(root / 'scripts/install_job_environment.py'),
+    result = subprocess.run([sys.executable, '-B', str(root / 'packaging/coragent_packaging/installer/install_job_environment.py'),
                              '--config', str(config_path), '--platform', 'science', '--backend', 'structure',
                              *(['--adopt'] if adopt else [])], capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stderr
@@ -125,7 +125,7 @@ def test_failed_new_install_removes_only_its_partial_prefix(tmp_path, monkeypatc
     import runpy
     import subprocess
     root = Path(__file__).resolve().parents[2]
-    installer = runpy.run_path(str(root / 'scripts/install_job_environment.py'))['install']
+    installer = runpy.run_path(str(root / 'packaging/coragent_packaging/installer/install_job_environment.py'))['install']
     prefix = tmp_path/'partial'
     lock = tmp_path/'science.lock'
     lock.write_text('@EXPLICIT\nhttps://example.test/python.conda#' + 'a'*64 + '\n')
@@ -144,7 +144,7 @@ def test_failed_new_install_removes_only_its_partial_prefix(tmp_path, monkeypatc
 def test_pip_install_requires_pinned_versions_and_hashes_before_creating_prefix(tmp_path, monkeypatch, contents):
     import runpy
     root = Path(__file__).resolve().parents[2]
-    installer = runpy.run_path(str(root/'scripts/install_job_environment.py'))['install']
+    installer = runpy.run_path(str(root/'packaging/coragent_packaging/installer/install_job_environment.py'))['install']
     lock = tmp_path/'science.lock'; lock.write_text('@EXPLICIT\nhttps://example.test/python.conda\n')
     lock.with_suffix('.requirements.txt').write_text(contents)
     monkeypatch.setattr('subprocess.run', lambda *a, **kw: pytest.fail('invalid lock must fail before installation'))

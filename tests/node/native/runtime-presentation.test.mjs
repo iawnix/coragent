@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { markInternalInput, RUNTIME_TASK_CONTINUATION_START, RUNTIME_TASK_CONTINUATION_END } from "../../../apps/agent/host/admission/input.mjs";
+import { markInternalInput, RUNTIME_TASK_CONTINUATION_START, RUNTIME_TASK_CONTINUATION_END } from "../../../apps/agent/runtime/admission/input.mjs";
 import { pinnedPiSource } from "./test-environment.mjs";
 
 const source = pinnedPiSource();

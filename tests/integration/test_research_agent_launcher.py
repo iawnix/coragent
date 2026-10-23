@@ -14,7 +14,7 @@ def test_server_launcher_uses_canonical_host_path(tmp_path: Path) -> None:
     package.mkdir()
     (package / "libexec").mkdir()
     shutil.copy2(ROOT / "libexec/coragent-host", package / "libexec/coragent-host")
-    launcher = package / "apps/agent-cli/launcher.py"
+    launcher = package / "apps/cli/launcher.py"
     launcher.parent.mkdir(parents=True)
     launcher.write_text("# canonical launcher\n")
     binaries = tmp_path / "bin"
@@ -31,5 +31,5 @@ def test_server_launcher_uses_canonical_host_path(tmp_path: Path) -> None:
 
 def test_release_has_no_second_server_launcher() -> None:
     package = json.loads((ROOT / "package.json").read_text())
-    assert "apps/agent-cli/research_agent_launcher.py" not in package["files"]
-    assert not (ROOT / "apps/agent-cli/research_agent_launcher.py").exists()
+    assert "apps/cli/research_agent_launcher.py" not in package["files"]
+    assert not (ROOT / "apps/cli/research_agent_launcher.py").exists()

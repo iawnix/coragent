@@ -6,7 +6,7 @@ import {create_workspace_initializer, validate_workspace_files} from '../../apps
 import {create_python_runtime_bridge, create_runtime_bridge} from '../../apps/agent/bridge/client.mjs';
 import {createResearchTools} from '../../apps/agent/tools/research/tools.mjs';
 import {createPublicToolContracts} from '../../apps/agent/tools/contracts.mjs';
-import Type from '../../apps/agent/pi/typebox.mjs';
+import Type from '../../apps/agent/runtime/typebox.mjs';
 import {validateToolArguments} from '@earendil-works/pi-ai';
 import {TEST_ROOT} from './native/test-environment.mjs';
 

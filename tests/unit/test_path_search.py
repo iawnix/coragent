@@ -418,7 +418,7 @@ def test_core_neb_accepts_independent_calculator_settings(tmp_path):
 
 
 def test_path_environment_profile_is_opt_in_and_preserves_wrapper_bindings(tmp_path):
-    from scripts import _job_install as jobs
+    from coragent_packaging.installer import _job_install as jobs
     from tests.unit.test_job_installation import options
     config=tmp_path/'job.toml'
     config.write_text('[execution]\nschema_version = 2\ndefault_platform="local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n[execution.platforms.local.bindings.xtb]\ncommand="/native/xtb"\n[execution.platforms.local.bindings.path_xtb]\ncommand="/native/xtb"\n')

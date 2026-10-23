@@ -14,7 +14,7 @@
 
 14 份受管补丁中，未发现可以因 **1.2.0–1.3.0 已完整实现同等功能**而整份删除的补丁。上游的压缩失败处理与部分需求重叠；新应用消息类型可以简化 Monitor 和自动续跑的消息记录。安装脚本中另有一处类型强制转换，其对应的 provider 类型缺口已被上游补齐。
 
-主要阻塞在集成接口：Pi 1.2.0 删除了我们依赖的 experimental server/client/plugin 栈，1.3.0 继续沿用这一变化。`apps/agent/pi/source.mjs` 的 27 个源码入口中，12 个路径已经不存在。Chord 的旧 service/facet 接口也被替换。因此，仅更新版本、commit 和 lock 文件无法启动现有 Worker 与终端。
+主要阻塞在集成接口：Pi 1.2.0 删除了我们依赖的 experimental server/client/plugin 栈，1.3.0 继续沿用这一变化。`apps/agent/runtime/source.mjs` 的 27 个源码入口中，12 个路径已经不存在。Chord 的旧 service/facet 接口也被替换。因此，仅更新版本、commit 和 lock 文件无法启动现有 Worker 与终端。
 
 建议继续使用 Pi durable 的任务、会话、存储和模型执行能力，将被删除的 Worker 生命周期与客户端连接功能迁到 CoRAgent 适配层。领域知识和化学流程继续由 Skill 承担。
 
@@ -74,7 +74,7 @@
 
 ### 补丁目录以外：OpenCode Go 强制转换
 
-`scripts/prepare_pi_source.py:hydrate_model_data()` 会修改 provider 源码，把 `Object.values(OPENCODE_GO_MODELS)` 转成 `any`。此改动不在 14 份补丁中。
+`packaging/coragent_packaging/pi/prepare.py:hydrate_model_data()` 会修改 provider 源码，把 `Object.values(OPENCODE_GO_MODELS)` 转成 `any`。此改动不在 14 份补丁中。
 
 1.3.0 的 OpenCode Go provider 已包含 `google-generative-ai` 类型和 API 实现。升级时应删除这处强制转换，再对实际生成的 catalog 执行构建。如果新 catalog 还有其他类型问题，按具体 API 修复。本次仅完成源码核对，尚未验证去掉转换后的完整构建。
 
@@ -82,13 +82,13 @@
 
 | CoRAgent 文件 | 当前依赖 / 升级工作 |
 |---|---|
-| `apps/agent/pi/source.mjs` | 27 个路径中 12 个消失：worker、process、setup、server、clientRuntime、clientCommand、client、clientTui、clientChat、slashCommands、presentationUI、transcript |
-| `apps/agent/pi/backend.mjs` | 启动被删除的 Pi server，通过旧 service 接口管理会话和订阅状态 |
-| `apps/agent/pi/worker.mjs` | 使用被删除的 session-worker/process 入口 |
-| `apps/agent/pi/setup.mjs` | 使用旧 Chord facet/service 和已删除的 harness-setup；需显式组装模型、settings、执行环境和服务适配 |
-| `apps/agent/pi/client.mjs`、`apps/agent/terminal/commands/facet.mjs` | 使用已删除的客户端、展示服务和命令扩展接口 |
-| `apps/agent/pi/tool-adapter.mjs` | 目前直接转交 coding tool 的 content 结果；新版 durable 的 ToolExecutionResult 使用 output，需在边界转换 |
-| `scripts/prepare_pi_source.py` | 要求 experimental 文件与旧 protocol 8；准备、安装、验证和构建条件需随新集成更新 |
+| `apps/agent/runtime/source.mjs` | 27 个路径中 12 个消失：worker、process、setup、server、clientRuntime、clientCommand、client、clientTui、clientChat、slashCommands、presentationUI、transcript |
+| `apps/agent/runtime/backend.mjs` | 启动被删除的 Pi server，通过旧 service 接口管理会话和订阅状态 |
+| `apps/agent/runtime/worker.mjs` | 使用被删除的 session-worker/process 入口 |
+| `apps/agent/runtime/setup.mjs` | 使用旧 Chord facet/service 和已删除的 harness-setup；需显式组装模型、settings、执行环境和服务适配 |
+| `apps/agent/runtime/client.mjs`、`apps/agent/terminal/commands/facet.mjs` | 使用已删除的客户端、展示服务和命令扩展接口 |
+| `apps/agent/runtime/tool-adapter.mjs` | 目前直接转交 coding tool 的 content 结果；新版 durable 的 ToolExecutionResult 使用 output，需在边界转换 |
+| `packaging/coragent_packaging/pi/prepare.py` | 要求 experimental 文件与旧 protocol 8；准备、安装、验证和构建条件需随新集成更新 |
 | `tools/test/environment.py`、native Pi 测试 | 依赖安装和原生集成验证需覆盖新启动路径与恢复行为 |
 
 `experimental/source-resolver.ts` 仍然存在；不能把整个 experimental 目录一概视为消失。旧 Pi protocol 8 与新 Chord 协议属于不同协议，不能直接把 descriptor 的 8 改成新 Chord 的版本号。

@@ -35,7 +35,6 @@ def audit(root: Path = ROOT) -> dict[str, int]:
         if selected.get('aggregate') or selected.get('external'): continue
         for path in suite_paths(name, root): owners.setdefault(Path(path), []).append(name)
     found = set((root / 'tests/node').rglob('*.test.mjs'))
-    found.update((root / 'backend/tests').rglob('test_*.py'))
     for directory in ('unit','contract','integration'):
         found.update((root / 'tests' / directory).rglob('test_*.py'))
     bad = [str(path.relative_to(root)) for path in sorted(found) if len(owners.get(path, [])) != 1]

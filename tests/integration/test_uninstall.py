@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from research_agent.foundation.layout import paths as app_paths
+from research_agent.bootstrap.layout import paths as app_paths
 
 import json
 import subprocess
@@ -8,13 +8,13 @@ from pathlib import Path
 
 import pytest
 
-from scripts import uninstall as uninstaller
-from scripts.install_from_github import install_uninstaller
-from scripts.uninstall import uninstall
+from coragent_packaging.installer import uninstall as uninstaller
+from coragent_packaging.installer.install_from_github import install_uninstaller
+from coragent_packaging.installer.uninstall import uninstall
 
 
 def _args(root: Path, **overrides: object):
-    from research_agent.foundation.layout import paths
+    from research_agent.bootstrap.layout import paths
     paths(root).initialize()
     values = {
         "install_root": str(root),
@@ -34,7 +34,7 @@ def _args(root: Path, **overrides: object):
 
 def test_uninstall_preserves_workspace_and_config_by_default(tmp_path: Path) -> None:
     root = tmp_path / "install"
-    from research_agent.foundation.layout import paths
+    from research_agent.bootstrap.layout import paths
     paths(root).initialize()
     (root / "workspaces/ts_001").mkdir(parents=True)
     web_token = app_paths(root).generated / 'web/auth.token'
@@ -87,7 +87,7 @@ def test_uninstall_does_not_follow_external_bin_directory(tmp_path: Path) -> Non
 
 def test_uninstall_uses_configured_external_workspace_root(tmp_path: Path) -> None:
     root = tmp_path / "install"
-    from research_agent.foundation.layout import paths
+    from research_agent.bootstrap.layout import paths
     paths(root).initialize()
     workspace_root = tmp_path / "research"
     (workspace_root / "reaction-a").mkdir(parents=True)
@@ -101,7 +101,7 @@ def test_uninstall_uses_configured_external_workspace_root(tmp_path: Path) -> No
 
 def test_uninstall_refuses_to_purge_an_installation_ancestor(tmp_path: Path) -> None:
     root = tmp_path / "install"
-    from research_agent.foundation.layout import paths
+    from research_agent.bootstrap.layout import paths
     paths(root).initialize()
     paths(root).update_config(workspace_root=str(tmp_path))
 
@@ -113,7 +113,7 @@ def test_uninstall_refuses_to_purge_an_installation_ancestor(tmp_path: Path) -> 
 
 def test_interactive_defaults_run_safe_uninstall_and_preserve_data(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "install"
-    from research_agent.foundation.layout import paths
+    from research_agent.bootstrap.layout import paths
     paths(root).initialize()
     workspace = root / "workspaces/ts_001"
     workspace.mkdir(parents=True)
@@ -162,7 +162,7 @@ def test_uninstall_removes_immutable_release_without_following_links(tmp_path: P
 
 def test_uninstall_purge_removes_the_dedicated_installation_root(tmp_path: Path) -> None:
     root = tmp_path / "install"
-    from research_agent.foundation.layout import paths
+    from research_agent.bootstrap.layout import paths
     paths(root).initialize()
     (root / "workspaces/ts_001").mkdir(parents=True)
     (root / "coragent").symlink_to("./current")
@@ -179,7 +179,7 @@ def test_uninstall_purge_removes_the_dedicated_installation_root(tmp_path: Path)
 
 def test_installed_uninstaller_runs_with_its_private_ui_module(tmp_path: Path) -> None:
     root = tmp_path / "install"
-    from research_agent.foundation.layout import paths
+    from research_agent.bootstrap.layout import paths
     paths(root).initialize()
     install_uninstaller(root, Path(__file__).resolve().parents[2])
 
@@ -201,7 +201,7 @@ def test_installed_uninstaller_runs_with_its_private_ui_module(tmp_path: Path) -
 
     assert completed.returncode == 0, completed.stderr
     assert json.loads(completed.stdout)["ok"] is True
-    assert (root / "runtimes/maintenance/_terminal_ui.py").is_file()
+    assert (root / "runtimes/maintenance/packaging/coragent_packaging/installer/_terminal_ui.py").is_file()
 
 
 def test_installed_uninstaller_removes_an_immutable_partial_release(tmp_path: Path) -> None:
@@ -272,7 +272,7 @@ def test_valid_ownership_marker_allows_cleanup_of_damaged_package_state(tmp_path
 
 def test_purge_config_removes_local_uninstaller_and_ownership_marker(tmp_path: Path) -> None:
     root = tmp_path / "install"
-    from research_agent.foundation.layout import paths
+    from research_agent.bootstrap.layout import paths
     paths(root).initialize()
     install_uninstaller(root, Path(__file__).resolve().parents[2])
     web_token = app_paths(root).generated / 'web/auth.token'
@@ -292,7 +292,7 @@ def test_purge_config_removes_local_uninstaller_and_ownership_marker(tmp_path: P
 
 def test_purge_removes_unified_host_sessions_and_credentials(tmp_path: Path) -> None:
     root = tmp_path / "install"
-    from research_agent.foundation.layout import paths
+    from research_agent.bootstrap.layout import paths
     paths(root).initialize()
     host_session = app_paths(root).state / 'pi/sessions/workspace/session/session.sqlite'
     host_session.parent.mkdir(parents=True)
@@ -320,7 +320,7 @@ def test_purge_removes_unified_host_sessions_and_credentials(tmp_path: Path) -> 
 
 def test_installed_uninstaller_removes_owned_relay_without_source_tree(tmp_path: Path) -> None:
     root = tmp_path / 'installation'
-    from research_agent.foundation.layout import paths
+    from research_agent.bootstrap.layout import paths
     paths(root).initialize()
     install_uninstaller(root, Path(__file__).resolve().parents[2])
     relay_root = root / 'runtimes/link-relay'
@@ -345,7 +345,7 @@ def test_installed_uninstaller_removes_owned_relay_without_source_tree(tmp_path:
 
 @pytest.mark.parametrize('purge', [False, True])
 def test_recovery_uninstaller_removes_qrun_without_application_runtime(tmp_path, monkeypatch, purge):
-    from scripts import _qrun_install
+    from coragent_packaging.installer import _qrun_install
     from research_agent.jobs import qrun
     root = tmp_path / 'installation'
     options = _args(root)

@@ -11,12 +11,12 @@ import pytest
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
-from scripts._suite import WEB_COMPONENT_FILES, load_web_manifest
-from scripts.build_web import build_web
+from coragent_packaging.manifests._suite import WEB_COMPONENT_FILES, load_web_manifest
+from coragent_packaging.build.build_web import build_web
 
 
 ROOT = Path(__file__).resolve().parents[2]
-COMPONENT_ROOT = ROOT / "components" / "coragent-web"
+COMPONENT_ROOT = ROOT / "apps/web"
 
 
 def test_web_cli_uses_explicit_provider_and_shared_catalog(tmp_path: Path, monkeypatch) -> None:
@@ -30,7 +30,7 @@ def test_web_cli_uses_explicit_provider_and_shared_catalog(tmp_path: Path, monke
     workspace_root = tmp_path / "projects"
     state_dir = tmp_path / "web-state"
     entry = [sys.executable, str(COMPONENT_ROOT / "bin/coragent-web")]
-    provider = str(ROOT / "apps/agent-cli/research_web_bridge.py")
+    provider = str(ROOT / "apps/cli/research_web_bridge.py")
 
     def invoke(command: str, *arguments: str) -> object:
         result = subprocess.run(
@@ -160,7 +160,7 @@ def test_provider_schemas_validate_actual_success_and_error_envelopes():
 
 def test_provider_json_lines_does_not_reuse_a_previous_request_id(tmp_path: Path) -> None:
     state_dir = tmp_path / "state"
-    provider = ROOT / "apps" / "agent-cli" / "research_web_bridge.py"
+    provider = ROOT / "apps/cli/research_web_bridge.py"
     first = {
         "schema_version": "research-memory-provider/1",
         "request_id": "first",

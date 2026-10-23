@@ -54,7 +54,7 @@ An existing remote target is only tested when selected for provisioning or with
 `--verify-job-target cluster`.
 
 For administrator maintenance, the lower-level target-local helper is still
-available as `python3 scripts/install_job_environment.py --config /absolute/job.toml
+available as `python3 packaging/coragent_packaging/installer/install_job_environment.py --config /absolute/job.toml
 --backend structure`. It requires existing explicit bindings
 and does not perform the public installer's release activation or Job acceptance.
 Structure and validation may share a prefix. CF22D needs no activation script

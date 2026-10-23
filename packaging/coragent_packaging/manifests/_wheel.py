@@ -1,0 +1,233 @@
+"""Validate CoRAgent wheel identity and payload without importing the package."""
+
+from __future__ import annotations
+
+import email.parser
+import hashlib
+import json
+import os
+import zipfile
+from pathlib import Path, PurePosixPath
+from typing import Any
+
+
+PYTHON_DISTRIBUTION = "coragent"
+PI_PACKAGE = "@iawnix/coragent"
+PYTHON_PACKAGE_NAME = "research_agent"
+PYTHON_PACKAGE_NAMES = ("research_agent",)
+PYTHON_PAYLOAD_SUFFIXES = frozenset({".css", ".html", ".js", ".json", ".py", ".svg", ".toml"})
+RELEASE_MANIFEST = ".coragent-release.json"
+RELEASE_SCHEMA_VERSION = "coragent-release/1"
+WHEEL_DIRECTORY = "python-dist"
+SOURCE_DATE_EPOCH = "315532800"
+
+
+class WheelContractError(RuntimeError):
+    """The Python distribution artifact does not satisfy the release contract."""
+
+
+
+
+def inspect_wheel(path: str | Path) -> dict[str, Any]:
+    """Return the identity and deterministic payload digest of one wheel."""
+
+    wheel = Path(path).expanduser().resolve()
+    if not wheel.is_file() or wheel.is_symlink() or wheel.suffix != ".whl":
+        raise WheelContractError(f"wheel must be one regular .whl file: {wheel}")
+    records: list[tuple[str, bytes]] = []
+    metadata_documents: list[bytes] = []
+    seen: set[str] = set()
+    try:
+        with zipfile.ZipFile(wheel) as archive:
+            for item in archive.infolist():
+                relative = PurePosixPath(item.filename)
+                if relative.is_absolute() or not relative.parts or ".." in relative.parts:
+                    raise WheelContractError(f"wheel member escapes its root: {item.filename}")
+                name = relative.as_posix().rstrip("/")
+                if name in seen:
+                    raise WheelContractError(f"wheel contains duplicate member: {name}")
+                seen.add(name)
+                if item.is_dir():
+                    continue
+                mode = item.external_attr >> 16
+                if mode and (mode & 0o170000) not in {0, 0o100000}:
+                    raise WheelContractError(f"wheel contains unsupported member type: {name}")
+                content = archive.read(item)
+                if relative.name == "METADATA" and relative.parent.name.endswith(".dist-info"):
+                    metadata_documents.append(content)
+                if relative.parts[0] in PYTHON_PACKAGE_NAMES:
+                    if not is_python_payload_path(relative):
+                        raise WheelContractError(f"wheel contains unsupported package payload: {name}")
+                    records.append((relative.as_posix(), content))
+                elif not relative.parts[0].endswith(".dist-info"):
+                    raise WheelContractError(f"wheel contains an unexpected install target: {name}")
+    except zipfile.BadZipFile as exc:
+        raise WheelContractError(f"invalid wheel archive: {wheel.name}") from exc
+
+    if len(metadata_documents) != 1:
+        raise WheelContractError("wheel must contain exactly one dist-info/METADATA document")
+    if not records:
+        raise WheelContractError("wheel contains no Python package payload")
+    metadata = email.parser.BytesParser().parsebytes(metadata_documents[0])
+    name = metadata.get("Name")
+    version = metadata.get("Version")
+    if not isinstance(name, str) or not name or not isinstance(version, str) or not version:
+        raise WheelContractError("wheel metadata is missing Name or Version")
+    return {
+        "name": name,
+        "version": version,
+        "filename": wheel.name,
+        "sha256": sha256_file(wheel),
+        "size_bytes": wheel.stat().st_size,
+        "payload_sha256": payload_records_sha256(records),
+    }
+
+
+def release_wheel(
+    package_root: str | Path,
+) -> tuple[Path, dict[str, Any]] | None:
+    """Resolve and revalidate the wheel bound to an installed release."""
+
+    root = Path(package_root).expanduser().resolve()
+    manifest_path = root / RELEASE_MANIFEST
+    if not manifest_path.exists():
+        return None
+    if not manifest_path.is_file() or manifest_path.is_symlink():
+        raise WheelContractError(f"release manifest must be a regular file: {manifest_path}")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise WheelContractError(f"release manifest is not valid JSON: {manifest_path}") from exc
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != RELEASE_SCHEMA_VERSION:
+        raise WheelContractError("installed release does not declare a supported Python wheel contract")
+    package = package_identity(root)
+    if manifest.get("package") != package:
+        raise WheelContractError("installed release package identity does not match package.json")
+    expected = validate_descriptor(manifest.get("python_distribution"))
+    if expected["version"] != package["version"].replace("-rc.", "rc"):
+        raise WheelContractError("bundled wheel version does not match the release package")
+    relative = PurePosixPath(str(expected["path"]))
+    wheel = root.joinpath(*relative.parts)
+    actual = inspect_wheel(wheel)
+    validate_descriptor_match(expected, actual)
+    source_digest = source_payload_sha256(root, package_names=_wheel_package_names(wheel))
+    if actual["payload_sha256"] != source_digest:
+        raise WheelContractError("bundled wheel payload does not match the release source payload")
+    return wheel, {**actual, "path": relative.as_posix(), "source": "bundled-release-wheel"}
+
+
+def validate_descriptor(value: object) -> dict[str, Any]:
+    expected_keys = {"name", "version", "path", "sha256", "size_bytes", "payload_sha256"}
+    if not isinstance(value, dict) or set(value) != expected_keys:
+        raise WheelContractError("invalid python_distribution descriptor")
+    for key in ("name", "version", "path", "sha256", "payload_sha256"):
+        if not isinstance(value.get(key), str) or not value[key]:
+            raise WheelContractError(f"python_distribution.{key} must be a non-empty string")
+    if value["name"] != PYTHON_DISTRIBUTION:
+        raise WheelContractError(f"Python distribution name must be {PYTHON_DISTRIBUTION}")
+    relative = PurePosixPath(value["path"])
+    if (
+        relative.is_absolute()
+        or len(relative.parts) != 2
+        or relative.parts[0] != WHEEL_DIRECTORY
+        or ".." in relative.parts
+        or not relative.name.endswith(".whl")
+    ):
+        raise WheelContractError("python_distribution.path must name one wheel under python-dist/")
+    if not relative.name.startswith(f"coragent-{value['version']}-"):
+        raise WheelContractError("Python wheel filename does not match the distribution version")
+    if len(value["sha256"]) != 64 or any(character not in "0123456789abcdef" for character in value["sha256"]):
+        raise WheelContractError("python_distribution.sha256 must be a lowercase SHA-256 digest")
+    if len(value["payload_sha256"]) != 64 or any(
+        character not in "0123456789abcdef" for character in value["payload_sha256"]
+    ):
+        raise WheelContractError("python_distribution.payload_sha256 must be a lowercase SHA-256 digest")
+    size = value.get("size_bytes")
+    if not isinstance(size, int) or isinstance(size, bool) or size <= 0:
+        raise WheelContractError("python_distribution.size_bytes must be a positive integer")
+    return dict(value)
+
+
+def validate_descriptor_match(expected: dict[str, Any], actual: dict[str, Any]) -> None:
+    for key in ("name", "version", "sha256", "size_bytes", "payload_sha256"):
+        if expected[key] != actual[key]:
+            raise WheelContractError(f"Python wheel {key} does not match the release manifest")
+    if PurePosixPath(expected["path"]).name != actual["filename"]:
+        raise WheelContractError("Python wheel filename does not match the release manifest")
+
+
+def source_payload_sha256(
+    package_root: str | Path,
+    *,
+    package_names: set[str] | None = None,
+) -> str:
+    package_root = Path(package_root).expanduser().resolve()
+    root = package_root / "backend/src/research_agent"
+    if not root.is_dir():
+        raise WheelContractError(f"Python source root is missing: {root}")
+    records: list[tuple[str, bytes]] = []
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.is_symlink():
+            continue
+        relative = PurePosixPath("research_agent") / path.relative_to(root).as_posix()
+        if is_python_payload_path(relative):
+            records.append((relative.as_posix(), path.read_bytes()))
+    return payload_records_sha256(records)
+
+
+def _wheel_package_names(path: Path) -> set[str]:
+    """Return Python payload namespaces present in a wheel archive."""
+
+    names: set[str] = set()
+    with zipfile.ZipFile(path) as archive:
+        for member in archive.namelist():
+            first = PurePosixPath(member).parts[:1]
+            if first and first[0] in PYTHON_PACKAGE_NAMES:
+                names.add(first[0])
+    return names
+
+
+def package_identity(package_root: str | Path) -> dict[str, str]:
+    path = Path(package_root).expanduser().resolve() / "package.json"
+    if not path.is_file() or path.is_symlink():
+        raise WheelContractError(f"package.json is missing or unsafe: {path}")
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise WheelContractError(f"package.json is not valid JSON: {path}") from exc
+    if not isinstance(value, dict) or value.get("name") != PI_PACKAGE:
+        raise WheelContractError(f"package.json name must be {PI_PACKAGE}")
+    version = value.get("version")
+    if not isinstance(version, str) or not version:
+        raise WheelContractError("package.json version must be a non-empty string")
+    return {"name": PI_PACKAGE, "version": version}
+
+
+def is_python_payload_path(path: PurePosixPath) -> bool:
+    return (
+        bool(path.parts)
+        and path.parts[0] in PYTHON_PACKAGE_NAMES
+        and (len(path.parts) < 2 or path.parts[1] != "web")
+        and "__pycache__" not in path.parts
+        and not any(part.endswith(".egg-info") for part in path.parts)
+        and path.suffix in PYTHON_PAYLOAD_SUFFIXES
+    )
+
+
+def payload_records_sha256(records: list[tuple[str, bytes]]) -> str:
+    digest = hashlib.sha256()
+    for relative, content in sorted(records):
+        encoded = relative.encode("utf-8")
+        digest.update(len(encoded).to_bytes(8, "big"))
+        digest.update(encoded)
+        digest.update(len(content).to_bytes(8, "big"))
+        digest.update(content)
+    return digest.hexdigest()
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()

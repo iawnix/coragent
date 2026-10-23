@@ -1,1 +1,1 @@
-"""Dependency-light storage, path and installation primitives."""
+"""Shared file IO, transactions, protocol identity and path safety."""

@@ -3,8 +3,8 @@ import { mkdir, mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { TODO_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
-import { createCodingTools } from "../../../apps/agent/pi/coding-tools.mjs";
-import { loadPi } from "../../../apps/agent/pi/source.mjs";
+import { createCodingTools } from "../../../apps/agent/runtime/coding-tools.mjs";
+import { loadPi } from "../../../apps/agent/runtime/source.mjs";
 import { TEST_ROOT } from "./test-environment.mjs";
 
 async function fixture(t, getSelection) {

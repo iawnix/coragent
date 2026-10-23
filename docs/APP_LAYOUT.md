@@ -4,7 +4,7 @@
 
 An installation has four separate roots. `config.toml` selects the software,
 local state and workspace roots; its own location selects the configuration directory.
-The canonical implementation is `backend/src/research_agent/foundation/layout.py`.
+The canonical implementation is `backend/src/research_agent/bootstrap/layout.py`.
 
 | Root | Default | Configuration |
 | --- | --- | --- |
@@ -65,7 +65,7 @@ Pi session history lives at
 Inspect resolved paths without changing the installation:
 
 ```bash
-python3 -B scripts/app_layout_doctor.py --config /absolute/path/config.toml --json
+python3 -B packaging/coragent_packaging/installer/app_layout_doctor.py --config /absolute/path/config.toml --json
 ```
 
 The layout schema is `coragent-installation/3`. Old installation-root `etc/`,

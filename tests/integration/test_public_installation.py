@@ -2,7 +2,7 @@
 
 from tests.support.platforms import execution_config
 
-from research_agent.foundation.layout import paths as app_paths
+from research_agent.bootstrap.layout import paths as app_paths
 import base64
 import importlib.util
 import json
@@ -14,9 +14,9 @@ import sys
 import tomllib
 import pytest
 
-from scripts.build_package import build_package
-from scripts import _job_install as jobs
-from research_agent.foundation.layout import paths
+from coragent_packaging.build.build_package import build_package
+from coragent_packaging.installer import _job_install as jobs
+from research_agent.bootstrap.layout import paths
 from tests.unit.conftest import execution_target_fixture
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,7 +33,7 @@ def test_public_package_install_accepts_jobs_and_preserves_external_environment(
     cache = app_paths(root).cache / 'job-install'
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.symlink_to(acceptance, target_is_directory=True)
-    pin = json.loads((ROOT/'config/pi-source.json').read_text())
+    pin = json.loads((ROOT/'packaging/coragent_packaging/pi/source.json').read_text())
     pi_root = root/'runtimes/pi'/pin['commit']
     pi_root.mkdir(parents=True)
     subprocess.run(['cp','--reflink=auto','-a',os.environ['CORAGENT_TEST_PI_RUNTIME_ROOT']+'/.',str(pi_root)],check=True)
@@ -55,7 +55,7 @@ def test_public_package_install_accepts_jobs_and_preserves_external_environment(
         environment.pop(key, None)
     agent_config = tmp_path/'model-config'
     agent_config.mkdir()
-    command = [sys.executable,'-S','-B',str(ROOT/'scripts/installer.py'),'install','--source','package',
+    command = [sys.executable,'-S','-B',str(ROOT/'packaging/coragent_packaging/installer/installer.py'),'install','--source','package',
                '--package-manifest',built['manifest'],'--install-root',str(root),'--conda-root',str(Path(conda).parent.parent),
                '--job-offline','--service-scope','none','--without-web',
                '--agent-config-dir',str(agent_config),

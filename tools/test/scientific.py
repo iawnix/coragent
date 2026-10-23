@@ -6,7 +6,7 @@ from pathlib import Path
 import shutil
 import subprocess
 
-from scripts._job_install import profiles, resource, digest
+from coragent_packaging.installer._job_install import profiles, resource, digest
 from tools.test.environment import locked, repair_conda_pycache_entries
 
 

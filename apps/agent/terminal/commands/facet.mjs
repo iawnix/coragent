@@ -1,6 +1,6 @@
-import { loadPi } from "../../pi/source.mjs";
+import { loadPi } from "../../runtime/source.mjs";
 import { parseSlashCommand, slashCompletions, SLASH_COMMAND_DEFINITIONS } from "../../tools/commands.mjs";
-import { CLIENT_QUERIES_SERVICE_ID } from "../../pi/services/queries.mjs";
+import { CLIENT_QUERIES_SERVICE_ID } from "../../runtime/services/queries.mjs";
 import { createStatusPresentation } from "../status/presentation.mjs";
 import { createDocumentView } from "../renderers/document.mjs";
 import { createCommandPresentation } from "./panel.mjs";

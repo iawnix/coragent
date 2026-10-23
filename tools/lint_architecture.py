@@ -8,14 +8,15 @@ single wheel ships one research_agent namespace.
 
 from __future__ import annotations
 
+import ast
 import re
 import sys
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "scripts"))
-from package_inventory import RETIRED_RUNTIME_PATHS
+sys.path.insert(0, str(ROOT / "packaging"))
+from coragent_packaging.manifests.package_inventory import RETIRED_RUNTIME_PATHS
 
 OLD_SUBPACKAGE = re.compile(
     r"\bresearch_agent_runtime\.(?:backends|analysis|remote|platforms|structures|reaction|pyscf|workspace|providers|io|path_safety|calculation_contracts|runtime)\b"
@@ -26,8 +27,40 @@ def _python_files(root: Path):
     return sorted(path for path in root.rglob("*.py") if "__pycache__" not in path.parts)
 
 
+def check_ownership() -> list[str]:
+    """Check source dependencies, not runtime payloads or compatibility aliases."""
+    errors = []
+    backend = ROOT / "backend/src/research_agent"
+    allowed = {
+        "foundation": {"foundation"},
+        "configuration": {"configuration", "foundation"},
+        "artifacts": {"artifacts", "foundation"},
+        "research": {"research", "artifacts", "foundation"},
+    }
+    for path in _python_files(backend):
+        owner = path.relative_to(backend).parts[0]
+        for node in ast.walk(ast.parse(path.read_text())):
+            modules = [alias.name for alias in node.names] if isinstance(node, ast.Import) else [node.module or ""] if isinstance(node, ast.ImportFrom) else []
+            for module in modules:
+                if module.split('.')[0] in {"coragent_packaging", "tools", "apps", "scripts"}:
+                    errors.append(f"backend imports delivery/development code: {path.relative_to(ROOT)}:{node.lineno}")
+                if owner in allowed and module.startswith("research_agent.") and module.split('.')[1] not in allowed[owner]:
+                    errors.append(f"{owner} imports an upper layer: {path.relative_to(ROOT)}:{node.lineno}")
+    for path in (ROOT / "apps").rglob("*.py"):
+        if re.search(r"(?:from|import)\s+(?:coragent_packaging|tools|scripts)\b", path.read_text()):
+            errors.append(f"application imports packaging/development code: {path.relative_to(ROOT)}")
+    for path in (ROOT / "apps/agent/host").rglob("*.mjs"):
+        if "@earendil-works/pi-durable" in path.read_text():
+            errors.append(f"Host owns Pi durable state: {path.relative_to(ROOT)}")
+    for name in ("assessment", "recovery", "execution-plan", "execution-selection", "projection"):
+        path = ROOT / f"apps/agent/tasks/{name}.mjs"
+        if re.search(r'from\s+[\'"][^\'\"]*(?:pi-durable|/runtime/|/host/)', path.read_text()):
+            errors.append(f"task policy imports session infrastructure: {path.relative_to(ROOT)}")
+    return errors
+
+
 def check() -> list[str]:
-    errors: list[str] = []
+    errors: list[str] = check_ownership()
     old_roots = [
         ROOT / "backend" / "src" / "research_agent" / "application" / name
         for name in ("backends", "analysis", "remote", "platforms", "structures", "reaction", "pyscf", "workspace", "providers", "io.py", "path_safety.py", "calculation_contracts.py", "runtime")
@@ -52,7 +85,7 @@ def check() -> list[str]:
             for item in path.rglob("*")
         )):
             errors.append(f"retired implementation remains: {relative}")
-    for root in (ROOT / "backend/src", ROOT / "packages", ROOT / "apps", ROOT / "scripts", ROOT / "tools"):
+    for root in (ROOT / "backend/src", ROOT / "packages", ROOT / "apps", ROOT / "packaging", ROOT / "tools"):
         for path in _python_files(root):
             text = path.read_text(encoding="utf-8")
             if OLD_SUBPACKAGE.search(text):
@@ -82,7 +115,7 @@ def check() -> list[str]:
         "CORAGENT_" + "KERNEL_MODULE",
         "load_pi_" + "runtime(",
     )
-    for root in (ROOT / "apps", ROOT / "packages", ROOT / "scripts"):
+    for root in (ROOT / "apps", ROOT / "packages", ROOT / "packaging"):
         for path in sorted(root.rglob("*.mjs")):
             if any(part in {"node_modules", ".git"} for part in path.parts):
                 continue
@@ -94,7 +127,7 @@ def check() -> list[str]:
     if "source-root" in app_server.read_text(encoding="utf-8"):
         errors.append("pi-app-server exposes a replaceable source-root option")
     for path in (ROOT / "apps/agent").rglob("*.mjs"):
-        if path.relative_to(ROOT).as_posix() == "apps/agent/pi/source.mjs":
+        if path.relative_to(ROOT).as_posix() == "apps/agent/runtime/source.mjs":
             continue
         if re.search(r"packages/(?:coding-agent|durable|ai|tui)/src/", path.read_text()):
             errors.append(f"Pi private source path outside adapter: {path.relative_to(ROOT)}")

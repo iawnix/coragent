@@ -13,7 +13,7 @@ from pathlib import Path, PurePosixPath
 
 from jsonschema import Draft202012Validator
 
-from research_agent.foundation.env import resolve_package_root
+from research_agent.bootstrap.env import resolve_package_root
 from research_agent.jobs.environment import validate_requirements
 
 _SCHEMA = json.loads(files(__package__).joinpath('execution_schema.json').read_text())

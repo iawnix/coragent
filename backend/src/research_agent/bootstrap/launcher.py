@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from research_agent.foundation.layout import paths as app_paths
+from research_agent.bootstrap.layout import paths as app_paths
 
-from research_agent.foundation.layout import paths
+from research_agent.bootstrap.layout import paths
 from research_agent.foundation.protocol import HOST_PROTOCOL, WORKSPACE_ID_PATTERN
 
 import fcntl
@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import NoReturn
 from urllib.parse import urlsplit
 
-from research_agent.foundation.env import (
+from research_agent.bootstrap.env import (
     DISABLE_REEXEC,
     ENV_OVERRIDE,
     PACKAGE_ROOT_OVERRIDE,
@@ -1261,7 +1261,7 @@ def _validate_remote_terminal_request(request: LaunchRequest) -> None:
 
 def resolve_pi_source(installation: Installation) -> Path:
     """Resolve the installation-pinned Pi source for every Native client."""
-    pin_path = installation.package_root / "config/pi-source.json"
+    pin_path = installation.package_root / "packaging/coragent_packaging/pi/source.json"
     try:
         pin = json.loads(pin_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -1282,7 +1282,7 @@ def build_harness_client_command(installation: Installation, request: LaunchRequ
     """Attach Pi's own experimental client TUI to the persistent harness."""
     source = resolve_pi_source(installation)
     entry = source / "packages/coding-agent/src/experimental/source-resolver.ts"
-    client = installation.package_root / "apps/agent/pi/client.mjs"
+    client = installation.package_root / "apps/agent/runtime/client.mjs"
     if not entry.is_file() or not client.is_file():
         raise CoRAgentHostError("Pi harness client source is unavailable; prepare the pinned Pi source or reinstall CoRAgent")
     command = [_node_binary(), "--import", str(entry), str(client)]
@@ -1306,7 +1306,7 @@ def launch_harness_client(installation: Installation, request: LaunchRequest, wo
     os.environ["PI_SERVER_DIR"] = str(app_paths(installation.root).state / 'host/pi-server')
     os.environ["PI_EXPERIMENTAL"] = "1"
     os.environ["CORAGENT_PACKAGE_ROOT"] = str(installation.package_root)
-    os.environ["PI_SESSION_WORKER_ENTRY"] = str(installation.package_root / "apps/agent/pi/worker.mjs")
+    os.environ["PI_SESSION_WORKER_ENTRY"] = str(installation.package_root / "apps/agent/runtime/worker.mjs")
     os.environ["CORAGENT_WORKSPACE_ROOT"] = str(installation.workspaces_root)
     os.environ.pop("CORAGENT_CUSTOM_UI", None)
     exec_pi(build_harness_client_command(installation, request), workspace)
@@ -1546,7 +1546,7 @@ def launch(argv: list[str], *, package_root: str | Path, install_root: str | Pat
     if request.show_help:
         print(SERVER_USAGE if request.host else USAGE, end="")
         return 0
-    from research_agent.foundation.installation_maintenance import assert_installation_available
+    from research_agent.bootstrap.installation_maintenance import assert_installation_available
     try:
         assert_installation_available(install_root)
     except (OSError, ValueError, RuntimeError) as exc:

@@ -27,8 +27,8 @@ Pi 从 Skill 目录的 `SKILL.md` 发现技能；当前这些入口使用英文�
 
 ## 系统提示词
 
-`apps/agent/pi/setup.mjs` 将工作目录、`prompts/coragent.md` 和已发现的 Skill 描述组装为系统提示词。
-`prompts/coragent.zh-CN.md` 是中文维护对照，不会同时注入，也不会随会话语言自动切换。
+`apps/agent/runtime/setup.mjs` 将工作目录、`apps/agent/prompts/coragent.md` 和已发现的 Skill 描述组装为系统提示词。
+`apps/agent/prompts/coragent.zh-CN.md` 是中文维护对照，不会同时注入，也不会随会话语言自动切换。
 `/sys-prompt` 可以检查当前 worker 的实际提示词及来源。
 
 系统提示词保留跨任务通用的决策规则：指令优先级、研究对象、执行归属、授权与预算、证据标准、
@@ -76,12 +76,12 @@ Python 的 `backend/src/research_agent/application/execution_catalog.py` 独立�
 
 ## 维护
 
-`config/resources.json` 保存随包 Skill、参考资料、脚本和提示词的资源摘要；执行目录另行固定其脚本依赖。
+`packaging/coragent_packaging/manifests/resources.json` 保存随包 Skill、参考资料、脚本和提示词的资源摘要；执行目录另行固定其脚本依赖。
 修改资源后运行：
 
 ```bash
-python3 scripts/update_resources.py
-python3 scripts/update_resources.py --check
+python3 tools/update_resources.py
+python3 tools/update_resources.py --check
 python3 tools/lint_skills.py
 ```
 

@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, symlink, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { createPackageSourceReadGuard } from "../../../apps/agent/pi/policy.mjs";
+import { createPackageSourceReadGuard } from "../../../apps/agent/runtime/policy.mjs";
 test("Harness package-source guard blocks private package reads but allows public skills", async () => {
   const root = await mkdtemp(join(tmpdir(), "t-"));
   const packageRoot = join(root, "package");

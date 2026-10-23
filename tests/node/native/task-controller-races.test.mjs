@@ -7,8 +7,8 @@ import { Harness, MemoryStorage, createRegistry, defineExtension, hook, Generati
 import { createModels, fauxProvider, fauxAssistantMessage } from "@earendil-works/pi-ai";
 import { TODO_CONTEXT as context } from "@earendil-works/chord/context";
 import { pinnedPiSource } from "./test-environment.mjs";
-import { createInputAdmission } from "../../../apps/agent/host/admission/input.mjs";
-import { createJobAdmission } from "../../../apps/agent/host/admission/jobs.mjs";
+import { createInputAdmission } from "../../../apps/agent/runtime/admission/input.mjs";
+import { createJobAdmission } from "../../../apps/agent/runtime/admission/jobs.mjs";
 import { createTaskController } from "../../../apps/agent/tasks/controller.mjs";
 import { createMonitorService } from "../../../apps/agent/tasks/service.mjs";
 
@@ -66,7 +66,7 @@ async function fixture(t) {
   } };
   function openController() {
     controller = createTaskController({ harness, conversation, admission, LiveDoc, InboxDoc, kernel, workspaceId: "workspace", sessionId: "session", context });
-    monitor = createJobAdmission({ admission, kernel, sessionId: "session", wakeMessage: event => `Job event ${event.event_id}`, producerToken: "fixture-token", taskController: controller });
+    monitor = createJobAdmission({ admission, kernel, sessionId: "session", producerToken: "fixture-token", taskController: controller });
   }
   openController();
   t.after(async () => { await controller.close(); await harness.close(context); });

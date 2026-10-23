@@ -24,7 +24,7 @@ npm run lint:skills
 npm run test:package
 ```
 
-使用测试运行器选择的托管环境。Native Pi 测试需要匹配 `config/pi-source.json` 的 Pi
+使用测试运行器选择的托管环境。Native Pi 测试需要匹配 `packaging/coragent_packaging/pi/source.json` 的 Pi
 源码；远端和真实模型场景都是显式 opt-in。测试启动的服务必须在退出前停止并清理临时状态。
 
 ## Contract 变更

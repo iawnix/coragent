@@ -46,7 +46,7 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     const jobConfig = join(root, "job.toml");
     closeQueue = await startQrunFixture(jobConfig, root);
     process.env.CORAGENT_JOB_CONFIG = jobConfig;
-    await execute(python, [join(packageRoot, "apps/agent-cli/workspace_mode.py"), "--root", workspace, "--workspace-id", "flow"]);
+    await execute(python, [join(packageRoot, "apps/cli/workspace_mode.py"), "--root", workspace, "--workspace-id", "flow"]);
     const fixtureJobId = "job_1";
     const preparedPath = join(workspace, "prepared.json");
     const prepared = JSON.stringify({request_id:"fixture_run", work_id:"fixture_work", metadata:{skill:"fixture", configuration_sha256:"fixture"},
@@ -132,7 +132,7 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
       models: [{ id: "fixture", name: "Fixture", reasoning: false, input: ["text"],
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 400000, maxTokens: 4096 }],
     } } }));
-    const { createCoRAgentHarnessBackend } = await import(pathToFileURL(join(packageRoot, "apps/agent/pi/backend.mjs")));
+    const { createCoRAgentHarnessBackend } = await import(pathToFileURL(join(packageRoot, "apps/agent/runtime/backend.mjs")));
     const packageAlias = join(root, "current-package");
     await symlink(packageRoot, packageAlias, "dir");
     const backendOptions = { sourceRoot, packageRoot: packageAlias, workspaceRoot,
@@ -147,7 +147,7 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     await backend.sendInput({ workspace_id: "flow", session_id, request_id: "fixture_request", client_message_id: "fixture_message",
       text: "Exercise the local fixture without sending mail.", mode: "auto" });
     const {deliverJobEvent} = await import(pathToFileURL(join(packageRoot,"apps/agent/host/jobs/worker.mjs")));
-    const runJson = async (command, root, extra=[]) => JSON.parse((await execute(python,[join(packageRoot,"apps/agent-cli/job_manager.py"),command,"--root",root,...extra])).stdout);
+    const runJson = async (command, root, extra=[]) => JSON.parse((await execute(python,[join(packageRoot,"apps/cli/job_manager.py"),command,"--root",root,...extra])).stdout);
     let read, restarted=false, monitorDelivered=false;
     stage = "wait-flow";
     for (let i = 0; i < 250; i++) {
@@ -172,7 +172,7 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     assert.ok(monitorDelivered, JSON.stringify({ requests: requests.length, failure: read.snapshot.runtime_error,
       lastResult: read.snapshot.last_result }));
     assert.equal(requests.length, steps.length, JSON.stringify(read.snapshot.failure));
-    const resident = await readFile(join(packageRoot, "prompts/coragent.md"), "utf8");
+    const resident = await readFile(join(packageRoot, "apps/agent/prompts/coragent.md"), "utf8");
     const evidenceGuide = await readFile(join(packageRoot, "skills/core/research-memory/references/evidence.md"), "utf8");
     const firstSystem = requests[0].messages.filter(message => message.role === "system").map(message => String(message.content)).join("\n");
     assert.ok(firstSystem.includes(resident.trim()), "resident object semantics reach the first provider request");

@@ -48,7 +48,7 @@ Preparation probes the selected local or SSH target: interpreter prefix, explici
 
 Installation receipts record `inventory_sha256` from actual environment preparation and inspection.
 Prepare scientific environments separately and reference their bindings in the platform configuration.
-For target-local maintenance use `python3 -B scripts/install_job_environment.py --config "$CORAGENT_JOB_CONFIG"
+For target-local maintenance use `python3 -B packaging/coragent_packaging/installer/install_job_environment.py --config "$CORAGENT_JOB_CONFIG"
 --platform PLATFORM --scheduler-entry ENTRY --backend BACKEND`; `--adopt` verifies an existing prefix
 and publishes its receipt. Run this on the execution host. The main installer validates selected bindings;
 `--verify-job-target PLATFORM/ENTRY` also submits bounded acceptance Jobs on that entry. Reports distinguish

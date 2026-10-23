@@ -4,7 +4,7 @@
 
 The pinned Pi runtime implements provider access and model calls. CoRAgent Host
 exposes the same session model selection to the terminal, CoRHub and browser.
-`config/pi-source.json` and `package.json` identify the current Pi version.
+`packaging/coragent_packaging/pi/source.json` and `package.json` identify the current Pi version.
 
 ## Configuration
 

@@ -1,6 +1,6 @@
 """Installed external executors use generic preparation and ordinary Jobs."""
 
-from research_agent.foundation.layout import paths as app_paths
+from research_agent.bootstrap.layout import paths as app_paths
 import hashlib
 import importlib.util
 import json
@@ -324,7 +324,7 @@ def test_installed_resolver_is_used_by_an_isolated_name_resolution_job(tmp_path,
     import tomllib
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
     from types import SimpleNamespace
-    from scripts import install_wizard as wizard
+    from coragent_packaging.installer import install_wizard as wizard
 
     requests = []
     class Resolver(BaseHTTPRequestHandler):

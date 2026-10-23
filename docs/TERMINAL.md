@@ -206,7 +206,7 @@ Relay transports opaque frames and does not own sessions or research state.
 Phone and the terminal receive the same Pi snapshot and events. The optional
 browser gateway attaches to one existing session over loopback HTTP/SSE; it
 does not start Pi or a worker. This transport gateway is separate from
-[CoRAgent Web](../components/coragent-web/README.md), the read-only research browser
+[CoRAgent Web](../apps/web/README.md), the read-only research browser
 that does not submit prompts.
 
 Host accepts only `initialize` with `protocol: "coragent-host/3"`. Clients using earlier Host protocols

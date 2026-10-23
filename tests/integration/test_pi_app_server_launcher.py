@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from research_agent.foundation.layout import paths as app_paths
-from research_agent.foundation.layout import paths as layout_paths
+from research_agent.bootstrap.layout import paths as app_paths
+from research_agent.bootstrap.layout import paths as layout_paths
 
 import json
 import os
@@ -204,11 +204,11 @@ def _copy_launcher(tmp_path: Path) -> tuple[Path, Path]:
     write_test_suite_manifest(suite_root, version=PACKAGE_VERSION)
     shutil.copy2(ROOT / "coragent", package_root / "coragent")
     (package_root / "coragent").chmod(0o755)
-    (package_root / "scripts").mkdir()
-    shutil.copy2(ROOT / "scripts" / "_bootstrap.py", package_root / "scripts" / "_bootstrap.py")
-    (package_root / "apps/agent-cli").mkdir(parents=True)
-    shutil.copy2(ROOT / "apps/agent-cli/launcher.py", package_root / "apps/agent-cli/launcher.py")
-    shutil.copy2(ROOT / "scripts" / "pi-loader.mjs", package_root / "scripts" / "pi-loader.mjs")
+    (package_root / "apps/cli").mkdir(parents=True)
+    (package_root / "apps/agent/runtime").mkdir(parents=True)
+    shutil.copy2(ROOT / "apps/cli/_bootstrap.py", package_root / "apps/cli/_bootstrap.py")
+    shutil.copy2(ROOT / "apps/cli/launcher.py", package_root / "apps/cli/launcher.py")
+    shutil.copy2(ROOT / "apps/agent/runtime/loader.mjs", package_root / "apps/agent/runtime/loader.mjs")
     shutil.copytree(
         ROOT / "backend/src",
         package_root / "backend/src",
@@ -428,10 +428,10 @@ def test_host_state_prepares_private_pi_workspace_before_root_lock(tmp_path: Pat
 def test_host_environment_publishes_owner_only_worker_diagnostics(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("CORAGENT_PI_RUNTIME_ROOT", raising=False)
     installation = _installation(tmp_path)
-    pin = json.loads((ROOT / "config/pi-source.json").read_text(encoding="utf-8"))
+    pin = json.loads((ROOT / "packaging/coragent_packaging/pi/source.json").read_text(encoding="utf-8"))
     commit = pin["commit"]
-    (installation.package_root / "config").mkdir(parents=True)
-    (installation.package_root / "config/pi-source.json").write_text(json.dumps(pin) + "\n", encoding="utf-8")
+    (installation.package_root / "packaging/coragent_packaging/pi").mkdir(parents=True)
+    (installation.package_root / "packaging/coragent_packaging/pi/source.json").write_text(json.dumps(pin) + "\n", encoding="utf-8")
     (installation.root / "runtimes/pi" / commit).mkdir(parents=True)
     diagnostic = app_paths(installation.root).log / 'worker-diagnostics.log'
     diagnostic.parent.mkdir(parents=True, exist_ok=True)
@@ -684,8 +684,8 @@ def test_default_terminal_exports_installation_pinned_pi_source(
     installation = _installation(tmp_path)
     source = installation.root / "runtimes/pi/pinned"
     source.mkdir(parents=True)
-    (installation.package_root / "config").mkdir(parents=True)
-    (installation.package_root / "config/pi-source.json").write_text(
+    (installation.package_root / "packaging/coragent_packaging/pi").mkdir(parents=True)
+    (installation.package_root / "packaging/coragent_packaging/pi/source.json").write_text(
         json.dumps({"commit": "pinned"}) + "\n",
         encoding="utf-8",
     )

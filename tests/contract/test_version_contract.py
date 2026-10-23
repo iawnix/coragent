@@ -21,11 +21,11 @@ def test_rc_release_maps_to_python_and_preserves_dependency_locks(tmp_path):
     assert {key: value for key, value in lock_after["packages"].items() if key} == {
         key: value for key, value in lock_before["packages"].items() if key
     }
-    relay = tmp_path / "services/relay/package.json"
+    relay = tmp_path / "apps/relay/package.json"
     value = json.loads(relay.read_text())
     value["version"] = "0.18.0"
     relay.write_text(json.dumps(value))
-    with pytest.raises(ValueError, match="services/relay/package.json"):
+    with pytest.raises(ValueError, match="apps/relay/package.json"):
         version.check(tmp_path)
 
 

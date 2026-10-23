@@ -78,7 +78,7 @@ activation restore the prior release and configuration; failures after activatio
 retain the new state and require rerunning the installer for forward repair.
 
 ```sh
-python3 scripts/app_layout_doctor.py --config /absolute/path/config.toml --json
+python3 packaging/coragent_packaging/installer/app_layout_doctor.py --config /absolute/path/config.toml --json
 ```
 
 ## Cluster boundary

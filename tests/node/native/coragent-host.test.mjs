@@ -178,7 +178,7 @@ test("Host initialization exposes its selected package release", async (t) => {
   const client = await connectHost({ socketPath: host.socketPath, expectedReleaseId: "release-test" });
   assert.equal(client.hello.release_id, "release-test");
   const runningPackage = JSON.parse(await readFile(new URL("../../../package.json", import.meta.url), "utf8"));
-  const runningPi = JSON.parse(await readFile(new URL("../../../config/pi-source.json", import.meta.url), "utf8"));
+  const runningPi = JSON.parse(await readFile(new URL("../../../packaging/coragent_packaging/pi/source.json", import.meta.url), "utf8"));
   assert.equal(client.hello.product.version, runningPackage.version);
   assert.equal(client.hello.product.name, runningPackage.name);
   assert.equal(client.hello.runtime.node, process.versions.node);
@@ -322,7 +322,7 @@ test("Host relays real Job Monitor events and rejects old or mismatched identiti
   }
   const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
-  await promisify(execFile)(process.env.CORAGENT_PYTHON, [new URL("../../../apps/agent-cli/job_manager.py", import.meta.url).pathname, "tick", "--root", root], { env: executionEnv });
+  await promisify(execFile)(process.env.CORAGENT_PYTHON, [new URL("../../../apps/cli/job_manager.py", import.meta.url).pathname, "tick", "--root", root], { env: executionEnv });
   for (let poll = 0; poll < 100 && notifications.length === 0; poll++) await new Promise(resolve => setTimeout(resolve, 20));
   assert.equal(notifications.length, 1, "current binding.json and event_* must be scanned");
   const event = notifications[0];

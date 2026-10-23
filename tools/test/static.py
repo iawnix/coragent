@@ -9,7 +9,7 @@ audit(ROOT)
 for command in (
     [sys.executable,'tools/version.py','check'],
     [sys.executable,'tools/layout.py','--check'],
-    [sys.executable,'scripts/update_resources.py','--check'],
+    [sys.executable,'tools/update_resources.py','--check'],
     ['npm','run','typecheck'],
     [sys.executable,'tools/lint_architecture.py'],
     [sys.executable,'tools/lint_public_surface.py'],

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { piModulePath } from "../pi/source.mjs";
+import { piModulePath } from "../runtime/source.mjs";
 
 /*
  * Host-mediated native Pi client.
@@ -181,7 +181,7 @@ async function main() {
     const sourceRoot = process.env.CORAGENT_PI_RUNTIME_ROOT;
     if (!sourceRoot) throw new Error("CORAGENT_PI_RUNTIME_ROOT is required for the native Pi client");
     const resolver = piModulePath("resolver", sourceRoot);
-    const client = resolve(packageRoot, "apps/agent/pi/client.mjs");
+    const client = resolve(packageRoot, "apps/agent/runtime/client.mjs");
     const childArgs = ["--import", resolver, client, "--connect", connect, "--session-id", descriptor.session_id, ...kept];
     process.env.CORAGENT_SESSION_CWD = workspaceRoot;
     process.env.PI_EXPERIMENTAL = "1";

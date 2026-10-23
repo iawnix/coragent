@@ -10,7 +10,7 @@ from pathlib import Path
 from pathlib import PurePosixPath
 from typing import Any
 
-from research_agent.foundation.env import (
+from research_agent.bootstrap.env import (
     PYTHON_DISTRIBUTION,
     RUNTIME_PROBE_VERSION,
     _is_python_payload_path,

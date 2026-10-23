@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from scripts.link_relay_discovery import discover_link_relay
+from coragent_packaging.installer.link_relay_discovery import discover_link_relay
 
 
 def test_discover_link_relay_reads_existing_service_metadata(tmp_path: Path) -> None:
     root = tmp_path / "coragent-link"
-    service = root / "current/services/relay"
+    service = root / "current/apps/relay"
     service.mkdir(parents=True)
     (service / "cli.mjs").write_text("#!/usr/bin/env node\n", encoding="utf-8")
     state = tmp_path / "coragent-link-state" / "relay.db"
@@ -32,7 +32,7 @@ ExecStart=\"/usr/bin/node\" \"/tmp/cli.mjs\" serve --state \"%s\" --public-url \
 
 def test_discover_link_relay_ignores_incomplete_installation(tmp_path: Path) -> None:
     root = tmp_path / "coragent-link"
-    (root / "current/services/relay").mkdir(parents=True)
+    (root / "current/apps/relay").mkdir(parents=True)
     (root / "coragent-relay.service").write_text(
         "ExecStart=node cli.mjs serve --public-url https://relay.example.test\n",
         encoding="utf-8",

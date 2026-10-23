@@ -158,7 +158,7 @@ prompt 通过 Host `input/send` 进入同一个 lane，并使用持久回执和�
 Phone 客户端必须通过 CoRAgent Link 使用版本化 `coragent-host/3` NDJSON 方法。Relay 只转发不透明
 帧，不拥有 session 或 Research Memory。可选 browser gateway 只附着一个已经存在的会话，
 通过 loopback HTTP/SSE 提供 snapshot 和事件，不启动 Pi 或 worker。这个传输 gateway
-与只读的 [CoRAgent Web](../components/coragent-web/README.zh-CN.md) 研究浏览器分开，后者不提交 prompt。
+与只读的 [CoRAgent Web](../apps/web/README.zh-CN.md) 研究浏览器分开，后者不提交 prompt。
 
 Host 握手仅接受 `protocol: "coragent-host/3"`，v1 客户端必须更新。能力列表与调用方法统一用斜杠。
 会话读取和附着只接受 `after_cursor: {epoch, sequence}`；Host epoch 改变时返回当前快照，

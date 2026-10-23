@@ -57,9 +57,9 @@ Job Manager owns execution receipts; Artifact Store owns bytes and provenance. J
 Inspect the workspace, rebuild derived views when the diagnostic identifies a projection problem, then inspect again:
 
 ```bash
-"$CORAGENT_PYTHON" apps/agent-cli/workspace.py doctor --root /absolute/workspace
-"$CORAGENT_PYTHON" apps/agent-cli/workspace.py rebuild --root /absolute/workspace
-"$CORAGENT_PYTHON" apps/agent-cli/workspace.py doctor --root /absolute/workspace
+"$CORAGENT_PYTHON" apps/cli/workspace.py doctor --root /absolute/workspace
+"$CORAGENT_PYTHON" apps/cli/workspace.py rebuild --root /absolute/workspace
+"$CORAGENT_PYTHON" apps/cli/workspace.py doctor --root /absolute/workspace
 ```
 
 Rebuild uses immutable records and results to restore Node/map indexes, search and readable views. It does not invent scientific results, change execution/email receipts or migrate old workspace formats. Missing or inconsistent originals require repairing the actual source. Use public tools for research changes; the CLI has no expected-version / observed-sequence global-progress arguments.
@@ -80,7 +80,7 @@ recording scheduler state, Job identity, commands, and collection results.
 Independent analyses run Skill scripts through generic Jobs. Registered
 validators and acceptance profiles are declared in `skills/chemical/execution.json`;
 `backend/src/research_agent/application/validators.py` verifies and stages the
-declared validator and inputs. Python owns execution catalog validation independently of Pi Skill discovery. Pi loads product and domain Skills from `package.json.pi.skills`; `scripts/update_resources.py` generates resource digests. New scientific algorithms require
+declared validator and inputs. Python owns execution catalog validation independently of Pi Skill discovery. Pi loads product and domain Skills from `package.json.pi.skills`; `tools/update_resources.py` generates resource digests. New scientific algorithms require
 bounded inputs, explicit applicability, counterexamples, replayable candidates
 and a version change when deterministic output semantics change. Keep domain
 schemas out of the always-loaded tools. Do not add scientific successor routing.
@@ -119,8 +119,8 @@ broker, or alternate session owner.
 | Scientific software | Skill scripts/parsers, environment configuration, focused Skill references, tests |
 | Scientific analysis | script, validator/profile manifest when applicable, input and output validation, scientific counterexamples, execution and Skill resource digests |
 | Job execution and recovery | dispatch and receipt transactions, native tools, restart and reconciliation tests |
-| Package inventory | `package.json`, `scripts/package_inventory.py`, package layout tests |
-| Installer/service path | `scripts/install_wizard.py`, uninstall logic, installation docs |
+| Package inventory | `package.json`, `packaging/coragent_packaging/manifests/package_inventory.py`, package layout tests |
+| Installer/service path | `packaging/coragent_packaging/installer/install_wizard.py`, uninstall logic, installation docs |
 
 ## Release Procedure
 

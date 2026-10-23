@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_pi_source_pin_is_explicit_and_uses_latest_durable_runtime() -> None:
-    pin = json.loads((ROOT / "config/pi-source.json").read_text(encoding="utf-8"))
+    pin = json.loads((ROOT / "packaging/coragent_packaging/pi/source.json").read_text(encoding="utf-8"))
     assert pin == {
         "component": "pi-sdk-runtime",
         "repository": "https://github.com/earendil-works/pi.git",
@@ -17,7 +17,7 @@ def test_pi_source_pin_is_explicit_and_uses_latest_durable_runtime() -> None:
         "commit": "abe508e1b89912adde45528136c3221eb69acdd7",
         "protocolVersion": 8,
     }
-    patch = "\n".join(path.read_text(encoding="utf-8") for path in sorted((ROOT / "config/pi-patches").glob("*.patch")))
+    patch = "\n".join(path.read_text(encoding="utf-8") for path in sorted((ROOT / "packaging/coragent_packaging/pi/patches").glob("*.patch")))
     assert "PI_SESSION_WORKER_ENTRY" in patch
     assert "CORAGENT_PI_DIAGNOSTIC_FILE" in patch
     assert "workspaceId" in patch
@@ -29,7 +29,7 @@ def test_prepare_pi_source_verifies_a_matching_checkout() -> None:
     if not configured or not Path(configured).is_dir():
         return
     result = subprocess.run(
-        ["python3", str(ROOT / "scripts/prepare_pi_source.py"), "--verify", configured],
+        ["python3", str(ROOT / "packaging/coragent_packaging/pi/prepare.py"), "--verify", configured],
         cwd=ROOT, text=True, capture_output=True, check=False,
     )
     assert result.returncode == 0, result.stderr
@@ -37,7 +37,7 @@ def test_prepare_pi_source_verifies_a_matching_checkout() -> None:
 
 def test_prepare_pi_source_rejects_incorrect_protocol_metadata(monkeypatch) -> None:
     import pytest
-    from scripts import prepare_pi_source as prepare
+    from coragent_packaging.pi import prepare
     source = Path(os.environ["CORAGENT_TEST_PI_RUNTIME_ROOT"])
     descriptor = {**prepare.pin(), "protocolVersion": -1}
     monkeypatch.setattr(prepare, "pin", lambda: descriptor)
@@ -49,7 +49,7 @@ def test_prepare_pi_source_rejects_unpatched_checkout(tmp_path) -> None:
     source = tmp_path / "pi"
     source.mkdir()
     (source / ".git").mkdir()
-    from scripts import prepare_pi_source
+    from coragent_packaging.pi import prepare as prepare_pi_source
     original = prepare_pi_source.git
     try:
         prepare_pi_source.git = lambda *_args: prepare_pi_source.pin()["commit"]
@@ -65,7 +65,7 @@ def test_prepare_pi_source_rejects_unpatched_checkout(tmp_path) -> None:
 
 def test_patch_groups_are_idempotent_and_reject_partial_application(tmp_path, monkeypatch) -> None:
     """Use a real Git checkout; do not let marker comments stand in for patches."""
-    from scripts import prepare_pi_source as prepare
+    from coragent_packaging.pi import prepare
 
     source = tmp_path / "source"
     source.mkdir()

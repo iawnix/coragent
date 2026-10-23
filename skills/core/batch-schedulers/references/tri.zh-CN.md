@@ -90,7 +90,7 @@ TRI 成功提交回执必须包含 `driver="external"` 和非空 `scheduler_id`�
 `TRI_ACCEPTANCE_DIR` 选择尚不存在的私有目录（仓库测试必须位于 `local_debug/`）：
 
 ```bash
-"$CORAGENT_PYTHON" "$CORAGENT_PACKAGE_ROOT/scripts/verify_tri_nodes.py" \
+"$CORAGENT_PYTHON" "$CORAGENT_PACKAGE_ROOT/packaging/coragent_packaging/installer/verify_tri_nodes.py" \
   --config "$HOME/.config/coragent/config.toml" \
   --package-root "$CORAGENT_PACKAGE_ROOT" --directory "$TRI_ACCEPTANCE_DIR" \
   --platform compute --scheduler-entry main --nodes '["fed1","fed2"]' --timeout 180

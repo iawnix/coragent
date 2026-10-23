@@ -123,7 +123,7 @@ def dependency_paths(package_root: Path, root: Path) -> dict[str, Path]:
         'python': default_prefix(package_root, root),
         'host': root / 'deps/host' / key(package_root,['environment.lock.txt','tools/test/environment.py']),
         'node': root / 'deps/node' / key(package_root, ['tools/test/environment.py'], node_version+node_input),
-        'pi': root / 'deps/pi' / key(package_root, ['config/pi-source.json','config/pi-patches/*.patch','scripts/prepare_pi_source.py','tools/test/environment.py'], node_version),
+        'pi': root / 'deps/pi' / key(package_root, ['packaging/coragent_packaging/pi/source.json','packaging/coragent_packaging/pi/patches/*.patch','packaging/coragent_packaging/pi/prepare.py','tools/test/environment.py'], node_version),
     }
 
 
@@ -172,10 +172,10 @@ def prepare(package_root: Path, root: Path, components: list[str] | None = None)
                     run(['npm','ci','--ignore-scripts','--no-audit','--no-fund'], target)
                 else:
                     # Keep clone/build diagnostics exclusively in the private log.
-                    code = ('import sys;sys.path.insert(0,sys.argv[1]);import prepare_pi_source as p;'
+                    code = ('import sys;sys.path.insert(0,sys.argv[1]);from coragent_packaging.pi import prepare as p;'
                             'from pathlib import Path;s=Path(sys.argv[2]);p.clone(s);p.install_deps(s);'
                             'p.hydrate_model_data(s);p.prepare_build(s);p.verify(s)')
-                    run([sys.executable,'-c',code,str(package_root / 'scripts'),str(target)])
+                    run([sys.executable,'-c',code,str(package_root / 'packaging'),str(target)])
                 pending=receipt.with_suffix('.pending')
                 pending.write_text(json.dumps({'component':component,'key':target.name}) + '\n')
                 pending.replace(receipt)

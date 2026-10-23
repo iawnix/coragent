@@ -7,8 +7,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-CLI = ROOT / "apps" / "agent-cli" / "workspace_mode.py"
-API = ROOT / "apps" / "agent-cli" / "research_api.py"
+CLI = ROOT / "apps/cli/workspace_mode.py"
+API = ROOT / "apps/cli/research_api.py"
 
 
 def _run(script: Path, *args: str) -> dict:
@@ -57,8 +57,8 @@ def test_workspace_rebuild_cli_recovers_missing_projections(tmp_path):
     _run(CLI, '--root', str(workspace), '--workspace-id', 'repair')
     node = _run(API, 'research_create', '--root', str(workspace), '--goal', 'Preserve original research')['node']
     (workspace / 'research/map.json').unlink()
-    fixed = _run(ROOT / 'apps/agent-cli/workspace.py', 'rebuild', '--root', str(workspace))
+    fixed = _run(ROOT / 'apps/cli/workspace.py', 'rebuild', '--root', str(workspace))
     assert fixed['rebuilt'] and fixed['nodes'] == 1
-    report = _run(ROOT / 'apps/agent-cli/workspace.py', 'doctor', '--root', str(workspace))
+    report = _run(ROOT / 'apps/cli/workspace.py', 'doctor', '--root', str(workspace))
     assert report['valid'] and report['status'] == 'healthy'
     assert _run(API, 'research_read', '--root', str(workspace), '--ref', node['id'])['node']['goal'] == 'Preserve original research'

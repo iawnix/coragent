@@ -105,7 +105,7 @@ runtime Python and `CORAGENT_PACKAGE_ROOT` to its package directory; select a fr
 private `TRI_ACCEPTANCE_DIR` (repository tests must use `local_debug/`):
 
 ```bash
-"$CORAGENT_PYTHON" "$CORAGENT_PACKAGE_ROOT/scripts/verify_tri_nodes.py" \
+"$CORAGENT_PYTHON" "$CORAGENT_PACKAGE_ROOT/packaging/coragent_packaging/installer/verify_tri_nodes.py" \
   --config "$HOME/.config/coragent/config.toml" \
   --package-root "$CORAGENT_PACKAGE_ROOT" --directory "$TRI_ACCEPTANCE_DIR" \
   --platform compute --scheduler-entry main --nodes '["fed1","fed2"]' --timeout 180

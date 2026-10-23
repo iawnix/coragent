@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_PATTERNS = (
     "README*.md", "skills/**/*.md", "docs/ARCHITECTURE*.md",
     "docs/TERMINAL*.md", "docs/INSTALLATION*.md", "docs/MAINTAINER_GUIDE*.md",
-    "docs/CORAGENT_LINK*.md", "components/coragent-web/README*.md",
+    "docs/CORAGENT_LINK*.md", "apps/web/README*.md",
 )
 RULES = (
     (re.compile(r"\b(?:ResearchAgent|TS Phone|TSWeb|research-agent|RESEARCH_AGENT_\w*)\b"),

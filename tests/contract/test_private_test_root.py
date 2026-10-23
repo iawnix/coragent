@@ -9,8 +9,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts._source_capture import SourceCaptureError, capture_source_tree
-from scripts.check_package import PackageCheckError, validate_tarball
+from coragent_packaging.build._source_capture import SourceCaptureError, capture_source_tree
+from coragent_packaging.build.check_package import PackageCheckError, validate_tarball
 from tools.test.environment import configure_paths
 
 
@@ -32,9 +32,9 @@ class PrivateTestRootTests(unittest.TestCase):
             "README.md": "fixture\n",
             "package.json": '{}\n',
             "backend/pyproject.toml": "[build-system]\nrequires = []\n",
-            "scripts/build_release.py": "# fixture\n",
-            "scripts/check_package.py": "# fixture\n",
-            "scripts/package_inventory.py": "# fixture\n",
+            "packaging/coragent_packaging/build/build_release.py": "# fixture\n",
+            "packaging/coragent_packaging/build/check_package.py": "# fixture\n",
+            "packaging/coragent_packaging/manifests/package_inventory.py": "# fixture\n",
         }
         for name, content in files.items():
             target = root / name
@@ -76,8 +76,8 @@ class PrivateTestRootTests(unittest.TestCase):
 
     def test_package_rejects_debug_even_if_an_allowlist_includes_it(self):
         private = "local_debug/notes.txt"
-        with patch("scripts.check_package.REQUIRED_TARBALL_FILES", set()), \
-             patch("scripts.check_package.expanded_allowlisted_files", return_value={private}):
+        with patch("coragent_packaging.build.check_package.REQUIRED_TARBALL_FILES", set()), \
+             patch("coragent_packaging.build.check_package.expanded_allowlisted_files", return_value={private}):
             with self.assertRaisesRegex(PackageCheckError, "forbidden files.*local_debug"):
                 validate_tarball({"package.json", private})
 

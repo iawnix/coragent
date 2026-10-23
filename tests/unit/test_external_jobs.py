@@ -124,7 +124,7 @@ def test_native_errors_preserve_ambiguity_and_retryability(queue, tmp_path, code
 
 def application_queue(queue, tmp_path, monkeypatch, file_mode='staged'):
     from tests.unit.test_job_recovery import workspace
-    from scripts._job_install import toml_bytes
+    from coragent_packaging.installer._job_install import toml_bytes
     config, state = queue
     config = {**config, 'file_mode': file_mode, 'submission': {'queue_wait_seconds': 60}}
     path = tmp_path / 'external.toml'
@@ -435,7 +435,7 @@ def test_handler_runs_over_ssh_with_same_lifecycle(queue, tmp_path, monkeypatch)
 def test_application_jobs_reconcile_and_collect_external_tasks(queue, tmp_path, monkeypatch, lose_response, file_mode):
     from research_agent.application.execution import dispatch, _JOB_MANAGERS
     from tests.unit.test_job_recovery import workspace
-    from scripts._job_install import toml_bytes
+    from coragent_packaging.installer._job_install import toml_bytes
 
     config, state = queue
     config = {**config, "file_mode": file_mode}
@@ -466,9 +466,9 @@ def test_application_jobs_reconcile_and_collect_external_tasks(queue, tmp_path, 
 
 @pytest.mark.parametrize('failure', [None, 'wrong_node', 'backend_failure'])
 def test_node_acceptance_checks_each_selected_node_and_keeps_unverified_backends(queue, tmp_path, monkeypatch, failure):
-    from scripts import _job_acceptance as acceptance
-    from scripts.verify_tri_nodes import verify
-    from scripts._job_install import toml_bytes
+    from coragent_packaging.installer import _job_acceptance as acceptance
+    from coragent_packaging.installer.verify_tri_nodes import verify
+    from coragent_packaging.installer._job_install import toml_bytes
     from research_agent.jobs.config_contract import load_job_config, resolve_binding
     config, state = queue
     (state / 'auto-run').touch()

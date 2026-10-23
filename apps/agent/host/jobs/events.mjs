@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { validate_workspace_manifest } from "../workspace.mjs";
 import bindingSchema from "../../../../contracts/monitor/jobs/binding.schema.json" with { type: "json" };
 import eventSchema from "../../../../contracts/monitor/jobs/event.schema.json" with { type: "json" };
-import { Value } from "../../pi/typebox.mjs";
+import { Value } from "../../runtime/typebox.mjs";
 const MONITOR_ID = /^monitor_[1-9][0-9]*$/u;
 const MONITOR_EVENT_ID = /^event_[1-9][0-9]*$/u;
 

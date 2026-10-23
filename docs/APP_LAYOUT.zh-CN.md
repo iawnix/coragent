@@ -4,7 +4,7 @@
 
 安装使用四个独立根目录。`config.toml` 指定软件、运行状态和工作区根目录；
 配置文件自身的位置确定配置目录。实现依据为
-`backend/src/research_agent/foundation/layout.py`。
+`backend/src/research_agent/bootstrap/layout.py`。
 
 | 根目录 | 默认路径 | 配置入口 |
 | --- | --- | --- |
@@ -62,7 +62,7 @@ Socket 和进程锁使用按安装身份隔离的系统 runtime 目录。Pi 会�
 只读检查解析后的路径：
 
 ```bash
-python3 -B scripts/app_layout_doctor.py --config /absolute/path/config.toml --json
+python3 -B packaging/coragent_packaging/installer/app_layout_doctor.py --config /absolute/path/config.toml --json
 ```
 
 当前布局 schema 为 `coragent-installation/3`。安装根下的旧 `etc/`、`var/`、

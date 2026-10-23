@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""Inspect a CoRAgent installation layout without mutating it."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+if __name__ == "__main__":
+    package_root = Path(__file__).resolve().parents[3]
+    sys.path[:0] = [str(package_root / "packaging"), str(package_root / "backend/src"), str(package_root)]
+
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from research_agent.bootstrap.layout import inspect_installation, paths
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--install-root", type=Path)
+    parser.add_argument("--config", type=Path)
+    parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    args = parser.parse_args(argv)
+    layout = paths(args.install_root, config_file=args.config)
+    import os
+    os.environ["CORAGENT_CONFIG"] = str(layout.config_file)
+    report = inspect_installation(layout.root)
+    if args.json or not sys.stdout.isatty():
+        print(json.dumps(report, indent=2, sort_keys=True))
+    else:
+        print(f"layout: {report['layout']}")
+        print(f"release: {report['release_id'] or 'unknown'}")
+        print(f"status: {'ok' if report['ok'] else 'attention required'}")
+        for finding in report["findings"]:
+            print(f"- {finding['code']}: {finding['message']}")
+    return 0 if report["ok"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -9,9 +9,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = re.compile(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc\.(0|[1-9]\d*))?")
-MANIFESTS = ("package.json", "packages/link/package.json", "services/relay/package.json",
-             "components/coragent-web/package.json")
-LOCKS = ("package-lock.json", "services/relay/package-lock.json")
+MANIFESTS = ("package.json", "packages/link/package.json", "apps/relay/package.json",
+             "apps/web/package.json")
+LOCKS = ("package-lock.json", "apps/relay/package-lock.json")
 
 
 def python_version(version: str) -> str:

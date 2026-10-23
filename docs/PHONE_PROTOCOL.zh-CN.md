@@ -5,7 +5,7 @@
 
 ## 协议身份
 
-规范值来自 `config/identity.json`，由 `tools/layout.py` 同步到运行时代码：
+规范值来自 `packaging/coragent_packaging/manifests/identity.json`，由 `tools/layout.py` 同步到运行时代码：
 
 | 项目 | 当前值 |
 | --- | --- |

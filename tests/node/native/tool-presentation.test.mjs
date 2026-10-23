@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createCoRAgentToolRenderers } from "../../../apps/agent/terminal/renderers/tools.mjs";
 import { enhanceMarkdown, enhanceAdmonitions, linkifyBareUrls, normalizeCircledNumbers } from "../../../apps/agent/terminal/renderers/markdown-enhance.mjs";
-import { PI_BUILTIN_TOOL_NAMES } from "../../../apps/agent/pi/presentation.mjs";
+import { PI_BUILTIN_TOOL_NAMES } from "../../../apps/agent/runtime/presentation.mjs";
 import { pinnedPiSource } from "./test-environment.mjs";
 
 const source = pinnedPiSource();

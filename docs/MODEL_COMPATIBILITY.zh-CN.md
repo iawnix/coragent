@@ -3,7 +3,7 @@
 [English](MODEL_COMPATIBILITY.md) | 简体中文
 
 模型调用和 provider 实现由固定版本的 Pi 提供。CoRAgent Host 为终端、CoRHub 和浏览器
-提供同一套会话模型选择；当前 Pi 版本以 `config/pi-source.json` 和 `package.json` 为准。
+提供同一套会话模型选择；当前 Pi 版本以 `packaging/coragent_packaging/pi/source.json` 和 `package.json` 为准。
 
 ## 配置入口
 

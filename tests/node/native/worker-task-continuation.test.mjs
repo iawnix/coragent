@@ -33,7 +33,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
     const jobConfig = join(root, "job.toml");
     closeQueue = await startQrunFixture(jobConfig, root);
     process.env.CORAGENT_JOB_CONFIG = jobConfig;
-    await execute(managedPython(), [join(packageRoot, "apps/agent-cli/workspace_mode.py"),
+    await execute(managedPython(), [join(packageRoot, "apps/cli/workspace_mode.py"),
       "--root", join(workspaceRoot, "task-flow"), "--workspace-id", "task-flow"]);
     server = createServer(async (req, res) => {
       try {
@@ -214,7 +214,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 4096 }],
     } } }));
     await writeFile(join(agentDir, "settings.json"), JSON.stringify({ retry: { enabled: false } }));
-    const { createCoRAgentHarnessBackend } = await import(pathToFileURL(join(packageRoot, "apps/agent/pi/backend.mjs")));
+    const { createCoRAgentHarnessBackend } = await import(pathToFileURL(join(packageRoot, "apps/agent/runtime/backend.mjs")));
     const options = { sourceRoot: pinnedPiSource(), packageRoot, workspaceRoot,
       serverDirectory: socketRoot, sessionDir: join(root, "sessions"), stateRoot: join(root, "state"),
       model: { provider: "fixture", id: "fixture" } };

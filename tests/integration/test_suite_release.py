@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from research_agent.foundation.layout import paths as app_paths
+from research_agent.bootstrap.layout import paths as app_paths
 
 import copy
 import json
@@ -10,12 +10,12 @@ from types import SimpleNamespace
 
 import pytest
 
-import scripts.install_package as install_package_module
-from scripts._runtime_install import PreparedRuntime
-from scripts._suite import SuiteReleaseError, validate_components, validate_suite_manifest
-from scripts._wheel import release_wheel
-from scripts.build_package import build_package
-from scripts.install_package import install_package
+import coragent_packaging.installer.install_package as install_package_module
+from coragent_packaging.installer._runtime_install import PreparedRuntime
+from coragent_packaging.manifests._suite import SuiteReleaseError, validate_components, validate_suite_manifest
+from coragent_packaging.manifests._wheel import release_wheel
+from coragent_packaging.build.build_package import build_package
+from coragent_packaging.installer.install_package import install_package
 from tests.integration.test_release_install import _synthetic_release
 from research_agent.research.workspace import admit_research_workspace, initialize_workspace
 
@@ -93,7 +93,7 @@ def test_core_package_build_is_deterministic_and_installs_app_server_payload(tmp
     assert (install_root / "coragent").resolve().is_file()
     assert not (install_root / "coragent-web").exists()
     assert not (install_root / "bin" / "coragent-web").exists()
-    from research_agent.foundation.layout import paths
+    from research_agent.bootstrap.layout import paths
     guards = paths(install_root).guards
     assert guards.is_dir()
     assert stat.S_IMODE(guards.stat().st_mode) == 0o700
@@ -129,7 +129,7 @@ def test_package_install_does_not_mutate_existing_research_workspace(tmp_path: P
 
 
 def test_preparing_a_release_does_not_publish_runtime_config_or_current(tmp_path, monkeypatch):
-    from scripts import _bootstrap
+    from apps.cli import _bootstrap
     from research_agent.bootstrap.session_guard import acquire_directory_guard
     import os
     root = tmp_path/'install'
@@ -249,7 +249,7 @@ def test_install_rejects_non_symlink_launcher_conflict(tmp_path: Path) -> None:
 
 
 def test_activation_failure_restores_one_pointer_and_runtime_manifest(tmp_path):
-    from research_agent.foundation.layout import paths
+    from research_agent.bootstrap.layout import paths
     root=tmp_path/'install'
     packages=[]
     for marker in ('before','after'):
@@ -271,7 +271,7 @@ def test_activation_failure_restores_one_pointer_and_runtime_manifest(tmp_path):
 def test_running_host_blocks_install_before_runtime_preparation(tmp_path, monkeypatch):
     import os
     from research_agent.bootstrap.session_guard import acquire_directory_guard, SessionGuardError
-    from research_agent.foundation.layout import paths
+    from research_agent.bootstrap.layout import paths
     root=tmp_path/'install';paths(root).initialize()
     manifest,_=_synthetic_release(tmp_path/'agent',marker='locked')
     built=build_package(output_dir=tmp_path/'package',agent_manifest_path=manifest,allow_dirty=True,include_web=False)

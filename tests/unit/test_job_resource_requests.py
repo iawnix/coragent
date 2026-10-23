@@ -16,7 +16,7 @@ from research_agent.application.api import execute
 from research_agent.application.executors import prepare, prepare_script
 from research_agent.application.execution_environment import check_binding, check_configuration
 from research_agent.jobs.config_contract import load_job_config
-from scripts.install_wizard import _job_config_bytes
+from coragent_packaging.installer.install_wizard import _job_config_bytes
 from tests.unit.test_external_jobs import queue, tasks, finish
 from tests.unit.test_job_recovery import workspace
 

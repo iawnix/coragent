@@ -1,16 +1,16 @@
 """A branding cutover must reject old state without adopting or rewriting it."""
 
-from research_agent.foundation.layout import paths as app_paths
+from research_agent.bootstrap.layout import paths as app_paths
 import json
 from pathlib import Path
 
 import pytest
 
-from research_agent.foundation.layout import paths
-from scripts._installation_metadata import read_installation_metadata
-from scripts.install_wizard import parse_args
-from scripts.installer import source_options
-from scripts.uninstall_link_relay import unit_belongs_to_root
+from research_agent.bootstrap.layout import paths
+from coragent_packaging.installer._installation_metadata import read_installation_metadata
+from coragent_packaging.installer.install_wizard import parse_args
+from coragent_packaging.installer.installer import source_options
+from coragent_packaging.installer.uninstall_link_relay import unit_belongs_to_root
 
 
 def test_old_installation_is_rejected_without_rewriting_ownership(tmp_path):
@@ -45,7 +45,7 @@ def test_old_environment_does_not_select_installation_source(monkeypatch):
 def test_relay_uninstaller_requires_new_identity_and_matching_root(tmp_path):
     root = tmp_path / "relay"
     unit = tmp_path / "coragent-relay.service"
-    directory = root / "current/services/relay"
+    directory = root / "current/apps/relay"
     unit.write_text(f"Description=CoRAgent Link Relay\nWorkingDirectory={directory}\n")
     assert unit_belongs_to_root(unit, root)
     assert not unit_belongs_to_root(unit, tmp_path / "another-installation")

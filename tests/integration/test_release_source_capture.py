@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from scripts._source_capture import SourceCaptureError, capture_source_tree
+from coragent_packaging.build._source_capture import SourceCaptureError, capture_source_tree
 
 
 def test_clean_release_capture_is_commit_bound_and_immutable(tmp_path: Path) -> None:
     repository = _repository(tmp_path / "repository")
-    executable = repository / "scripts" / "build_release.py"
+    executable = repository / "packaging/coragent_packaging/build/build_release.py"
     executable.chmod(0o700)
     assert subprocess.run(
         ["git", "status", "--porcelain"],
@@ -51,15 +51,15 @@ def _repository(root: Path) -> Path:
         "README.md": "captured source\n",
         "package.json": '{"name":"@iawnix/coragent"}\n',
         "backend/pyproject.toml": "[build-system]\nrequires = []\n",
-        "scripts/build_release.py": "# build fixture\n",
-        "scripts/check_package.py": "# check fixture\n",
-        "scripts/package_inventory.py": "# package fixture\n",
+        "packaging/coragent_packaging/build/build_release.py": "# build fixture\n",
+        "packaging/coragent_packaging/build/check_package.py": "# check fixture\n",
+        "packaging/coragent_packaging/manifests/package_inventory.py": "# package fixture\n",
     }
     for relative, content in files.items():
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
-    (root / "scripts" / "build_release.py").chmod(0o755)
+    (root / "packaging/coragent_packaging/build/build_release.py").chmod(0o755)
     _git(root, "init", "-q")
     _git(root, "config", "user.name", "CoRAgent Test")
     _git(root, "config", "user.email", "coragent-test@example.invalid")

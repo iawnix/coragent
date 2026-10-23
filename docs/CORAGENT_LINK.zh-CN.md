@@ -47,7 +47,7 @@ Host 安装器的 `--with-link-relay` 一起部署。在 Relay 机器上的 CoRA
 生成新的 code：
 
 ```bash
-node /opt/coragent-relay/current/services/relay/cli.mjs enrollment create \
+node /opt/coragent-relay/current/apps/relay/cli.mjs enrollment create \
   --state /var/lib/coragent-relay/relay.db
 ```
 

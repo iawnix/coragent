@@ -11,7 +11,7 @@ import { TODO_CONTEXT as context } from "@earendil-works/chord/context";
 import { TEST_ROOT, pinnedPiSource } from "./test-environment.mjs";
 import { create_workspace_initializer } from "../../../apps/agent/host/workspace.mjs";
 import { create_python_runtime_bridge } from "../../../apps/agent/bridge/client.mjs";
-import { createInputAdmission } from "../../../apps/agent/host/admission/input.mjs";
+import { createInputAdmission } from "../../../apps/agent/runtime/admission/input.mjs";
 import { createResearchTools } from "../../../apps/agent/tools/research/tools.mjs";
 import { createTaskTools } from "../../../apps/agent/tasks/tools.mjs";
 import { createTaskController } from "../../../apps/agent/tasks/controller.mjs";

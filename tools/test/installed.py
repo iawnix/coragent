@@ -10,7 +10,8 @@ import subprocess
 import sys
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
-from scripts._wheel import build_wheel,inspect_wheel
+from coragent_packaging.build.wheel import build_wheel
+from coragent_packaging.manifests._wheel import inspect_wheel
 from tools.test.environment import key,locked
 from tools.test.pytest_lane import run as run_pytest
 from tools.test.supervisor import write_json
@@ -38,7 +39,7 @@ def install_wheel(wheel: Path, overlay: Path):
 def wheel_validation(files, extra, workers):
     test_root=Path(os.environ['CORAGENT_TEST_ENV_ROOT'])
     run_root=Path(os.environ['CORAGENT_TEST_RUN_ROOT'])
-    identity=key(ROOT,['backend/pyproject.toml','backend/src/**/*','package.json','scripts/_wheel.py','tools/test/installed.py'],sys.version+sys.prefix)
+    identity=key(ROOT,['backend/pyproject.toml','backend/src/**/*','package.json','packaging/coragent_packaging/build/wheel.py','packaging/coragent_packaging/manifests/_wheel.py','tools/test/installed.py'],sys.version+sys.prefix)
     cache=test_root/'builds'/identity
     with locked(test_root,'wheel-'+identity):
         receipt=cache/'wheel.json'

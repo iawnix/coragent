@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { lstat, readFile, readdir } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { packageRoot as installedRoot } from "../platform/resources.mjs";
-import { loadPi } from "../pi/source.mjs";
+import { loadPi } from "../runtime/source.mjs";
 
 function ownedPath(root, value) {
   const path = resolve(root, value);
@@ -29,7 +29,7 @@ async function regularTree(root, path, files) {
 export async function loadProductSkills({ packageRoot = installedRoot } = {}) {
   const [manifest, inventory, { loadSkills }] = await Promise.all([
     readFile(join(packageRoot, "package.json"), "utf8").then(JSON.parse),
-    readFile(join(packageRoot, "config/resources.json"), "utf8").then(JSON.parse),
+    readFile(join(packageRoot, "packaging/coragent_packaging/manifests/resources.json"), "utf8").then(JSON.parse),
     loadPi("skills"),
   ]);
   if (inventory.schema_version !== "coragent-resources/1") throw new Error("Invalid resource inventory");
@@ -43,7 +43,7 @@ export async function loadProductSkills({ packageRoot = installedRoot } = {}) {
     }
     await regularTree(packageRoot, root, resourceFiles);
   }
-  const promptFile = ownedPath(packageRoot, "prompts/coragent.md");
+  const promptFile = ownedPath(packageRoot, "apps/agent/prompts/coragent.md");
   await regularTree(packageRoot, dirname(promptFile), resourceFiles);
   if (!resourceFiles.includes(promptFile)) throw new Error("Managed system prompt is missing");
   for (const file of resourceFiles) {

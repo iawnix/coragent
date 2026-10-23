@@ -56,10 +56,10 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
     const workspaceRoot = join(root, "workspaces");
     await mkdir(workspaceRoot);
     await execute(process.env.CORAGENT_PYTHON, [
-      join(packageRoot, "apps/agent-cli/workspace_mode.py"),
+      join(packageRoot, "apps/cli/workspace_mode.py"),
       "--root", join(workspaceRoot, "startup"), "--workspace-id", "startup",
     ]);
-    const { createCoRAgentHarnessBackend } = await import(pathToFileURL(join(packageRoot, "apps/agent/pi/backend.mjs")));
+    const { createCoRAgentHarnessBackend } = await import(pathToFileURL(join(packageRoot, "apps/agent/runtime/backend.mjs")));
     backend = await createCoRAgentHarnessBackend({
       sourceRoot, packageRoot, workspaceRoot,
       serverDirectory: socketRoot, sessionDir: join(root, "sessions"),

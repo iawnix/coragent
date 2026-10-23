@@ -2,7 +2,7 @@
 
 from tests.support.platforms import execution_config
 
-from research_agent.foundation.layout import paths as app_paths
+from research_agent.bootstrap.layout import paths as app_paths
 import importlib.util
 import json
 import os
@@ -13,8 +13,8 @@ import tomllib
 
 import pytest
 
-from scripts import _job_install as jobs
-from scripts import install_wizard as wizard
+from coragent_packaging.installer import _job_install as jobs
+from coragent_packaging.installer import install_wizard as wizard
 from tests.unit.test_remote_job_execution import cluster
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -97,7 +97,7 @@ def test_managed_upgrade_reuses_identity_and_detects_concurrent_config_change(tm
 def test_bootstrap_validation_works_without_site_packages(tmp_path):
     config = tmp_path/'job.toml'
     config.write_text('[execution]\nschema_version = 2\ndefault_platform="local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n[execution.platforms.local.bindings.shell]\ncommand="/bin/sh"\n')
-    result = subprocess.run([sys.executable, '-S', '-B', str(ROOT/'scripts/installer.py'), 'install',
+    result = subprocess.run([sys.executable, '-S', '-B', str(ROOT/'packaging/coragent_packaging/installer/installer.py'), 'install',
                              '--source', 'local', '--dry-run', '--job-config', str(config),
                              '--install-root', str(tmp_path/'install')], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
@@ -138,7 +138,7 @@ def test_ssh_payload_contains_only_selected_target_resources(tmp_path, monkeypat
         assert command[0] == 'ssh' and command[-2] == 'cluster'
         payload = json.loads(kwargs['input'])
         assert payload['request'] == request
-        assert set(payload['bundle']) == {'scripts/_job_target.py','scripts/install_job_environment.py',
+        assert set(payload['bundle']) == {'packaging/coragent_packaging/installer/_job_target.py','packaging/coragent_packaging/installer/install_job_environment.py',
             'backend/src/research_agent/jobs/config_contract.py','backend/src/research_agent/jobs/environment_probe.py'}
         assert 'models.json' not in kwargs['input'] and 'auth.json' not in kwargs['input']
         return subprocess.CompletedProcess(command, 0, 'CORAGENT_PROVISION={"status":"environment_verified"}\n', '')
@@ -150,7 +150,7 @@ def test_ssh_payload_contains_only_selected_target_resources(tmp_path, monkeypat
 @pytest.mark.parametrize('file_mode', ['staged', 'shared'])
 @pytest.mark.skipif(importlib.util.find_spec('numpy') is None, reason='fixture environment lacks NumPy for structure acceptance')
 def test_remote_acceptance_uses_scheduler_collects_results_and_removes_test_jobs(cluster, tmp_path, monkeypatch, scheduler, file_mode):
-    from scripts._job_acceptance import accept
+    from coragent_packaging.installer._job_acceptance import accept
     from research_agent.jobs import environment
     platform, calls, remote_root = cluster
     local = tomllib.loads(Path(os.environ['CORAGENT_JOB_CONFIG']).read_text())['execution']['platforms']['local']
@@ -177,7 +177,7 @@ def test_remote_acceptance_uses_scheduler_collects_results_and_removes_test_jobs
 
 
 def test_acceptance_waits_for_cancellation_and_reports_pending_jobs(tmp_path, monkeypatch):
-    from scripts import _job_acceptance as acceptance
+    from coragent_packaging.installer import _job_acceptance as acceptance
     calls = []
     def execute(operation, *args):
         calls.append(operation)
@@ -197,7 +197,7 @@ def test_acceptance_waits_for_cancellation_and_reports_pending_jobs(tmp_path, mo
 
 
 def test_target_provisioning_reuses_verified_environment_and_recovers_interrupted_prefix(tmp_path, monkeypatch):
-    from scripts import _job_target as target
+    from coragent_packaging.installer import _job_target as target
     import base64
     store = tmp_path/'managed'
     raw = b'@EXPLICIT\nhttps://fixture.invalid/python.conda\n'

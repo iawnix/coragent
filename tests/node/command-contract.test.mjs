@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { existsSync } from "node:fs";
 import { createPublicToolContracts } from '../../apps/agent/tools/contracts.mjs';
-import Type, { Value } from '../../apps/agent/pi/typebox.mjs';
+import Type, { Value } from '../../apps/agent/runtime/typebox.mjs';
 import { validateToolArguments } from '@earendil-works/pi-ai';
 
 test("retired compute bootstrap and implementation have no compatibility modules", () => {

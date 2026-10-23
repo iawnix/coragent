@@ -1,10 +1,10 @@
-import { piModulePath } from "./pi/source.mjs";
+import { piModulePath } from "./runtime/source.mjs";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
 import { startCoRAgentHost } from "./host/server.mjs";
-import { createCoRAgentHarnessBackend } from "./pi/backend.mjs";
+import { createCoRAgentHarnessBackend } from "./runtime/backend.mjs";
 
 import { packageRoot } from "./platform/resources.mjs";
 const args = process.argv.slice(2);
@@ -129,7 +129,7 @@ startupPromise = (async () => {
     // Do not expose runtime state until signal cleanup is installed above.
     mkdirSync(piServerDirectory, { recursive: true, mode: 0o700 });
     mkdirSync(stateRoot, { recursive: true, mode: 0o700 });
-    const pin = JSON.parse(readFileSync(join(packageRoot, "config/pi-source.json"), "utf8"));
+    const pin = JSON.parse(readFileSync(join(packageRoot, "packaging/coragent_packaging/pi/source.json"), "utf8"));
     const sourceRoot = resolve(process.env.CORAGENT_PI_RUNTIME_ROOT);
     if (sourceRoot.split("/").at(-1) !== pin.commit) throw new Error("Pi runtime pin mismatch");
     if (process.env.CORAGENT_PI_RUNTIME_ROOT && resolve(process.env.CORAGENT_PI_RUNTIME_ROOT) !== sourceRoot) {
@@ -173,7 +173,7 @@ await startupPromise;
 // Job Manager owns background tracking and reliable event delivery.
 // Do not put the Host into a restart loop when that optional component is not
 // present.  Host session traffic remains available either way.
-if (process.env.CORAGENT_JOB_TRACKING_DISABLED !== "1" && existsSync(join(packageRoot, "apps/agent-cli/job_manager.py"))) supervise("job-manager", "apps/agent/host/jobs/worker.mjs", [
+if (process.env.CORAGENT_JOB_TRACKING_DISABLED !== "1" && existsSync(join(packageRoot, "apps/cli/job_manager.py"))) supervise("job-manager", "apps/agent/host/jobs/worker.mjs", [
   "--workspace-root", workspaceRoot, "--host-socket", socketPath, "--state-root", stateRoot,
 ], { CORAGENT_INTERNAL_JOB_TOKEN: jobToken });
 if (process.env.CORAGENT_LINK_URL || process.env.CORAGENT_LINK_HOST_TOKEN_FILE) {

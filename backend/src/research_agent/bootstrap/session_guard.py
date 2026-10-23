@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from research_agent.foundation.layout import paths as app_paths
+from research_agent.bootstrap.layout import paths as app_paths
 
 import fcntl
 import hashlib
@@ -102,7 +102,7 @@ def _ensure_workspace_pi_root(workspace: Path) -> Path:
 
 def guard_directory(installation: Path, workspace: Path) -> Path:
     key = hashlib.sha256(os.fsencode(workspace)).hexdigest()
-    from research_agent.foundation.layout import paths
+    from research_agent.bootstrap.layout import paths
     return paths(installation).guards / key
 
 

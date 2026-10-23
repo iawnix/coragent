@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import time
 
-from scripts import _terminal_ui as ui
+from coragent_packaging.installer import _terminal_ui as ui
 
 
 class TerminalBuffer(io.StringIO):

@@ -5,10 +5,10 @@ import { join } from "node:path";
 import { Harness, MemoryStorage, createRegistry, defineExtension, hook, GenerationTask, InboxDoc, LiveDoc } from "@earendil-works/pi-durable";
 import { createModels, fauxProvider, fauxAssistantMessage } from "@earendil-works/pi-ai";
 import { TODO_CONTEXT as context } from "@earendil-works/chord/context";
-import { createJobAdmission } from "../../../apps/agent/host/admission/jobs.mjs";
-import { createInputAdmission } from "../../../apps/agent/host/admission/input.mjs";
+import { createJobAdmission } from "../../../apps/agent/runtime/admission/jobs.mjs";
+import { createInputAdmission } from "../../../apps/agent/runtime/admission/input.mjs";
 import { recordUserSources } from "../../../apps/agent/tools/user-sources.mjs";
-import { wakeMessage } from "../../../apps/agent/host/jobs/worker.mjs";
+import { wakeMessage } from "../../../apps/agent/runtime/admission/jobs.mjs";
 import { pinnedPiSource } from "./test-environment.mjs";
 
 const { admitSubmission } = await import(pathToFileURL(join(pinnedPiSource(), "packages/durable/src/harness/submissions.ts")));
@@ -36,7 +36,7 @@ async function setup(t, { validate = false } = {}) {
   const conversation = await harness.root(context, { agent: { model: { provider: "faux", modelId: "faux-1" } } });
   const state = { obsolete: false, paused: false, assessments: 0, next: null, wait: async () => {} };
   admission = createInputAdmission({ harness, conversation, LiveDoc, InboxDoc, admitSubmission });
-  monitor = createJobAdmission({ admission, wakeMessage, sessionId: "s", producerToken: token,
+  monitor = createJobAdmission({ admission, sessionId: "s", producerToken: token,
     taskController: {
       prepareJobEvents: async events => ({events, basis:{}}),
       validateConsumption: (record, _origin, ctx, basis) => admission.recordConsumption(record,basis,ctx),

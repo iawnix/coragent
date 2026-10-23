@@ -336,7 +336,7 @@ def test_executor_selection_uses_one_public_configuration(executor, transport):
 
 def test_example_and_installer_publication_keep_qrun_selection(tmp_path):
     import tomllib
-    from scripts import _job_install
+    from coragent_packaging.installer import _job_install
     example = Path(__file__).resolve().parents[2] / 'config/job.qrun.example.toml'
     settings = validate_job_config(tomllib.loads(example.read_text()))
     raw = _job_install.toml_bytes(configuration_document(settings))

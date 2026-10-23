@@ -68,6 +68,8 @@ cd coragent
 
 ## 开发
 
+源码归属、依赖方向和发行边界见[目录与职责](docs/SOURCE_LAYOUT.zh-CN.md)。
+
 在源码目录执行：
 
 ```bash

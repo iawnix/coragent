@@ -11,12 +11,12 @@ from pathlib import Path
 
 import pytest
 
-from scripts._component_release import REQUIRED_RUNTIME_FILES, prepare_install_root
-from scripts._wheel import inspect_wheel
+from coragent_packaging.manifests._component_release import REQUIRED_RUNTIME_FILES, prepare_install_root
+from coragent_packaging.manifests._wheel import inspect_wheel
 
 
 ROOT = Path(__file__).resolve().parents[2]
-BUILD_RELEASE = ROOT / "scripts" / "build_release.py"
+BUILD_RELEASE = ROOT / "packaging/coragent_packaging/build/build_release.py"
 PACKAGE_VERSION = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))["version"]
 
 
@@ -87,15 +87,15 @@ def test_real_release_build_excludes_development_tree(tmp_path: Path) -> None:
         names = {member.name.removeprefix("package/") for member in handle.getmembers()}
     release_manifest = json.loads(manifest.read_text(encoding="utf-8"))
     distribution = release_manifest["python_distribution"]
-    assert "scripts/_component_release.py" in names
+    assert "packaging/coragent_packaging/manifests/_component_release.py" in names
     assert "docs/ARCHITECTURE.md" in names
     assert "docs/INSTALLATION.md" in names
     assert "docs/MAINTAINER_GUIDE.md" in names
     assert "apps/agent/main.mjs" in names
-    assert "apps/agent/pi/worker.mjs" in names
-    assert "config/pi-source.json" in names
-    assert "config/pi-patches/001-workspaces.patch" in names
-    assert "scripts/prepare_pi_source.py" in names
+    assert "apps/agent/runtime/worker.mjs" in names
+    assert "packaging/coragent_packaging/pi/source.json" in names
+    assert "packaging/coragent_packaging/pi/patches/001-workspaces.patch" in names
+    assert "packaging/coragent_packaging/pi/prepare.py" in names
     assert not any(name.startswith("backend/src/research_agent/application/web/") for name in names)
     assert not any(name.startswith(("packages/research-compute/", "packages/coragent-provider-runtime/")) for name in names)
     assert "backend/src/research_agent/research/contracts/finding_candidates.schema.json" not in names
@@ -107,8 +107,8 @@ def test_real_release_build_excludes_development_tree(tmp_path: Path) -> None:
     assert distribution["version"] == json.loads((ROOT / "package.json").read_text(encoding="utf-8"))["version"]
     assert distribution["path"] in names
     assert sum(name.startswith("python-dist/") and name.endswith(".whl") for name in names) == 1
-    assert "scripts/check_package.py" not in names
-    assert "scripts/build_release.py" not in names
+    assert "packaging/coragent_packaging/build/check_package.py" not in names
+    assert "packaging/coragent_packaging/build/build_release.py" not in names
     assert not any(name.startswith("tests/") for name in names)
     assert not any("node_modules" in Path(name).parts for name in names)
 
@@ -159,7 +159,7 @@ def _synthetic_release(
         for name, content in sorted(files.items()):
             info = tarfile.TarInfo(name if name.startswith("package/") else f"package/{name}")
             info.size = len(content)
-            info.mode = 0o755 if name in {"coragent", "libexec/coragent-host", "apps/agent-cli/research_web_bridge.py"} else 0o644
+            info.mode = 0o755 if name in {"coragent", "libexec/coragent-host", "apps/cli/research_web_bridge.py"} else 0o644
             archive.addfile(info, io.BytesIO(content))
     digest = hashlib.sha256(temporary_archive.read_bytes()).hexdigest()
     release_id = f"{version}-sha256-{digest[:16]}"

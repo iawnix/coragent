@@ -1,42 +1,27 @@
 # Managed Pi runtime patches
 
 CoRAgent pins Pi v1.1.0 at `abe508e1b89912adde45528136c3221eb69acdd7`
-in `config/pi-source.json`. The experimental transport protocol remains version 8.
+in `packaging/coragent_packaging/pi/source.json`. The experimental transport protocol remains version 8.
 Terminal presentation uses Pi's experimental client, separately from ordinary
 `InteractiveMode`.
 
 The [Pi 1.3.0 migration audit](PI_1_3_MIGRATION.zh-CN.md) records upstream
-coverage and migration work for all fourteen patches and the installer model
+coverage and migration work for the fourteen patches present at the time of that audit and the installer model
 type workaround. Pi 1.2.0 removed the experimental server/client stack; 1.3.0
 requires replacing that integration before changing the active pin.
 
-`scripts/prepare_pi_source.py` checks and applies the patches in
-`config/pi-patches/` in order, skips completely applied groups, and rejects a
+`packaging/coragent_packaging/pi/prepare.py` checks and applies the patches in
+`packaging/coragent_packaging/pi/patches/` in order, skips completely applied groups, and rejects a
 partial or incompatible group before applying that group. Later patches can
 depend on earlier ones. Verification checks that
 Git can reverse every patch; comments or version strings alone are insufficient.
 A mismatched upstream commit is rejected. Verify the complete ordered stack in
 a separate checkout before installing it.
 
-| Patch | Purpose | Validation |
-|---|---|---|
-| 001-workspaces | Workspace-scoped catalog directories, metadata, cwd, and ambiguous ID rejection | Native worker startup, Host routing, existing SQLite session recovery |
-| 002-worker-launch | CoRAgent worker entry and stderr diagnostics | Native worker startup and terminal diagnostics |
-| 003-client-connection | Observe connection and attachment state for Unix as well as Radius | Pi client tests and native connection tests |
-| 004-client-lifecycle | AbortSignal closes only the presentation; Host-selected sessions must already exist | Session switching, quit, missing-session rejection, connection disposal |
-| 005-client-history | Populate input history from accepted user entries in the active transcript | Pi presentation/history tests; each session gets a new editor |
-| 006-tool-presentation | Register compact tool renderers and connect Ctrl+O expansion | Native tool card rendering and retained full results |
-| 007-client-status | Independent footer/activity display, expiring command feedback and dismissible documents | Native status, timer, focus, Esc interruption, resize, session-switch and disposal tests |
-| 008-request-admission | Fail-closed generation hooks and one bounded compaction attempt | Request admission failure, context budget and compaction outcome tests |
-| 009-input-identity | Native clients supply stable request IDs; AgentController preserves them and specific admission errors | Real native-controller and common input-admission tests |
-| 010-context-lifecycle | Atomic passive context preparation, pinned summary supplements and an operating input budget | Native context persistence, compaction, recovery and budget tests |
-| 011-markdown-presentation | Register Markdown transformers in the experimental chat view | Native Markdown rendering and retained transcript text |
-| 012-skill-presentation | Keep attached user/tool detail inside the expandable Skill card | Collapsed/expanded Skill card and ordinary InteractiveMode rendering |
-| 013-monitor-presentation | Present recorded Job event messages as compact event cards | Native Job event transcript rendering and reconnect replay |
-| 014-runtime-presentation | Render task continuations as compact runtime status messages | Native continuation rendering, legacy messages and transcript replay |
+The authoritative patch ownership, regression coverage and removal conditions are maintained in the [Pi integration registry](../packaging/coragent_packaging/pi/README.md).
 
 There is also a source modification outside the patch directory:
-`hydrate_model_data()` in `scripts/prepare_pi_source.py` adds an `as any` cast to
+`hydrate_model_data()` in `packaging/coragent_packaging/pi/prepare.py` adds an `as any` cast to
 the OpenCode Go model list. Include it in every upgrade audit. Pi 1.3.0 adds
 the Google API type and implementation missing from 1.1.0's provider; the
 migration should remove the cast and validate the hydrated catalog build.
@@ -79,7 +64,7 @@ and credentials through the installation configuration described in
 its supported commands, not the ordinary Pi command set.
 
 Job event admission is implemented in CoRAgent's worker service rather than another
-Pi source patch. `apps/agent/host/admission/jobs.mjs` uses the pinned
+Pi source patch. `apps/agent/runtime/admission/jobs.mjs` uses the pinned
 `packages/durable/src/harness/submissions.ts` transaction primitive
 `admitSubmission`: run/inbox checks, immutable input provenance and placement
 share one short Pi commit. All State/Python assessment runs outside that commit.

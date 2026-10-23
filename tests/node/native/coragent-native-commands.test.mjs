@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createTerminalCommands } from "../../../apps/agent/terminal/commands/facet.mjs";
-import { createClientQueries } from "../../../apps/agent/pi/services/queries.mjs";
+import { createClientQueries } from "../../../apps/agent/runtime/services/queries.mjs";
 import { createTerminalSession, runTerminalSessions } from "../../../apps/agent/terminal/session.mjs";
 import { parseSlashCommand, slashCompletions, SLASH_COMMAND_NAMES } from "../../../apps/agent/tools/commands.mjs";
 
