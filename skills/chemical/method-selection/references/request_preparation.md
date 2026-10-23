@@ -1,6 +1,6 @@
 # Preparing a scientific Job request
 
-Start from the method Skill's instructions and selected software binding. When it supplies a predefined recipe, prepare it with `--config "$CORAGENT_JOB_CONFIG" --platform <name> --executor <id> --version <version> --input <role>=<file>`, followed by `--` and runner arguments. The generic preparer stages declared resources with their module paths intact. Target Python comes from the backend or environment binding in job.toml.
+Start from the method Skill's instructions and selected software binding. Bind the Task's platform and scheduler entry through the [execution-platforms Skill](../../../core/execution-platforms/SKILL.md) before preparation. For a predefined recipe, use `--config "$CORAGENT_JOB_CONFIG" --executor <id> --version <version> --input <role>=<file>`, followed by `--` and runner arguments. The preparer inherits the Task's target and stages declared resources with their module paths intact. Target Python comes from the software binding in the main `config.toml`; `CORAGENT_JOB_CONFIG` points to its generated execution input.
 
 For runner parameters, use `"$CORAGENT_PYTHON" -m research_agent.application.executors --executor <id> --version <version> --help`. This reads the pinned CLI contract without running science or contacting a compute target. Fixed input/output/executable flags are supplied by the preparer.
 
@@ -18,7 +18,7 @@ collected outputs and runner resources participate in the generated request iden
 This helper only packages the requested calculation; the Agent selects the sequence
 and interprets numerical checks using the Gaussian Skill.
 
-Python dependencies are installation-owned Conda environments configured in job.toml. Run preparation helpers with "$CORAGENT_PYTHON"; target runners use the resolved Conda binding. Missing environments require installation maintenance, not ad-hoc pip installs during a research turn.
+Prepare scientific Conda environments separately on their execution hosts and bind them in the main configuration's `execution.platforms.<platform>.bindings`, with scheduler-entry overrides where needed. The effective binding's `python` takes precedence over the platform/entry's shared `python`. Run preparation helpers with "$CORAGENT_PYTHON"; target runners use the resolved Conda binding. Missing environments require [environment maintenance](../../environments/README.md), not ad-hoc pip installs during a research turn.
 
 
 Use the research Node’s returned `work_dir` for task scripts and prepared requests.
@@ -36,7 +36,7 @@ and execute in the selected Python binding. Use `--input-artifact <id-or-ref>`
 for registered inputs: Runtime checks that their exact bytes are actually staged
 and carries their provenance into collected outputs.
 
-For example, a local RDKit script uses the configured `structure` backend:
+For example, an RDKit script uses the bound target's configured `structure` backend:
 
 ```bash
 "$CORAGENT_PYTHON" -m research_agent.application.executors \
@@ -49,14 +49,15 @@ The script must actually write `analysis.json` relative to its Job cwd. Submit t
 returned `request_file` and `request_sha256` with the intended `node_id` to
 `job_start`. `--collect`/`outputs` declare collection; they do not create files or
 redirect stdout. `print()` is captured in `logs/stdout.log`, not `stdout.txt`.
-`platform=local` selects the target only; a direct `bash -lc "python ..."` command
+Selecting a local platform chooses the target only; a direct `bash -lc "python ..."` command
 does not resolve the `structure` backend. For other libraries or remote execution,
 choose the corresponding configured backend and environment.
 
-Remote preparation requires an explicit `submission.queue` in the environment
-or backend's job.toml table. `submission.resources` supplies CPU/memory/walltime;
-backend fields override environment defaults. An allowlist does not choose a
-queue. Missing queue configuration needs installation maintenance. Inspect
+Configure `submission.queue` when the selected scheduler requires a queue;
+SSH transport alone does not require one, and Qrun does not accept named queues.
+In the main configuration, `submission.resources` supplies CPU/memory/walltime
+defaults at platform, scheduler-entry or binding level; binding values override
+the effective entry defaults. An allowlist does not choose a queue. Inspect
 job_status diagnostics when a queue-wait event arrives; no exit receipt while
 queued/running is normal. Do not resubmit or change queues without reconciling
 the original Job. An optional `submission.queue_wait_seconds` causes one Monitor

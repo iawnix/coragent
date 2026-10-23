@@ -46,7 +46,10 @@ def _heading_slugs(text: str) -> set[str]:
         match = re.match(r"^ {0,3}(#{1,6})\s+(.+?)\s*#*\s*$", line)
         if not match:
             continue
-        heading = re.sub(r"[`*_~]", "", match.group(2)).strip().lower()
+        # Underscores inside identifiers (such as next_run) survive in GitHub
+        # anchors. Remove paired emphasis delimiters, not identifier characters.
+        heading = re.sub(r"(?<![\w`])(_{1,2})(\S(?:.*?\S)?)\1(?![\w`])", r"\2", match.group(2))
+        heading = re.sub(r"[`*~]", "", heading).strip().lower()
         chars: list[str] = []
         for char in unicodedata.normalize("NFKC", heading):
             if char.isalnum() or char in {"_", "-", " "}:

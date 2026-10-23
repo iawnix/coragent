@@ -62,10 +62,10 @@ free energy or a reaction mechanism.
 
 ## Parser coverage
 
-`scripts/parser.py::parse_xtb_artifacts` accepts `sp`, `opt`, `freq`, `opt_freq`,
+The [xTB parser](../../xtb/scripts/parser.py)'s `parse_xtb_artifacts` accepts `sp`, `opt`, `freq`, `opt_freq`,
 and `md`, extracting SCC, energies, optimization, frequencies, and trajectory
 summaries. Generic Jobs do not invoke it automatically; import it explicitly in
-an analysis script and preserve its `_shared/xyz.py` dependency.
+an analysis script and preserve its [shared XYZ dependency](../../_shared/xyz.py).
 There is no scan parser branch: analyze frames in `xtbscan.log` alongside the raw
 log and register the actual analysis outputs. Parsed fields are observations;
 scientific conclusions require the raw evidence and task-specific criteria.

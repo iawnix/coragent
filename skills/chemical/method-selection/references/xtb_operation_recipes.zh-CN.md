@@ -51,8 +51,8 @@ $end
 
 ## 解析范围
 
-`scripts/parser.py::parse_xtb_artifacts` 接受 `sp`、`opt`、`freq`、`opt_freq`、`md`，
+[xTB 解析器](../../xtb/scripts/parser.py)的 `parse_xtb_artifacts` 接受 `sp`、`opt`、`freq`、`opt_freq`、`md`，
 可提取 SCC、能量、优化、频率及轨迹摘要。通用 Job 不会自动调用它；需要在分析脚本中显式导入，
-并保留其 `_shared/xyz.py` 依赖。
+并保留其[共享 XYZ 依赖](../../_shared/xyz.py)。
 扫描没有对应的解析分支，应分析 `xtbscan.log` 的各帧与原始日志，并登记实际分析产物。
 解析字段是观察数据，科学结论仍需结合原始输出与任务判据。

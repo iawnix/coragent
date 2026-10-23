@@ -50,6 +50,12 @@ The canonical implementation is `backend/src/research_agent/bootstrap/layout.py`
   artifacts/
 ```
 
+The tree shows the default layout. If `paths.state_root` is outside the software
+root, `generated/`, `jobs/` and `backups/` live under that state root instead.
+Use the layout doctor below to obtain the resolved paths. A platform's configured
+`storage.work_root` still determines its execution files; `jobs/` is not an
+implicit replacement for that setting.
+
 Edit `config.toml` and adjacent `credentials.json`. `generated/job.toml`,
 `generated/email.toml`, `generated/name-resolver.toml` and `pi/agent/models.json`
 are materialized component inputs (`pi/agent` remains under the state root). Editing them does not
@@ -72,7 +78,8 @@ Pi session history lives at
 `<state_root>/pi/sessions/<workspace-id>/<session-id>/session.sqlite`, with adjacent
 `meta.json`. Research files remain in the workspace across session changes.
 
-Inspect resolved paths without changing the installation:
+Inspect resolved paths without changing the installation. Run from a source
+checkout or the installed package root, `<software_root>/current/agent`:
 
 ```bash
 python3 -B packaging/coragent_packaging/installer/app_layout_doctor.py --config /absolute/path/config.toml --json

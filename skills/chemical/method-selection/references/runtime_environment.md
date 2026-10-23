@@ -4,7 +4,8 @@
 requests and format existing evidence. It does not supply scientific libraries.
 
 Use the method Skill to choose a recipe, native command or task script and a
-named environment from `job.toml`. The selected binding supplies the target
+platform and scheduler entry from the main `config.toml`'s `[execution]` section.
+`CORAGENT_JOB_CONFIG` supplies the generated execution input to tools. The selected binding supplies the target
 Python or native program; a recipe also declares its own dependencies.
 Structure preparation and chemical validators can
 share the `structure.lock` environment. Gaussian/xTB/CREST Python wrappers use
@@ -16,10 +17,10 @@ Request preparation already checks the chosen target. For diagnosis before
 preparation, check only the selected recipe and environment:
 
 ```bash
-"$CORAGENT_PYTHON" -m research_agent.application.environment_check --config "$CORAGENT_JOB_CONFIG" --platform <name> --executor <id> --version <version>
+"$CORAGENT_PYTHON" -m research_agent.application.environment_check --config "$CORAGENT_JOB_CONFIG" --platform <platform> --scheduler-entry <entry> --executor <id> --version <version>
 ```
 
-For a native command or task script without a recipe, replace executor/version
+Use the Task's bound platform and entry in this diagnostic command. For a native command or task script without a recipe, replace executor/version
 with `--backend <binding>`. It checks the binding's Python and native program
 when configured; `--runtime native` or `--runtime python` selects one runtime.
 Only the chosen environment is contacted, including when it is remote.
@@ -34,7 +35,7 @@ The recipe index never determines software availability.
 
 An import error from a direct Job identifies a failure in that command's Python,
 not in every configured backend. Inspect the failed Job's command and
-`metadata.execution_binding`; when absent, inspect `job.toml` for the intended
+`metadata.execution_binding`; when absent, inspect the main configuration's platform/entry `bindings` for the intended
 backend and run the targeted check with `--backend <binding> --runtime python`.
 For a verified binding, prepare the script with `--script` and `--backend` and
 submit a new request. Do not repeat the same bare-Python command. Record recovery
@@ -48,8 +49,8 @@ dependency or verified receipt is an installation gap, not permission to run
 science in the Host interpreter or silently choose another method.
 
 Record the unmet requirement and report the concrete missing binding. An
-operator can install a versioned prefix from the shipped lock with
-`packaging/coragent_packaging/installer/install_job_environment.py`; a research task must not modify shared
+operator can install a versioned prefix from the shipped lock using the
+[target-local environment helper](../../environments/README.md); a research task must not modify shared
 environments. Existing jobs retain their original identities after maintenance.
 
 A native prerequisite probe resolves and hashes the configured executable; it

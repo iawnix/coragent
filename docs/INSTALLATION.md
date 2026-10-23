@@ -21,7 +21,9 @@ the software root, configuration file and local state root. Relocation requires
 explicit redeployment.
 
 The software root contains an `installation.json` locator without credentials.
-The software root also contains `config/`, `state/`, `generated/`, `jobs/` and `backups/`.
+By default it also contains `config/`, `state/`, `generated/`, `jobs/` and `backups/`.
+With an external `paths.state_root`, `generated/`, `jobs/` and `backups/` live
+under that state root. Configuration follows the selected `--config` path.
 Local state contains `installation/`, `host/`, `pi/sessions/`, `logs/` and `cache/`.
 `generated/` and `pi/agent/models.json` are generated component inputs, never a
 second operator-owned configuration source.
@@ -114,8 +116,12 @@ activation restore the prior release and configuration; failures after activatio
 retain the new state and require rerunning the installer for forward repair.
 
 ```sh
-python3 packaging/coragent_packaging/installer/app_layout_doctor.py --config /absolute/path/config.toml --json
+python3 /absolute/coragent/current/agent/packaging/coragent_packaging/installer/app_layout_doctor.py \
+  --config /absolute/path/config.toml --json
 ```
+
+Replace `/absolute/coragent` with the software root. From a source checkout,
+use `packaging/coragent_packaging/installer/app_layout_doctor.py` relative to that checkout.
 
 ## Cluster boundary
 

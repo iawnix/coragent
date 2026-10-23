@@ -13,6 +13,8 @@ CoRAgent 将平台的连接、共享软件和存储，与平台内的调度入�
 FEDCluster 使用 local + TRI；Com30 使用 SSH `agent.com30` + Qrun；
 1WCluster 登记 SSH `agent.1w`，在确认调度器与存储前保持 `enabled=false`。
 示例中的 `/ABS` 路径须替换为核验后的路径，不能视为软件已经安装或服务已经部署。
+示例 Qrun 入口使用默认 handler，供主安装器创建受管资源池。已有独立 Qrun 资源池时，
+替换为其安装返回的完整 handler 参数数组（含状态目录）；主安装器的托管选项不会接管该池。
 
 平台 ID 和别名不区分大小写，入口 ID 精确匹配。明确入口优先，否则用所选平台的默认入口；
 按调度器类型筛选也仅限所选平台。平台级 `python`、`bindings`、`storage`、`submission`

@@ -18,18 +18,23 @@ glibc >=2.28。CF22D 选择通用 x86_64 PySCF 构建，不绑定维护者的 CP
 基础文本报告 helper 使用 Host 标准库；图文报告/轨迹 Job 使用 structure，均不需要渲染锁。渲染环境中的 notebook 依赖来自
 xyzrender 上游要求，只安装在渲染目标中。这些环境均不安装 CoRAgent wheel。
 
-在执行机器上独立准备这些环境，再将 Python 前缀、锁文件和原生求解器的绝对路径
-绑定到 `config.toml` 中平台或调度入口的 `bindings`。主安装器校验已配置绑定；
+先将 Python 前缀、锁文件和原生求解器的绝对路径绑定到 `config.toml` 中平台或
+调度入口的 `bindings`，再在执行机器上独立准备这些版本化环境。主安装器校验已配置绑定；
 未配置时不创建科学环境，也不创建 Qrun 队列。
 
 目标机器上的安装工具使用显式绑定：
 
 ```bash
-python3 -B packaging/coragent_packaging/installer/install_job_environment.py \
-  --config /absolute/job.toml --platform PLATFORM --scheduler-entry ENTRY --backend structure
+python3 -B /ABS/package-root/packaging/coragent_packaging/installer/install_job_environment.py \
+  --config /ABS/execution.toml --platform PLATFORM --scheduler-entry ENTRY --backend structure
 ```
 
-在执行机器上运行，所有路径属于该机器，本机控制端的 Python 路径不能当作远端环境。
+将 `/ABS/package-root` 替换为执行机器上可用的 CoRAgent 包目录绝对路径。
+`/ABS/execution.toml` 是由主配置生成、仅包含 execution 的文件在目标主机上的可访问副本
+（`execution.schema_version = 2`）。所选绑定的 `conda_executable`、`prefix` 和 `lock_ref`
+路径必须在该机器上有效。绑定统一在主 `config.toml` 中维护，修改后重新生成副本。
+在执行机器上运行该工具，
+本机控制端的 Python 路径不能当作远端环境。
 `wrapper` 为已配置的 Gaussian/xTB/CREST 包装脚本提供 Python，原生求解器仍单独安装。
 使用专用、版本化的前缀。该工具保存核验后的归属与包清单，不负责 CoRAgent 版本切换，
 也不提交验收 Job。structure 与 validation 可共用前缀；CF22D 不需要自定义激活脚本
@@ -51,7 +56,7 @@ structure 验收检查 RDKit 和结构生成，不要求解析器配置。安装
 已有前缀不就地更新。显式 `--adopt` 才会核验预先准备的环境并发布安装回执。
 
 绑定配置完成后，用已安装的控制解释器执行
-`-m research_agent.application.environment_check --config /absolute/job.toml`，核验实际目标与声明的
+`-m research_agent.application.environment_check --config "$CORAGENT_JOB_CONFIG"`，核验实际目标与声明的
 依赖导入，包括 SSH 目标。随后运行有时限的科学 Job；包清单和导入一致不代表方法
 已经有效工作。
 

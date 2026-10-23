@@ -26,7 +26,7 @@ description: 选择命名计算平台与调度入口，查询资源，准备本�
 提交实际的最小检查 Job。
 
 普通 bash 始终在控制端执行。科学作业使用
-`python -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --platform Com30 --scheduler-entry qrun ...`
+`"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --platform Com30 --scheduler-entry qrun ...`
 准备。`--executor` 选择科学步骤，`--backend` 选择脚本使用的软件绑定，二者都不是调度入口选择参数。
 将返回的请求文件与摘要原样交给 `job_start`。
 Task 尚未绑定不影响普通 bash 或平台诊断。平台配置变化后，已有 Job 的查询、取消和回收继续使用

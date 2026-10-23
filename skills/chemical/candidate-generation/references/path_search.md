@@ -32,11 +32,12 @@ paths and Artifact refs with the real returned values):
 | `chemical.gradient-xtb` | `path_xtb` | Bound Cartesian electronic energy and gradient |
 | `chemical.neb-xtb` | `path_xtb` | Full path, per-image energy/gradient evidence, NEB-force history and candidate |
 
-Native path operations need **RDKit/NumPy plus the configured solver**, unlike the
-standard-library-only Gaussian/xTB wrappers. Configure path_xtb/path_gaussian with
-the appropriate native command/activation script. `--job-profile local:path`
-binds only those explicitly configured backends to path.lock (RDKit/NumPy, ASE and SciPy);
-it does not install solvers or run default native scientific acceptance jobs.
+Native path operations need **RDKit/NumPy plus the configured solver**, beyond the
+Gaussian/xTB wrapper dependencies. Configure path_xtb/path_gaussian with
+the appropriate native command/activation script and a Python binding based on
+`path.lock` in the main `config.toml`. The [environment maintenance helper](../../environments/README.md)
+prepares that prefix on the execution host with RDKit/NumPy, ASE and SciPy;
+it does not install solvers or run native scientific acceptance jobs.
 Check the selected recipe using environment_check with --executor and --version,
 then run a bounded scientific case. The existing wrapper profile stays unchanged.
 ASE is required by NEB. No new native binding is inferred from PATH.

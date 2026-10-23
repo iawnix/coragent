@@ -1,6 +1,6 @@
 # 准备科学 Job 请求
 
-先根据方法 Skill 的指导选择软件绑定。Skill 提供预设入口时，准备命令为 `--config "$CORAGENT_JOB_CONFIG" --platform <环境> --executor <id> --version <版本> --input <角色>=<文件>`，`--` 后放 runner 参数。通用准备器暂存已声明资源并保留模块路径；目标 Python 来自 job.toml 的后端或环境绑定。
+先根据方法 Skill 的指导选择软件绑定，并按[execution-platforms Skill](../../../core/execution-platforms/SKILL.zh-CN.md)绑定 Task 的平台与调度入口。Skill 提供预设入口时，准备命令为 `--config "$CORAGENT_JOB_CONFIG" --executor <id> --version <版本> --input <角色>=<文件>`，`--` 后放 runner 参数。准备器继承 Task 的执行目标，暂存已声明资源并保留模块路径。目标 Python 来自主 `config.toml` 的软件绑定，`CORAGENT_JOB_CONFIG` 指向生成的执行输入。
 
 查看 runner 参数用 `"$CORAGENT_PYTHON" -m research_agent.application.executors --executor <id> --version <版本> --help`。它读取已固定的 CLI 契约，不执行科学计算或连接计算目标。固定的输入、输出、可执行文件参数由准备器提供。
 
@@ -17,7 +17,7 @@ helper 只封装当前计算，计算顺序由 Agent 决定，数值检查须结
 
 选择方法或准备已指定方法的执行时都使用本 Skill。从列出的路径读取具体方法 Skill。读取安装配置、检查方法可用性属于 Agent 的工作，尚未验证不应自动变成用户输入门槛。
 
-Python 依赖由安装阶段创建的 Conda 环境隔离，并通过 job.toml 的结构化 python 绑定选择：backend.python 优先，否则继承 environment.python。用 "$CORAGENT_PYTHON" 执行本地准备 helper；远程 runner 使用配置的 Conda prefix，不猜 python3、不用 --python 覆盖。CF22D 使用 backends.pyscf.python，不再同时指定 Python command。缺失环境交由安装维护处理，不在研究回合临时 pip install。
+科学 Conda 环境在执行机器上独立准备，再配置到主配置的 `execution.platforms.<platform>.bindings`，需要时由调度入口覆盖。生效绑定的 `python` 优先，否则继承平台/入口共享的 `python`。用 "$CORAGENT_PYTHON" 执行本地准备 helper；远程 runner 使用配置的 Conda prefix，不猜 python3、不用 --python 覆盖。CF22D 使用 `bindings.pyscf.python`，不同时指定 Python command。缺失环境按[环境维护说明](../../environments/README.zh-CN.md)处理，不在研究回合临时 pip install。
 
 
 任务脚本与准备请求放在研究 Node 返回的 `work_dir` 下。
@@ -31,7 +31,7 @@ request_file/request_sha256，直接交给 job_start，只补可选 timeout_seco
 脚本和依赖会固定摘要并在所选 Python 绑定内执行。已登记输入用
 `--input-artifact <id或引用>`；Runtime 核对其真实字节已暂存，并把来源关联到收集结果。
 
-例如，本地 RDKit 脚本使用已配置的 `structure` 绑定：
+例如，RDKit 脚本使用当前绑定目标中已配置的 `structure` 后端：
 
 ```bash
 "$CORAGENT_PYTHON" -m research_agent.application.executors \
@@ -43,12 +43,12 @@ request_file/request_sha256，直接交给 job_start，只补可选 timeout_seco
 脚本须相对 Job cwd 实际写出 `analysis.json`。把返回的 `request_file`、`request_sha256`
 连同目标 `node_id` 交给 `job_start`。`--collect`/`outputs` 只声明收集要求，不创建文件或
 重定向标准输出；`print()` 被保存到 `logs/stdout.log`，不会生成 `stdout.txt`。
-`platform=local` 只选择执行目标；直接执行 `bash -lc "python ..."` 不会解析 `structure`
+选择本地平台只决定执行目标；直接执行 `bash -lc "python ..."` 不会解析 `structure`
 绑定。使用其它科学库或远端执行时，选择相应已配置的 backend 与 environment。
 
-远程 job.toml 的 environment 或 backend 必须明确配置 submission.queue；
-submission.resources 保存 CPU、内存、walltime，backend 覆盖环境默认值。
-allowed_queues 不负责选择队列。缺配置交由安装维护，不猜队列。可用
+所选调度器要求队列时配置 `submission.queue`；SSH 传输本身不要求队列，Qrun 不接受命名队列。
+主配置中平台、调度入口或软件绑定的 `submission.resources` 保存 CPU、内存、walltime
+默认值，绑定值覆盖生效入口的默认值。`allowed_queues` 不负责选择队列。可用
 submission.queue_wait_seconds 设置一次性排队超时诊断事件；收到后查看
 job_status.diagnostics。Q/R 尚无退出回执是正常现象；重投或改队列前先对账原 Job。
 

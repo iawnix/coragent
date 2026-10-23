@@ -24,18 +24,22 @@ SSH 上传／回收模式需要两端都有 rsync；共享模式沿用现有文�
 
 ## 通过主安装器管理
 
-主安装器自动管理使用默认 handler 的本机 Qrun 目标，多个本机目标共用一个资源池。
+先在主配置 `config.toml` 声明平台和调度入口，可参考上述示例中的 execution 配置。
+没有执行配置时，安装器不创建资源池。主安装器管理明确配置且使用默认 handler 的
+本机 Qrun 入口，多个本机入口共用一个资源池。
 默认预算为当前进程可用 CPU 数减一（至少一个）和主机物理内存的 75%，可明确调整：
 
 ```sh
-./install.sh --qrun-cpus local/qrun=8 --qrun-memory-mb local/qrun=16384
+./install.sh --config /ABS/config.toml \
+  --qrun-cpus local/qrun=8 --qrun-memory-mb local/qrun=16384
 ```
 
-在执行配置中声明 `com30` 目标（`transport = "ssh"`、`executor = "qrun"`、
-`ssh_host = "agent.com30"`）后，可以显式托管远端队列：
+上例假定 `local` 平台已配置 `qrun` 入口。为 `com30` 平台声明 `transport = "ssh"`、
+`ssh_host = "agent.com30"`，并为其 `qrun` 入口声明 `executor = "qrun"` 和默认 handler 后，
+可以显式托管远端队列：
 
 ```sh
-./install.sh --manage-qrun com30/qrun \
+./install.sh --config /ABS/config.toml --manage-qrun com30/qrun \
   --qrun-state-dir com30/qrun=/home/USER/.local/state/coragent/qrun \
   --qrun-cpus com30/qrun=32 --qrun-memory-mb com30/qrun=65536
 ```
@@ -109,7 +113,7 @@ wheel 包提供 qrun 命令，也可以只复制 `backend/src/research_agent/job
 loginctl enable-linger USER
 python3 -B /absolute/path/qrun.py \
   --state-dir /home/USER/.local/state/coragent/qrun \
-  install --cpus 32 --memory-mb 65536 \
+  install --runtime systemd --cpus 32 --memory-mb 65536 \
   --work-root /home/USER/DATA/qrun-jobs
 ```
 

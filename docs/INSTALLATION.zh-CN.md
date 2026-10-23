@@ -17,7 +17,9 @@ CoRAgent 采用一份主配置 `config.toml` 和相邻的 `credentials.json`。
 共享数据路径中的配置级别别名会统一解析；工作区内部的路径安全检查仍然保留。
 安装记录会绑定软件根、配置文件和状态根，修改这些位置需要显式重新部署。
 
-软件目录包含程序、运行环境、`config/`、`state/`、`generated/`、`jobs/`、`backups/`，以及不含凭据的安装定位记录 `installation.json`。
+默认软件目录包含程序、运行环境、`config/`、`state/`、`generated/`、`jobs/`、`backups/`，以及不含凭据的安装定位记录 `installation.json`。
+若 `paths.state_root` 指向软件根之外，`generated/`、`jobs/`、`backups/` 位于该状态根下；
+配置目录由所选 `--config` 路径决定。
 本机状态目录包含 `installation/`、`host/`、`pi/sessions/`、`logs/`、`cache/`。
 `generated/` 及 `pi/agent/models.json` 是组件需要的生成文件，不能作为第二份配置修改。
 配置只沿一个方向流动：校验待安装设置，保存 `config.toml` 和 `credentials.json`，再生成组件输入。
@@ -106,8 +108,12 @@ password = "credential:smtp_password"
 激活前失败恢复原配置和版本；激活后失败保留新状态，重新运行安装器修复。
 
 ```sh
-python3 packaging/coragent_packaging/installer/app_layout_doctor.py --config /absolute/path/config.toml --json
+python3 /absolute/coragent/current/agent/packaging/coragent_packaging/installer/app_layout_doctor.py \
+  --config /absolute/path/config.toml --json
 ```
+
+将 `/absolute/coragent` 替换为软件根。从源码检出运行时，使用相对于检出根的
+`packaging/coragent_packaging/installer/app_layout_doctor.py`。
 
 ## TRI 与共享计算环境
 

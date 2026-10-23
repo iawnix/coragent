@@ -46,7 +46,7 @@
 ["execution"."platforms"."batch"."schedulers"."pbs"]
 "executor" = "pbs"
 "cluster_name" = "cluster"
-"handler" = ["/usr/bin/python3", "/opt/coragent/skills/core/batch-schedulers/scripts/batch.py", "pbs"]
+"handler" = ["/usr/bin/python3", "/opt/coragent/current/agent/skills/core/batch-schedulers/scripts/batch.py", "pbs"]
 
 ["execution"."platforms"."batch"."schedulers"."pbs"."submission"]
 "queue" = "batch"

@@ -31,10 +31,11 @@ NEB 统一使用 [ASE](ase_neb_executor.zh-CN.md)，输入和执行器为版本 
 | `chemical.gradient-xtb` | `path_xtb` | 绑定结构的 Cartesian 电子能与梯度 |
 | `chemical.neb-xtb` | `path_xtb` | 完整路径、逐 image 能量/梯度、NEB 力历史和候选 |
 
-原生路径操作需要 **RDKit/NumPy 加已配置的求解器**，不同于只需标准库的旧 Gaussian/xTB
-包装器。为 path_xtb/path_gaussian 配置相应原生命令/激活脚本，再以
-`--job-profile local:path` 为显式配置的后端绑定 path.lock（RDKit/NumPy、ASE、SciPy）。
-此 profile 不安装求解器、不默认执行原生科学验收；先按 --executor/--version
+原生路径操作需要在 Gaussian/xTB 包装器依赖之外提供 **RDKit/NumPy 加已配置的求解器**。
+在主 `config.toml` 中为 path_xtb/path_gaussian 配置原生命令/激活脚本与
+基于 `path.lock` 的 Python 绑定，再按[环境维护说明](../../environments/README.zh-CN.md)
+在执行机器上准备包含 RDKit/NumPy、ASE、SciPy 的前缀。
+环境工具不安装求解器、不执行原生科学验收；先按 --executor/--version
 检查选定入口环境，再运行有界科学案例。旧 wrapper 环境不变；NEB 使用 ASE，
 也不根据 PATH 自动猜测原生绑定。
 

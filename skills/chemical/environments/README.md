@@ -20,21 +20,27 @@ The basic text report helper uses the Host's standard library. Illustrated repor
 Rendering's notebook dependencies are upstream xyzrender requirements; they
 are confined to the rendering target. No environment includes the CoRAgent wheel.
 
-Prepare these environments independently on their execution hosts, then record the
-absolute Python prefix, lock and native solver paths in `config.toml` under the
-platform or scheduler entry's `bindings`. The main installer validates configured
+Declare the absolute Python prefix, lock and native solver paths in `config.toml`
+under the platform or scheduler entry's `bindings`, then prepare those versioned
+environments independently on their execution hosts. The main installer validates configured
 bindings; an unconfigured installation creates neither a scientific environment
 nor a Qrun queue.
 
 The target-local helper consumes explicit bindings:
 
 ```bash
-python3 -B packaging/coragent_packaging/installer/install_job_environment.py \
-  --config /absolute/job.toml --platform PLATFORM --scheduler-entry ENTRY --backend structure
+python3 -B /ABS/package-root/packaging/coragent_packaging/installer/install_job_environment.py \
+  --config /ABS/execution.toml --platform PLATFORM --scheduler-entry ENTRY --backend structure
 ```
 
-Run it on the execution host. Its paths belong to that host; a controller Python
-path is not a remote environment. `wrapper` provides Python for configured
+Replace `/ABS/package-root` with the absolute CoRAgent package directory
+available on the execution host. `/ABS/execution.toml` is a copy accessible on that
+host of the execution-only file generated from the main configuration
+(`execution.schema_version = 2`). The selected binding's `conda_executable`,
+`prefix` and `lock_ref` paths must be valid on that host. Maintain those bindings
+in the main `config.toml` and regenerate the copy after changes.
+Run the helper on the execution host; a controller Python path is not a remote
+environment. `wrapper` provides Python for configured
 Gaussian/xTB/CREST wrappers, while their native binaries remain operator-provided.
 Use a dedicated, versioned prefix. The helper records verified environment
 ownership and inventory; it does not activate a CoRAgent release or submit an
@@ -63,7 +69,7 @@ place. `--adopt` explicitly verifies a previously seeded environment against
 the locks before publishing its receipt.
 
 After configuring the bindings, run the installed control interpreter's
-`-m research_agent.application.environment_check --config /absolute/job.toml`. This checks
+`-m research_agent.application.environment_check --config "$CORAGENT_JOB_CONFIG"`. This checks
 the actual configured target and declared imports, including SSH targets.
 Then execute a bounded scientific Job: matching package inventories and imports
 alone do not prove a solver or method works.

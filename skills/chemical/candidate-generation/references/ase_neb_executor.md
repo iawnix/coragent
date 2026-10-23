@@ -18,8 +18,10 @@ mechanism/candidate work first; distant multistep R/P should be split into plaus
 steps. Check explicit-H mapping, charge, multiplicity and unwanted fragment motion.
 The executor fixes supplied endpoints; it neither optimizes nor certifies them.
 
-Configure native `path_xtb` or `path_gaussian`, then provision `--job-profile local:path`.
-The separate `path.lock` includes ASE, SciPy, RDKit and NumPy. Existing wrapper and
+Configure native `path_xtb` or `path_gaussian` and its Python binding in the main
+`config.toml`. Prepare a versioned prefix from `path.lock` on the execution host
+using the [environment maintenance helper](../../environments/README.md).
+The separate lock includes ASE, SciPy, RDKit and NumPy. Existing wrapper and
 structure environments do not automatically acquire ASE. Check the selected
 executor/version in the chosen environment before dispatch.
 

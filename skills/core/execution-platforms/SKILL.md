@@ -28,7 +28,7 @@ snapshots do not guarantee admission. `job_probe` checks infrastructure, not sci
 software environment checker before preparation and a real check Job when compute-node readiness matters.
 
 Ordinary bash stays on the controller. Prepare a scientific Job with
-`python -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --platform Com30 --scheduler-entry qrun ...`.
+`"$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --platform Com30 --scheduler-entry qrun ...`.
 Select the scientific recipe with `--executor` or the script's software binding with `--backend`;
 these do not select the queue adapter. Submit the returned request file and digest unchanged with `job_start`.
 An unbound Task does not block ordinary bash or platform diagnostics. Existing Jobs keep their recorded

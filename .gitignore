@@ -7,6 +7,10 @@ __pycache__/
 /docs/CORHUB_MONITOR_PAGE_PLAN.zh-CN.md
 # Local branding design drafts.
 /design/branding/cor-crab-v1/
+# Local figures and visualization tools.
+/assets/figures/
+/tools/figures/
+/tools/vibration/
 # Private installation inputs; only *.example.* templates belong in Git.
 /config/models.json
 /config/auth.json

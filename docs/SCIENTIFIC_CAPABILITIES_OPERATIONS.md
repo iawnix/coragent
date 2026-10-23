@@ -48,9 +48,20 @@ Preparation probes the selected local or SSH target: interpreter prefix, explici
 
 Installation receipts record `inventory_sha256` from actual environment preparation and inspection.
 Prepare scientific environments separately and reference their bindings in the platform configuration.
-For target-local maintenance use `python3 -B packaging/coragent_packaging/installer/install_job_environment.py --config "$CORAGENT_JOB_CONFIG"
---platform PLATFORM --scheduler-entry ENTRY --backend BACKEND`; `--adopt` verifies an existing prefix
-and publishes its receipt. Run this on the execution host. The main installer validates selected bindings;
+For target-local maintenance, run from a verified CoRAgent source or package root
+on the execution host, using a copy of the execution document generated from
+the main configuration and made available on that host:
+
+```sh
+python3 -B packaging/coragent_packaging/installer/install_job_environment.py \
+  --config /ABS/execution.toml --platform PLATFORM --scheduler-entry ENTRY --backend BACKEND
+```
+
+`/ABS/execution.toml` is that generated document's target-side copy, not another
+manually maintained configuration source. It contains the selected platform/entry's
+environment bindings and target-local paths. A controller's `CORAGENT_JOB_CONFIG` path is usable only where that file is
+actually available. `--adopt` verifies an existing prefix and publishes its receipt.
+The main installer validates selected bindings;
 `--verify-job-target PLATFORM/ENTRY` also submits bounded acceptance Jobs on that entry. Reports distinguish
 configuration, environment and actual execution verification. `job_probe` checks infrastructure only;
 PubChem/OPSIN network availability is separate from offline acceptance.

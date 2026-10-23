@@ -2,6 +2,8 @@
 
 唯一配置格式为 `execution.schema_version = 2`，包含 `default_platform` 和 `platforms`。
 旧 `execution.targets` 配置会被拒绝。通过主安装器发布核对后的完整配置；登记平台不代表在每个提交端安装完整 CoRAgent。
+在安装实例的 `config.toml` 中维护 `[execution]`；`CORAGENT_JOB_CONFIG` 指向生成的运行时配置，
+不是另一份需要编辑的配置文件。
 
 启用的平台定义 `transport`、`storage.work_root`、`default_scheduler` 和 `schedulers`。
 SSH 平台还定义 `ssh_host`，使用已有 SSH 主机配置。未接入完成的平台可以设为 `enabled = false`，
@@ -22,7 +24,7 @@ work_root 保存 Job 工作目录，scratch_root 保存临时数据。跨平台�
 不能假定远端路径在本机存在。
 
 handler 可达、软件可用和计算节点可执行是不同检查。软件检查命令为
-`python -m research_agent.application.environment_check --config "$CORAGENT_JOB_CONFIG" --platform Com30 --scheduler-entry qrun --backend gaussian`。
+`"$CORAGENT_PYTHON" -m research_agent.application.environment_check --config "$CORAGENT_JOB_CONFIG" --platform Com30 --scheduler-entry qrun --backend gaussian`。
 登录端检查成功不代表计算节点可见软件或许可证可用。
 
 改变默认值不迁移已提交 Job；相关配置改变后重新准备尚未提交的请求。

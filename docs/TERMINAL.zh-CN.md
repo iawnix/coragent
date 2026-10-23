@@ -32,10 +32,14 @@ socket。SSH transport 只改变连接路径，不改变 workspace、session 或
 ```bash
 ./coragent --workspace reaction-a \
   --remote-host pi.example \
-  --remote-host-socket /run/user/1000/coragent/host.sock \
-  --remote-proxy-path /opt/coragent/apps/agent/transport/ssh.mjs \
+  --remote-host-socket /ABS/remote-host.sock \
+  --remote-proxy-path /opt/coragent/current/agent/apps/agent/transport/ssh.mjs \
   --ssh-config ~/.ssh/config
 ```
+
+将 socket 占位路径替换为该安装实际的 Host 端点，其目录和文件名包含安装及服务身份。
+proxy 示例假定远端软件根是 `/opt/coragent`；使用源码检出时则为
+`<checkout>/apps/agent/transport/ssh.mjs`。
 
 启动器会对 Host 返回的 Pi App Server socket 再使用同一个 SSH proxy，并给 Pi 一个本地私有
 Unix endpoint。workspace 和 session 仍由远端 Host 持有；本地目录只用于 presentation cwd。

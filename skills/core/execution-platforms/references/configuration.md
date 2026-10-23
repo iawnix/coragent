@@ -3,6 +3,8 @@
 The only configuration format is `execution.schema_version = 2`, with `default_platform` and `platforms`.
 Flat `execution.targets` configuration is rejected. Use the main installer to publish a reviewed complete
 configuration; it does not install complete CoRAgent on every submission host.
+Maintain `[execution]` in the installation's `config.toml`. `CORAGENT_JOB_CONFIG` points to generated
+runtime configuration; it is not a second file to edit.
 
 Each enabled platform defines `transport`, `storage.work_root`, `default_scheduler` and `schedulers`.
 SSH platforms also define `ssh_host` using an existing SSH host configuration. An unfinished platform may
@@ -23,8 +25,7 @@ paths. work_root holds Job directories; scratch_root holds temporary data. Colle
 immutable artifacts before using them on another platform. Never assume a remote path exists locally.
 
 Basic handler readiness, software readiness and compute-node readiness are distinct observations.
-Check software with `python -m research_agent.application.environment_check --config "$CORAGENT_JOB_CONFIG"
---platform Com30 --scheduler-entry qrun --backend gaussian`. A successful login-host probe does not
+Check software with `"$CORAGENT_PYTHON" -m research_agent.application.environment_check --config "$CORAGENT_JOB_CONFIG" --platform Com30 --scheduler-entry qrun --backend gaussian`. A successful login-host probe does not
 establish node visibility or license availability.
 
 Changing defaults does not retarget submitted Jobs. Prepared requests must be prepared again after relevant

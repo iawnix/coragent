@@ -14,8 +14,9 @@ ASE 是唯一 NEB 实现。旧版本 1 执行入口已删除，旧请求须按�
 多重度与片段运动。只有反应物时先提出候选机制/产物；跨多步的 R/P 应先拆分为合理的
 基元步骤。执行器固定给定端点，不替用户优化或认证端点。
 
-配置原生 `path_xtb` 或 `path_gaussian` 后安装 `--job-profile local:path`。
-独立 `path.lock` 含 ASE、SciPy、RDKit、NumPy；旧 wrapper/structure 不自动获得 ASE。
+在主 `config.toml` 中配置原生 `path_xtb` 或 `path_gaussian` 及其 Python 绑定，
+按[环境维护说明](../../environments/README.zh-CN.md)在执行机器上从 `path.lock` 准备版本化前缀。
+该锁含 ASE、SciPy、RDKit、NumPy；旧 wrapper/structure 不自动获得 ASE。
 执行前检查所选环境、executor 和 version。
 
 ```text

@@ -1,23 +1,25 @@
-# Remote Execution Contract
+# Execution platform contract
 
 `job_start` owns the calculation lifecycle for both local and remote targets.
-The remote adapter is the installation-bound OpenSSH/SCP and Torque transport;
-it is not a second public calculation lifecycle. Use `job_probe` with the selected `platform` for a bounded availability check.
+Local or SSH transport connects to the selected scheduler handler. Use `job_probe`
+with `execution_target: {"platform": "Com30", "scheduler_entry": "qrun"}` for a
+bounded availability check, substituting the Task's actual bound target.
 
 ## Installation-Owned Policy
 
-`job.toml` is the recommended shared policy file. Each environment declares a
-`kind` and a `backends` table; `kind = "remote"` environments additionally own SSH
-host/config, remote root, scheduler commands, queues, resource ceilings,
-activation, scratch policy, and process environment. Local and remote environments
-are defined in this one file; there is no separate remote registry. A calculation
-request selects a named environment and resources within its configured limits.
+The installation's main `config.toml` owns `[execution]` with `schema_version = 2`.
+Each named `execution.platforms.<name>` declares `transport = "local"` or `"ssh"`,
+storage, software `bindings` and scheduler entries under `schedulers`.
+SSH platforms also declare `ssh_host` and optional `ssh_config`. A scheduler entry
+selects its `executor`, handler, submission defaults and resource limits; it can
+override shared bindings and storage. The generated `job.toml`, exposed through
+`CORAGENT_JOB_CONFIG`, is an input for execution tools, not a file to maintain separately.
 
-This file is the single local/remote environment authority. Do not add a
-second `.pi/remote.toml` registry or infer a remote environment from a host
-directory. Pass the configured environment name as `platform` in `job_start`. An environment's optional software metadata
-describes readiness; it is not a workflow registry or a launch gate beyond the
-probe and transport checks.
+Bind a Task through the [execution-platforms Skill](../../../core/execution-platforms/SKILL.md)
+before preparation. Its `{platform, scheduler_entry}` selection becomes the Job's
+`execution_target`; science preparation inherits that selection. Resource requests
+must fit the selected entry's limits. A missing scientific binding is reported by
+the targeted check below; transport availability alone does not establish readiness.
 
 `job_probe` checks platform availability, not scientific readiness. Inspect the
 selected backend's command, activation script and Python binding with the
@@ -30,13 +32,15 @@ Do not install scientific dependencies into a research workspace.
 
 ## Isolation
 
-Remote directories are derived from the Job execution identity and workspace path. The upload manifest binds regular files, sizes, SHA-256, command, environment,
-resources, expected artifacts, and submission ID. Remote files provide the
-execution copy; collection downloads declared outputs into the local workspace.
+With staged storage, remote directories are derived from the Job identity and
+workspace path. The upload manifest binds files and digests; the request also fixes
+command, environment, resources and expected outputs. Collection downloads declared
+outputs into the local workspace. Shared storage uses the configured shared work
+root and its directory identity checks instead of copying the execution directory.
 
 ## Control Lifecycle
 
-Submit persists pre-effect staging state before calling Torque. Once the
+Submit persists pre-effect staging state before calling the configured scheduler. Once the
 scheduler request begins, transport failure may be ambiguous. Preserve any
 known job ID and durable submission record even if later queue/history lookup
 fails.
@@ -52,7 +56,7 @@ manifest and works even when scheduler history is unavailable.
 ## Verify Results
 
 - Reconcile an unknown submit or cancel result before another control action.
-- Resolve remote paths and commands from the configured environment and intent.
+- Resolve new submissions from the selected platform; existing Jobs use their persisted route and intent.
 - Check the selected platform and scientific command separately; SSH alone is insufficient.
 - Check program termination and required outputs after scheduler completion.
 - Collect outputs, verify them locally, and parse them before recording research notes.

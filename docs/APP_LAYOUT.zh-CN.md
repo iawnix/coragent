@@ -50,7 +50,11 @@
   artifacts/
 ```
 
-日常修改 `config.toml` 及相邻的 `credentials.json`。软件根下的
+上图是默认布局。如果 `paths.state_root` 位于软件根之外，`generated/`、`jobs/`、
+`backups/` 会改为该状态根下的目录。通过下方 layout doctor 获取实际解析路径。
+平台的执行文件仍由其 `storage.work_root` 决定，`jobs/` 不会隐式替换该设置。
+
+日常修改 `config.toml` 及相邻的 `credentials.json`。数据根下的
 `generated/job.toml`、`generated/email.toml`、`generated/name-resolver.toml`
 和状态根下的 `pi/agent/models.json` 是生成的组件输入；直接编辑不会更新主配置，重新生成时会被覆盖。
 运行命令通过 `CORAGENT_JOB_CONFIG` 等变量取得解析后的路径。
@@ -67,6 +71,7 @@ Socket 和进程锁使用按安装身份隔离的系统 runtime 目录。Pi 会�
 `<state_root>/pi/sessions/<workspace-id>/<session-id>/session.sqlite`，
 相邻 `meta.json` 保存元数据。研究文件保存在工作区，不随切换会话搬迁。
 
+从源码检出根或安装包根 `<software_root>/current/agent` 运行，
 只读检查解析后的路径：
 
 ```bash

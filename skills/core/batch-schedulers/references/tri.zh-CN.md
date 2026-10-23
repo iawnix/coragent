@@ -7,21 +7,21 @@
 - [提交与诊断](#提交与诊断)
 - [按计算节点和后端验收](#按计算节点和后端验收)
 
-将随附的 [tri.py](../scripts/tri.py) 配置为通用外部目标的 handler。
+将随附的 [tri.py](../scripts/tri.py) 配置为 `executor="tri"` 调度入口的 handler。
 提交主机需要 Python 3 和原生 `tri_sub`、`tri_stat`、`tri_del`。
 脚本从 stdin 读取一个 JSON 请求，向 stdout 输出一个统一 JSON 响应，支持
 `probe`、`submit`、`status`、`cancel` 和 `recover`。
 
-CoRAgent 与 TRI 位于同一登录节点时，使用 `executor = "external"
-`transport="local"`。`work_root` 指向与计算节点共享的持久目录，`handler`
-指定已安装 Python 和本脚本的绝对路径。完整配置见[目标配置与协议](../../../../docs/EXTERNAL_JOBS.zh-CN.md)。
+CoRAgent 与 TRI 位于同一登录节点时，平台使用 `transport="local"`，
+`storage.work_root` 指向与计算节点共享的持久目录。调度入口的 `handler`
+指定提交端 Python 和本脚本的安装绝对路径。完整配置见[目标配置与协议](../../../../docs/EXTERNAL_JOBS.zh-CN.md)。
 研究计算继续通过 `job_start`、`job_status`、`job_reconcile` 和 `job_collect` 管理。
 
 原生任务状态、取消确认和日志检查见[TRI 任务诊断](tri-diagnosis.zh-CN.md)；服务端与节点部署见[TRI 运维](../../../../docs/TRI_OPERATIONS.zh-CN.md)。
 
 ## Handler 环境
 
-在目标的 `handler_environment` 中按需设置：
+在调度入口的 `handler_environment` 中按需设置：
 
 | 变量 | 用途 |
 | --- | --- |
@@ -56,8 +56,8 @@ python3 "$TRI_JOB_HANDLER" <<'JSON'
 JSON
 ```
 
-设置 `file_mode="shared"`，并将 `work_root` 指向共享工作区父目录，即可直接在
-工作区任务目录执行；本机和 SSH 提交均支持。默认 `file_mode="staged"` 保留输入
+设置 `storage.file_mode="shared"`，并将 `storage.work_root` 指向共享工作区父目录，即可直接在
+工作区任务目录执行；本机和 SSH 提交均支持。默认 `storage.file_mode="staged"` 保留输入
 传输与输出回收。共享检查由通用执行层负责，TRI 协议和处理器无需改变。
 
 ## 提交与诊断

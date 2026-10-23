@@ -29,20 +29,25 @@ including through target/backend defaults.
 
 ## Main installer and uninstaller
 
-The main installer automatically manages local Qrun targets using the default
-handler. Multiple local targets share one pool. The default budget is the current
+First declare the platform and scheduler entry in the main `config.toml`, using
+the execution section in the example above as a starting point. Without execution
+configuration the installer creates no pool. It manages explicitly configured
+local Qrun entries using the default handler. Multiple local entries share one pool.
+The default budget is the current
 process's available CPU count minus one (at least one) and 75% of physical RAM.
 Override the budget explicitly:
 
 ```sh
-./install.sh --qrun-cpus local/qrun=8 --qrun-memory-mb local/qrun=16384
+./install.sh --config /ABS/config.toml \
+  --qrun-cpus local/qrun=8 --qrun-memory-mb local/qrun=16384
 ```
 
-After configuring target `com30` with `transport = "ssh"`, `executor = "qrun"`
-and `ssh_host = "agent.com30"`, enroll its remote pool explicitly:
+This assumes platform `local` has a `qrun` entry. After configuring platform
+`com30` with `transport = "ssh"` and `ssh_host = "agent.com30"`, and its `qrun`
+entry with `executor = "qrun"` and the default handler, enroll its remote pool explicitly:
 
 ```sh
-./install.sh --manage-qrun com30/qrun \
+./install.sh --config /ABS/config.toml --manage-qrun com30/qrun \
   --qrun-state-dir com30/qrun=/home/USER/.local/state/coragent/qrun \
   --qrun-cpus com30/qrun=32 --qrun-memory-mb com30/qrun=65536
 ```
@@ -125,7 +130,7 @@ library; no Agent or model configuration is needed. Run on each execution host:
 loginctl enable-linger USER
 python3 -B /absolute/path/qrun.py \
   --state-dir /home/USER/.local/state/coragent/qrun \
-  install --cpus 32 --memory-mb 65536 \
+  install --runtime systemd --cpus 32 --memory-mb 65536 \
   --work-root /home/USER/DATA/qrun-jobs
 ```
 

@@ -7,15 +7,16 @@
 - [Submission and diagnostics](#submission-and-diagnostics)
 - [Verify each compute node and backend](#verify-each-compute-node-and-backend)
 
-Use the bundled [tri.py](../scripts/tri.py) as the handler for a generic
-external target. It needs Python 3 and the native `tri_sub`, `tri_stat`, `tri_del`
+Use the bundled [tri.py](../scripts/tri.py) as the handler for a scheduler entry
+with `executor="tri"`. It needs Python 3 and the native `tri_sub`, `tri_stat`, `tri_del`
 commands on the submission host. It reads one JSON request from stdin and writes
 one normalized JSON response to stdout. Supported actions are `probe`, `submit`,
 `status`, `cancel` and `recover`.
 
-For CoRAgent and TRI on the same login node, use `executor = "external"
-`transport="local"`. Set `work_root` to a persistent directory shared with compute
-nodes; set `handler` to the installed Python and this script's absolute path.
+For CoRAgent and TRI on the same login node, set the platform's `transport="local"`
+and `storage.work_root` to a persistent directory shared with compute nodes.
+Set the scheduler entry's `handler` to the submission host's Python and this
+script's installed absolute path.
 See [target configuration and protocol](../../../../docs/EXTERNAL_JOBS.md) for a full
 configuration. Research calculations continue through `job_start`, `job_status`,
 `job_reconcile` and `job_collect`.
@@ -24,7 +25,7 @@ For native task states, cancellation confirmation and log inspection, read [TRI 
 
 ## Handler environment
 
-Set these in the target's `handler_environment` as needed:
+Set these in the scheduler entry's `handler_environment` as needed:
 
 | Variable | Use |
 | --- | --- |
@@ -62,9 +63,9 @@ python3 "$TRI_JOB_HANDLER" <<'JSON'
 JSON
 ```
 
-Use `file_mode="shared"` and set `work_root` to the shared workspace parent to run
+Use `storage.file_mode="shared"` and set `storage.work_root` to the shared workspace parent to run
 directly in each workspace Job directory. Both local and SSH submission support
-this mode. The default `file_mode="staged"` retains input/output transfers.
+this mode. The default `storage.file_mode="staged"` retains input/output transfers.
 Storage probes and compute-node guards belong to the generic runtime; the TRI
 protocol and helper do not change.
 

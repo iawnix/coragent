@@ -38,8 +38,17 @@
 准备器在选定本地或 SSH 目标上核验解释器前缀、Conda 显式锁、pip 固定版本、安装回执、包清单，以及程序和激活文件摘要。请求身份包含这次观测；新提交时复查，真正运行时由暂存并固定摘要的检查程序再次复查。激活文件先检查再加载。变化导致拒绝执行，既有 Job 的查询和重试仍返回原身份。核验保证环境与记录一致，科学能力仍须由实际求解与验证证明。
 
 安装回执根据实际准备和核验记录 inventory_sha256。科学环境独立准备后在平台配置中绑定。
-在执行主机维护环境使用 `python3 -B packaging/coragent_packaging/installer/install_job_environment.py --config "$CORAGENT_JOB_CONFIG"
---platform PLATFORM --scheduler-entry ENTRY --backend BACKEND`，增加 --adopt 可核验现有 prefix 并发布回执。
+在执行主机上，从核验后的 CoRAgent 源码根或包根运行环境维护命令，并指定由主配置导出的
+执行文档在该主机上可访问的副本：
+
+```sh
+python3 -B packaging/coragent_packaging/installer/install_job_environment.py \
+  --config /ABS/execution.toml --platform PLATFORM --scheduler-entry ENTRY --backend BACKEND
+```
+
+`/ABS/execution.toml` 是该生成文档在目标端的副本，不是手工维护的第二份配置源。
+它声明所选平台／入口的环境绑定，内部路径均属于执行主机。控制端的 `CORAGENT_JOB_CONFIG`
+路径只有在该文件实际可访问的主机上才能使用。增加 --adopt 可核验现有 prefix 并发布回执。
 主安装器核验所选绑定，--verify-job-target PLATFORM/ENTRY 还会在指定入口提交有时限的验收 Job。
 报告区分配置、环境与实际执行验证；job_probe 只表示基础设施状态，PubChem／OPSIN 网络可用性单独检查。
 

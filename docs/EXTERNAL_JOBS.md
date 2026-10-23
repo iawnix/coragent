@@ -8,7 +8,7 @@ staging, restart recovery and collection. The bridge owns native submission
 syntax and state interpretation. It is an executable program, not a Python plugin
 imported into the CoRAgent process.
 
-[Qrun](QRUN.md) supplies a durable FIFO CPU/memory queue backed by systemd for
+[Qrun](QRUN.md) supplies a durable FIFO CPU/memory queue using systemd or its portable runtime for
 both local and SSH hosts. It uses this same handler protocol, staging and
 collection. Configure it with `executor = "qrun"` and the chosen `transport`.
 
@@ -28,7 +28,7 @@ schedulers.main.executor = "tri"
 transport = "local"
 schedulers.main.cluster_name = "compute"
 storage.work_root = "/absolute/shared/coragent-jobs"
-schedulers.main.handler = ["/usr/bin/python3", "/absolute/coragent/skills/core/batch-schedulers/scripts/tri.py"]
+schedulers.main.handler = ["/usr/bin/python3", "/absolute/coragent/current/agent/skills/core/batch-schedulers/scripts/tri.py"]
 
 [execution.platforms.compute.schedulers.main.handler_environment]
 TRI_SOCKET = "/absolute/runtime/tri/server.sock"
@@ -39,6 +39,9 @@ memory_mb = 4096
 ```
 
 Replace example paths with this installation's paths and create `work_root`.
+Here `/absolute/coragent` is the software root; in a source checkout the handler
+is `<checkout>/skills/core/batch-schedulers/scripts/tri.py`. For SSH, use the
+verified handler path on the submission host, which may have its own installation.
 Add scientific software bindings under `execution.platforms.compute.bindings` as
 for other execution targets. `transport = "local"` means commands run on the
 CoRAgent host; the queue chooses the compute node. Multiple local command targets
@@ -71,8 +74,8 @@ location = "cluster"
 schedulers.main.executor = "tri"
 transport = "local"
 storage.file_mode = "shared"
-storage.work_root = "/home/iaw/DATA/coragent/workspaces"
-schedulers.main.handler = ["/usr/bin/python3", "/absolute/coragent/skills/core/batch-schedulers/scripts/tri.py"]
+storage.work_root = "/home/USER/DATA/coragent/workspaces"
+schedulers.main.handler = ["/usr/bin/python3", "/absolute/coragent/current/agent/skills/core/batch-schedulers/scripts/tri.py"]
 ```
 
 Merge this target into `config.toml`; retain the required connection environment

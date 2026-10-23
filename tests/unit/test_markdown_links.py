@@ -46,3 +46,18 @@ def test_examples_do_not_count_as_skill_reference_routes(tmp_path):
     actual.write_text('# Actual\n')
     entry.write_text('`[example](example.md)`\n[actual](actual.md)\n')
     assert lint_skills._reachable_references(entry, tmp_path) == {entry, actual}
+
+
+def test_identifier_heading_fragments_preserve_underscores(tmp_path, monkeypatch):
+    monkeypatch.setattr(lint_skills, 'ROOT', tmp_path)
+    entry = tmp_path / 'SKILL.md'
+    guide = tmp_path / 'guide.md'
+    guide.write_text('## Context and next_run\n## Context and next_run\n'
+                     '## _Prepare_ **Job** with `__init__`\n')
+    text = '[context](guide.md#context-and-next_run)\n'
+    text += '[duplicate](guide.md#context-and-next_run-1)\n'
+    text += '[formatted](guide.md#prepare-job-with-__init__)\n'
+    text += '[stale](guide.md#context-and-nextrun)\n'
+    assert lint_skills._check_links(entry, text) == [
+        'SKILL.md: broken fragment guide.md#context-and-nextrun',
+    ]

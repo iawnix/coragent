@@ -7,7 +7,7 @@ CoRAgent 管理 Job 身份、持久回执、文件暂存、重启恢复与结果
 负责原生提交语法和状态解释。它是可执行程序，无需作为 Python 插件导入
 CoRAgent 进程。
 
-[Qrun](QRUN.zh-CN.md) 提供基于 systemd 的 CPU／内存 FIFO 队列，本机与 SSH 远端
+[Qrun](QRUN.zh-CN.md) 通过 systemd 或 portable 运行方式提供 CPU／内存 FIFO 队列，本机与 SSH 远端
 复用同一 handler 协议、文件暂存和回收。通过 `executor = "qrun"` 与独立的
 `transport` 选择执行方式和连接方式。
 
@@ -27,7 +27,7 @@ schedulers.main.executor = "tri"
 transport = "local"
 schedulers.main.cluster_name = "compute"
 storage.work_root = "/absolute/shared/coragent-jobs"
-schedulers.main.handler = ["/usr/bin/python3", "/absolute/coragent/skills/core/batch-schedulers/scripts/tri.py"]
+schedulers.main.handler = ["/usr/bin/python3", "/absolute/coragent/current/agent/skills/core/batch-schedulers/scripts/tri.py"]
 
 [execution.platforms.compute.schedulers.main.handler_environment]
 TRI_SOCKET = "/absolute/runtime/tri/server.sock"
@@ -37,7 +37,10 @@ cpus = 4
 memory_mb = 4096
 ```
 
-将示例路径替换为本次安装的实际路径，并创建 `work_root`。科学软件配置与
+将示例路径替换为本次安装的实际路径，并创建 `work_root`。示例的 `/absolute/coragent`
+是软件根；源码检出中的 handler 位于 `<checkout>/skills/core/batch-schedulers/scripts/tri.py`。
+使用 SSH 时必须选择提交主机上核验过的 handler 路径，该主机可以使用独立安装。
+科学软件配置与
 其它目标一样放在 `execution.platforms.compute.bindings` 中。`transport="local"`
 表示提交命令在 CoRAgent 所在主机执行，计算节点由队列分配。多个本机命令
 目标可以与 Qrun 目标共存，并分别指定集群名称。
@@ -64,8 +67,8 @@ location = "cluster"
 schedulers.main.executor = "tri"
 transport = "local"
 storage.file_mode = "shared"
-storage.work_root = "/home/iaw/DATA/coragent/workspaces"
-schedulers.main.handler = ["/usr/bin/python3", "/absolute/coragent/skills/core/batch-schedulers/scripts/tri.py"]
+storage.work_root = "/home/USER/DATA/coragent/workspaces"
+schedulers.main.handler = ["/usr/bin/python3", "/absolute/coragent/current/agent/skills/core/batch-schedulers/scripts/tri.py"]
 ```
 
 将目标合并到 `config.toml`，补齐实际连接环境和计算软件绑定。PBS、Torque、Slurm

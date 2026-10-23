@@ -33,8 +33,8 @@ storage.file_mode = "staged"
 
 [execution.platforms.Com30.schedulers.qrun]
 executor = "qrun"
-# Use the exact handler returned by Qrun installation, including --state-dir.
-handler = ["/ABS/python3", "/home/agent/soft/Qrun/qrun.py", "--state-dir", "/home/agent/soft/Qrun/state", "handler"]
+# The main installer replaces this for a managed pool.
+handler = ["qrun", "handler"]
 submission.resources = {cpus = 4, memory_mb = 4096}
 limits = {cpus = 112, memory_mb = 377221, max_in_flight = 20}
 
@@ -50,6 +50,9 @@ enabled = false
 
 Replace `/ABS` paths with verified installations. This example does not deploy services or assert that
 software is installed. Leave 1WCluster disabled until its scheduler and storage are established.
+For an independently installed Qrun pool, replace the default handler with the
+exact argv returned by that installation, including its state directory; the
+main installer's management options do not take ownership of that pool.
 
 Platform IDs/aliases match without case sensitivity; scheduler entry IDs are exact. An explicit entry wins;
 otherwise the platform's default entry applies. Scheduler-type selection is restricted to the selected

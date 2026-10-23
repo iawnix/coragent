@@ -37,10 +37,15 @@ For a remote installation, provide the remote Host socket and the proxy path:
 ```bash
 ./coragent --workspace reaction-a \
   --remote-host pi.example \
-  --remote-host-socket /run/user/1000/coragent/host.sock \
-  --remote-proxy-path /opt/coragent/apps/agent/transport/ssh.mjs \
+  --remote-host-socket /ABS/remote-host.sock \
+  --remote-proxy-path /opt/coragent/current/agent/apps/agent/transport/ssh.mjs \
   --ssh-config ~/.ssh/config
 ```
+
+Replace the socket placeholder with that installation's actual Host endpoint;
+its directory and filename include installation and server identities. The proxy
+example assumes `/opt/coragent` is the remote software root; a source checkout
+instead uses `<checkout>/apps/agent/transport/ssh.mjs`.
 
 The launcher uses the same SSH proxy for the Pi App Server socket returned by
 Host, then gives Pi a private local Unix endpoint. The workspace and session

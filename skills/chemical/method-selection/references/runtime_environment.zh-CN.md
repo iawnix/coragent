@@ -2,7 +2,8 @@
 
 `CORAGENT_PYTHON` 是安装管理的控制解释器，用于准备请求和整理已有证据，不提供科学库。
 
-根据方法 Skill 选择预设入口、原生命令或任务脚本，以及 `job.toml` 中的命名环境。
+根据方法 Skill 选择预设入口、原生命令或任务脚本，以及主 `config.toml` 的 `[execution]`
+中配置的平台与调度入口。工具通过 `CORAGENT_JOB_CONFIG` 读取生成的执行输入。
 所选绑定提供目标 Python 或原生程序；预设入口还声明自己的依赖。
 结构准备与化学验证器可共用 `structure.lock` 环境；Gaussian/xTB/CREST
 的 Python 包装脚本使用 `wrapper.lock`；CF22D 使用 `cf22d.lock`；分子图像使用
@@ -12,10 +13,11 @@
 准备请求时已经核验所选目标。准备前需要诊断时，只检查选定的入口和环境：
 
 ```bash
-"$CORAGENT_PYTHON" -m research_agent.application.environment_check --config "$CORAGENT_JOB_CONFIG" --platform <环境> --executor <id> --version <版本>
+"$CORAGENT_PYTHON" -m research_agent.application.environment_check --config "$CORAGENT_JOB_CONFIG" --platform <平台> --scheduler-entry <入口> --executor <id> --version <版本>
 ```
 
-使用没有预设入口的原生命令或任务脚本时，将 executor/version 换成 `--backend <绑定>`。
+该诊断命令使用 Task 已绑定的平台与入口。使用没有预设入口的原生命令或任务脚本时，
+将 executor/version 换成 `--backend <绑定>`。
 默认核验绑定中配置的 Python 与原生程序；用 `--runtime native` 或 `--runtime python`
 选择具体运行方式。只连接所选环境，远端也一样。需要底层观测详情时加 `--details`。
 
@@ -25,7 +27,7 @@
 原生命令或任务脚本。不能用预设入口索引判断软件是否可用。
 
 直接提交的 Job 报导入错误，只能说明该命令所用 Python 导入失败，不能据此判断所有绑定缺包。
-检查失败 Job 的 command 与 `metadata.execution_binding`；没有绑定时，读取 `job.toml`
+检查失败 Job 的 command 与 `metadata.execution_binding`；没有绑定时，读取主配置中平台/入口的 `bindings`
 找到所需 backend，用 `--backend <绑定> --runtime python` 做定向检查。
 绑定通过检查后，用 `--script` 与 `--backend` 重新准备并提交新请求，不重复相同的裸 Python
 命令。保留失败 Job，用新 Job 证据记录恢复。只有所选绑定实际检查失败时才报告安装阻塞；
@@ -34,7 +36,7 @@
 准备请求时核验所选目标并固定输入、脚本与环境身份，提交和执行时再次检查。缺失绑定、
 依赖或已核验回执属于安装缺口，不能据此改用 Host 解释器计算或偷偷更换方法。
 
-保留未满足的要求，并报告具体缺失的绑定。维护者可通过 `packaging/coragent_packaging/installer/install_job_environment.py`
+保留未满足的要求，并报告具体缺失的绑定。维护者可通过[目标端环境工具](../../environments/README.zh-CN.md)
 从随包锁文件安装版本化前缀；研究任务不应修改共享环境。维护后，已有 Job 仍保留原身份。
 
 原生程序的前置探测只解析并固定所配置可执行文件的摘要，不运行求解器，也不证明许可、
