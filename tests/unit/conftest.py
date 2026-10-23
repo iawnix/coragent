@@ -23,9 +23,14 @@ def execution_target_fixture(tmp_path, monkeypatch):
     packages = [path for path in sys.path if Path(path).name in {'site-packages', 'dist-packages'}]
     (site / 'fixture-packages.pth').write_text('\n'.join(packages) + '\n')
     lock = tmp_path / "fixture.lock"
-    lock.write_text('@EXPLICIT\nhttps://fixture.invalid/python.conda\n')
-    conda.write_text("#!/bin/sh\nset -eu\nif [ \"$1\" = list ]; then cat " + shlex.quote(str(lock)) +
-                     "; else shift 5; exec " + shlex.quote(str(prefix / 'bin/python')) + ' "$@"; fi\n')
+    checksum = 'a' * 64
+    lock.write_text('@EXPLICIT\nhttps://fixture.invalid/python.conda#' + checksum + '\n')
+    metadata = prefix / 'conda-meta'
+    metadata.mkdir()
+    (metadata / 'python-3.11-fixture.json').write_text(json.dumps({'fn': 'python.conda', 'sha256': checksum}))
+    # Target probes read prefix records directly; any Conda listing is a regression.
+    conda.write_text("#!/bin/sh\nset -eu\nif [ \"$1\" = list ]; then exit 97; else shift 5; exec "
+                    + shlex.quote(str(prefix / 'bin/python')) + ' "$@"; fi\n')
     conda.chmod(0o700)
     install = runpy.run_path(str(Path(__file__).resolve().parents[2] / 'packaging/coragent_packaging/installer/install_job_environment.py'))['install']
     install({'manager': 'conda', 'conda_executable': str(conda), 'prefix': str(prefix), 'lock_ref': str(lock)}, adopt=True)

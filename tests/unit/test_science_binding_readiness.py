@@ -5,6 +5,7 @@ import pytest
 
 from research_agent.jobs.config_contract import load_job_config
 from research_agent.application.environment_check import check_environments
+from tests.support.platforms import execution_config
 
 
 def config():
@@ -70,3 +71,41 @@ def test_unregistered_native_binding_can_be_verified_without_claiming_a_method()
     row = report['local/main']['binding:native']
     assert row['status'] == 'verified'
     assert row['environment_evidence']['observation']['python'] is None
+
+
+def native_platforms():
+    return {'execution': execution_config('first', {name: {
+        'transport': 'local', 'executor': 'qrun', 'work_root': '/fixture/' + name,
+        'bindings': {'native': {'command': '/bin/true'}}}
+        for name in ('first', 'second', 'third')})}
+
+
+@pytest.mark.parametrize('targets,expected', [
+    (None, ['first/main', 'second/main', 'third/main']),
+    (['second/main'], ['second/main']),
+    ([], []),
+])
+def test_environment_check_probes_only_selected_targets(monkeypatch, targets, expected):
+    from research_agent.application import environment_check
+    calls = []
+    def probe(settings, selected, requirements):
+        calls.append(selected['environment'])
+        return {'target': selected['environment']}
+    monkeypatch.setattr(environment_check, 'probe_binding', probe)
+    report = check_environments(native_platforms(), catalogs=[], targets=targets)
+    assert calls == expected
+    assert list(report) == expected
+    assert all(row['binding:native']['status'] == 'verified' for row in report.values())
+
+
+def test_target_filter_preserves_configuration_and_catalog_validation():
+    document = native_platforms()
+    document['execution']['platforms']['third']['transport'] = 'invalid'
+    with pytest.raises(ValueError, match='platform requires local or ssh transport'):
+        check_environments(document, catalogs=[], targets=['first/main'])
+    with pytest.raises(ValueError, match='execution_environment_not_configured'):
+        check_environments(native_platforms(), catalogs=[], targets=['missing/main'])
+    catalog = [{'executors': [{'id': 'native.recipe', 'version': '1', 'backend': 'native',
+                              'runtime': 'native', 'argv': ['{entry}']}]}]
+    with pytest.raises(ValueError, match='execution_binding_command_mismatch'):
+        check_environments(native_platforms(), catalogs=catalog, targets=['first/main'], probe=False)

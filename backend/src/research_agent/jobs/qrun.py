@@ -822,15 +822,18 @@ class Queue:
             if started.get('boot') == job['boot'] and started.get('started_at'):
                 self.update(job, started_at=started['started_at'])
         result_path = directory / 'result.json'
-        result = json.loads(result_path.read_text()) if result_path.exists() else None
         # System reboot proves the previous boot's units cannot still consume resources.
         if job['boot'] != boot_id():
+            result = json.loads(result_path.read_text()) if result_path.exists() else None
             if result:
                 self.terminal(job, result['state'], result['exit_code'], result.get('error'))
             else:
                 self.terminal(job, 'failed', error='execution host restarted; job was not rerun')
             return
         native = self.runtime.inspect(job)
+        # Inspection can observe a result published while it runs. Read it afterwards
+        # so a finished worker cannot be failed using an earlier absence of evidence.
+        result = json.loads(result_path.read_text()) if result_path.exists() else None
         if native['state'] == 'finished':
             if result:
                 self.terminal(job, result['state'], result['exit_code'], result.get('error'))

@@ -15,7 +15,6 @@ from pathlib import Path
 import re
 import shlex
 import shutil
-import subprocess
 import sys
 
 
@@ -55,6 +54,31 @@ def package_lines(text):
     return packages
 
 
+def conda_packages(prefix):
+    """Read the installed archive identities that Conda records in its prefix."""
+    packages = {}
+    try:
+        with os.scandir(Path(prefix) / 'conda-meta') as entries:
+            paths = sorted(entry.path for entry in entries
+                           if entry.name.endswith('.json') and not entry.name.startswith('._'))
+        for path in paths:
+            record = json.loads(Path(path).read_bytes())
+            if not isinstance(record, dict):
+                raise ValueError('invalid package record')
+            archive, checksum = record.get('fn'), record.get('sha256')
+            if (not isinstance(archive, str) or not re.fullmatch(r'[^/\\\0]+\.(?:conda|tar\.bz2)', archive)
+                    or archive in packages):
+                raise ValueError('invalid package archive')
+            if checksum is None:
+                checksum = ''
+            if not isinstance(checksum, str) or checksum and not re.fullmatch(r'[0-9a-f]{64}', checksum):
+                raise ValueError('invalid package checksum')
+            packages[archive] = checksum
+    except (OSError, UnicodeError, ValueError):
+        raise EnvironmentMismatch('environment_conda_inventory_mismatch') from None
+    return packages
+
+
 def pip_packages(content):
     packages = {}
     for line in content.decode().replace('\\\n', ' ').splitlines():
@@ -80,10 +104,8 @@ def inspect_python(binding, requirements, command=(), *, require_receipt=True):
     pip_path = lock.with_suffix(".requirements.txt")
     pip_lock = pip_path.read_bytes() if pip_path.is_file() else b""
     lock_digest = "sha256:" + hashlib.sha256(content + b"\0" + pip_lock).hexdigest()
-    exported = subprocess.run([binding["conda_executable"], "list", "--explicit", "--sha256", "--prefix", binding["prefix"]],
-                              capture_output=True, text=True, timeout=90)
     expected = package_lines(content.decode())
-    actual = package_lines(exported.stdout) if not exported.returncode else {}
+    actual = conda_packages(binding['prefix'])
     if actual.keys() != expected.keys() or any(checksum and checksum != actual[url] for url, checksum in expected.items()):
         raise EnvironmentMismatch("environment_conda_inventory_mismatch")
     for name, version in pip_packages(pip_lock).items():

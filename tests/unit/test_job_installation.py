@@ -300,6 +300,46 @@ def test_acceptance_waits_for_cancellation_and_reports_pending_jobs(tmp_path, mo
     assert calls[-1] == 'job_status'
 
 
+@pytest.mark.parametrize('targets', [
+    ['first/main'],
+    ['first/main', 'offline/main', 'last/main'],
+])
+def test_acceptance_probes_each_selected_target_once_and_isolates_failures(tmp_path, monkeypatch, targets):
+    from coragent_packaging.installer import _job_acceptance as acceptance
+    from research_agent.application import environment_check
+    config = tmp_path / 'job.toml'
+    config.write_bytes(jobs.toml_bytes({'execution': execution_config('first', {name: {
+        'transport': 'local', 'executor': 'qrun', 'work_root': '/fixture/' + name,
+        'bindings': {'native': {'command': '/bin/true'}}}
+        for name in ('first', 'offline', 'last')})}))
+    calls = []
+    def probe(settings, selected, requirements):
+        name = selected['environment']
+        calls.append(name)
+        if name == 'offline/main':
+            raise ValueError('environment_executable_missing')
+        return {'target': name}
+    monkeypatch.setattr(environment_check, 'probe_binding', probe)
+    monkeypatch.setattr(environment_check, 'installed_catalogs', lambda: [])
+    monkeypatch.setattr(acceptance, 'profiles', lambda _: {})
+    monkeypatch.setattr(acceptance, 'initialize_workspace', lambda *args: None)
+    monkeypatch.setattr(acceptance, 'admit_research_workspace', lambda *args: None)
+    monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(config))
+    monkeypatch.setenv('CORAGENT_PACKAGE_ROOT', str(ROOT))
+    report = acceptance.accept(config, ROOT, tmp_path / 'acceptance', targets, 1)
+    assert report['schema_version'] == 'coragent-job-readiness/1'
+    assert calls == targets
+    for name, row in report['targets'].items():
+        if name not in targets:
+            assert row == {'status': 'not_verified'}
+        elif name == 'offline/main':
+            assert row['status'] == 'failed'
+            assert row['error'] == 'environment_executable_missing'
+        else:
+            assert row['status'] == 'environment_verified'
+            assert row['environments']['binding:native']['environment_evidence'] == {'target': name}
+
+
 def test_target_provisioning_reuses_verified_environment_and_recovers_interrupted_prefix(tmp_path, monkeypatch):
     from coragent_packaging.installer import _job_target as target
     import base64

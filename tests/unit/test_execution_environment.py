@@ -70,17 +70,57 @@ def test_actual_python_environment_matches_receipt_and_declared_dependencies():
 
 
 def test_target_conda_package_hash_must_match_the_declared_lock(tmp_path):
-    import shlex
     settings, selected = target()
     binding = selected['python']
     # Keep identical package URLs and versions; only the package content differs.
     Path(binding['lock_ref']).write_text('@EXPLICIT\nhttps://fixture.invalid/python.conda#'+'a'*64+'\n')
-    actual = tmp_path/'actual.lock'
-    actual.write_text('@EXPLICIT\nhttps://fixture.invalid/python.conda#'+'b'*64+'\n')
-    conda = Path(binding['conda_executable'])
-    conda.write_text(conda.read_text().replace(shlex.quote(binding['lock_ref']), shlex.quote(str(actual))))
+    record = next((Path(binding['prefix']) / 'conda-meta').glob('*.json'))
+    record.write_text(json.dumps({'fn': 'python.conda', 'sha256': 'b' * 64}))
     with pytest.raises(ValueError, match='environment_conda_inventory_mismatch'):
         probe_binding(settings, selected, {})
+
+
+@pytest.mark.parametrize('change', ['missing', 'extra', 'malformed_json', 'non_object',
+                                   'missing_archive', 'invalid_archive', 'invalid_hash', 'missing_hash', 'duplicate'])
+def test_target_conda_records_must_match_the_complete_locked_inventory(change):
+    settings, selected = target()
+    metadata = Path(selected['python']['prefix']) / 'conda-meta'
+    record = next(metadata.glob('*.json'))
+    value = json.loads(record.read_text())
+    if change == 'missing':
+        record.unlink()
+    elif change == 'extra':
+        (metadata / 'extra.json').write_text(json.dumps({'fn': 'extra.conda', 'sha256': 'b' * 64}))
+    elif change == 'malformed_json':
+        record.write_text('{')
+    elif change == 'non_object':
+        record.write_text('[]')
+    elif change == 'missing_archive':
+        value.pop('fn')
+        record.write_text(json.dumps(value))
+    elif change == 'invalid_archive':
+        record.write_text(json.dumps({**value, 'fn': '../python.conda'}))
+    elif change == 'invalid_hash':
+        record.write_text(json.dumps({**value, 'sha256': 'not-a-package-digest'}))
+    elif change == 'missing_hash':
+        value.pop('sha256')
+        record.write_text(json.dumps(value))
+    else:
+        (metadata / 'duplicate.json').write_text(record.read_text())
+    with pytest.raises(ValueError, match='environment_conda_inventory_mismatch'):
+        probe_binding(settings, selected, {})
+
+
+def test_python_probe_reads_conda_records_without_invoking_conda_list(tmp_path):
+    import shlex
+    settings, selected = target()
+    conda = Path(selected['python']['conda_executable'])
+    calls = tmp_path / 'conda-list-was-called'
+    conda.write_text(conda.read_text().replace('then exit 97;',
+        'then touch ' + shlex.quote(str(calls)) + '; exit 97;'))
+    observed = probe_binding(settings, selected, {})
+    assert observed['observation']['python']['receipt_sha256']
+    assert not calls.exists()
 
 
 @pytest.mark.parametrize('changed', ['lock', 'receipt', 'inventory', 'prefix'])

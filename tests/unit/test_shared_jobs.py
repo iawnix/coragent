@@ -248,7 +248,7 @@ def test_shared_acceptance_retains_failed_or_interrupted_workspace(queue, tmp_pa
     target = {**config, 'file_mode':'shared', 'bindings':{'shell':{'command':'/bin/true'}}}
     path = tmp_path / 'job.toml'
     path.write_bytes(toml_bytes({'execution':execution_config('compute', {'compute':target})}))
-    monkeypatch.setattr(acceptance, 'check_environments', lambda _: {'compute/main':{}})
+    monkeypatch.setattr(acceptance, 'check_environments', lambda _, *, targets: {'compute/main':{}})
     monkeypatch.setattr(acceptance, 'profiles', lambda _: {'check':{'root':str(tmp_path),
         'checks':[{'backend':'shell','script':'example.py'}]}})
     monkeypatch.setattr(acceptance, 'resource', lambda *args: Path('/bin/true'))

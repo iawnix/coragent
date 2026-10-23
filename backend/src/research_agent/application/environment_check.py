@@ -55,13 +55,20 @@ def check_target(settings, target, *, backend=None, executor=None, version=None,
             **({'environment_evidence': evidence} if details else {})}
 
 
-def check_environments(settings, *, catalogs=None, probe=True):
-    validate_job_config(settings)
+def check_environments(settings, *, catalogs=None, probe=True, targets=None):
+    """Check all configured targets, or only the supplied internal target keys."""
+    settings = validate_job_config(settings)
+    configured = configured_targets(settings)
+    selected_names = set(configured) if targets is None else set(targets)
+    if selected_names - configured.keys():
+        raise ValueError('execution_environment_not_configured')
     catalogs = installed_catalogs() if catalogs is None else catalogs
     entries = [(kind, entry) for catalog in catalogs for kind in ('executors', 'validators')
                for entry in catalog.get(kind, [])]
     results = {}
-    for name, target in configured_targets(settings).items():
+    for name, target in configured.items():
+        if name not in selected_names:
+            continue
         results[name] = {}
         covered = set()
         cache = {}

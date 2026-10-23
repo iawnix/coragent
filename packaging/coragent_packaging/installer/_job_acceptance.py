@@ -109,7 +109,7 @@ def accept(config, package, directory, targets, timeout, *, bindings_only=False,
         shared_workspace = None
         accepted = False
         try:
-            row['environments'] = check_environments(settings)[name]
+            row['environments'] = check_environments(settings, targets=[name])[name]
             row['status'] = 'environment_verified'
             if target.get('file_mode', 'staged') == 'shared':
                 # Acceptance must exercise the same filesystem as real Jobs.

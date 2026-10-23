@@ -209,6 +209,35 @@ def test_completion_wins_a_cancel_race(pool):
     assert status(queue, req)['state'] == 'succeeded'
 
 
+@pytest.mark.parametrize('native_result', ['portable-exit', 'success'])
+@pytest.mark.parametrize('state,code,error', [
+    ('succeeded', 0, None), ('failed', 7, 'worker failure'),
+])
+def test_result_published_during_inspection_is_used(pool, monkeypatch, native_result, state, code, error):
+    queue, runtime, work = pool
+    req = request(work)
+    queue.handle(req)
+    queue.tick()
+    job = queue.rows()[0]
+    result_path = queue.directory(job) / 'result.json'
+    assert not result_path.exists()
+
+    def inspect(current):
+        assert current['id'] == job['id']
+        qrun.atomic_json(result_path, {
+            'state': state, 'exit_code': code, 'error': error, 'descendants_reaped': True,
+        })
+        return {'state': 'finished', 'result': native_result}
+
+    monkeypatch.setattr(runtime, 'inspect', inspect)
+    queue.tick()
+    outcome = status(queue, req)
+    assert outcome['execution_finished']
+    assert outcome['state'] == state
+    assert outcome['exit_code'] == code
+    assert outcome['error'] == error
+
+
 def test_reboot_fails_without_rerunning_and_releases_resources(pool, monkeypatch):
     queue, runtime, work = pool
     req = request(work)
