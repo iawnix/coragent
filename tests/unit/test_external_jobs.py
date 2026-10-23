@@ -4,6 +4,7 @@ from dataclasses import replace
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import sys
@@ -276,6 +277,27 @@ def test_tri_checks_submitted_wrapper_before_running_a_stale_compute_node_copy(q
     assert platform.status(receipt).state == JobState.FAILED
     assert not (remote / 'old-calculation-started').exists()
     assert not (remote / 'current-calculation-started').exists()
+
+
+@pytest.mark.parametrize('file_mode', ['staged', 'shared'])
+@pytest.mark.parametrize('changed', [False, True])
+def test_tri_wrapper_guard_survives_systemd_environment_expansion(queue, tmp_path, file_mode, changed):
+    config, state = queue
+    platform = ExternalJobPlatform({**config, 'file_mode': file_mode})
+    request = spec(Path(config['work_root']) if file_mode == 'shared' else tmp_path,
+                   command=('/bin/sh', '-c', 'touch calculation-started'))
+    receipt = platform.start(request)
+    remote = Path(receipt.metadata['remote_dir'])
+    task = tasks(state)[0]
+    if changed:
+        Path(task['script']).write_text('#!/bin/sh\ntouch stale-calculation-started\n')
+    # TRI's systemd launcher expands absent ${...} variables inside each argv
+    # element before the shell sees it, including shell parameter expressions.
+    command = [re.sub(r'\$\{[^}]*\}', '', argument) for argument in task['command']]
+    result = subprocess.run(command, cwd=task['cwd'])
+    assert result.returncode == (125 if changed else 0)
+    assert (remote / 'calculation-started').exists() is not changed
+    assert not (remote / 'stale-calculation-started').exists()
 
 
 @pytest.mark.parametrize('file_mode', ['staged', 'shared'])

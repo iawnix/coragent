@@ -148,8 +148,10 @@ def handle(request):
         # whose identical path points to a different filesystem.
         digest = hashlib.sha256(Path(request["script"]).read_bytes()).hexdigest()
         reject = "{ printf '%s\\n' CORAGENT_EXECUTION_ERROR=execution_script_changed >&2; exit 125; }"
+        # systemd expands braced variables inside argv before the shell runs.
+        # Compare GNU sha256sum's complete stdin result without that syntax.
         bootstrap = ('coragent_script_hash=$(sha256sum < "$2") || ' + reject + '\n'
-                     'test "${coragent_script_hash%% *}" = "$1" || ' + reject + '\n'
+                     'test "$coragent_script_hash" = "$1  -" || ' + reject + '\n'
                      'exec /bin/sh "$2"\n')
         task = native("tri_sub", *args, "--", "/bin/sh", "-c", bootstrap,
                       "coragent-tri", digest, request["script"])["task"]

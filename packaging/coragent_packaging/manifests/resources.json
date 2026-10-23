@@ -334,7 +334,7 @@
     "skills/core/batch-schedulers/references/tri.md": "sha256:7825e2f07c7001c946c23be3ef58a6627bfe0763357821e94a2314d0a544b3fd",
     "skills/core/batch-schedulers/references/tri.zh-CN.md": "sha256:245d8f6f29d325fed11f66be953e5f7874953a434e5c9893ada3ccc72132bdfc",
     "skills/core/batch-schedulers/scripts/batch.py": "sha256:ec37e08c059fee6e376dfaa4bb3cbd71eddefd98b471cd5b640e1e0aa28c70d1",
-    "skills/core/batch-schedulers/scripts/tri.py": "sha256:75a22d5048200d4a8cd4bfbd5b586eb338afd097abdd553c026ccef0afbad0b7",
+    "skills/core/batch-schedulers/scripts/tri.py": "sha256:53b6c2b25e3d80906262af9aacb89b40800dc7d41ea63204e7f1a20102587bce",
     "skills/core/email/SKILL.md": "sha256:0742bf0c82877dba8b899671e368da7cafcfb58774fe5544019f5108942046b6",
     "skills/core/email/SKILL.zh-CN.md": "sha256:0cd941e7d36494c55c5417549390845635670c7697a9ddb38542b8fa12584e64",
     "skills/core/email/references/email_delivery.md": "sha256:8ab5c7a18d0d0bb4237ca2e84fb01cb2a096b8a97724202e765cd7e5ea9da66d",
