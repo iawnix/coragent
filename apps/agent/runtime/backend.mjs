@@ -293,6 +293,7 @@ export async function createCoRAgentHarnessBackend(options = {}) {
     // Pi execution and reconciles its durable user task, including idle tasks.
     const result = await recoverSessionCatalog({
       sessions: [...(admin.directory.state.value?.sessions || [])],
+      workspaceCatalog,
       openSession: summary => openBinding(summary.workspaceId, summary.sessionId),
       isClosed: () => closed,
     });
@@ -398,13 +399,15 @@ export async function createCoRAgentHarnessBackend(options = {}) {
   return backend;
 }
 
-/** Bound Worker recovery without treating a failed session as an empty task. */
-export async function recoverSessionCatalog({ sessions, openSession, isClosed }) {
+/** Recover only sessions owned by the current workspace catalog. */
+export async function recoverSessionCatalog({ sessions, workspaceCatalog, openSession, isClosed }) {
+  const workspaces = new Set((await workspaceCatalog.list()).map(row => row.workspace_id));
+  const selected = sessions.filter(summary => workspaces.has(summary.workspaceId));
   const result = { state: "recovering", recovered: 0, failures: [] };
   let next = 0;
-  await Promise.all(Array.from({ length: Math.min(4, sessions.length) }, async () => {
-    while (!isClosed() && next < sessions.length) {
-      const summary = sessions[next++];
+  await Promise.all(Array.from({ length: Math.min(4, selected.length) }, async () => {
+    while (!isClosed() && next < selected.length) {
+      const summary = selected[next++];
       try {
         await openSession(summary);
         result.recovered += 1;

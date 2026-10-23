@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 import time
 import tomllib
@@ -18,11 +19,12 @@ import ensemble
 from analysis_material import read_material
 from complex_sample import combine, sample_complex
 from crest_cli import parse_arguments
-from crest_io import HARTREE_TO_KCAL, frames, parse_primary
+from crest_io import HARTREE_TO_KCAL, frames, main as reparse_main, parse_primary, reparse, sha
 from crest_run import input_geometry, run
 from ensemble_material import checked, derive_material, identity_check, import_crest, xyz_text
 from ensemble_select import select_ensemble
 from material import build_material
+from xyz import read_xyz_frames
 
 
 def water(shift=0., graph=True):
@@ -38,11 +40,16 @@ def frame(m, energy=-5.):
     return xyz_text(m['atoms'], m['coordinates'], str(energy))
 
 
-def primary(tmp_path, m=None):
+def primary_texts(m=None, count=2):
     m = m or water()
-    texts = {'crest.out': 'Version 3.0.2\nCREST terminated normally.\n',
-             'crest_conformers.xyz': frame(m) + frame(m, -4.99), 'crest_best.xyz': frame(m),
-             'crest.energies': f'1 0.000\n2 {.01*HARTREE_TO_KCAL:.3f}\n'}
+    return {'crest.out': 'Version 3.0.2\nCREST terminated normally.\n',
+            'crest_conformers.xyz': ''.join(frame(m, -5. + index * .01) for index in range(count)),
+            'crest_best.xyz': frame(m),
+            'crest.energies': ''.join(f'{index + 1} {index * .01 * HARTREE_TO_KCAL:.3f}\n' for index in range(count))}
+
+
+def primary(tmp_path, m=None, count=2):
+    texts = primary_texts(m, count)
     for name, text in texts.items(): (tmp_path / name).write_text(text)
     return texts
 
@@ -153,8 +160,10 @@ def test_perturb_preserves_supplied_complex_and_rejects_impossible_constraints()
     with pytest.raises(ValueError, match='mobile'): sample_complex(one)
 
 
-def fake_crest(path, mode='success'):
-    texts = {'crest_conformers.xyz': frame(water()), 'crest_best.xyz': frame(water()), 'crest.energies': '1 0.000\n'}
+def fake_crest(path, mode='success', members=1):
+    texts = {name: text for name, text in primary_texts(count=members).items() if name != 'crest.out'}
+    if mode == 'truncated': texts['crest_conformers.xyz'] = frame(water()) + '3\n-4.0\nO 0 0 0\n'
+    if mode == 'energy_mismatch': texts['crest.energies'] = texts['crest.energies'].replace('1 0.000\n', '1 1.000\n')
     path.write_text(f'''#!{sys.executable}
 import json, os, subprocess, sys, time
 from pathlib import Path
@@ -191,6 +200,131 @@ def test_native_runner_retains_receipt_and_kills_descendants(tmp_path, mode):
         assert result['primary']['members'] and not result['primary']['complete']
     imported = import_crest(read_material(source), result, 'sha256:'+'b'*64)
     assert imported['complete'] == (mode == 'success')
+
+
+def test_138_native_members_survive_parsing_import_and_bounded_selection(tmp_path):
+    source = tmp_path / 'material.json'; source.write_text(json.dumps(water(graph=False)['value']))
+    out = tmp_path / 'native'; native = fake_crest(tmp_path / 'crest', members=138)
+    result = run(parse_arguments(['--material', str(source), '--output-dir', str(out), '--executable', str(native)]))
+    assert result['status'] == 'completed' and result['returncode'] == 0
+    assert result['primary']['complete'] and len(result['primary']['members']) == 138
+    raw = {name: (out / name).read_bytes() for name in result['primary']['primary_sha256']}
+    assert len(read_xyz_frames(out / 'crest_conformers.xyz')) == 138
+
+    from ensemble_cli import parse_arguments as parse_ensemble
+    exported = tmp_path / 'ensemble'
+    imported = ensemble.run(parse_ensemble(['--output-dir', str(exported), 'import',
+        '--material', str(source), '--run', str(out / 'result.json')]))
+    assert imported['complete'] and len(imported['members']) == len(imported['exports']) == 138
+    assert imported['members'][-1]['id'] == 'member_0138'
+    assert (exported / 'members/0138/geometry.xyz').is_file()
+
+    selected = select_ensemble(imported, max_selected=2, max_pairs=1)
+    assert len(selected['decisions']) == 138 and len(selected['selected_ids']) == 2
+    assert selected['selection_limit_reached'] and selected['comparison_budget_exhausted']
+    assert sum(row['decision'] == 'deferred' for row in selected['decisions']) == 136
+    assert {name: (out / name).read_bytes() for name in raw} == raw
+
+
+def test_native_read_limit_can_be_reparsed_without_reexecution(tmp_path):
+    source = tmp_path / 'material.json'; source.write_text(json.dumps(water()['value']))
+    out = tmp_path / 'native'; native = fake_crest(tmp_path / 'crest', members=138)
+    completed = subprocess.run([sys.executable, str(SKILLS / 'crest/scripts/crest_run.py'),
+        '--material', str(source), '--output-dir', str(out), '--executable', str(native),
+        '--max-members', '64'], capture_output=True, text=True)
+    assert completed.returncode == 0, completed.stderr
+    run_path = out / 'result.json'; original = run_path.read_bytes(); result = json.loads(original)
+    assert result['status'] == 'completed' and result['returncode'] == 0
+    assert result['settings']['max_members'] == 64
+    parsed = result['primary']
+    assert parsed['parsing_status'] == 'limited' and not parsed['complete']
+    assert set(parsed['issues']) == {'member_limit_reached', 'energy_table_limit_reached'}
+    assert parsed['read_budget'] == {'max_members': 64, 'members_read': 64, 'energy_rows_read': 64,
+                                    'has_unread_members': True, 'has_unread_energy_rows': True}
+    assert 'do not rerun CREST' in parsed['next_action']
+    assert len(import_crest(read_material(source), result, sha(original))['members']) == 64
+    assert not import_crest(read_material(source), result, sha(original))['complete']
+    raw = {name: (out / name).read_bytes() for name in parsed['primary_sha256']}
+    assert len(read_xyz_frames(out / 'crest_conformers.xyz')) == 138
+
+    # The native executable is gone: recovery can only consume saved outputs.
+    native.unlink()
+    output = tmp_path / 'reparsed.json'
+    argv = ['--directory', str(out), '--material', str(source), '--run', str(run_path),
+            '--max-members', '256', '--output', str(output)]
+    assert reparse_main(argv) == 0
+    restored = json.loads(output.read_bytes())
+    assert restored['status'] == 'completed' and restored['primary']['complete']
+    assert restored['primary']['parsing_status'] == 'complete'
+    assert restored['primary']['read_budget']['members_read'] == 138
+    assert restored['primary']['primary_sha256'] == parsed['primary_sha256']
+    assert restored['reparse_of'] == {'run_sha256': sha(original), 'primary_sha256': parsed['primary_sha256']}
+    imported = import_crest(read_material(source), restored, sha(output.read_bytes()))
+    assert imported['complete'] and len(imported['members']) == 138
+    saved = output.read_bytes()
+    assert reparse_main(argv) == 1 and output.read_bytes() == saved
+    assert run_path.read_bytes() == original
+    assert {name: (out / name).read_bytes() for name in raw} == raw
+
+
+@pytest.mark.parametrize('mode', ['truncated', 'energy_mismatch'])
+def test_read_limit_does_not_hide_invalid_native_evidence(tmp_path, mode):
+    source = tmp_path / 'material.json'; source.write_text(json.dumps(water()['value']))
+    out = tmp_path / 'native'; native = fake_crest(tmp_path / 'crest', mode, members=138)
+    result = run(parse_arguments(['--material', str(source), '--output-dir', str(out),
+        '--executable', str(native), '--max-members', '64']))
+    assert result['returncode'] == 0 and result['status'] == 'failed'
+    assert result['primary']['parsing_status'] == 'invalid' and not result['primary']['complete']
+    assert any(issue not in {'member_limit_reached', 'energy_table_limit_reached'} for issue in result['primary']['issues'])
+
+
+@pytest.mark.parametrize('change', ['material', 'primary'])
+def test_reparse_requires_unchanged_source_bytes(tmp_path, change):
+    primary(tmp_path, count=138)
+    source = tmp_path / 'material.json'; source.write_text(json.dumps(water()['value']))
+    result = {'schema_version': 'chemical-crest-run/1', 'material_sha256': sha(source.read_bytes()),
+              'returncode': 0, 'status': 'failed', 'primary': parse_primary(tmp_path, ['O', 'H', 'H'], 64)}
+    run_path = tmp_path / 'run.json'; run_path.write_text(json.dumps(result))
+    changed = source if change == 'material' else tmp_path / 'crest.out'
+    changed.write_bytes(changed.read_bytes() + b'\n')
+    with pytest.raises(ValueError, match='exact source material' if change == 'material' else 'unchanged four primary'):
+        reparse(tmp_path, source, run_path)
+
+
+@pytest.mark.parametrize('returncode,expected_status', [(0, 'completed'), (7, 'failed'), (None, 'failed')])
+def test_reparse_preserves_native_exit_outcome(tmp_path, returncode, expected_status):
+    primary(tmp_path, count=138)
+    source = tmp_path / 'material.json'; source.write_text(json.dumps(water()['value']))
+    result = {'schema_version': 'chemical-crest-run/1', 'material_sha256': sha(source.read_bytes()),
+              'returncode': returncode, 'status': 'failed', 'primary': parse_primary(tmp_path, ['O', 'H', 'H'], 64),
+              'error': {'type': 'ValueError', 'reason': 'previous wrapper failure'}}
+    run_path = tmp_path / 'run.json'; run_path.write_text(json.dumps(result))
+    recovered = reparse(tmp_path, source, run_path)
+    assert recovered['status'] == expected_status and recovered['returncode'] == returncode
+    assert recovered['primary']['complete'] and len(recovered['primary']['members']) == 138
+    assert ('error' not in recovered) == (returncode == 0)
+
+
+def test_limited_prefix_does_not_assume_it_contains_the_best_member(tmp_path):
+    m = water(); energies = [-5. - index * .01 for index in range(138)]
+    texts = primary_texts(m, 138)
+    texts['crest_conformers.xyz'] = ''.join(frame(m, energy) for energy in energies)
+    texts['crest_best.xyz'] = frame(m, energies[-1])
+    texts['crest.energies'] = ''.join(f'{index + 1} {(energy - energies[-1]) * HARTREE_TO_KCAL:.3f}\n'
+                                    for index, energy in enumerate(energies))
+    for name, text in texts.items(): (tmp_path / name).write_text(text)
+    limited = parse_primary(tmp_path, ['O', 'H', 'H'], 64)
+    assert limited['parsing_status'] == 'limited' and not limited['best_membership_verified']
+    assert limited['best_member_indexes'] == []
+    complete = parse_primary(tmp_path, ['O', 'H', 'H'])
+    assert complete['complete'] and complete['best_member_indexes'] == [138]
+
+
+def test_read_limit_does_not_mask_mismatched_primary_counts(tmp_path):
+    texts = primary(tmp_path, count=138)
+    (tmp_path / 'crest.energies').write_text(''.join(texts['crest.energies'].splitlines(keepends=True)[:64]))
+    parsed = parse_primary(tmp_path, ['O', 'H', 'H'], 64)
+    assert parsed['parsing_status'] == 'invalid' and 'energy_member_counts_differ' in parsed['issues']
 
 
 @pytest.mark.parametrize('change', ['charge', 'excited', 'isotope'])

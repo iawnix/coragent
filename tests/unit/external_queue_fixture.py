@@ -31,9 +31,10 @@ def main():
                     "spec": {"requested_cpu": int(option('--cpu', '1')),
                              "requested_mem_bytes": int(option('--mem', '64M')[:-1]) * 1024**2,
                              "requested_gpus": int(option('--gpu', '0'))},
-                    "cwd": option("--chdir"), "script": args[-1], "arguments": args}
+                    "cwd": option("--chdir"), "script": args[-1],
+                    "command": args[args.index('--') + 1:], "arguments": args}
             if (root / 'auto-run').exists():
-                result = subprocess.run(['/bin/sh', task['script']], capture_output=True)
+                result = subprocess.run(task['command'], cwd=task['cwd'], capture_output=True)
                 task.update(node=option('--node', 'fed1'), state='done' if result.returncode == 0 else 'fail',
                             exit_code=result.returncode, started_at=str(time.time()), finished_at=str(time.time()),
                             assigned_cpus='0', assigned_gpus='')

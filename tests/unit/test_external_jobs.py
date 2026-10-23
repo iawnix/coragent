@@ -1,5 +1,6 @@
 
 from tests.support.platforms import execution_config
+from dataclasses import replace
 import json
 import os
 from pathlib import Path
@@ -54,7 +55,7 @@ def update_task(queue_dir, **fields):
 
 def finish(state, env=None):
     task = tasks(state)[0]
-    result = subprocess.run(["/bin/sh", task["script"]], env={**os.environ, **(env or {})})
+    result = subprocess.run(task["command"], cwd=task["cwd"], env={**os.environ, **(env or {})})
     timeout_path = Path(task["cwd"]) / "status.state"
     native_state = "timed_out" if timeout_path.exists() else "done" if result.returncode == 0 else "fail"
     update_task(state, state=native_state, exit_code=result.returncode, finished_at="now", lease_id=None)
@@ -255,6 +256,150 @@ def test_identity_is_scoped_across_workspaces(queue, tmp_path):
         ExternalJobPlatform(config).start(spec(directory, command=("/bin/true",)))
     assert len(tasks(state)) == 2
     assert tasks(state)[0]["external_id"] != tasks(state)[1]["external_id"]
+
+
+@pytest.mark.parametrize('file_mode', ['staged', 'shared'])
+def test_tri_checks_submitted_wrapper_before_running_a_stale_compute_node_copy(queue, tmp_path, file_mode):
+    config, state = queue
+    config = {**config, 'file_mode': file_mode}
+    request = spec(Path(config['work_root']) if file_mode == 'shared' else tmp_path,
+                   command=('/bin/sh', '-c', 'touch current-calculation-started'))
+    platform = ExternalJobPlatform(config)
+    receipt = platform.start(request)
+    remote = Path(receipt.metadata['remote_dir'])
+    script = Path(tasks(state)[0]['script'])
+    # Simulate an identically named path exposing an old filesystem on fed2.
+    # The replacement has no trustworthy guard and would run different science.
+    script.write_text('#!/bin/sh\ncd ' + shlex.quote(str(remote)) + '\ntouch old-calculation-started\n')
+    finish(state)
+    assert tasks(state)[0]['exit_code'] == 125
+    assert platform.status(receipt).state == JobState.FAILED
+    assert not (remote / 'old-calculation-started').exists()
+    assert not (remote / 'current-calculation-started').exists()
+
+
+@pytest.mark.parametrize('file_mode', ['staged', 'shared'])
+@pytest.mark.parametrize('input_kind', ['file', 'directory'])
+@pytest.mark.parametrize('change', ['changed', 'missing'])
+def test_compute_wrapper_rechecks_input_bytes_before_starting_science(queue, tmp_path, file_mode, input_kind, change):
+    config, state = queue
+    platform = ExternalJobPlatform({**config, 'file_mode': file_mode})
+    request = spec(Path(config['work_root']) if file_mode == 'shared' else tmp_path,
+                   command=('/bin/sh', '-c', 'touch calculation-started'))
+    directory = request.cwd / 'input files'
+    directory.mkdir()
+    source = directory / "molecule 'quoted'.xyz"
+    source.write_text('current CREST input')
+    request = replace(request, inputs=(source if input_kind == 'file' else directory,))
+    receipt = platform.start(request)
+    remote = Path(receipt.metadata['remote_dir'])
+    stale = remote / source.relative_to(request.cwd)
+    if change == 'changed':
+        stale.write_text('old Gaussian input')
+    else:
+        stale.unlink()
+    finish(state)
+    assert tasks(state)[0]['exit_code'] == 125
+    assert platform.status(receipt).state == JobState.FAILED
+    assert not (remote / 'calculation-started').exists()
+
+
+@pytest.mark.parametrize('file_mode', ['staged', 'shared'])
+@pytest.mark.parametrize('change', ['added', 'empty_directory_missing', 'cache_only'])
+def test_compute_wrapper_checks_directory_membership_and_ignores_python_cache(queue, tmp_path, file_mode, change):
+    config, state = queue
+    platform = ExternalJobPlatform({**config, 'file_mode': file_mode})
+    request = spec(Path(config['work_root']) if file_mode == 'shared' else tmp_path,
+                   command=('/bin/sh', '-c', 'touch calculation-started'))
+    directory = request.cwd / "input 'directory'"
+    directory.mkdir()
+    if change != 'empty_directory_missing':
+        for name in ('geometry.xyz', 'z.xyz', '\u03b1\ngeometry.xyz'):
+            (directory / name).write_text('current input')
+    if change == 'cache_only':
+        (directory / '__pycache__').mkdir()
+        (directory / '__pycache__' / 'before.pyc').write_text('old cache')
+        (directory / 'compiled.pyc').write_text('old bytecode')
+    receipt = platform.start(replace(request, inputs=(directory,)))
+    remote = Path(receipt.metadata['remote_dir'])
+    staged = remote / directory.relative_to(request.cwd)
+    if change == 'added':
+        (staged / "old\n'molecule'.xyz").write_text('unexpected older input')
+    elif change == 'empty_directory_missing':
+        staged.rmdir()
+    else:
+        (staged / '__pycache__' / 'before.pyc').unlink()
+        (staged / '__pycache__' / 'after').write_text('new cache')
+        (staged / 'compiled.pyc').write_text('new bytecode')
+        (staged / 'another.pyc').write_text('additional bytecode')
+    finish(state)
+    succeeded = change == 'cache_only'
+    assert tasks(state)[0]['exit_code'] == (0 if succeeded else 125)
+    assert platform.status(receipt).state == (JobState.SUCCEEDED if succeeded else JobState.FAILED)
+    assert (remote / 'calculation-started').exists() == succeeded
+
+
+def test_directory_listing_failure_cannot_pass_as_an_empty_directory(queue, tmp_path):
+    config, state = queue
+    commands = tmp_path / 'commands'
+    commands.mkdir()
+    find = commands / 'find'
+    find.write_text('#!/bin/sh\nexit 1\n')
+    find.chmod(0o700)
+    request = spec(tmp_path, command=('/bin/sh', '-c', 'touch calculation-started'))
+    directory = request.cwd / 'empty-input'
+    directory.mkdir()
+    request = replace(request, inputs=(directory,), env={'PATH': str(commands) + ':/usr/bin:/bin'})
+    platform = ExternalJobPlatform(config)
+    receipt = platform.start(request)
+    finish(state)
+    assert tasks(state)[0]['exit_code'] == 125
+    assert platform.status(receipt).state == JobState.FAILED
+    assert not (Path(receipt.metadata['remote_dir']) / 'calculation-started').exists()
+
+
+def test_reused_local_path_with_new_workspace_identity_keeps_separate_staging(queue, tmp_path):
+    config, state = queue
+    platform = ExternalJobPlatform(config)
+    first = spec(tmp_path, command=('/bin/true',), workspace_id='first_workspace')
+    first_receipt = platform.start(first)
+    original_script = Path(tasks(state)[0]['script']).read_bytes()
+    first.cwd.rename(tmp_path / 'archived-controller')
+    second = spec(tmp_path, command=('/bin/false',), workspace_id='second_workspace')
+    second_receipt = platform.start(second)
+    assert first_receipt.metadata['remote_dir'] != second_receipt.metadata['remote_dir']
+    assert Path(tasks(state)[0]['script']).read_bytes() == original_script
+    assert len(tasks(state)) == 2
+
+
+def test_staging_never_merges_with_an_existing_execution_directory(queue, tmp_path):
+    config, state = queue
+    platform = ExternalJobPlatform(config)
+    request = spec(tmp_path, command=('/bin/true',), workspace_id='workspace')
+    remote = Path(platform._remote_dir(request))
+    remote.mkdir()
+    old_output = remote / 'result.txt'
+    old_output.write_text('older execution evidence')
+    receipt = platform.start(request)
+    assert platform.status(receipt).state == JobState.FAILED
+    assert receipt.metadata['submission_error']['action_outcome'] == 'not_submitted'
+    assert old_output.read_text() == 'older execution evidence'
+    assert not (state / 'tasks.json').exists()
+
+
+def test_existing_execution_recovery_uses_its_recorded_directory(queue, tmp_path, monkeypatch):
+    config, state = queue
+    request = spec(tmp_path, command=('/bin/sh', '-c', 'echo output > result.txt'),
+                   outputs=(JobOutput('result.txt', required=True),), workspace_id='workspace')
+    platform = ExternalJobPlatform(config)
+    submitted = platform.start(request)
+    monkeypatch.setattr(platform, '_remote_dir', lambda *_: pytest.fail('existing Jobs must retain their recorded directory'))
+    recovered = platform.recover_receipt(request.job_id, request.cwd)
+    assert recovered.metadata['remote_dir'] == submitted.metadata['remote_dir']
+    assert platform.status(recovered).state == JobState.QUEUED
+    finish(state)
+    assert platform.collect(recovered)['output_validation']['complete']
+    assert (request.cwd / 'result.txt').read_text() == 'output\n'
 
 
 def test_running_cancellation_waits_for_execution_to_finish(queue, tmp_path):

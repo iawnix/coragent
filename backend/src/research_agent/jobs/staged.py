@@ -24,6 +24,13 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def staged_directory(work_root, cwd, job_id, workspace_id):
+    """Locate a new staged execution without reusing another workspace's files."""
+    identity = json.dumps([workspace_id, str(Path(cwd).resolve())]).encode()
+    scope = hashlib.sha256(identity).hexdigest()[:24]
+    return f"{work_root.rstrip('/')}/{job_id}-{scope}"
+
+
 class StagedJobPlatform(ExecutionPlatform):
     """Shared staging, wrappers and collection for command-backed targets."""
 
@@ -53,19 +60,57 @@ class StagedJobPlatform(ExecutionPlatform):
             raise ValueError("remote job id has an invalid format")
         if self.shared:
             return str(self.shared.directory(spec.cwd, job=True))
-        scope = hashlib.sha256(str(spec.cwd.resolve()).encode()).hexdigest()[:24]
-        return f"{self.remote_root}/{job_id}-{scope}"
+        return staged_directory(self.remote_root, spec.cwd, job_id, spec.workspace_id)
 
     def stage_inputs(self, spec: JobSpec) -> dict[str, Any]:
         remote_dir = self._remote_dir(spec)
         if self.shared:
             return {'remote_dir': remote_dir, 'shared_token': self.shared.prepare(spec)}
-        self.run_command(f"umask 077; mkdir -p {shlex.quote(remote_dir)}/logs {shlex.quote(remote_dir)}/.coragent")
+        self.run_command(f"umask 077; mkdir -- {shlex.quote(remote_dir)} && "
+                         f"mkdir -- {shlex.quote(remote_dir)}/logs {shlex.quote(remote_dir)}/.coragent")
         self.transport.copy(spec.cwd, remote_dir)
         for path in spec.inputs:
             if not path.resolve().is_relative_to(spec.cwd.resolve()):
                 self.transport.copy(path, f"{remote_dir}/{path.name}")
         return {"remote_dir": remote_dir}
+
+    @staticmethod
+    def _input_guard(spec):
+        """Pin staged input bytes in the wrapper before the queue can delay execution."""
+        cwd = spec.cwd.resolve()
+        files = {}
+        directories = {}
+        for path in (*spec.inputs, *((spec.stdin,) if spec.stdin else ())):
+            source = path.resolve()
+            relative = source.relative_to(cwd) if source.is_relative_to(cwd) else Path(path.name)
+            directory = path.is_dir()
+            members = []
+            for item in sorted(path.rglob('*')) if directory else (path,):
+                if item.is_file():
+                    member = item.relative_to(path) if directory else None
+                    if directory and ('__pycache__' in member.parts or member.suffix == '.pyc'):
+                        continue
+                    destination = relative / member if directory else relative
+                    files[str(destination)] = hashlib.sha256(item.read_bytes()).hexdigest()
+                    if directory:
+                        members.append(os.fsencode(member))
+            if directory:
+                names = b''.join(name + b'\0' for name in sorted(members))
+                directories[str(relative)] = hashlib.sha256(names).hexdigest()
+        reject = "{ printf '%s\\n' CORAGENT_INPUT_ERROR=staged_input_changed >&2; exit 125; }"
+        # pipefail preserves find/sort failures, including a missing or unreadable
+        # directory. C sorting and NUL separators match the byte manifest above.
+        listing = ('cd -- "$1" && find . -type d -name __pycache__ -prune -o '
+                   '-type f ! -name "*.pyc" -printf "%P\\0" | LC_ALL=C sort -z | sha256sum')
+        directory_guards = ''.join(
+            'coragent_input_hash=$(' + shlex.join(['/bin/bash', '-o', 'pipefail', '-c', listing,
+                                                 'coragent-input-directory', path]) + ') || ' + reject + '\n'
+            + 'test "${coragent_input_hash%% *}" = ' + shlex.quote(digest) + ' || ' + reject + '\n'
+            for path, digest in sorted(directories.items()))
+        return directory_guards + ''.join(
+            'coragent_input_hash=$(sha256sum < ' + shlex.quote(path) + ') || ' + reject + '\n'
+            + 'test "${coragent_input_hash%% *}" = ' + shlex.quote(digest) + ' || ' + reject + '\n'
+            for path, digest in sorted(files.items()))
 
     def _wrapper(self, spec, remote_dir, *, inherit_environment=()):
         variables, scratch = job_process_environment(remote_dir, spec.metadata, spec.env)
@@ -87,6 +132,7 @@ class StagedJobPlatform(ExecutionPlatform):
         script = ('set +e\numask 077\n'
                   + 'mkdir -p -- ' + shlex.quote(scratch) + ' || exit 125\n'
                   + 'cd ' + shlex.quote(remote_dir) + ' || exit 125\n'
+                  + self._input_guard(spec)
                   + 'rm -f .coragent/command.exit\n'
                   + shlex.join(argv) + ' < ' + shlex.quote(stdin) + ' > logs/stdout.log 2> logs/stderr.log\n'
                   + 'code=$?\n')

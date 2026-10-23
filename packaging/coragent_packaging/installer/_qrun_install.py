@@ -52,7 +52,8 @@ def save(root, value):
 
 
 def route_identity(route):
-    return {key: route[key] for key in ('transport', 'ssh_host', 'ssh_config') if key in route}
+    """Identify the host independently of changeable SSH connection settings."""
+    return {key: route[key] for key in ('transport', 'ssh_host') if key in route}
 
 
 def assignments(values, targets, *, numeric=False):
@@ -117,6 +118,8 @@ def plan(args, settings):
         key = json.dumps(route_identity(route), sort_keys=True)
         if key in pools and pools[key]['state_dir'] != state:
             raise ValueError('one managed Qrun pool per host; use the same state directory for its targets')
+        if key in pools and pools[key]['route'].get('ssh_config') != route.get('ssh_config'):
+            raise ValueError('targets sharing a Qrun pool must use the same SSH configuration')
         available = len(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else (os.cpu_count() or 1)
         ram = os.sysconf('SC_PHYS_PAGES') * os.sysconf('SC_PAGE_SIZE') // (1024 * 1024)
         row = pools.setdefault(key, {'route': route, 'state_dir': state, 'targets': [], 'work_roots': [],

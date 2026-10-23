@@ -17,3 +17,8 @@ Read the applicable operation contract below for input formats, required argumen
 Use the table’s executor ID and version for `--executor` and `--version`, and actual roles for `--input role=path`. The execution target is inherited from the task; domain Skills omit `--platform` / `--scheduler-entry`. Consult that executor’s `--help` only for options absent from its contract.
 
 For preparation failures, correct inputs, arguments or software bindings first; successful preparation has not executed the calculation. Reconcile the existing Job and receipt after an uncertain submission. Collect available outputs after calculation failure and use the operation contract to decide whether to retry; failed outputs are not validated results.
+
+For `primary.parsing_status=limited`, use `scripts/crest_io.py` with `--directory`,
+`--material`, `--run`, `--max-members` and a new `--output` file, as described in
+[reparse retained outputs](crest_ensemble.md#reparse-retained-outputs). This is pure
+parsing of collected evidence, not a new executor or another native search.

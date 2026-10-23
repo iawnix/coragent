@@ -1,6 +1,5 @@
 """Bounded native CREST execution with a retained receipt on timeout/failure."""
 import json
-import math
 import os
 from pathlib import Path
 import shutil
@@ -9,9 +8,8 @@ import subprocess
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / '_shared'))
-from xyz import PERIODIC_TABLE, validate_electronic_state
 from crest_cli import parse_arguments
-from crest_io import parse_primary, sha, version
+from crest_io import input_geometry, parse_primary, sha, version
 
 
 def bounded(command, cwd, log, timeout, env):
@@ -31,30 +29,6 @@ def bounded(command, cwd, log, timeout, env):
         for sig, handler in old.items(): signal.signal(sig, handler)
 
 
-def input_geometry(raw):
-    value = json.loads(raw)
-    if value.get('schema_version') != 'chemical-material/1' or (value.get('geometry') or {}).get('unit') != 'angstrom':
-        raise ValueError('chemical material with angstrom coordinates required')
-    if value.get('electronic_state', {}).get('kind') != 'ground':
-        raise ValueError('CREST profile requires an explicit ground-state declaration')
-    atoms = value.get('atoms')
-    if not isinstance(atoms, list) or not 1 <= len(atoms) <= 256:
-        raise ValueError('1..256 atoms required')
-    ids = [a.get('atom_id') for a in atoms]
-    if any(not isinstance(i, str) or not i for i in ids) or len(set(ids)) != len(ids) or ids != value.get('atom_order', {}).get('output_atom_ids'):
-        raise ValueError('material atom IDs/order inconsistent')
-    rows = []
-    for a in atoms:
-        p = a.get('coordinates')
-        if a.get('element') not in PERIODIC_TABLE[1:] or a.get('isotope') is not None:
-            raise ValueError('unsupported element or explicit isotope masses')
-        if not isinstance(p, list) or len(p) != 3 or any(type(x) not in (int, float) or not math.isfinite(x) for x in p):
-            raise ValueError('finite Cartesian coordinates required')
-        rows.append([a['element'], *p])
-    validate_electronic_state(rows, value.get('charge'), value.get('multiplicity'))
-    return value, rows
-
-
 def run(args):
     if args.material.stat().st_size > 32 * 1024 * 1024: raise ValueError('material exceeds 32 MiB')
     raw = args.material.read_bytes(); material, atoms = input_geometry(raw)
@@ -69,6 +43,7 @@ def run(args):
                 'charge': material['charge'], 'multiplicity': material['multiplicity'], 'uhf': material['multiplicity'] - 1,
                 'threads': args.threads, 'solvent': args.solvent, 'solvent_model': 'ALPB' if args.solvent else 'gas',
                 'energy_window_kcal_mol': args.energy_window, 'timeout_seconds': args.timeout,
+                'max_members': args.max_members,
                 'constraints': [], 'random_seed': None, 'seed_scope': 'Native CREST randomness is not controlled by this command profile'}
     command = [executable, 'input.xyz', '--' + args.method, '--chrg', str(material['charge']), '--uhf', str(material['multiplicity'] - 1),
                '--optlev', args.opt_level, '-T', str(args.threads), '--ewin', str(args.energy_window)]
@@ -86,7 +61,7 @@ def run(args):
         result['returncode'] = bounded(command, out, out / 'crest.out', args.timeout, env)
         if result['returncode'] != 0: raise RuntimeError('CREST returned a nonzero exit status')
         result['primary'] = parse_primary(out, [a[0] for a in atoms], args.max_members)
-        if not result['primary']['complete']: raise ValueError('CREST primary outputs are incomplete or inconsistent')
+        if result['primary']['parsing_status'] == 'invalid': raise ValueError('CREST primary outputs are incomplete or inconsistent')
         result['status'] = 'completed'
     except (ValueError, RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
         result['error'] = {'type': type(exc).__name__, 'reason': str(exc)}

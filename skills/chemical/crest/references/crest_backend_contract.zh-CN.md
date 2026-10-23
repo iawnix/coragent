@@ -4,6 +4,11 @@
 CREST 3.0.2 绑定，并记录原生输出文件和来源摘要。适配器保留方法、溶剂、电荷、多重度、
 成员 ID、坐标和部分运行状态。其它版本和原生选项必须通过显式声明的通用 Job 执行。
 
+原生完成与解析覆盖分开：原生退出 0 且已读证据合法时，可以是 `status=completed`，
+同时 `primary.parsing_status=limited`、`primary.complete=false`。完整原文件和摘要保持不变。
+读取预算不足不构成重跑搜索的理由；按集合合同使用纯重解析命令。已观察到的证据缺失或
+不一致仍然失败。
+
 `chemical.crest-ensemble@1`、`chemical.ensemble-select@1`、`chemical.complex-sample@1`
 通过 structure 绑定消费或转换这些记录。成员筛选和刚性放置语义属于独立操作合同，见[集合操作](crest_ensemble.zh-CN.md)。
 

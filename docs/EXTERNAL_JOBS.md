@@ -52,6 +52,12 @@ and optionally `ssh_config`. `handler` and `work_root` are paths on that host.
 By default, SSH targets use rsync to stage and collect files. Local targets copy between the
 controller Job directory and `work_root`; this directory must be visible at the
 same path on compute nodes. The generic runtime does not provision shared mounts.
+New staged execution directories include the workspace identity and controller
+Job path in their scope. An existing directory is rejected before submission,
+so staging cannot merge a new request with older execution files. Recovery and
+collection continue to use the original directory recorded in each receipt.
+Before starting the calculation, the wrapper verifies the bytes of each declared
+input file, including files inside declared input directories.
 Qrun and batch schedulers use
 external handlers.
 
@@ -90,6 +96,9 @@ absolute Job path must be valid on every participating node. Different mount
 paths are not translated. Before submission, a temporary file round-trip checks
 that the command host sees the same writable storage. The wrapper checks its
 per-Job marker on the allocated compute node before starting the calculation.
+The TRI handler also carries a wrapper digest check in the native task command;
+the compute node must pass that check before it can execute the wrapper itself.
+An identical absolute path on different filesystems does not establish shared storage.
 Success requires the compute node's start and exit evidence to be visible to
 the controller as well as scheduler success. Missing evidence remains unknown.
 There is no automatic fallback to staging when these checks fail.

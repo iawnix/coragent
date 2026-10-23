@@ -25,6 +25,7 @@ from research_agent.application.api import execute
 from research_agent.application.environment_check import check_environments
 from research_agent.application.executors import prepare, prepare_script
 from research_agent.jobs.config_contract import binding_digest, configured_targets, load_job_config, target_identity, target_key
+from research_agent.jobs.staged import staged_directory
 from research_agent.research.workspace import initialize_workspace, admit_research_workspace
 
 
@@ -83,8 +84,7 @@ def run_job(root, request, timeout):
             settings = load_job_config(os.environ['CORAGENT_JOB_CONFIG'])
             target = configured_targets(settings)[target_key(request['execution_target'])]
             remote = receipt['metadata']['remote_dir']
-            scope = hashlib.sha256(str(Path(receipt['cwd']).resolve()).encode()).hexdigest()[:24]
-            expected = target['work_root'].rstrip('/') + '/' + receipt['job_id'] + '-' + scope
+            expected = staged_directory(target['work_root'], receipt['cwd'], receipt['job_id'], receipt['workspace_id'])
             if remote != expected:
                 raise RuntimeError('acceptance_cleanup_path_mismatch')
             platform = platforms_from_config(Path(os.environ['CORAGENT_JOB_CONFIG']))[0][target_key(request['execution_target'])]

@@ -15,7 +15,7 @@ Use CREST when uncertainty in conformation, fragment orientation, or weak-comple
 
 ## What to prepare
 
-Start from a material with explicit coordinates, charge, multiplicity, fragments, and the solvent model used by the study. Choose GFN2 for the normal search and GFN1 when a cheaper broad screen is useful. Set an energy window large enough to retain chemically distinct conformers; the adapter default is 6 kcal/mol and the maximum retained member count is 256.
+Start from a material with explicit coordinates, charge, multiplicity, fragments, and the solvent model used by the study. Choose GFN2 for the normal search and GFN1 when a cheaper broad screen is useful. Set an energy window large enough to retain chemically distinct conformers; the adapter default is 6 kcal/mol. `--max-members` bounds structured parsing, defaults to 256 and accepts 1–1024; it does not limit native sampling or select the final ensemble.
 
 CREST can produce a conformer ensemble for one molecule, a rigid-fragment complex ensemble, a deterministic subset selected by energy/diversity/record ID, or perturbed and assembled complex samples for a reaction-center search.
 
@@ -23,7 +23,7 @@ CREST can produce a conformer ensemble for one molecule, a rigid-fragment comple
 
 1. Prepare the parent material and keep its source digest as the ensemble parent.
 2. Run `chemical.crest@1` with the chosen GFN method, search/optimization level, solvent, thread count, timeout, and energy window.
-3. Import the run with `chemical.crest-ensemble@1` when the ensemble will be reused in a later Job.
+3. Inspect the run status and `primary.parsing_status`: a completed run with `limited` parsing has an unread output tail, not a failed search. Reparse the retained outputs with a larger explicit budget when the full ensemble is needed; do not rerun CREST for a read limit. Import the run or derived reparse receipt with `chemical.crest-ensemble@1` when it will be reused in a later Job.
 4. Use `chemical.ensemble-select@1` to retain members by a declared selection rule. Keep several low-energy members when their reactive torsions or faces differ.
 5. For separate reactants, use `chemical.complex-sample@1` in `assemble` or `perturb` mode, inspect contacts, and pass accepted poses to `reactive-geometry` or `candidate-generation`.
 6. Optimize or evaluate selected members at the study method, then compare reaction candidates with the same method and state.
@@ -38,6 +38,8 @@ The run keeps member IDs, coordinates, source material, solvent, method, energie
 - `chemical.complex-sample@1` -> `ensemble.py`; assembles or perturbs rigid fragments.
 
 Prepare these through the standard executor and Job lifecycle. Read [the backend contract](references/crest_backend_contract.md) for input schema and [the ensemble contract](references/crest_ensemble.md) for selection and complex records.
+
+`scripts/crest_io.py` also provides the documented [reparse command](references/crest_ensemble.md#reparse-retained-outputs). It reads existing evidence into a new receipt without invoking CREST or replacing source files.
 
 ## Choosing the handoff
 

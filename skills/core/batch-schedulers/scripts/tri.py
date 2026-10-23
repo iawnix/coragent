@@ -2,9 +2,11 @@
 """TRI native CLI bridge for coragent-external-job/1; stdlib only."""
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import sys
@@ -141,8 +143,16 @@ def handle(request):
             args += ["--timeout", str(math.ceil(request["timeout_seconds"]))]
         if os.environ.get("CORAGENT_TRI_NODE"):
             args += ["--node", os.environ["CORAGENT_TRI_NODE"]]
-        # Absolute wrapper path remains valid on the assigned node's shared filesystem.
-        task = native("tri_sub", *args, "--", request["script"])["task"]
+        # The verification code and expected digest travel in TRI's task argv.
+        # A guard inside run.sh cannot protect against a stale run.sh on a node
+        # whose identical path points to a different filesystem.
+        digest = hashlib.sha256(Path(request["script"]).read_bytes()).hexdigest()
+        reject = "{ printf '%s\\n' CORAGENT_EXECUTION_ERROR=execution_script_changed >&2; exit 125; }"
+        bootstrap = ('coragent_script_hash=$(sha256sum < "$2") || ' + reject + '\n'
+                     'test "${coragent_script_hash%% *}" = "$1" || ' + reject + '\n'
+                     'exec /bin/sh "$2"\n')
+        task = native("tri_sub", *args, "--", "/bin/sh", "-c", bootstrap,
+                      "coragent-tri", digest, request["script"])["task"]
         return observation(identity(task, request))
     if action == "recover":
         # A read-only lookup by persistent workflow identity. An unavailable

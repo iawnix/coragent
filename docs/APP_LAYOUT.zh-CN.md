@@ -72,6 +72,12 @@ Socket 和进程锁使用按安装身份隔离的系统 runtime 目录。Pi 会�
 `<state_root>/pi/sessions/<workspace-id>/<session-id>/session.sqlite`，
 相邻 `meta.json` 保存元数据。研究文件保存在工作区，不随切换会话搬迁。
 
+`paths.workspace_root` 选择 Job 监控和 Host 会话恢复共同使用的活动工作区目录。
+切换到新的工作区根目录后，原研究目录及 Pi 会话文件留在原处；所属工作区不在当前
+catalog 中的会话不会在 Host 启动时重新打开，因此不会加载其 Task 或 Research 协议。
+将旧工作区显式注册到当前 catalog 会使它重新进入活动范围。
+改变范围前应先停止 Host；这个设置不会终止已经运行的 Worker，也不会迁移历史记录。
+
 从源码检出根或安装包根 `<software_root>/current/agent` 运行，
 只读检查解析后的路径：
 

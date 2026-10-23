@@ -7,6 +7,13 @@ method, solvent, charge, multiplicity, member IDs, coordinates and partial-run
 status. Unsupported versions and native options must use a generic Job with an
 explicit declaration.
 
+Native completion and parsed coverage are separate: a zero native exit with valid
+read data can be `status=completed` while `primary.parsing_status=limited` and
+`primary.complete=false`. The original files and their digests remain intact.
+Read budgets never justify rerunning a completed search; use the pure reparse
+command in the ensemble contract. Missing or inconsistent observed evidence
+remains a failure.
+
 `chemical.crest-ensemble@1`, `chemical.ensemble-select@1` and
 `chemical.complex-sample@1` consume or transform these records through the
 structure binding. Their member selection and rigid-placement semantics are

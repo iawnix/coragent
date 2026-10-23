@@ -6,6 +6,7 @@
 
 - [Independent Jobs](#independent-jobs)
 - [Native profile and evidence](#native-profile-and-evidence)
+- [Reparse retained outputs](#reparse-retained-outputs)
 - [Member identity, selection and refinement](#member-identity-selection-and-refinement)
 - [Rigid complex inputs](#rigid-complex-inputs)
 
@@ -45,7 +46,7 @@ excited-state tracking are supplied. Native sampling randomness is uncontrolled.
 
 Input is chemical-material/1 with supplied angstrom coordinates in current atom
 order (1–256 atoms). Defaults: GFN2, normal search, vtight optimization, one thread,
-3600 seconds, 6 kcal/mol window and 256 parsed members (maximum 1024). Unsupported
+3600 seconds, 6 kcal/mol window and a 256-member parsing budget (maximum 1024). Unsupported
 version, missing outputs, timeout, nonzero exit or inconsistent primary evidence
 fail the Job; result.json and available primary files remain collectable.
 Descendant processes are terminated when the wrapper attempt ends.
@@ -55,11 +56,55 @@ crest.energies, at most 64 MiB each. XYZ comments contain absolute hartree energ
 crest.energies contains consecutive 1-based indexes and relative kcal/mol.
 Counts, element row order and relative differences must agree (0.002 kcal/mol
 tolerance); best geometry must match a minimum-energy member in fixed order
-(1e-6 Å and 1e-7 hartree). Malformed tails retain only the valid frame prefix and
-mark the run incomplete. No silent row skipping or missing-energy zero fill.
+(1e-6 Å and 1e-7 hartree) when the full ensemble is read. Observed malformed tails
+retain the valid frame prefix and mark parsing invalid. No silent row skipping or
+missing-energy zero fill.
+
+`--max-members` limits structured member and energy-row reading; it is not a CREST
+sampling control or a selection count. `primary.parsing_status` is `complete`,
+`limited` or `invalid`. Reaching only this read budget leaves the native run
+`status=completed` and the wrapper exit code zero, while `primary.complete=false`.
+`read_budget` reports the requested maximum, `members_read`, `energy_rows_read`,
+and `has_unread_members` / `has_unread_energy_rows`. The unread tail is unvalidated;
+no total member count is inferred. A best geometry outside that prefix has
+`best_membership_verified=false` until it can be matched in a fuller read.
+Observed missing, malformed or inconsistent data still fails even when a read
+limit is also reached. All four original files and their full-file digests remain
+available; a partial import remains `complete=false`.
+
+For example, native output containing 138 conformers and `--max-members 64` produces
+64 parsed members and an explicit unread tail. This calls for reparsing retained
+files when more coverage is needed, not repeating the search. To restrict later
+refinement, use `--max-selected`; `--max-pairs`, `--max-candidates` and `--max-search`
+bound comparison work. `--max-candidates 64` concerns graph mappings per comparison,
+not the number of conformers in the source ensemble.
 
 Upstream contract: [options](https://github.com/crest-lab/crest/blob/v3.0.2/src/confparse.f90),
 [energy table writer](https://github.com/crest-lab/crest/blob/v3.0.2/src/cregen.f90).
+
+## Reparse retained outputs
+
+Use the installed Skill's `scripts/crest_io.py` with the control interpreter. This
+command performs no native calculation and needs no new executor. Supply the
+original material, original run receipt and a directory containing the four
+unchanged primary files. The output parent directory must already exist:
+
+```text
+"$CORAGENT_PYTHON" <installed-crest-skill>/scripts/crest_io.py --directory <collected-primary-directory> --material <original-material.json> --run <original-result.json> --max-members 256 --output <new-work-directory>/crest-reparsed.json
+```
+
+The command checks the material digest and all four primary digests against the
+original receipt, then invokes the same bounded parser. Existing output files
+are rejected. The new `chemical-crest-run/1` receipt retains the native command,
+settings and exit code, updates only parsing and its resulting wrapper status,
+and records `reparse_of` with the original receipt and primary digests. Native
+nonzero exits cannot become successful through reparsing. Historical Job state
+and collected Artifacts are unchanged.
+
+Register the new receipt as derived material with its source references; it can
+be passed as the `run` input to `chemical.crest-ensemble@1`. Inspect its new
+`primary.parsing_status` before claiming full coverage. A larger budget is an
+explicit reading choice within 1–1024, not an automatic increase or silent crop.
 
 ## Member identity, selection and refinement
 

@@ -2,6 +2,14 @@
 
 [English](crest_ensemble.md)
 
+## 内容
+
+- [独立 Job](#独立-job)
+- [原生封装与证据](#原生封装与证据)
+- [重解析已保留输出](#重解析已保留输出)
+- [身份、筛选与独立精修](#身份筛选与独立精修)
+- [刚性复合物输入](#刚性复合物输入)
+
 ## 独立 Job
 
 全部入口版本为 `1`。登记输入 Artifact，使用已安装控制解释器准备请求；
@@ -35,17 +43,50 @@ CREST 需要目标机 `crest` 命令与 Python wrapper 绑定；`wrapper.lock` �
 
 输入 chemical-material/1，要求按当前原子顺序提供 angstrom 坐标，1–256 原子。
 默认 GFN2、normal 搜索、vtight 优化、单线程、3600 秒、6 kcal/mol 窗口、
-解析最多 256 成员（可增至 1024）。版本不支持、输出缺失、超时、非零退出或主要
+结构化读取预算 256 成员（可增至 1024）。版本不支持、输出缺失、超时、非零退出或主要
 证据不一致时 Job 失败，仍保留 result.json 和可收集的原始文件。封装退出时终止子进程组。
 
 主要文件为 crest.out、crest_conformers.xyz、crest_best.xyz、crest.energies，
 每个最多 64 MiB。XYZ 注释是绝对 hartree；crest.energies 是从 1 连续编号的
 相对 kcal/mol。核对行数、元素顺序和能量差（容差 0.002 kcal/mol）；best 必须
-在固定顺序下匹配最低能成员（1e-6 Å、1e-7 hartree）。损坏尾部只保留有效帧前缀，
-标记不完整；不跳过坏行，不把缺失能量补零。
+在完整读取时以固定顺序匹配最低能成员（1e-6 Å、1e-7 hartree）。已观察到损坏尾部时，
+保留有效帧前缀并将解析标为 invalid；不跳过坏行，不把缺失能量补零。
+
+`--max-members` 限制结构化成员和能量行的读取，不控制 CREST 采样或最终筛选数量。
+`primary.parsing_status` 为 complete、limited 或 invalid。仅达到读取上限时，原生运行
+仍是 `status=completed`，封装退出码为 0，但 `primary.complete=false`。`read_budget`
+记录本次最大值、members_read、energy_rows_read，以及 has_unread_members /
+has_unread_energy_rows。未读尾部尚未验证，不推测总成员数。best 几何不在前缀内时，
+best_membership_verified=false，需更完整读取后再验证成员归属。已经发现的缺失、损坏
+或不一致仍会失败，即使同时触及读取预算。4 个完整原文件及全文摘要始终保留；
+部分导入的集合仍是 complete=false。
+
+例如原生输出 138 个构象但设置 `--max-members 64`，会得到 64 个已解析成员及明确的
+未读尾部，需要更多覆盖时重解析已有文件，不重新搜索。限制后续精修数量用
+`--max-selected`；max-pairs、max-candidates 和 max-search 限制比较工作。
+`--max-candidates 64` 是每次比较的图映射上限，不是来源集合的构象数量上限。
 
 上游依据：[命令参数](https://github.com/crest-lab/crest/blob/v3.0.2/src/confparse.f90)、
 [能量表输出](https://github.com/crest-lab/crest/blob/v3.0.2/src/cregen.f90)。
+
+## 重解析已保留输出
+
+用控制解释器执行已安装 Skill 的 `scripts/crest_io.py`。该命令不调用原生求解器，
+不新增 executor。提供原 material、原运行回执和包含 4 个未改变主要文件的目录；
+输出的父目录应已存在：
+
+```text
+"$CORAGENT_PYTHON" <installed-crest-skill>/scripts/crest_io.py --directory <collected-primary-directory> --material <original-material.json> --run <original-result.json> --max-members 256 --output <new-work-directory>/crest-reparsed.json
+```
+
+命令核对 material 摘要与原回执、4 个主要文件摘要与原回执一致，再调用同一个有界解析器。
+已有输出文件会被拒绝。新的 chemical-crest-run/1 回执保留原生命令、设置和退出码，
+只更新解析及由此得出的封装状态，用 reparse_of 保存原回执摘要和主要文件摘要。
+原生非零退出不会因重解析而变成成功；历史 Job 状态与已收集 Artifact 不变。
+
+把新回执作为带源引用的派生材料登记，即可作为 chemical.crest-ensemble@1 的 run 输入。
+声称完整覆盖前检查新的 primary.parsing_status。提高读取预算是 1–1024 范围内的
+明确选择，不自动扩限，也不静默裁剪。
 
 ## 身份、筛选与独立精修
 

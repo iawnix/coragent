@@ -226,6 +226,82 @@ def transaction(tmp_path, **extra):
     return options, value
 
 
+@pytest.mark.parametrize(('before', 'after'), [
+    (None, '/fixture/ssh-config'),
+    ('/fixture/old-config', '/fixture/ssh-config'),
+    ('/fixture/ssh-config', None),
+])
+def test_ssh_configuration_update_keeps_one_owned_pool_and_updates_maintenance(tmp_path, monkeypatch, before, after):
+    options = args(tmp_path, manage_qrun=['remote/main'], qrun_state_dir=['remote/main=/queue'],
+                   qrun_cpus=['remote/main=8'], qrun_memory_mb=['remote/main=4096'])
+    configured = target(tmp_path, transport='ssh', ssh_host='fixture',
+                        **({'ssh_config': before} if before is not None else {}))
+    settings = {'targets': {'remote/main': configured}}
+    value = {'install_root': options.install_root, 'settings': settings,
+             'qrun': installer.plan(options, settings)}
+    calls = []
+
+    def invoke(pool, operation, *_args, **_fields):
+        calls.append((operation, pool['route'].get('ssh_config')))
+        return {'handler': ['/stable/handler'], 'unit': 'fixture.service'}
+
+    monkeypatch.setattr(installer, 'invoke', invoke)
+    installer.commit(installer.prepare(value, options, REPO))
+    configured.pop('ssh_config', None)
+    if after is not None:
+        configured['ssh_config'] = after
+    upgrade = args(tmp_path)
+    value['qrun'] = installer.plan(upgrade, settings)
+    assert len(value['qrun']) == 1
+    pool = value['qrun'][0]
+    assert pool['state_dir'] == '/queue'
+    assert (pool['cpus'], pool['memory_mb']) == (8, 4096)
+    transaction = installer.prepare(value, upgrade, REPO)
+    rows = installer.registry(options.install_root)['pools']
+    assert len(rows) == 1
+    assert rows[0]['previous']['route'].get('ssh_config') == before
+    assert rows[0]['route'].get('ssh_config') == after
+    installer.commit(transaction)
+    rows = installer.registry(options.install_root)['pools']
+    assert len(rows) == 1 and rows[0]['published'] and not rows[0]['pending']
+    assert rows[0]['handler'] == ['/stable/handler'] and 'previous' not in rows[0]
+    installer.remove(Path(options.install_root), upgrade, REPO)
+    assert calls == [('install', before), ('commit', before),
+                     ('install', after), ('commit', after), ('remove', after)]
+
+
+@pytest.mark.parametrize('change', ['host', 'transport', 'state_dir'])
+def test_connection_update_does_not_allow_moving_an_owned_pool(tmp_path, change):
+    options = args(tmp_path)
+    state = installer.registry(options.install_root)
+    state['pools'] = [{'route': {'transport': 'ssh', 'ssh_host': 'fixture'},
+                       'targets': ['remote/main'], 'state_dir': '/queue',
+                       'handler': ['/stable/handler'], 'cpus': 8, 'memory_mb': 4096}]
+    installer.save(options.install_root, state)
+    configured = target(tmp_path, transport='ssh', ssh_host='fixture',
+                        ssh_config='/fixture/ssh-config', handler=['/stable/handler'])
+    if change == 'host':
+        configured['ssh_host'] = 'other'
+    elif change == 'transport':
+        configured['transport'] = 'local'
+    else:
+        options.qrun_state_dir = ['remote/main=/other-queue']
+    with pytest.raises(ValueError, match='managed Qrun (route changed|state directory cannot change)'):
+        installer.plan(options, {'targets': {'remote/main': configured}})
+
+
+def test_shared_remote_pool_rejects_conflicting_ssh_configuration(tmp_path):
+    names = ['one/main', 'two/main']
+    options = args(tmp_path, manage_qrun=names,
+                   qrun_state_dir=[name + '=/queue' for name in names],
+                   qrun_cpus=[name + '=8' for name in names],
+                   qrun_memory_mb=[name + '=4096' for name in names])
+    settings = {'targets': {name: target(tmp_path, transport='ssh', ssh_host='fixture',
+                                         ssh_config='/fixture/' + name.split('/')[0]) for name in names}}
+    with pytest.raises(ValueError, match='same SSH configuration'):
+        installer.plan(options, settings)
+
+
 def test_controller_records_ownership_before_effect_and_rolls_back_lost_response(tmp_path, monkeypatch):
     options, value = transaction(tmp_path)
     calls = []

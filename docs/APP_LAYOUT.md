@@ -80,6 +80,15 @@ Pi session history lives at
 `<state_root>/pi/sessions/<workspace-id>/<session-id>/session.sqlite`, with adjacent
 `meta.json`. Research files remain in the workspace across session changes.
 
+`paths.workspace_root` selects the active workspace catalog used by both Job
+monitoring and Host session recovery. Switching to a new workspace root leaves
+the previous research directories and Pi session files in place. Sessions whose
+workspace is outside the current catalog are not reopened during Host startup,
+so their Task and Research schemas are not loaded. Explicitly registering an
+older workspace in the current catalog brings it back into the active scope.
+Stop the Host before changing this scope; the setting does not terminate workers
+that are already running or migrate historical records.
+
 Inspect resolved paths without changing the installation. Run from a source
 checkout or the installed package root, `<software_root>/current/agent`:
 

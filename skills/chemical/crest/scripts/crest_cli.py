@@ -17,7 +17,8 @@ def parse_arguments(argv=None):
     p.add_argument('--timeout', type=float, default=3600., help='Wall time in seconds for the search')
     p.add_argument('--energy-window', type=float, default=6., help='CREST ewin in kcal/mol')
     p.add_argument('--solvent', help='ALPB solvent; omitted means gas phase')
-    p.add_argument('--max-members', type=int, default=256)
+    p.add_argument('--max-members', type=int, default=256,
+                   help='Structured output read budget (1..1024), not a native sampling or selection limit; larger outputs remain available for reparsing')
     a = p.parse_args(argv)
     if not 1 <= a.threads <= 256 or not 1 <= a.max_members <= 1024:
         p.error('threads must be 1..256 and max-members 1..1024')

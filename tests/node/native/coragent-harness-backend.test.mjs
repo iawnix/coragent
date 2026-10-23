@@ -3,6 +3,8 @@ import test from "node:test";
 
 import { failureSummary, normalizeOperationFailure } from "../../../apps/agent/runtime/backend.mjs";
 
+const workspaceCatalog = (...ids) => ({ list: async () => ids.map(workspace_id => ({ workspace_id })) });
+
 test("normalizes auth_unavailable failures with an HTTP status and operation id", () => {
   const detail = "503 auth_unavailable: no auth available providers=codex, model=gpt-5.6-sol\nlast upstream error: server_error: Our servers are currently overloaded";
   assert.deepEqual(
@@ -67,7 +69,8 @@ test("catalog recovery opens idle sessions without clients, bounds startup, and 
   const sessions = Array.from({ length: 11 }, (_, index) => ({ workspaceId: "workspace-a", sessionId: `session-${index}` }));
   let concurrent = 0, peak = 0;
   const visited = [];
-  const result = await recoverSessionCatalog({ sessions, isClosed: () => false, openSession: async summary => {
+  const result = await recoverSessionCatalog({ sessions, workspaceCatalog: workspaceCatalog("workspace-a"),
+    isClosed: () => false, openSession: async summary => {
     concurrent++;
     peak = Math.max(peak, concurrent);
     visited.push(summary.sessionId);
@@ -86,10 +89,39 @@ test("catalog recovery stops opening workers during backend shutdown", async () 
   let closed = false;
   const sessions = Array.from({ length: 20 }, (_, index) => ({ workspaceId: "workspace-a", sessionId: `session-${index}` }));
   const opened = [];
-  const result = await recoverSessionCatalog({ sessions, isClosed: () => closed, openSession: async summary => {
+  const result = await recoverSessionCatalog({ sessions, workspaceCatalog: workspaceCatalog("workspace-a"),
+    isClosed: () => closed, openSession: async summary => {
     opened.push(summary.sessionId);
     closed = true;
   } });
   assert.equal(opened.length, 1);
   assert.equal(result.state, "stopped");
+});
+
+test("changing the active workspace catalog retains old sessions without reopening their workers", async () => {
+  const { recoverSessionCatalog } = await import("../../../apps/agent/runtime/backend.mjs");
+  const sessions = Object.freeze([
+    Object.freeze({ workspaceId: "old-research", sessionId: "old-protocol-session" }),
+    Object.freeze({ workspaceId: "recovered-research", sessionId: "current-session" }),
+  ]);
+  const opened = [];
+  const result = await recoverSessionCatalog({ sessions, workspaceCatalog: workspaceCatalog("recovered-research"),
+    isClosed: () => false, openSession: async summary => {
+      if (summary.workspaceId === "old-research") throw new Error("Old session protocol must not be read");
+      opened.push(summary.sessionId);
+    } });
+  assert.deepEqual(opened, ["current-session"]);
+  assert.deepEqual(result, { state: "ready", recovered: 1, failures: [] });
+  assert.equal(sessions.length, 2);
+  assert.equal(sessions[0].sessionId, "old-protocol-session");
+});
+
+test("an empty active workspace catalog does not recover archived sessions", async () => {
+  const { recoverSessionCatalog } = await import("../../../apps/agent/runtime/backend.mjs");
+  const result = await recoverSessionCatalog({
+    sessions: [{ workspaceId: "old-research", sessionId: "old-session" }],
+    workspaceCatalog: workspaceCatalog(), isClosed: () => false,
+    openSession: async () => assert.fail("No active workspace owns this session"),
+  });
+  assert.deepEqual(result, { state: "ready", recovered: 0, failures: [] });
 });

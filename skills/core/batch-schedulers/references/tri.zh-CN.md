@@ -42,6 +42,13 @@ Job 的有效运行时限转换为 `--timeout`。TRI 按节点和资源分配任
 `logs/stdout.log` 和 `logs/stderr.log`，TRI 自身的任务日志写入
 `logs/scheduler.stdout` 和 `logs/scheduler.stderr`。
 
+新提交时，handler 在提交主机计算暂存入口脚本的哈希，将预期哈希和校验命令一起
+写入 TRI 的原生任务 argv。分配节点上的入口文件缺失或字节不一致时，先以退出码 125
+和 `CORAGENT_EXECUTION_ERROR=execution_script_changed` 拒绝，不执行该文件。
+入口还在计算前核对声明输入文件；输入变化或缺失会报
+`CORAGENT_INPUT_ERROR=staged_input_changed`。因此同路径上的旧文件不会悄悄运行另一项
+计算；这些检查不修复挂载差异，也不负责 TRI 节点间的文件传输。
+
 提交将 Job 的稳定请求身份同时作为 `--request-id` 和 `--external-id`。
 恢复使用 `tri_stat --external-id` 查找原任务。脚本将 `wait` 转换为排队，
 `run` 转换为运行，`lost` 转换为未知。运行中的取消请求保持待确认，直到 TRI
@@ -58,7 +65,8 @@ JSON
 
 设置 `storage.file_mode="shared"`，并将 `storage.work_root` 指向共享工作区父目录，即可直接在
 工作区任务目录执行；本机和 SSH 提交均支持。默认 `storage.file_mode="staged"` 保留输入
-传输与输出回收。共享检查由通用执行层负责，TRI 协议和处理器无需改变。
+传输与输出回收。共享检查由通用执行层负责，TRI handler 在原生命令中加入入口脚本
+校验；两种模式使用同一个外部 Job 协议。
 
 ## 提交与诊断
 

@@ -5,6 +5,10 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
+
+# Direct Skill invocation uses the same configuration contract as the Host.
+sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "backend/src"))
 
 from notify_lib import delivery
 from notify_lib.artifacts import workspace_path

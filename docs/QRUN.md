@@ -67,6 +67,10 @@ service mode when acceptance requires execution Jobs. Custom handlers are never
 implicitly adopted. `--without-managed-qrun` uses independently managed pools.
 Different SSH aliases are not recognized as the same host; use one canonical alias
 to avoid duplicate resource budgets.
+For an existing pool, `ssh_config` can be added, changed or removed during an
+upgrade while retaining its transport, SSH host and state directory. Maintenance
+and uninstall use the updated connection settings. Targets sharing the pool must
+agree on `ssh_config`.
 
 Upgrades require a drained queue and preserve history and stable handler paths.
 Explicit capacity flags resize drained pools; omitted flags preserve the live budget. Failures attempt to restore the

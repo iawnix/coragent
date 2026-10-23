@@ -47,6 +47,15 @@ directory and writes the scientific process's logs to `logs/stdout.log` and
 `logs/stderr.log`; TRI's own task logs go to `logs/scheduler.stdout` and
 `logs/scheduler.stderr`.
 
+For new submissions, the handler hashes the staged wrapper on the submission
+host and carries the expected digest and verification command in TRI's task argv.
+On the allocated node, missing or different wrapper bytes fail with exit 125 and
+`CORAGENT_EXECUTION_ERROR=execution_script_changed`, before that file can execute.
+The wrapper then checks the declared input files before starting the calculation;
+changed or missing input bytes fail with `CORAGENT_INPUT_ERROR=staged_input_changed`.
+This prevents an old file at the same absolute path from silently running another
+calculation. It does not repair mismatched mounts or transfer files between TRI nodes.
+
 Submission uses the Job's stable request identity as both `--request-id` and
 `--external-id`. Recovery queries `tri_stat --external-id` for the original task.
 The helper reports `wait` as queued, `run` as running, and `lost` as unknown.
@@ -67,7 +76,8 @@ Use `storage.file_mode="shared"` and set `storage.work_root` to the shared works
 directly in each workspace Job directory. Both local and SSH submission support
 this mode. The default `storage.file_mode="staged"` retains input/output transfers.
 Storage probes and compute-node guards belong to the generic runtime; the TRI
-protocol and helper do not change.
+handler adds the wrapper check to its native command. Both modes use the same
+external Job protocol.
 
 ## Submission and diagnostics
 
