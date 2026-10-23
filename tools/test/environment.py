@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-TEST_IMPORTS = "import ase,jsonschema,packaging,numpy,pytest,rdkit,scipy; from PIL import Image"
+TEST_IMPORTS = "import ase,cclib,jsonschema,packaging,numpy,pytest,rdkit,scipy; from PIL import Image"
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -56,6 +56,7 @@ def spec_sha256(package_root: Path) -> str:
 def default_prefix(package_root: Path, env_root: Path) -> Path:
     return env_root / 'deps/python' / key(package_root, [
         'tools/test/environment.lock.txt', 'tools/test/environment.py',
+        'skills/chemical/environments/structure.requirements.txt',
     ])
 
 
@@ -161,6 +162,9 @@ def prepare(package_root: Path, root: Path, components: list[str] | None = None)
                         shutil.rmtree(target)
                     repair_conda_pycache_entries(Path(os.environ['CONDA_PKGS_DIRS']))
                     run([conda, 'create', '--yes', '--offline', '--prefix', str(target), '--file', str(lock)])
+                    if component == 'python':
+                        run([str(target / 'bin/python'), '-m', 'pip', 'install', '--no-deps', '--require-hashes',
+                             '-r', str(package_root / 'skills/chemical/environments/structure.requirements.txt')])
                     if not probe(target / 'bin/python',TEST_IMPORTS if component=='python' else 'import jsonschema,packaging'): raise RuntimeError('Locked Python probe failed')
                 elif component == 'node':
                     target.mkdir()

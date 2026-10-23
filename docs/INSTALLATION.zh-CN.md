@@ -69,8 +69,9 @@ password = "credential:smtp_password"
 无交互安装增加 `--non-interactive --yes`。`--dry-run` 不下载、安装或启动服务，且不输出凭据。
 
 安装器准备 CoRAgent 自身的 Python/Pi 运行环境、生成服务并检查已配置的执行环境。
-科学计算环境可独立准备后在 `execution.targets.*.bindings` 中绑定，也可显式使用安装参数
-`--job-profile TARGET:PROFILE` 选择受管环境。主安装不默认创建科学环境，详见
+科学计算环境独立准备后在 `execution.platforms.<platform>.bindings` 或入口覆盖中绑定。
+主安装器不创建科学环境；平台与 Qrun 参数采用 `PLATFORM/ENTRY`，见
+[计算平台](EXECUTION_PLATFORMS.zh-CN.md)。环境准备详见
 [科学执行与运维](SCIENTIFIC_CAPABILITIES_OPERATIONS.zh-CN.md)。
 
 安装器不会隐式导入 `~/.pi/agent`。需要导入已有组件配置时，可以显式使用
@@ -98,6 +99,12 @@ fed1/fed2 共享软件时，在有写权限的节点安装一次，两个节点�
 外部目标可设置 `file_mode="shared"` 直接在该目录执行；默认仍为暂存传输。
 共享检查和配置方式见 [外部任务](EXTERNAL_JOBS.zh-CN.md)。
 
+本机默认 Qrun 队列由主安装器自动管理；SSH 队列可通过 `--manage-qrun TARGET`
+及状态目录、CPU、内存参数显式托管。多个本机目标共用资源池，代码升级要求先排空作业。
+日常 CPU／内存预算调整使用 `qrun config` 在线完成，无需排空；升级时未明确传容量参数，
+就保留在线调整后的预算。
+配置示例及依赖见 [Qrun 安装与运维](QRUN.zh-CN.md)。
+
 ## 卸载
 
 ```sh
@@ -107,7 +114,10 @@ fed1/fed2 共享软件时，在有写权限的节点安装一次，两个节点�
 默认移除应用程序及匹配的服务，保留配置、会话和研究工作区。
 `--purge-config` 清理主配置、凭据和生成配置；`--purge-workspaces` 显式清理工作区与会话；
 `--purge-runtime` 只清理有匹配归属记录的 CoRAgent 自身运行环境。
-它不会清理独立计算环境或 TRI。卸载只删除选定配置文件，不递归删除其父目录中的其他文件。
+卸载会移除所属本机与 SSH Qrun 队列服务，默认保留队列历史与计算目录。
+未完成作业会阻止卸载，除非传入 `--cancel-qrun-jobs`；`--purge-qrun-state`
+可删除队列历史。`--purge-all` 包含历史清理，但不隐含取消作业。
+它不会清理独立计算环境、独立管理的 Qrun 或 TRI。卸载只删除选定配置文件，不递归删除其父目录中的其他文件。
 卸载器的必要解析代码随安装保存，因此删除源码检出后仍可卸载。
 
 ## 测试

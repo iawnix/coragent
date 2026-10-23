@@ -39,7 +39,7 @@ test("task destination reaches runtime for raw, file and registered requests", a
   const calls = [];
   const [start] = createJobTools({
     commandBridge: { execute_command: async (_command, params) => { calls.push(params); return { job_id: "job_1" }; } },
-    getTaskBinding: async () => ({ user_task_id: "task_1", execution_target: "cluster_a", route_digest: "sha256:" + "a".repeat(64) }),
+    getTaskBinding: async () => ({ user_task_id: "task_1", execution_context: { selection: { target: { platform: "cluster_a", scheduler_entry: "main" }, route_digest: "sha256:" + "a".repeat(64) } } }),
   });
   assert.equal("required_target" in start.parameters.properties, false);
   assert.equal("required_route_digest" in start.parameters.properties, false);
@@ -47,8 +47,8 @@ test("task destination reaches runtime for raw, file and registered requests", a
     await start.execute(params, api, context);
   }
   assert.equal(calls.length, 3);
-  assert.ok(calls.every(p => p.required_target === "cluster_a"));
-  assert.ok(calls.every(p => p.required_route_digest === "sha256:" + "a".repeat(64)));
+  assert.ok(calls.every(p => p.execution_context.selection.target.platform === "cluster_a"));
+  assert.ok(calls.every(p => p.execution_context.selection.route_digest === "sha256:" + "a".repeat(64)));
   assert.equal(calls[1].request_file, "request.json");
   assert.equal("platform" in calls[1], false, "task constraint checks but never rewrites a prepared request");
 });

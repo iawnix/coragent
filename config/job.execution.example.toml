@@ -1,44 +1,57 @@
-# Command transport and compute scheduling are configured independently.
-[execution]
-default_target = "local"
+["execution"]
+"schema_version" = 2
+"default_platform" = "local"
 
-[execution.targets.local]
-type = "local"
-driver = "systemd" # use process where a user systemd manager is unavailable
-scheduler = "none"
-location = "controller"
-aliases = ["direct"]
+["execution"."platforms"]
 
-[execution.targets.batch]
-driver = "external"
-transport = "ssh" # use local when CoRAgent runs on the submission host
-scheduler = "pbs" # set to slurm or tri when using the corresponding handler
-location = "cluster"
-aliases = ["queue"]
-cluster_name = "cluster"
-ssh_host = "login.cluster.example" # omit for local transport
-file_mode = "staged" # default: copy inputs and collect outputs
-work_root = "/shared/coragent/jobs"
-# For direct shared execution, set file_mode = "shared" and work_root to
-# the shared workspace parent, e.g. /home/iaw/DATA/coragent/workspaces.
-# Controller, submission host and compute nodes must see the same physical paths.
-handler = ["/usr/bin/python3", "/opt/coragent/skills/core/batch-schedulers/scripts/batch.py", "pbs"]
-connect_timeout_seconds = 15
-command_timeout_seconds = 180
-transfer_timeout_seconds = 3600
+["execution"."platforms"."local"]
+"transport" = "local"
+"default_scheduler" = "qrun"
+"aliases" = ["direct"]
 
-# Use slurm or torque as the handler's final argument for those schedulers.
-# For TRI: scheduler = "tri" and handler = ["/usr/bin/python3", "/opt/coragent/skills/core/batch-schedulers/scripts/tri.py"]
-# Configure TRI_SOCKET under handler_environment and omit submission.queue.
-# For Slurm: scheduler = "slurm" and use the batch-schedulers batch.py handler with final argument slurm.
+["execution"."platforms"."local"."storage"]
+"work_root" = "/opt/coragent/jobs"
 
-[execution.targets.batch.bindings.xtb]
-command = "/opt/xtb/bin/xtb"
+["execution"."platforms"."local"."schedulers"]
 
-[execution.targets.batch.submission]
-queue = "batch"
+["execution"."platforms"."local"."schedulers"."qrun"]
+"executor" = "qrun"
 
-[execution.targets.batch.submission.resources]
-cpus = 4
-memory_mb = 4096
-walltime = "01:00:00"
+["execution"."platforms"."local"."schedulers"."qrun"."submission"]
+
+["execution"."platforms"."local"."schedulers"."qrun"."submission"."resources"]
+"cpus" = 1
+"memory_mb" = 1024
+
+["execution"."platforms"."batch"]
+"transport" = "ssh"
+"default_scheduler" = "pbs"
+"ssh_host" = "login.cluster.example"
+"connect_timeout_seconds" = 15
+"command_timeout_seconds" = 180
+"transfer_timeout_seconds" = 3600
+"aliases" = ["queue"]
+
+["execution"."platforms"."batch"."bindings"]
+
+["execution"."platforms"."batch"."bindings"."xtb"]
+"command" = "/opt/xtb/bin/xtb"
+
+["execution"."platforms"."batch"."storage"]
+"work_root" = "/shared/coragent/jobs"
+"file_mode" = "staged"
+
+["execution"."platforms"."batch"."schedulers"]
+
+["execution"."platforms"."batch"."schedulers"."pbs"]
+"executor" = "pbs"
+"cluster_name" = "cluster"
+"handler" = ["/usr/bin/python3", "/opt/coragent/skills/core/batch-schedulers/scripts/batch.py", "pbs"]
+
+["execution"."platforms"."batch"."schedulers"."pbs"."submission"]
+"queue" = "batch"
+
+["execution"."platforms"."batch"."schedulers"."pbs"."submission"."resources"]
+"cpus" = 4
+"memory_mb" = 4096
+"walltime" = "01:00:00"

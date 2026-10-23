@@ -14,7 +14,7 @@
 | 手机连接及客户端协议 | [CoRAgent Link](CORAGENT_LINK.zh-CN.md)、[Phone 协议](PHONE_PROTOCOL.zh-CN.md) |
 | 模型、凭据和上下文容量 | [模型配置](MODEL_COMPATIBILITY.zh-CN.md) |
 | 科学计算方法和支持范围 | [科学执行与运维](SCIENTIFIC_CAPABILITIES_OPERATIONS.zh-CN.md)、[能力清单](../skills/chemical/method-selection/references/capabilities.zh-CN.md) |
-| 调度器接入和 Job 资源 | [外部 Job](EXTERNAL_JOBS.zh-CN.md) |
+| 调度器接入和 Job 资源 | [外部 Job](EXTERNAL_JOBS.zh-CN.md)、[Qrun 本机／SSH 队列](QRUN.zh-CN.md) |
 | Skill 和操作入口 | [Skill 目录](../skills/README.zh-CN.md)、[脚本索引](skill-script-routing.zh-CN.md) |
 
 ## 理解与维护
@@ -31,6 +31,9 @@
 | 科学回归的覆盖范围 | [领域科学回归](SCIENTIFIC_REGRESSIONS.zh-CN.md) |
 | 固定 Pi 运行时集成 | [Pi 补丁（英文）](PI_RUNTIME_PATCHES.md) |
 
+[命名计算平台与多集群执行](EXECUTION_PLATFORMS.zh-CN.md)说明平台／入口配置、共享环境、
+存储、任务计划与安装入口选择。
+
 ## 待实施提案
 
 [Pi 1.3.0 升级审查](PI_1_3_MIGRATION.zh-CN.md)是注明日期的上游对照和未实施建议。
@@ -43,3 +46,5 @@
 明确标注。测试结果只适用于对应源码或发行产物，历史通过记录不能证明后续版本已经验收。
 
 项目源码采用 [Apache License 2.0](../LICENSE)；第三方依赖、固定 Pi 源码和素材保留各自许可证。
+
+- [TRI 部署与维护](TRI_OPERATIONS.zh-CN.md)

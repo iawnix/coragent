@@ -13,13 +13,12 @@ from .models import (
     JobStatus,
 )
 from .platform import ExecutionPlatform
-from .local import LocalProcessPlatform
 from .external import ExternalJobPlatform
 from .config import load_job_config, platforms_from_config
 from .manager import JobManager
 
 __all__ = [
     "ExecutionPlatform", "JobOutput", "JobReceipt", "JobManager", "JobSpec",
-    "JobState", "JobStatus", "ExternalJobPlatform", "LocalProcessPlatform",
+    "JobState", "JobStatus", "ExternalJobPlatform",
     "load_job_config", "platforms_from_config",
 ]

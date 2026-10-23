@@ -34,14 +34,7 @@ def catalog(root, monkeypatch):
 
 
 def binding(path):
-    text = '''[execution]
-default_target="local"
-[execution.targets.local]
-type="local"
-driver="process"
-[execution.targets.local.bindings.shell]
-command="/bin/sh"
-'''
+    text = '[execution]\nschema_version = 2\ndefault_platform="local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n[execution.platforms.local.bindings.shell]\ncommand="/bin/sh"\n'
     path.write_text(text)
     return text
 
@@ -56,7 +49,7 @@ def test_external_native_executor_runs_without_core_changes_or_python_binding(tm
     binding(config)
     source = root / "data.txt"
     source.write_text("externally declared result\n")
-    request = prepare(config, "local", "external.copy", "3", {"data": source})
+    request = prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, "external.copy", "3", {"data": source})
     assert request["metadata"]["execution_argv"] == ["/bin/sh", "run.sh", "input.txt"]
     assert "python_binding" not in request["metadata"]
     assert not list((root/"operations/executions").glob("*.json"))
@@ -96,9 +89,9 @@ def test_only_selected_binding_and_actual_input_content_change_work_identity(tmp
     source = tmp_path / "data.txt"
     source.write_text("one")
     def request():
-        return prepare(config, "local", "external.copy", "3", {"data": source})
+        return prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, "external.copy", "3", {"data": source})
     first = request()
-    config.write_text(original + '\n[execution.targets.other]\ntype="local"\ndriver="external"\ntransport="local"\nwork_root="/tmp/other"\nhandler=["/bin/true"]\n[execution.targets.other.bindings.other]\ncommand="/unrelated"\n')
+    config.write_text(original + '\n[execution.platforms.other]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="local"\nstorage.work_root="/tmp/other"\nschedulers.main.handler=["/bin/true"]\n[execution.platforms.other.bindings.other]\ncommand="/unrelated"\n')
     assert request() == first
     config.write_text(original.replace('/bin/sh', '/bin/bash'))
     assert request()["work_id"] != first["work_id"]
@@ -117,7 +110,7 @@ def test_previously_loaded_catalog_does_not_authorize_changed_executor_resources
     source.write_text("input")
     (tmp_path / "catalog/run.sh").write_text("exit 23\n")
     with pytest.raises(ValueError, match="execution_resource_changed"):
-        prepare(config, "local", "external.copy", "3", {"data": source})
+        prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, "external.copy", "3", {"data": source})
 
 
 def test_unregistered_version_or_undeclared_input_cannot_prepare(tmp_path, monkeypatch):
@@ -125,9 +118,9 @@ def test_unregistered_version_or_undeclared_input_cannot_prepare(tmp_path, monke
     config = tmp_path / "job.toml"
     binding(config)
     with pytest.raises(ValueError, match="executors_not_registered"):
-        prepare(config, "local", "external.copy", "4", {})
+        prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, "external.copy", "4", {})
     with pytest.raises(ValueError, match="executor_inputs_invalid"):
-        prepare(config, "local", "external.copy", "3", {})
+        prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, "external.copy", "3", {})
 
 
 def test_prepared_native_entry_cannot_replace_its_bound_executable(tmp_path, monkeypatch):
@@ -137,7 +130,7 @@ def test_prepared_native_entry_cannot_replace_its_bound_executable(tmp_path, mon
     config = tmp_path / 'job.toml'
     binding(config)
     source = tmp_path / 'input.txt'; source.write_text('input')
-    request = prepare(config, 'local', 'external.copy', '3', {'data': source})
+    request = prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, 'external.copy', '3', {'data': source})
     metadata = request['metadata']
     metadata['execution_argv'][0] = '/bin/false'
     request['command'], _ = guarded_command(metadata['execution_binding'], metadata['execution_argv'], metadata['execution_environment'])
@@ -150,7 +143,7 @@ def test_task_specific_script_uses_explicit_binding_and_pinned_dependencies(tmp_
     import os
     import tomllib
     settings = tomllib.loads(Path(os.environ['CORAGENT_JOB_CONFIG']).read_text())
-    prefix = Path(settings['execution']['targets']['local']['bindings']['structure']['python']['prefix'])
+    prefix = Path(settings['execution']['platforms']['local']['bindings']['structure']['python']['prefix'])
     # This dependency exists only in the selected target, not the control Python.
     site = next(prefix.glob('lib/python*/site-packages'))
     (site / 'target_only_analysis.py').write_text('def transform(text): return text.upper()\n')
@@ -161,7 +154,7 @@ def test_task_specific_script_uses_explicit_binding_and_pinned_dependencies(tmp_
         "print(result)\n" + ("Path('output.json').write_text(result)\n" if write_output else ""))
     source = tmp_path / "data.txt"
     source.write_text("new research method")
-    request = prepare_script(os.environ["CORAGENT_JOB_CONFIG"], "local", "structure", script,
+    request = prepare_script(os.environ["CORAGENT_JOB_CONFIG"], {'platform': 'local', 'scheduler_entry': 'main'}, "structure", script,
                              dependencies=[str(source) + "=input.txt"], collect=["output.json"])
     assert request["metadata"]["execution_binding"]["backend"] == "structure"
     assert "executor" not in request["metadata"]
@@ -204,32 +197,11 @@ def test_validator_on_remote_default_uses_remote_python_and_selected_resources(t
     (root / "package.json").write_text(json.dumps({"coragent": {"execution": ["execution.json"]}}))
     monkeypatch.setenv("CORAGENT_PACKAGE_ROOT", str(root))
     config = tmp_path / "job.toml"
-    config.write_text('''[execution]
-default_target="cluster"
-[execution.targets.cluster]
-driver="external"
-transport="ssh"
-handler=["/bin/true"]
-ssh_host="fixture"
-work_root="/scratch/jobs"
-[execution.targets.cluster.submission]
-queue="science"
-[execution.targets.cluster.submission.resources]
-cpus=3
-[execution.targets.cluster.bindings.validation]
-[execution.targets.cluster.bindings.validation.python]
-manager="conda"
-conda_executable="/cluster/conda/bin/conda"
-prefix="/cluster/validation"
-lock_ref="/cluster/validation.lock"
-[execution.targets.local]
-type="local"
-driver="process"
-''')
+    config.write_text('[execution]\nschema_version = 2\ndefault_platform="cluster"\n[execution.platforms.cluster]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="ssh"\nschedulers.main.handler=["/bin/true"]\nssh_host="fixture"\nstorage.work_root="/scratch/jobs"\n[execution.platforms.cluster.schedulers.main.submission]\nqueue="science"\n[execution.platforms.cluster.schedulers.main.submission.resources]\ncpus=3\n[execution.platforms.cluster.bindings.validation]\n[execution.platforms.cluster.bindings.validation.python]\nmanager="conda"\nconda_executable="/cluster/conda/bin/conda"\nprefix="/cluster/validation"\nlock_ref="/cluster/validation.lock"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n')
     artifact = evidence("create", {"root": str(tmp_path), "content": "registered input"})
     params = {"validator_id": "external.validator", "validator_version": "1", "input_artifact_ids": [artifact["artifact_id"]]}
     request = prepare_validator(tmp_path, params)
-    assert request["execution_target"] == "cluster"
+    assert request["execution_target"] == {'platform': 'cluster', 'scheduler_entry': 'main'}
     assert "/cluster/conda/bin/conda" in request["command"]
     assert "/cluster/validation" in request["command"]
     assert request["metadata"]["resources"] == {"cpus": 3}
@@ -240,7 +212,7 @@ driver="process"
     from research_agent.application.execution_environment import check_binding
     check_binding(allocated, probe=False)
     with pytest.raises(ValueError, match="executor_binding_missing"):
-        prepare_validator(tmp_path, {**params, "execution_target": "local"})
+        prepare_validator(tmp_path, {**params, "execution_target": {'platform': 'local', 'scheduler_entry': 'main'}})
 
 
 @pytest.mark.parametrize("kind", ["seed", "path-candidates", "generic-path-candidates"])
@@ -261,7 +233,7 @@ def test_structure_generation_collects_every_output_with_binding_and_attempt(tmp
         inputs, refs = {"spec": spec}, [registered["artifact_id"]]
         arguments = ["--enumerate-stereo", "--conformers", "1"]
         expected = "results/candidate-1-1/ts.gjf"
-    request = prepare(os.environ["CORAGENT_JOB_CONFIG"], "local", "chemical." + kind.removeprefix("generic-"), "1", inputs, arguments, input_artifact_ids=refs)
+    request = prepare(os.environ["CORAGENT_JOB_CONFIG"], {'platform': 'local', 'scheduler_entry': 'main'}, "chemical." + kind.removeprefix("generic-"), "1", inputs, arguments, input_artifact_ids=refs)
     path = tmp_path / "request.json"
     path.write_text(json.dumps(request))
     receipt = execute("job_start", tmp_path, {"request_file": str(path),
@@ -306,42 +278,20 @@ def test_one_executor_resolves_explicit_local_and_remote_targets(tmp_path, monke
     monkeypatch.setattr('research_agent.application.executors.probe_binding', probe)
     catalog(tmp_path / 'catalog', monkeypatch)
     config = tmp_path / 'job.toml'
-    config.write_text('''[execution]
-default_target="local"
-[execution.targets.local]
-type="local"
-driver="process"
-[execution.targets.local.bindings.shell]
-command="/bin/sh"
-[execution.targets.cluster]
-driver="external"
-transport="ssh"
-handler=["/bin/true"]
-ssh_host="fixture"
-work_root="/scratch/jobs"
-[execution.targets.cluster.submission]
-queue="science"
-[execution.targets.cluster.bindings.shell]
-command="/cluster/bin/sh"
-[execution.targets.empty]
-driver="external"
-transport="local"
-work_root="/scratch/empty"
-handler=["/bin/true"]
-''')
+    config.write_text('[execution]\nschema_version = 2\ndefault_platform="local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n[execution.platforms.local.bindings.shell]\ncommand="/bin/sh"\n[execution.platforms.cluster]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="ssh"\nschedulers.main.handler=["/bin/true"]\nssh_host="fixture"\nstorage.work_root="/scratch/jobs"\n[execution.platforms.cluster.schedulers.main.submission]\nqueue="science"\n[execution.platforms.cluster.bindings.shell]\ncommand="/cluster/bin/sh"\n[execution.platforms.empty]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="local"\nstorage.work_root="/scratch/empty"\nschedulers.main.handler=["/bin/true"]\n')
     source = tmp_path / 'input.txt'
     source.write_text('same scientific input')
-    local = prepare(config, 'local', 'external.copy', '3', {'data': source})
-    remote = prepare(config, 'cluster', 'external.copy', '3', {'data': source})
+    local = prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, 'external.copy', '3', {'data': source})
+    remote = prepare(config, {'platform': 'cluster', 'scheduler_entry': 'main'}, 'external.copy', '3', {'data': source})
     assert local['metadata']['executor'] == remote['metadata']['executor']
     assert local['metadata']['resources_sha256'] == remote['metadata']['resources_sha256']
     assert local['metadata']['execution_argv'][0] == '/bin/sh'
     assert remote['metadata']['execution_argv'][0] == '/cluster/bin/sh'
     assert remote['metadata']['queue'] == 'science'
-    assert remote['execution_target'] == 'cluster' and local['execution_target'] == 'local'
+    assert remote['execution_target'] == {'platform': 'cluster', 'scheduler_entry': 'main'} and local['execution_target'] == {'platform': 'local', 'scheduler_entry': 'main'}
     assert remote['work_id'] != local['work_id']
     with pytest.raises(ValueError, match='executor_binding_missing'):
-        prepare(config, 'empty', 'external.copy', '3', {'data': source})
+        prepare(config, {'platform': 'empty', 'scheduler_entry': 'main'}, 'external.copy', '3', {'data': source})
 
 
 def test_readiness_distinguishes_shared_backend_configuration_from_verification(tmp_path, monkeypatch):
@@ -356,14 +306,14 @@ def test_readiness_distinguishes_shared_backend_configuration_from_verification(
     declaration['executors'].append(second)
     path.write_text(json.dumps(declaration))
     config = tmp_path / 'job.toml'
-    config.write_text(binding(config) + '\n[execution.targets.empty]\ntype="local"\ndriver="external"\ntransport="local"\nwork_root="/tmp/empty"\nhandler=["/bin/true"]\n')
+    config.write_text(binding(config) + '\n[execution.platforms.empty]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="local"\nstorage.work_root="/tmp/empty"\nschedulers.main.handler=["/bin/true"]\n')
     monkeypatch.setattr('research_agent.application.environment_check.probe_binding',
                         lambda *args: pytest.fail('configuration-only check must not contact a target'))
     result = check_environments(load_job_config(config), catalogs=installed_catalogs(), probe=False)
-    assert len(result['local']) == 2
-    assert all(row['status'] == 'configuration_validated' for row in result['local'].values())
-    assert all(row['environment_evidence'] is None for row in result['local'].values())
-    assert all(row['status'] == 'not_configured' for row in result['empty'].values())
+    assert len(result['local/main']) == 2
+    assert all(row['status'] == 'configuration_validated' for row in result['local/main'].values())
+    assert all(row['environment_evidence'] is None for row in result['local/main'].values())
+    assert all(row['status'] == 'not_configured' for row in result['empty/main'].values())
 
 
 @pytest.mark.skipif(importlib.util.find_spec('numpy') is None or importlib.util.find_spec('rdkit') is None,
@@ -397,7 +347,7 @@ def test_installed_resolver_is_used_by_an_isolated_name_resolution_job(tmp_path,
             job = app_paths(root).job_config
             job.parent.mkdir(parents=True)
             settings = tomllib.loads(Path(os.environ['CORAGENT_JOB_CONFIG']).read_text())
-            local = settings['execution']['targets']['local']
+            local = settings['execution']['platforms']['local']
             local['bindings'] = {'structure': local['bindings']['structure']}
             job.write_bytes(wizard._job_config_bytes(settings))
             resolver = app_paths(root).resolver_config
@@ -407,7 +357,7 @@ def test_installed_resolver_is_used_by_an_isolated_name_resolution_job(tmp_path,
             monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(job))
             # Ambient Host configuration must not substitute for the installed binding.
             monkeypatch.setenv('CORAGENT_NAME_RESOLVER_CONFIG', str(tmp_path/'absent.toml'))
-            request = prepare(job, 'local', 'chemical.resolve', '1', {}, ['--name', 'ethanol'])
+            request = prepare(job, {'platform': 'local', 'scheduler_entry': 'main'}, 'chemical.resolve', '1', {}, ['--name', 'ethanol'])
             assert request['environment']['CORAGENT_NAME_RESOLVER_CONFIG'] == str(resolver)
             work = tmp_path / 'workspace'
             workspace(work)
@@ -442,7 +392,7 @@ def test_name_lookup_fallback_candidates_and_geometry_run_as_managed_jobs(tmp_pa
     config = os.environ['CORAGENT_JOB_CONFIG']
 
     def run(executor, inputs, arguments=()):
-        request = prepare(config, 'local', executor, '1', inputs, arguments)
+        request = prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, executor, '1', inputs, arguments)
         path = tmp_path / (executor + '.request.json')
         path.write_text(json.dumps(request))
         receipt = execute('job_start', tmp_path, {'request_file': str(path),

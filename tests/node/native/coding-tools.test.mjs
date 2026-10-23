@@ -69,11 +69,11 @@ test("search cancellation reaches the original Pi implementations", async t => {
 });
 
 test("bash inherits the current pinned target without shell interpolation or stale context", async t => {
-  let selection = { target: "tri'$(touch should-not-exist)", route_digest: "sha256:" + "a".repeat(64),
-    sources: [{ text: "quote ' and $(touch should-not-exist)" }] };
+  let selection = { selection: { target: "tri'$(touch should-not-exist)", route_digest: "sha256:" + "a".repeat(64),
+    } };
   const { cwd, invoke } = await fixture(t, async () => selection);
   const response = await invoke("bash", { command: 'printf "%s" "$CORAGENT_TASK_EXECUTION"' });
-  assert.ok(response.text.includes(JSON.stringify({ target: selection.target, route_digest: selection.route_digest })));
+  assert.ok(response.text.includes(JSON.stringify({ ...selection, workspace_root: cwd })));
   assert.doesNotMatch(response.text, /sources/);
   await assert.rejects(readFile(join(cwd, "should-not-exist")), { code: "ENOENT" });
   selection = null;

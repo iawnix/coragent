@@ -1,3 +1,5 @@
+
+from tests.support.platforms import execution_config
 import importlib.util
 from pathlib import Path
 import pytest
@@ -9,28 +11,24 @@ def binding(prefix):
 
 
 def config():
-    return validate_job_config({"execution": {"default_target": "local", "targets": {
-        "local": {"type": "local", "driver": "local"},
-        "remote": {"driver": "external", "transport": "ssh", "ssh_host": "fixture", "work_root": "/scratch/jobs",
-                   "handler": ["/bin/true"], "submission": {"queue": "test"}, "python": binding("/opt/runner"), "bindings": {
-            "xtb": {"command": ["/opt/xtb"]}, "pyscf": {"python": binding("/opt/cf22d")}}}}}})
+    return validate_job_config({"execution": execution_config("local", {
+        "local": {'executor': 'qrun', 'transport': 'local', 'work_root': '/fixture/qrun/jobs'},
+        "remote": {'executor': 'external', 'transport': 'ssh', 'ssh_host': 'fixture', 'work_root': '/scratch/jobs', 'handler': ['/bin/true'], 'submission': {'queue': 'test'}, 'python': binding('/opt/runner'), 'bindings': {'xtb': {'command': ['/opt/xtb']}, 'pyscf': {'python': binding('/opt/cf22d')}}}})})
 
 
 def test_conda_selection_and_host_python_isolation():
     c = validate_job_config(config())
-    assert resolve_python(c, "remote", "xtb")["prefix"] == "/opt/runner"
-    assert resolve_python(c, "remote", "pyscf")["prefix"] == "/opt/cf22d"
-    command = python_command(resolve_python(c, "remote", "xtb"))
+    assert resolve_python(c, 'remote/main', "xtb")["prefix"] == "/opt/runner"
+    assert resolve_python(c, 'remote/main', "pyscf")["prefix"] == "/opt/cf22d"
+    command = python_command(resolve_python(c, 'remote/main', "xtb"))
     assert command[:6] == ["env", "-u", "PYTHONHOME", "-u", "PYTHONPATH", "PYTHONNOUSERSITE=1"]
     assert command[-3:] == ["-p", "/opt/runner", "python"]
 
 
 def test_legacy_interpreter_is_not_a_second_configuration_protocol():
-    c = {"execution": {"default_target": "local", "targets": {
-        "local": {"type": "local", "driver": "local"},
-        "remote": {"type": "remote", "driver": "external", "transport": "ssh",
-                   "ssh_host": "fixture", "work_root": "/scratch/jobs", "handler": ["/bin/true"],
-                   "python": "/usr/bin/python3"}}}}
+    c = {"execution": execution_config("local", {
+        "local": {'executor': 'qrun', 'transport': 'local', 'work_root': '/fixture/qrun/jobs'},
+        "remote": {'executor': 'external', 'transport': 'ssh', 'ssh_host': 'fixture', 'work_root': '/scratch/jobs', 'handler': ['/bin/true'], 'python': '/usr/bin/python3'}})}
     with pytest.raises(ValueError, match="migrate legacy"):
         validate_job_config(c)
 
@@ -40,42 +38,20 @@ def test_skill_preparation_uses_bound_conda_and_rejects_dual_pyscf_binding(tmp_p
     import tomllib
     from research_agent.application.executors import prepare
     path = tmp_path / "job.toml"
-    text = '''[execution]
-default_target = "remote"
-[execution.targets.remote]
-driver = "external"
-transport = "ssh"
-handler = ["/bin/true"]
-ssh_host = "fixture"
-work_root = "/scratch/jobs"
-[execution.targets.remote.submission]
-queue = "test"
-[execution.targets.remote.python]
-manager = "conda"
-conda_executable = "/opt/conda/bin/conda"
-prefix = "/opt/runner"
-lock_ref = "/opt/locks/runner.lock"
-[execution.targets.remote.bindings.xtb]
-command = ["/opt/xtb"]
-[execution.targets.remote.bindings.pyscf.python]
-manager = "conda"
-conda_executable = "/opt/conda/bin/conda"
-prefix = "/opt/cf22d"
-lock_ref = "/opt/locks/cf22d.lock"
-'''
+    text = '[execution]\nschema_version = 2\ndefault_platform = "remote"\n[execution.platforms.remote]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport = "ssh"\nschedulers.main.handler = ["/bin/true"]\nssh_host = "fixture"\nstorage.work_root = "/scratch/jobs"\n[execution.platforms.remote.schedulers.main.submission]\nqueue = "test"\n[execution.platforms.remote.python]\nmanager = "conda"\nconda_executable = "/opt/conda/bin/conda"\nprefix = "/opt/runner"\nlock_ref = "/opt/locks/runner.lock"\n[execution.platforms.remote.bindings.xtb]\ncommand = ["/opt/xtb"]\n[execution.platforms.remote.bindings.pyscf.python]\nmanager = "conda"\nconda_executable = "/opt/conda/bin/conda"\nprefix = "/opt/cf22d"\nlock_ref = "/opt/locks/cf22d.lock"\n'
     path.write_text(text)
     xyz = tmp_path / "water.xyz"; xyz.write_text("1\nH\nH 0 0 0\n")
-    job = prepare(path, "remote", "chemical.xtb", "1", {"geometry": xyz}, ["--task", "opt-sp"])
+    job = prepare(path, {'platform': 'remote', 'scheduler_entry': 'main'}, "chemical.xtb", "1", {"geometry": xyz}, ["--task", "opt-sp"])
     assert "/opt/runner" in job["command"]
-    assert job["execution_target"] == "remote"
+    assert job["execution_target"] == {'platform': 'remote', 'scheduler_entry': 'main'}
     assert job["metadata"]["python_binding"]["lock_ref"] == "/opt/locks/runner.lock"
     with pytest.raises(ValueError, match="runner_arguments_invalid.*",):
-        prepare(path, "remote", "chemical.xtb", "1", {"geometry": xyz}, ["--task", "opt-sp", "--method", "GFN2-xTB"])
+        prepare(path, {'platform': 'remote', 'scheduler_entry': 'main'}, "chemical.xtb", "1", {"geometry": xyz}, ["--task", "opt-sp", "--method", "GFN2-xTB"])
     with pytest.raises(ValueError, match="owned by the execution descriptor"):
-        prepare(path, "remote", "chemical.xtb", "1", {"geometry": xyz}, ["--task", "sp", "--output-dir", "/tmp/escaped"])
-    path.write_text(text.replace('[execution.targets.remote.bindings.pyscf.python]', '[execution.targets.remote.bindings.pyscf]\ncommand = ["/old/python"]\n[execution.targets.remote.bindings.pyscf.python]'))
+        prepare(path, {'platform': 'remote', 'scheduler_entry': 'main'}, "chemical.xtb", "1", {"geometry": xyz}, ["--task", "sp", "--output-dir", "/tmp/escaped"])
+    path.write_text(text.replace('[execution.platforms.remote.bindings.pyscf.python]', '[execution.platforms.remote.bindings.pyscf]\ncommand = ["/old/python"]\n[execution.platforms.remote.bindings.pyscf.python]'))
     with pytest.raises(ValueError, match="executor_binding_unused_command"):
-        prepare(path, "remote", "chemical.cf22d", "1", {"geometry": xyz}, ["--task", "opt-sp"])
+        prepare(path, {'platform': 'remote', 'scheduler_entry': 'main'}, "chemical.cf22d", "1", {"geometry": xyz}, ["--task", "opt-sp"])
 
 
 def test_example_and_python_binding_share_public_schema():
@@ -92,14 +68,14 @@ def test_example_and_python_binding_share_public_schema():
     validator.validate(example)
     validate_job_config(example)
     inherited = copy.deepcopy(example)
-    inherited['execution']['targets']['local']['bindings']['pyscf'] = {}
+    inherited['execution']['platforms']['local']['bindings']['pyscf'] = {}
     validator.validate(inherited)
     validate_job_config(inherited)
-    assert resolve_python(validate_job_config(inherited), 'local', 'pyscf') == validate_job_config(inherited)['targets']['local']['python']
+    assert resolve_python(validate_job_config(inherited), 'local/qrun', 'pyscf') == validate_job_config(inherited)['targets']['local/qrun']['python']
     for invalid in ['/usr/bin/python3', {**binding('/opt/env'), 'manager': 'venv'},
                     {**binding('/opt/env'), 'prefix': 'relative'}, {**binding('/opt/env'), 'extra': True}]:
         c = copy.deepcopy(example)
-        c['execution']['targets']['local']['python'] = invalid
+        c['execution']['platforms']['local']['python'] = invalid
         assert list(validator.iter_errors(c))
         with pytest.raises(ValueError):
             validate_job_config(c)
@@ -128,15 +104,15 @@ def test_installer_cli_uses_selected_target(tmp_path, adopt):
     import sys
     root = Path(__file__).resolve().parents[2]
     config_path = tmp_path / 'job.toml'
-    config_path.write_text(config_path.read_text().replace('execution.targets.local', 'execution.targets.science')
-                           .replace('default_target = "local"', 'default_target = "queue"')
-                           + '\n[execution.targets.queue]\ndriver = "external"\ntransport = "local"\n'
-                           + 'work_root = ' + json.dumps(str(tmp_path / 'queue')) + '\nhandler = ["/bin/true"]\n')
+    config_path.write_text(config_path.read_text().replace('execution.platforms.local', 'execution.platforms.science')
+                           .replace('default_platform = "local"', 'default_platform = "queue"')
+                           + '\n[execution.platforms.queue]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport = "local"\n'
+                           + 'storage.work_root = ' + json.dumps(str(tmp_path / 'queue')) + '\nschedulers.main.handler = ["/bin/true"]\n')
     receipt = tmp_path / 'target-python/coragent-environment.json'
     if adopt:
         receipt.unlink()
     result = subprocess.run([sys.executable, '-B', str(root / 'scripts/install_job_environment.py'),
-                             '--config', str(config_path), '--target', 'science', '--backend', 'structure',
+                             '--config', str(config_path), '--platform', 'science', '--backend', 'structure',
                              *(['--adopt'] if adopt else [])], capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stderr
     installed = json.loads(result.stdout)
@@ -179,12 +155,12 @@ def test_pip_install_requires_pinned_versions_and_hashes_before_creating_prefix(
 
 def test_remote_queue_selection_is_explicit_and_allowlisted():
     from research_agent.jobs.config_contract import resolve_submission
-    c=config();remote=c['targets']['remote'];remote['allowed_queues']=['test']
-    assert resolve_submission(c,'remote','xtb')['queue']=='test'
+    c=config();remote=c['targets']['remote/main'];remote['allowed_queues']=['test']
+    assert resolve_submission(c,'remote/main','xtb')['queue']=='test'
     remote['submission']['queue']='forbidden'
-    with pytest.raises(ValueError,match='not allowed'):resolve_submission(c,'remote','xtb')
+    with pytest.raises(ValueError,match='not allowed'):resolve_submission(c,'remote/main','xtb')
     del remote['submission']
-    assert 'queue' not in resolve_submission(c,'remote','xtb')
+    assert 'queue' not in resolve_submission(c,'remote/main','xtb')
 
 
 @pytest.mark.parametrize('mutate', [
@@ -201,7 +177,7 @@ def test_runtime_and_generated_schema_reject_invalid_remote_settings(mutate):
     from jsonschema import Draft202012Validator
     from research_agent.jobs.config_contract import job_config_schema
     value = configuration_document(config())
-    mutate(value['execution']['targets']['remote'])
+    mutate(value['execution']['platforms']['remote'])
     with pytest.raises(ValueError): validate_job_config(value)
     assert list(Draft202012Validator(job_config_schema()).iter_errors(value))
 
@@ -211,27 +187,22 @@ def test_target_selection_has_no_implicit_local_or_remote_alias(tmp_path, monkey
     monkeypatch.delenv('CORAGENT_JOB_CONFIG', raising=False)
     with pytest.raises(ValueError, match='job_config_required'): platforms_from_config()
     path = tmp_path / 'remote.toml'
-    path.write_text('[execution]\ndefault_target="cluster_a"\n[execution.targets.cluster_a]\ndriver="external"\ntransport="ssh"\nhandler=["/bin/true"]\nssh_host="fixture"\nwork_root="/scratch/jobs"\n')
+    path.write_text('[execution]\nschema_version = 2\ndefault_platform="cluster_a"\n[execution.platforms.cluster_a]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="ssh"\nschedulers.main.handler=["/bin/true"]\nssh_host="fixture"\nstorage.work_root="/scratch/jobs"\n')
     platforms, default = platforms_from_config(path)
-    assert set(platforms) == {'cluster_a'} and default == 'cluster_a'
+    assert set(platforms) == {'cluster_a/main'} and default == 'cluster_a/main'
 
 
-def test_local_supervisor_is_explicit_and_part_of_prepared_binding(tmp_path):
+def test_executor_and_transport_are_part_of_prepared_binding():
     from research_agent.jobs.config_contract import resolve_binding, binding_digest
-    from research_agent.jobs.config import platforms_from_config
     settings = config()
-    settings['targets']['local']['backends'] = {'shell': {'command': '/bin/sh'}}
-    baseline = resolve_binding(settings, 'local', 'shell', runtime='native')
-    assert baseline['supervisor'] == 'systemd'
-    settings['targets']['local']['supervisor'] = 'process'
-    selected = resolve_binding(validate_job_config(settings), 'local', 'shell', runtime='native')
-    assert selected['supervisor'] == 'process'
+    settings['targets']['local/main']['backends'] = {'shell': {'command': '/bin/sh'}}
+    baseline = resolve_binding(settings, 'local/main', 'shell', runtime='native')
+    assert baseline['executor'] == 'qrun'
+    assert baseline['transport'] == 'local'
+    settings['targets']['local/main'].update(executor='tri', scheduler='tri')
+    selected = resolve_binding(settings, 'local/main', 'shell', runtime='native')
     assert binding_digest(selected) != binding_digest(baseline)
-    path = tmp_path / 'process.toml'
-    path.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\nsupervisor="process"\n')
-    platforms, _ = platforms_from_config(path)
-    assert platforms['local'].supervisor == 'process'
-    settings = configuration_document(settings)
-    settings['execution']['targets']['remote']['supervisor'] = 'process'
+    document = configuration_document(settings)
+    document['execution']['platforms']['local']['supervisor'] = 'process'
     with pytest.raises(ValueError, match='unsupported fields'):
-        validate_job_config(settings)
+        validate_job_config(document)

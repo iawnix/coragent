@@ -15,6 +15,6 @@
 - [reaction investigation](reaction_investigation.zh-CN.md)
 - [strategy reflection](strategy_reflection.zh-CN.md)
 
-准备命令中的 `--executor` 和 `--version` 使用上表值，`--input role=path` 使用实际输入角色。执行目标继承当前任务，不在领域 Skill 中指定 `--target`。仅当合同未说明某个选项时，查询该 executor 的 `--help`。
+准备命令中的 `--executor` 和 `--version` 使用上表值，`--input role=path` 使用实际输入角色。执行目标继承当前任务，不在领域 Skill 中指定 `--platform` / `--scheduler-entry`。仅当合同未说明某个选项时，查询该 executor 的 `--help`。
 
 准备失败时先修正输入、参数或软件绑定；准备成功不表示计算已执行。提交超时先核实已有 Job 与回执。计算失败时收集可用输出，按操作合同检查原因后再决定重试；不要把失败输出当作通过验证的结果。

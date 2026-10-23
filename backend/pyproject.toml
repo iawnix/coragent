@@ -10,6 +10,9 @@ license = "Apache-2.0"
 requires-python = ">=3.11"
 dependencies = ["jsonschema>=4.23,<5", "packaging>=24,<27"]
 
+[project.scripts]
+qrun = "research_agent.jobs.qrun:main"
+
 [project.optional-dependencies]
 test = ["pytest>=8,<10"]
 

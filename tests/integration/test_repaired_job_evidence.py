@@ -10,7 +10,6 @@ from research_agent.application.job_state import execution, observe_execution, p
 from research_agent.foundation.transactions import read_json
 from research_agent.research import doctor, nodes, relations, results, views
 from research_agent.research.workspace import initialize_workspace, admit_research_workspace
-from tests.unit.test_job_recovery import wait_reaped
 
 
 @pytest.fixture
@@ -18,7 +17,7 @@ def research_workspace(tmp_path, monkeypatch):
     initialize_workspace(tmp_path, 'repaired_evidence', 'research')
     admit_research_workspace(tmp_path)
     config = tmp_path / 'job.toml'
-    config.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\nsupervisor="process"\n')
+    config.write_text('[execution]\nschema_version = 2\ndefault_platform="local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n')
     monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(config))
     return tmp_path
 
@@ -41,7 +40,6 @@ def run_attempt(root, request):
         status = execute('job_status', root, {'job_id': receipt['job_id']})
         if status['state'] not in terminal:
             execute('job_cancel', root, {'job_id': receipt['job_id']})
-        wait_reaped(SimpleNamespace(**receipt))
 
 
 def test_repaired_job_dedup_and_late_failure_cannot_replace_selected_evidence(research_workspace):

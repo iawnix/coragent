@@ -346,11 +346,11 @@ def test_registered_path_operations_through_jobs(tmp_path,monkeypatch,operation)
     from tests.unit.test_job_recovery import workspace
     root=tmp_path/'work';workspace(root)
     config=Path(os.environ['CORAGENT_JOB_CONFIG']);text=config.read_text();data=tomllib.loads(text)
-    binding=data['execution']['targets']['local']['bindings']['structure']['python']
+    binding=data['execution']['platforms']['local']['bindings']['structure']['python']
     for backend,program in [('path_xtb',fake_xtb(tmp_path/'xtb')),('path_gaussian',fake_gaussian(tmp_path/'g16'))]:
         text=re.sub(r'(?ms)^\[execution\.targets\.local\.bindings\.'+backend+r'\]\n.*?(?=^\[|\Z)','',text)
-        text+='\n[execution.targets.local.bindings.'+backend+']\ncommand = '+json.dumps(str(program))+'\n'
-        text+='[execution.targets.local.bindings.'+backend+'.python]\n'+''.join(k+' = '+json.dumps(v)+'\n' for k,v in binding.items())
+        text+='\n[execution.platforms.local.bindings.'+backend+']\ncommand = '+json.dumps(str(program))+'\n'
+        text+='[execution.platforms.local.bindings.'+backend+'.python]\n'+''.join(k+' = '+json.dumps(v)+'\n' for k,v in binding.items())
     config=tmp_path/'job.toml';config.write_text(text);monkeypatch.setenv('CORAGENT_JOB_CONFIG',str(config))
     if operation=='qst-prepare':spec=qst_input(True)
     elif operation.startswith('scan'):spec=scan_input(backend=operation.split('-')[1])
@@ -359,7 +359,7 @@ def test_registered_path_operations_through_jobs(tmp_path,monkeypatch,operation)
         spec={'schema_version':'chemical-neb-input/2',**endpoints(),'settings':settings(),'image_count':3,'max_steps':0}
         spec.update(reactant=molecule(center=True),product=molecule(3.,permutation=[1,0],center=True))
     source=root/'input.json';source.write_text(json.dumps(spec))
-    prepared=prepare(config,'local','chemical.'+operation,'2' if operation=='neb-xtb' else '1',{'input':source})
+    prepared=prepare(config,{'platform': 'local', 'scheduler_entry': 'main'},'chemical.'+operation,'2' if operation=='neb-xtb' else '1',{'input':source})
     node=execute('research_create',root,{'goal':'Independent path operation fixture'})['node']
     receipt=execute('job_start',root,{**prepared,'node_id':node['id']})
     try:
@@ -396,8 +396,8 @@ def test_native_timeout_retains_failed_point_and_reaps_descendants(tmp_path):
     s['settings']['timeout_seconds']=.4
     result=scan(s,tmp_path/'out','xtb',lambda m,s:XtbCalculator(m,s,str(native)))
     assert result['status']=='failed' and result['points'][0]['error']['type']=='TimeoutExpired'
-    pid=int((tmp_path/'out/points/0000/child.pid').read_text());proc=Path(f'/proc/{pid}/stat')
-    assert not proc.exists() or proc.read_text().split()[2]=='Z'
+    from tests.support.processes import assert_stopped
+    assert_stopped(int((tmp_path/'out/points/0000/child.pid').read_text()))
     assert json.loads((tmp_path/'out/result.json').read_text())==result
 
 
@@ -421,10 +421,8 @@ def test_path_environment_profile_is_opt_in_and_preserves_wrapper_bindings(tmp_p
     from scripts import _job_install as jobs
     from tests.unit.test_job_installation import options
     config=tmp_path/'job.toml'
-    config.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\n'
-                      '[execution.targets.local.bindings.xtb]\ncommand="/native/xtb"\n'
-                      '[execution.targets.local.bindings.path_xtb]\ncommand="/native/xtb"\n')
-    value=jobs.plan(options(tmp_path,'--job-config',str(config),'--job-profile','local:path'))
+    config.write_text('[execution]\nschema_version = 2\ndefault_platform="local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n[execution.platforms.local.bindings.xtb]\ncommand="/native/xtb"\n[execution.platforms.local.bindings.path_xtb]\ncommand="/native/xtb"\n')
+    value=jobs.plan(options(tmp_path,'--job-config',str(config),'--job-profile','local/main:path'))
     assert len(value['environments'])==1
     row=value['environments'][0]
     assert row['backends']==['path_xtb']

@@ -1,5 +1,7 @@
 """Installation failure boundaries preserve the matching code and State."""
 
+from tests.support.platforms import execution_config
+
 from research_agent.foundation.layout import paths as app_paths
 import json
 from pathlib import Path
@@ -13,7 +15,7 @@ import pytest
 from scripts import install_wizard as wizard
 from research_agent.foundation.installation_maintenance import InstallationMaintenance, assert_installation_available
 
-CONFIG = '[execution]\ndefault_target = "local"\n[execution.targets.local]\ntype = "local"\ndriver = "process"\n'
+CONFIG = '[execution]\nschema_version = 2\ndefault_platform = "local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n'
 
 
 def test_exclusive_installation_and_durable_activation_window(tmp_path):
@@ -84,7 +86,7 @@ def installation(tmp_path, monkeypatch):
     job_config = app_paths(root).job_config
     job_config.parent.mkdir(parents=True, exist_ok=True)
     from research_agent.foundation.configuration import Configuration
-    Configuration(app_paths(root).config_file).update(execution={'default_target':'local', 'targets':{'local':{'type':'local', 'driver':'systemd'}}})
+    Configuration(app_paths(root).config_file).update(execution=execution_config('local', {'local':{'executor': 'qrun', 'transport': 'local', 'work_root': '/fixture/qrun/jobs'}}))
     job_config.write_text('# original fixture configuration\n'+CONFIG)
     (workspace/'research_map').mkdir(parents=True)
     original = {'workspace_id':'t001', 'nodes':[{'id':'n1','dependencies':[]}],
@@ -105,7 +107,7 @@ def installation(tmp_path, monkeypatch):
         (root/'releases/new').mkdir(exist_ok=True)
         return {'release_id':'new','package_root':str(root/'releases/new'),'runtime':{'python_executable': 'fixture-python'}}
     def publish(_root, result, **kwargs):
-        assert events[-1] == 'stop'
+        assert 'stop' in events
         (root/'current').unlink()
         (root/'current').symlink_to('releases/new')
         (control/'install-state.json').write_text(json.dumps({'current_release_id':'new'}))
@@ -128,7 +130,7 @@ def installation(tmp_path, monkeypatch):
         events.append('configure-units')
         return []
     def activate(*_args):
-        assert events[-1] == 'inspect'
+        assert events[-1] == 'qrun-commit'
         assert_installation_available(root)
         events.append('activate')
         # A started runtime could accept new input before a later service fails.
@@ -145,8 +147,19 @@ def installation(tmp_path, monkeypatch):
     monkeypatch.setattr(wizard,'stop_installation_services',lambda _args:events.append('stop'))
     monkeypatch.setattr(wizard,'run_install',install)
     from scripts import install_package
+    from scripts import _qrun_install
+    def prepare_qrun(*_args):
+        if state.get('qrun'):
+            assert events[-1] == 'stop'
+            with pytest.raises(RuntimeError, match='maintenance_required'):
+                assert_installation_available(root)
+        events.append('qrun-prepare')
+        return {'fixture': True}
+    monkeypatch.setattr(_qrun_install, 'prepare', prepare_qrun)
+    monkeypatch.setattr(_qrun_install, 'rollback', lambda *_a: events.append('qrun-rollback'))
+    monkeypatch.setattr(_qrun_install, 'commit', lambda *_a: events.append('qrun-commit'))
     monkeypatch.setattr(install_package, 'activate_prepared_package', publish)
-    monkeypatch.setattr(wizard._job_install, 'plan', lambda *_a: {'inputs': {}})
+    monkeypatch.setattr(wizard._job_install, 'plan', lambda *_a: {'inputs': {}, 'qrun': [{}] if state.get('qrun') else []})
     monkeypatch.setattr(wizard._job_install, 'prepare', prepare_jobs)
     monkeypatch.setattr(wizard._job_install, 'publish', lambda *_a: {'job': {'path': str(job_config), 'status':'configured'}})
     monkeypatch.setattr(wizard,'install_uninstaller',lambda *_a:None)
@@ -197,6 +210,7 @@ def test_failure_before_activation_restores_configuration_and_old_release(instal
     assert json.loads(app_paths(root).credentials.read_bytes()) == json.loads(auth)
     assert (workspace/'research_map/context.json').read_bytes() == original
     assert 'activate' not in events
+    assert 'qrun-rollback' in events and 'qrun-commit' not in events
     assert_installation_available(root)
 
 
@@ -210,6 +224,7 @@ def test_failure_after_activation_retains_new_release_and_resumes(installation):
     assert context['requirements'] == [{'id':'r1','status':'unmet'}]
     assert context['nodes'] == [{'id':'n1','dependencies':[]}]
     assert events[-1] == 'stop'
+    assert 'qrun-commit' in events and 'qrun-rollback' not in events
     with pytest.raises(RuntimeError, match='maintenance_required'):
         assert_installation_available(root)
     assert (workspace/'runtime-evidence.txt').read_text() == 'new evidence'
@@ -217,6 +232,20 @@ def test_failure_after_activation_retains_new_release_and_resumes(installation):
     assert wizard.main(options) == 0
     assert (root/'current').resolve().name == 'new'
     assert json.loads(app_paths(root).credentials.read_bytes()) == json.loads(auth)
+    assert_installation_available(root)
+
+
+@pytest.mark.parametrize('failure', [None, 'preparation'])
+def test_managed_qrun_is_prepared_only_after_old_clients_are_fenced(installation, failure):
+    root, _, options, events, state, _ = installation
+    state.update(qrun=True, failure=failure)
+    assert wizard.main(options) == (1 if failure else 0)
+    assert events.index('stop') < events.index('qrun-prepare') < events.index('prepare-jobs')
+    if failure:
+        assert 'qrun-rollback' in events and 'qrun-commit' not in events
+        assert (root / 'current').resolve().name == 'old'
+    else:
+        assert events.index('inspect') < events.index('qrun-commit') < events.index('activate')
     assert_installation_available(root)
 
 

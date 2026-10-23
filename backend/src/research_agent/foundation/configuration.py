@@ -144,7 +144,7 @@ def validate_settings(document):
         'web': {'enabled', 'host', 'port', 'allow_remote'},
         'runtime': {'env_root', 'conda_root'},
         'phone': {'access', 'relay_url'},
-        'execution': {'default_target', 'targets'},
+        'execution': {'schema_version', 'default_platform', 'platforms'},
         'notifications': {'email'},
     }
     for section, allowed in fields.items():

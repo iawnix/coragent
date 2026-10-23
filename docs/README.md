@@ -15,7 +15,7 @@ reports are retained in Git history rather than used as operating instructions.
 | Phone connection and client contract | [CoRAgent Link](CORAGENT_LINK.md), [Phone protocol (Chinese)](PHONE_PROTOCOL.zh-CN.md) |
 | Models, credentials and context capacity | [Model configuration](MODEL_COMPATIBILITY.md) |
 | Scientific methods and supported scope | [Scientific operations](SCIENTIFIC_CAPABILITIES_OPERATIONS.md), [Capability inventory](../skills/chemical/method-selection/references/capabilities.md) |
-| Scheduler handlers and Job resources | [External Jobs](EXTERNAL_JOBS.md) |
+| Scheduler handlers and Job resources | [External Jobs](EXTERNAL_JOBS.md), [Qrun local/SSH queues](QRUN.md) |
 | Skills and their operation entrypoints | [Skill catalog](../skills/README.md), [Script index](skill-script-routing.md) |
 
 ## Understand and maintain
@@ -31,6 +31,9 @@ reports are retained in Git history rather than used as operating instructions.
 | Maintain, test and package | [Maintainer Guide](MAINTAINER_GUIDE.md), [Contributing](../CONTRIBUTING.md), [Test runner](../tools/test/README.md) |
 | Scientific regression scope | [Scientific regressions (Chinese)](SCIENTIFIC_REGRESSIONS.zh-CN.md) |
 | Pinned Pi integration | [Pi runtime patches](PI_RUNTIME_PATCHES.md) |
+
+[Named execution platforms and multi-cluster execution](EXECUTION_PLATFORMS.md) explains the
+platform/entry configuration, shared environments, storage, task plans and installer entry selection.
 
 ## Proposals
 
@@ -48,3 +51,5 @@ apply only to the tested source or release artifact, not every later version.
 
 Project source uses [Apache License 2.0](../LICENSE); third-party dependencies,
 Pi source and assets retain their own notices.
+
+- [TRI deployment and maintenance](TRI_OPERATIONS.md)

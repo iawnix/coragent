@@ -86,7 +86,7 @@ local-only wheel, or replace the lock of a running installation in place.
 The optional `path` profile uses path.lock for explicitly configured
 `path_xtb` / `path_gaussian` native bindings. It provides RDKit/NumPy, ASE and SciPy for scans,
 gradients and ASE NEB v2 without changing the existing lightweight wrappers. For example,
-configure `[execution.targets.local.bindings.path_xtb]` with `command = "/opt/xtb/bin/xtb"`
+configure `[execution.platforms.local.bindings.path_xtb]` with `command = "/opt/xtb/bin/xtb"`
 (and activation_script if needed), then select `--job-profile local:path`.
 This profile has no default native scientific smoke calculation; the selected
 recipe's environment check and an explicit bounded scientific Job are separate.

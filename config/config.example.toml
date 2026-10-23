@@ -19,11 +19,16 @@ port = 8766
 # apiKey = "credential:provider_key" and store the value in credentials.json.
 
 [execution]
-default_target = "local"
+schema_version = 2
+default_platform = "local"
 
-[execution.targets.local]
-type = "local"
-driver = "systemd"
+[execution.platforms.local]
+default_scheduler = "qrun"
+schedulers.qrun.executor = "qrun"
+transport = "local"
+storage.work_root = "/opt/coragent/jobs"
+# Install Qrun on this host first; use the absolute handler returned by qrun install.
+submission = { resources = { cpus = 1, memory_mb = 1024 } }
 
 [notifications.email]
 enabled = false

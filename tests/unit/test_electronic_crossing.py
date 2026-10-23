@@ -250,8 +250,8 @@ def test_electronic_and_crossing_jobs(tmp_path,monkeypatch,operation):
     from research_agent.application.executors import prepare
     from tests.unit.test_job_recovery import workspace
     root=tmp_path/'work';workspace(root)
-    config_path=Path(os.environ['CORAGENT_JOB_CONFIG']);text=config_path.read_text();binding=tomllib.loads(text)['execution']['targets']['local']['bindings']['structure']['python']
-    text+='\n[execution.targets.local.bindings.path_gaussian]\ncommand='+json.dumps(str(fake_gaussian(tmp_path/'g16')))+'\n[execution.targets.local.bindings.path_gaussian.python]\n'+''.join(k+'='+json.dumps(v)+'\n' for k,v in binding.items())
+    config_path=Path(os.environ['CORAGENT_JOB_CONFIG']);text=config_path.read_text();binding=tomllib.loads(text)['execution']['platforms']['local']['bindings']['structure']['python']
+    text+='\n[execution.platforms.local.bindings.path_gaussian]\ncommand='+json.dumps(str(fake_gaussian(tmp_path/'g16')))+'\n[execution.platforms.local.bindings.path_gaussian.python]\n'+''.join(k+'='+json.dumps(v)+'\n' for k,v in binding.items())
     config_path=tmp_path/'electronic-job.toml';config_path.write_text(text);monkeypatch.setenv('CORAGENT_JOB_CONFIG',str(config_path))
     if operation=='electronic-gaussian':s={'schema_version':'chemical-electronic-input/1','material':excited_material()['value'],'settings':config('td'),'task':'opt'}
     elif operation=='state-tracking':s=tracking_input(True)
@@ -266,7 +266,7 @@ def test_electronic_and_crossing_jobs(tmp_path,monkeypatch,operation):
         # source stays unchanged; the runner resolves omitted settings at runtime.
         s['settings'].pop('threads'); s['settings'].pop('memory_mb')
         submission = {'resources': {'cpus': 12, 'memory_mb': 16384}}
-    path=root/'input.json';path.write_text(json.dumps(s));request=prepare(config_path,'local','chemical.'+operation,'2' if operation=='neb-gaussian' else '1',{'input':path}, submission=submission)
+    path=root/'input.json';path.write_text(json.dumps(s));request=prepare(config_path,{'platform': 'local', 'scheduler_entry': 'main'},'chemical.'+operation,'2' if operation=='neb-gaussian' else '1',{'input':path}, submission=submission)
     node=execute('research_create',root,{'goal':'Bound electronic/crossing fixture'})['node'];receipt=execute('job_start',root,{**request,'node_id':node['id']})
     try:
         for _ in range(600):

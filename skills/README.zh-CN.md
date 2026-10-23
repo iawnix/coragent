@@ -57,5 +57,6 @@ Skill 提供科学操作、方法/后端适配和研究协调方面的指导，�
 
 | Skill | 用途 |
 | --- | --- |
-| [tri-operations](core/tri-operations/SKILL.zh-CN.md) | 部署和维护 TRI 服务端与计算节点，配置资源，排查任务调度、执行与恢复问题。 |
-| [batch-schedulers](core/batch-schedulers/SKILL.zh-CN.md) | 配置 PBS、Torque、Slurm 执行目标，选择资源并诊断原生队列和记账结果。 |
+| [batch-schedulers](core/batch-schedulers/SKILL.zh-CN.md) | 配置 Qrun、TRI、PBS、Torque、Slurm 执行目标，查询资源并诊断作业状态、日志和恢复。 |
+
+- [execution-platforms](core/execution-platforms/SKILL.zh-CN.md): 命名平台、调度入口、环境、存储与多平台计划。

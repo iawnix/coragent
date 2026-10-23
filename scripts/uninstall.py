@@ -22,11 +22,11 @@ from pathlib import Path
 try:
     from ._installation_metadata import read_installation_metadata, read_workspace_root
     from ._terminal_ui import Spinner, ask_text as ask, ask_yes_no, failure, field, note, section, success, title
-    from . import _job_install
+    from . import _job_install, _qrun_install
 except ImportError:
     from _installation_metadata import read_installation_metadata, read_workspace_root
     from _terminal_ui import Spinner, ask_text as ask, ask_yes_no, failure, field, note, section, success, title
-    import _job_install
+    import _job_install, _qrun_install
 
 
 SERVICE_NAMES = (
@@ -50,6 +50,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--purge-relay-state", action="store_true", help="Delete Relay state and enrolled credentials owned by this installation.")
     parser.add_argument("--keep-link-relay", action="store_true", help="Keep an installation-owned Link Relay running and preserve its marker.")
     parser.add_argument("--remove-root", action="store_true", help="Remove the installation directory after cleanup.")
+    parser.add_argument("--cancel-qrun-jobs", action="store_true", help="Cancel unfinished Jobs in installation-owned local and SSH Qrun pools before removal.")
+    parser.add_argument("--purge-qrun-state", action="store_true", help="Delete owned Qrun queue state after stopping its services; never deletes calculation work roots.")
     parser.add_argument("--purge-all", action="store_true", help="Enable all purge and root removal options.")
     parser.add_argument("--non-interactive", action="store_true")
     parser.add_argument("--yes", action="store_true")
@@ -98,6 +100,7 @@ def choose_options(args: argparse.Namespace, root: Path) -> None:
     if getattr(args, "purge_all", False):
         args.purge_workspaces = args.purge_config = args.purge_runtime = args.remove_root = True
         args.purge_relay_state = True
+        args.purge_qrun_state = True
     if args.remove_root and not (args.purge_workspaces and args.purge_config and args.purge_runtime):
         raise ValueError("--remove-root requires --purge-workspaces, --purge-config, and --purge-runtime")
     if args.non_interactive:
@@ -121,6 +124,10 @@ def choose_options(args: argparse.Namespace, root: Path) -> None:
     args.purge_workspaces = args.purge_workspaces or ask_yes_no("Delete workspaces and Pi session files", False)
     args.purge_config = args.purge_config or ask_yes_no("Delete installation config and Phone/Web credentials", False)
     args.purge_runtime = args.purge_runtime or ask_yes_no("Delete managed Python runtime state", False)
+    pools = _qrun_install.registry(root)['pools']
+    if pools:
+        args.cancel_qrun_jobs = getattr(args, 'cancel_qrun_jobs', False) or ask_yes_no("Cancel unfinished Jobs in managed Qrun queues", False)
+        args.purge_qrun_state = getattr(args, 'purge_qrun_state', False) or ask_yes_no("Delete managed Qrun queue history (calculation files are kept)", False)
     all_data_selected = args.purge_workspaces and args.purge_config and args.purge_runtime
     if not args.remove_root and all_data_selected:
         args.remove_root = ask_yes_no("Remove the installation directory", False)
@@ -128,6 +135,12 @@ def choose_options(args: argparse.Namespace, root: Path) -> None:
     section("Removal plan")
     field("Target", root, tone="accent")
     field("Application", "Remove", tone="warning")
+    if pools:
+        field("Qrun services", "Remove owned local and SSH queue services", tone="warning")
+        field("Qrun unfinished Jobs", "Cancel" if args.cancel_qrun_jobs else "Block uninstall until drained",
+              tone="warning")
+        field("Qrun history", "Delete" if args.purge_qrun_state else "Keep",
+              tone="danger" if args.purge_qrun_state else "success")
     field("Workspaces", "Delete" if args.purge_workspaces else "Keep",
           tone="danger" if args.purge_workspaces else "success")
     field("Config and secrets", "Delete" if args.purge_config else "Keep",
@@ -361,6 +374,7 @@ def uninstall(args: argparse.Namespace, *, show_progress: bool = False) -> dict[
         raise
     activity.start()
     try:
+        qrun_result = _qrun_install.remove(root, args, Path(__file__).resolve().parents[1])
         stopped = stop_services(args, root)
         relay_result = remove_owned_relay(args, root)
         activity.update("Removing service registrations")
@@ -398,7 +412,7 @@ def uninstall(args: argparse.Namespace, *, show_progress: bool = False) -> dict[
         return {"ok": True, "install_root": str(root), "workspace_root": str(workspace_root), "stopped_services": stopped, "removed": removed,
                 "preserved_workspaces": not args.purge_workspaces, "preserved_config": not args.purge_config,
                 "preserved_runtime": not args.purge_runtime, "link_relay": relay_result,
-                'retained_job_environments': retained_job_environments}
+                'retained_job_environments': retained_job_environments, 'qrun': qrun_result}
     except BaseException:
         activity.fail("CoRAgent uninstall failed")
         raise

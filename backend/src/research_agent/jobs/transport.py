@@ -78,7 +78,7 @@ class SSHTransport:
         return result
 
     def copy(self, source: Path, destination: str, *, pull=False):
-        command = ["rsync", "-a", "--protect-args", "-e", shlex.join(self.argv()[:-1])]
+        command = ["rsync", "-a", "--checksum", "--partial-dir=.coragent-transfer", "--delay-updates", "--protect-args", "-e", shlex.join(self.argv()[:-1])]
         if pull:
             for path in ('spec.json', 'receipt.json', 'status.json', 'input_manifest.json',
                          'supervisor.json', 'remote.json', 'cancel.request', '.coragent', '.scratch'):
@@ -93,7 +93,7 @@ class SSHTransport:
         if self.run(f"test -e {shlex.quote(source)}", check=False).returncode:
             return False
         destination.parent.mkdir(parents=True, exist_ok=True)
-        command = ["rsync", "-a", "--protect-args", "-e", shlex.join(self.argv()[:-1]),
+        command = ["rsync", "-a", "--checksum", "--partial-dir=.coragent-transfer", "--delay-updates", "--protect-args", "-e", shlex.join(self.argv()[:-1]),
                    f"{self.host}:{source}" + ("/" if recursive else ""),
                    str(destination) + ("/" if recursive else "")]
         self.capture(command, timeout=self.transfer_timeout).check_returncode()

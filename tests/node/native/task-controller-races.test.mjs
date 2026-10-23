@@ -44,11 +44,7 @@ async function fixture(t) {
       if (!allocatedTasks.has(key)) allocatedTasks.set(key, `task_${allocatedTasks.size + 1}`);
       return { identifier: allocatedTasks.get(key) };
     }
-    if (method === "job_resolve_target") return { target: params.target || "local", scheduler: params.target === "cluster_a" ? "slurm" : "none",
-      location: params.target === "cluster_a" ? "cluster" : "controller", route_digest: "sha256:" + "a".repeat(64), selection_mode: params.target ? "explicit" : "default" };
-    if (method === "job_targets") return { default_target: "local", targets: {
-      local: { scheduler: "none", location: "controller", aliases: [] },
-    } };
+    if (method === "job_resolve_target") return { target: params.target || { platform: "local", scheduler_entry: "main" }, executor: params.target?.platform === "cluster_a" ? "slurm" : "qrun", route_digest: "sha256:" + "a".repeat(64), selection_mode: params.target ? "explicit" : "default" };
     if (method === "job_list") return { jobs: [...jobs].map(([job_id, state]) => ({ job_id, state })), next_cursor: null };
     if (method === "job_status") return { job_id: params.job_id, state: jobs.get(params.job_id) };
     if (method === "job_cancel") {

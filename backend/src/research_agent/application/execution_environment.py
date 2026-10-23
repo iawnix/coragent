@@ -1,7 +1,7 @@
 """Validate prepared environment evidence at the managed submission boundary."""
 import os
 
-from research_agent.jobs.config_contract import SUBMISSION_FIELDS, binding_digest, load_job_config, resolve_binding
+from research_agent.jobs.config_contract import SUBMISSION_FIELDS, target_identity, binding_digest, load_job_config, resolve_binding
 from research_agent.jobs.environment import guarded_command, probe_binding
 
 
@@ -20,7 +20,7 @@ def check_configuration(params):
                                requested=metadata.get('submission_request'))
     if selected != expected or metadata.get("configuration_sha256") != binding_digest(configured):
         raise ValueError("execution_binding_changed: prepare again with the current configuration")
-    if params.get("execution_target") != selected["environment"]:
+    if params.get("execution_target") != target_identity(selected["environment"]):
         raise ValueError("execution_binding_target_mismatch")
     if (params.get("environment", {}) != selected["binding"].get("environment", {}) or "env" in params
             or metadata.get("python_binding") != selected["python"]):

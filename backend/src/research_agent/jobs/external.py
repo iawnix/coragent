@@ -29,7 +29,6 @@ class ExternalJobPlatform(StagedJobPlatform):
     """The handler owns native CLI syntax; this platform owns Job lifecycle."""
 
     def __init__(self, config, *, platform_name="external"):
-        config = {**config, **config.get("options", {})}
         handler = config.get("handler")
         if (not isinstance(handler, list) or not handler or
                 any(not isinstance(arg, str) or not arg or "\0" in arg for arg in handler)):
@@ -39,7 +38,7 @@ class ExternalJobPlatform(StagedJobPlatform):
         if not isinstance(self.handler_environment, dict):
             raise ValueError("handler_environment must be a table")
         validate_environment(self.handler_environment)
-        transport = config.get("transport", "ssh" if config.get("type") == "remote" else "local")
+        transport = config.get("transport")
         if transport not in {"local", "ssh"}:
             raise ValueError("external transport must be local or ssh")
         root = config.get("work_root")
@@ -68,6 +67,7 @@ class ExternalJobPlatform(StagedJobPlatform):
 
     def probe(self, spec):
         missing = [str(path) for path in spec.inputs if not path.exists()]
+        observation = {}
         try:
             result = self.run_command(f"test -d {shlex.quote(self.remote_root)} && test -w {shlex.quote(self.remote_root)}", check=False)
             if self.shared:
@@ -79,7 +79,8 @@ class ExternalJobPlatform(StagedJobPlatform):
             available, error = False, str(exc)
         return {"platform": self.name, "available": available, "transport": self.transport.name,
                 "work_root": self.remote_root, "file_mode": self.file_mode, "cwd_exists": spec.cwd.is_dir(),
-                "inputs_present": not missing, "missing_inputs": missing, "error": error}
+                "inputs_present": not missing, "missing_inputs": missing, "error": error,
+                **({'queue': observation['queue']} if isinstance(observation.get('queue'), dict) else {})}
 
     @staticmethod
     def _identity(value):
@@ -110,8 +111,7 @@ class ExternalJobPlatform(StagedJobPlatform):
 
     def _prepare_submission(self, spec):
         validate_submission({key: value for key, value in spec.metadata.items() if key in SUBMISSION_FIELDS},
-                            kind="local", driver="external",
-                            allowed_queues=(self.allowed_queues,))
+                            allowed_queues=(self.allowed_queues,), executor=self.config.get('executor'))
         probe = self.probe(spec)
         if not all(probe[key] for key in ("available", "cwd_exists", "inputs_present")):
             raise ValueError(f"external execution probe failed: {probe}")

@@ -1,6 +1,6 @@
 # Torque integration
 
-Use `scheduler="torque"` and `handler=["/usr/bin/python3", "/opt/coragent/skills/core/batch-schedulers/scripts/batch.py", "torque"]`. Native commands are `qsub`, `qstat` and `qdel`; override their paths with `CORAGENT_QSUB`, `CORAGENT_QSTAT` and `CORAGENT_QDEL`.
+Use `executor="torque"` and `handler=["/usr/bin/python3", "/opt/coragent/skills/core/batch-schedulers/scripts/batch.py", "torque"]`. Native commands are `qsub`, `qstat` and `qdel`; override their paths with `CORAGENT_QSUB`, `CORAGENT_QSTAT` and `CORAGENT_QDEL`.
 
 CPU requests become `nodes=1:ppn=N` and memory becomes `mem=Mmb`. GPU syntax depends on the site; adapt and test resource translation before requesting GPUs. The handler reads `qstat -x` XML, including records retained by that installation, and matches `CORAGENT_REQUEST_ID` for recovery. On Maui/Moab sites, `checkjob JOB_ID` can explain resource feasibility. A disappeared record remains unknown.
 

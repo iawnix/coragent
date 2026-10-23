@@ -2,7 +2,7 @@
   "schema_version": "coragent-command-source/1",
   "commands": [
     {
-      "id": "job_targets",
+      "id": "job_platforms",
       "domain": "runtime",
       "schema": {
         "type": "object",
@@ -14,7 +14,96 @@
         {}
       ],
       "result": {
-        "type": "object"
+        "type": "object",
+        "properties": {
+          "default_platform": {
+            "type": "string"
+          },
+          "platforms": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "display_name": {
+                  "type": "string"
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "transport": {
+                  "enum": [
+                    "local",
+                    "ssh"
+                  ]
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "default_scheduler": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "schedulers": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "executor": {
+                        "type": "string"
+                      },
+                      "software": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "storage": {
+                        "type": "object"
+                      },
+                      "submission": {
+                        "type": "object"
+                      },
+                      "limits": {
+                        "type": "object"
+                      },
+                      "sources": {
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "executor",
+                      "software",
+                      "storage",
+                      "submission",
+                      "limits",
+                      "sources"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "display_name",
+                "aliases",
+                "transport",
+                "enabled",
+                "default_scheduler",
+                "schedulers"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "default_platform",
+          "platforms"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -24,16 +113,9 @@
         "type": "object",
         "properties": {
           "target": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "$ref": "shared.json#/definitions/execution_target"
           },
           "scheduler": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 128
-          },
-          "location": {
             "type": "string",
             "minLength": 1,
             "maxLength": 128
@@ -50,7 +132,39 @@
         {}
       ],
       "result": {
-        "type": "object"
+        "type": "object",
+        "properties": {
+          "target": {
+            "$ref": "shared.json#/definitions/resolved_execution_target"
+          },
+          "route_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "executor": {
+            "enum": [
+              "qrun",
+              "pbs",
+              "torque",
+              "slurm",
+              "tri",
+              "external"
+            ]
+          },
+          "selection_mode": {
+            "enum": [
+              "explicit",
+              "default"
+            ]
+          }
+        },
+        "required": [
+          "target",
+          "route_digest",
+          "executor",
+          "selection_mode"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -86,26 +200,7 @@
             "description": "Direct submission only: files/directories the command will produce, relative to Job cwd. job_collect registers available declared outputs with producer provenance. Prepared requests already contain this field. Declarations do not create files or redirect stdout. print() goes to logs/stdout.log; write a result file explicitly before declaring it."
           },
           "environment": {
-            "anyOf": [
-              {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
-              },
-              {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              }
-            ]
-          },
-          "env": {
-            "type": [
-              "object",
-              "null"
-            ],
+            "type": "object",
             "additionalProperties": {
               "type": "string"
             }
@@ -129,8 +224,7 @@
             "type": "string"
           },
           "execution_target": {
-            "type": "string",
-            "description": "Direct submission only: configured execution target name, such as local, tri or slurm. Prepared requests already select their target. This selects routing, not a Conda environment or scientific backend."
+            "$ref": "shared.json#/definitions/execution_target"
           },
           "session_id": {
             "type": [
@@ -178,16 +272,8 @@
           "submission": {
             "$ref": "shared.json#/tools/job_start/properties/submission"
           },
-          "required_target": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 128,
-            "description": "Runtime task constraint injected by the tool adapter; checked after resolving any prepared request."
-          },
-          "required_route_digest": {
-            "type": "string",
-            "pattern": "^sha256:[a-f0-9]{64}$",
-            "description": "Runtime routing identity injected from the pinned task selection; not a model override."
+          "execution_context": {
+            "$ref": "shared.json#/definitions/execution_context"
           }
         },
         "required": [],
@@ -303,26 +389,7 @@
             }
           },
           "environment": {
-            "anyOf": [
-              {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
-              },
-              {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              }
-            ]
-          },
-          "env": {
-            "type": [
-              "object",
-              "null"
-            ],
+            "type": "object",
             "additionalProperties": {
               "type": "string"
             }
@@ -346,7 +413,7 @@
             "type": "string"
           },
           "execution_target": {
-            "type": "string"
+            "$ref": "shared.json#/definitions/execution_target"
           }
         },
         "required": [],
@@ -512,6 +579,128 @@
           "limit": 20
         }
       ]
+    },
+    {
+      "id": "job_resources",
+      "domain": "runtime",
+      "schema": {
+        "$ref": "shared.json#/tools/job_resources"
+      },
+      "examples": [
+        {}
+      ],
+      "result": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "$ref": "shared.json#/definitions/resolved_execution_target"
+          },
+          "executor": {
+            "type": "string"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "observed_at": {
+            "type": "string"
+          },
+          "capacity": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "cpus": {
+                "type": "number"
+              },
+              "memory_mb": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "cpus",
+              "memory_mb"
+            ]
+          },
+          "reserved": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "cpus": {
+                "type": "number"
+              },
+              "memory_mb": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "cpus",
+              "memory_mb"
+            ]
+          },
+          "free": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "cpus": {
+                "type": "number"
+              },
+              "memory_mb": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "cpus",
+              "memory_mb"
+            ]
+          },
+          "usage": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "memory_enforcement": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scheduler_observation": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "target",
+          "executor",
+          "available",
+          "observed_at",
+          "capacity",
+          "reserved",
+          "free",
+          "usage",
+          "memory_enforcement",
+          "scheduler_observation",
+          "error"
+        ],
+        "additionalProperties": false
+      }
     }
   ]
 }

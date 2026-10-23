@@ -61,9 +61,9 @@ nor starts services and does not print credentials.
 
 The installer prepares CoRAgent's own Python/Pi runtime and generated services,
 and checks configured execution bindings. Prepare scientific environments
-separately and bind their paths in `execution.targets.*.bindings`, or explicitly
-select installer profiles with `--job-profile TARGET:PROFILE`. Core installation
-does not provision scientific environments by default. See
+separately and bind their paths in `execution.platforms.<platform>.bindings`
+(or an entry override). The core installer does not provision scientific environments.
+Platform selection and Qrun options use `PLATFORM/ENTRY`; see [execution platforms](EXECUTION_PLATFORMS.md). See
 [Scientific operations](SCIENTIFIC_CAPABILITIES_OPERATIONS.md) for environment preparation.
 
 There is no implicit import from `~/.pi/agent`. Explicit one-time component
@@ -96,6 +96,13 @@ Job records remain under each workspace's `runs/jobs/<job-id>/`. External target
 can use `file_mode="shared"` to execute there directly; staging remains the default.
 See [external Jobs](EXTERNAL_JOBS.md) for storage checks and configuration.
 
+The main installer manages default local Qrun queues automatically. Enroll SSH
+queues explicitly with `--manage-qrun TARGET` and state-directory/CPU/memory
+options. Local targets share a pool; code upgrades require drained queues.
+Use `qrun config` for online CPU/memory budget changes without draining jobs;
+upgrades preserve this budget unless capacity flags are explicitly supplied. See
+[Qrun installation and operations](QRUN.md) for examples and prerequisites.
+
 ## Uninstall
 
 ```sh
@@ -108,6 +115,10 @@ removes the selected configuration, credentials and generated inputs;
 `--purge-workspaces` explicitly removes workspaces and sessions;
 `--purge-runtime` only removes CoRAgent-owned runtime environments with matching
 ownership records. Scientific environments and TRI remain independently managed.
+Owned local and SSH Qrun services are removed, retaining queue history and
+calculation directories by default. Unfinished Jobs block removal unless
+`--cancel-qrun-jobs` is supplied. `--purge-qrun-state` deletes queue history;
+`--purge-all` includes history cleanup but does not imply Job cancellation.
 Configuration cleanup does not recursively delete unrelated files in its parent.
 The necessary parser modules are installed with the uninstaller, so removing the
 source checkout does not prevent uninstall.

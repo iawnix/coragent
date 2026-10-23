@@ -7,41 +7,46 @@ CoRAgent 管理 Job 身份、持久回执、文件暂存、重启恢复与结果
 负责原生提交语法和状态解释。它是可执行程序，无需作为 Python 插件导入
 CoRAgent 进程。
 
+[Qrun](QRUN.zh-CN.md) 提供基于 systemd 的 CPU／内存 FIFO 队列，本机与 SSH 远端
+复用同一 handler 协议、文件暂存和回收。通过 `executor = "qrun"` 与独立的
+`transport` 选择执行方式和连接方式。
+
 ## 配置执行目标
 
 CoRAgent 与队列命令都部署在登录节点时：
 
 ```toml
 [execution]
-default_target = "compute"
+schema_version = 2
+default_platform = "compute"
 
-[execution.targets.compute]
-scheduler = "tri"
+[execution.platforms.compute]
+default_scheduler = "main"
 location = "cluster"
-driver = "external"
+schedulers.main.executor = "tri"
 transport = "local"
-cluster_name = "compute"
-work_root = "/absolute/shared/coragent-jobs"
-handler = ["/usr/bin/python3", "/absolute/coragent/skills/core/batch-schedulers/scripts/tri.py"]
+schedulers.main.cluster_name = "compute"
+storage.work_root = "/absolute/shared/coragent-jobs"
+schedulers.main.handler = ["/usr/bin/python3", "/absolute/coragent/skills/core/batch-schedulers/scripts/tri.py"]
 
-[execution.targets.compute.handler_environment]
+[execution.platforms.compute.schedulers.main.handler_environment]
 TRI_SOCKET = "/absolute/runtime/tri/server.sock"
 
-[execution.targets.compute.submission.resources]
+[execution.platforms.compute.schedulers.main.submission.resources]
 cpus = 4
 memory_mb = 4096
 ```
 
 将示例路径替换为本次安装的实际路径，并创建 `work_root`。科学软件配置与
-其它目标一样放在 `execution.targets.compute.bindings` 中。`transport="local"`
+其它目标一样放在 `execution.platforms.compute.bindings` 中。`transport="local"`
 表示提交命令在 CoRAgent 所在主机执行，计算节点由队列分配。多个本机命令
-目标可以与直接执行的 process/systemd 目标共存，并分别指定集群名称。
+目标可以与 Qrun 目标共存，并分别指定集群名称。
 
 从另一台主机提交时，将 `transport` 改为 `ssh`，设置 `ssh_host`，按需指定
 `ssh_config`。此时 `handler` 与 `work_root` 是该主机上的路径。默认情况下，SSH 目标通过
 rsync 暂存和收集文件；本机目标在控制端 Job 目录与 `work_root` 之间复制。
 计算节点需要能以相同路径访问该目录，共享挂载由部署环境提供。
-本机进程使用内置 process/systemd 驱动，批处理队列使用外部脚本。
+本机和 SSH 裸机使用 Qrun，批处理队列使用对应的外部脚本。
 
 `handler_environment` 配置提交命令的环境，与计算程序环境分开。
 凭据优先沿用已有受保护的服务/连接配置。Job 保存目标配置摘要；修改连接地址
@@ -53,14 +58,14 @@ rsync 暂存和收集文件；本机目标在控制端 Job 目录与 `work_root`
 复制流程。如果控制端、提交端和计算节点共享工作区文件系统，可以配置：
 
 ```toml
-[execution.targets.compute]
-scheduler = "tri"
+[execution.platforms.compute]
+default_scheduler = "main"
 location = "cluster"
-driver = "external"
+schedulers.main.executor = "tri"
 transport = "local"
-file_mode = "shared"
-work_root = "/home/iaw/DATA/coragent/workspaces"
-handler = ["/usr/bin/python3", "/absolute/coragent/skills/core/batch-schedulers/scripts/tri.py"]
+storage.file_mode = "shared"
+storage.work_root = "/home/iaw/DATA/coragent/workspaces"
+schedulers.main.handler = ["/usr/bin/python3", "/absolute/coragent/skills/core/batch-schedulers/scripts/tri.py"]
 ```
 
 将目标合并到 `config.toml`，补齐实际连接环境和计算软件绑定。PBS、Torque、Slurm

@@ -228,6 +228,11 @@ def parse_args(argv: list[str] | None = None, *, use_environment: bool = True) -
         help="Explicit CoRAgent Web token (8-100 URL-safe characters; prefer --web-auth-token-file for secrets).",
     )
     parser.add_argument("--job-config", help="Explicitly import execution settings into config.toml.")
+    try:
+        from . import _qrun_install
+    except ImportError:
+        import _qrun_install
+    _qrun_install.options(parser)
     parser.add_argument(
         "--agent-config-dir",
         help="Directory containing installation-owned Pi models.json and auth.json.",
@@ -237,10 +242,10 @@ def parse_args(argv: list[str] | None = None, *, use_environment: bool = True) -
         help="Explicitly import name resolver settings into config.toml.",
     )
     parser.add_argument("--conda-root")
-    parser.add_argument('--job-profile', action='append', metavar='TARGET:PROFILE', help='Prepare a domain environment (structure, pyscf, render, wrapper, path). Repeat for multiple targets.')
-    parser.add_argument('--job-software-root', action='append', metavar='TARGET=PATH', help='Dedicated target directory for managed scientific environments.')
-    parser.add_argument('--job-conda', action='append', metavar='TARGET=PATH', help='Target-local Conda executable; required when provisioning a new remote target.')
-    parser.add_argument('--verify-job-target', action='append', metavar='TARGET', help='Also verify this remote target through real scheduled Jobs.')
+    parser.add_argument('--job-profile', action='append', metavar='PLATFORM/ENTRY:PROFILE', help='Prepare a domain environment (structure, pyscf, render, wrapper, path). Repeat for multiple targets.')
+    parser.add_argument('--job-software-root', action='append', metavar='PLATFORM/ENTRY=PATH', help='Dedicated target directory for managed scientific environments.')
+    parser.add_argument('--job-conda', action='append', metavar='PLATFORM/ENTRY=PATH', help='Target-local Conda executable; required when provisioning a new remote target.')
+    parser.add_argument('--verify-job-target', action='append', metavar='PLATFORM/ENTRY', help='Also verify this remote target through real scheduled Jobs.')
     parser.add_argument('--job-check-timeout', type=int, default=180, help='Maximum seconds per acceptance Job, including queue wait.')
     parser.add_argument('--job-offline', action='store_true', help='Provision scientific environments from prepared caches only.')
     parser.add_argument('--without-default-job-environment', action='store_true', help='Create a control-only installation when no job.toml is supplied.')
@@ -623,14 +628,14 @@ def interactive_menu_options(args: argparse.Namespace) -> argparse.Namespace:
                 args.name_resolver_config or "",
             ).strip() or None
             args.job_profile = [value.strip() for value in ask(
-                'Environment selections, comma separated (TARGET:structure/pyscf/render/wrapper/path; blank preserves defaults)',
+                'Environment selections, comma separated (PLATFORM/ENTRY:structure/pyscf/render/wrapper/path; blank preserves defaults)',
                 ','.join(args.job_profile or [])).split(',') if value.strip()]
             args.verify_job_target = [value.strip() for value in ask(
                 'Remote targets to verify through the scheduler, comma separated (blank skips remote verification)',
                 ','.join(args.verify_job_target or [])).split(',') if value.strip()]
             for attribute, prompt in (
-                ('job_software_root', 'Environment stores, comma separated TARGET=/absolute/path'),
-                ('job_conda', 'Conda executables, comma separated TARGET=/absolute/path'),
+                ('job_software_root', 'Environment stores, comma separated PLATFORM/ENTRY=/absolute/path'),
+                ('job_conda', 'Conda executables, comma separated PLATFORM/ENTRY=/absolute/path'),
             ):
                 setattr(args, attribute, [value.strip() for value in ask(prompt,
                     ','.join(getattr(args, attribute) or [])).split(',') if value.strip()])
@@ -742,8 +747,13 @@ def show_install_plan(args: argparse.Namespace, installation: dict[str, str | No
     field("Pi App Server", "install pinned runtime and verify", tone="success")
     field("Local backend policy", "automatic structure environment on a fresh install; native tools use supplied paths", tone="muted")
     field("Job platform config", args.job_config or "preserve existing bindings or generate local defaults", tone="muted")
-    for row in _job_install.preview(_job_install.plan(args))['environments']:
+    scientific = _job_install.preview(_job_install.plan(args))
+    for row in scientific['environments']:
         field(row['target'] + ':' + row['profile'], row['action'] + ' - ' + row['prefix'], tone='muted')
+    for row in scientific['qrun_pools']:
+        host = row['route'].get('ssh_host', 'local')
+        field('Qrun: ' + ', '.join(row['targets']),
+              f"manage on {host}; runtime={row.get('runtime', 'auto')}; {row['cpus']} CPUs, {row['memory_mb']} MiB; {row['state_dir']}", tone='success')
     field(
         "Chemical name resolver config",
         args.name_resolver_config or "bundled PubChem default for a new install; preserve existing otherwise",
@@ -857,7 +867,7 @@ def validate_options(args: argparse.Namespace) -> None:
             parsed_job = tomllib.loads(source.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
             raise ValueError(f"invalid job TOML configuration: {source}: {error}") from error
-        _validate_job_config(_job_install.plan(args)['settings'] if args.job_profile else parsed_job)
+        _validate_job_config(_job_install.contract().configuration_document(_job_install.plan(args)['settings']) if args.job_profile else parsed_job)
     else:
         layout = app_paths(args.install_root)
         execution = layout.configuration.read(required=False).get('execution')
@@ -1506,18 +1516,17 @@ def _bind_local_name_resolver(job: dict, resolver: Path) -> None:
     raw = destination.read_bytes()
     config = tomllib.loads(raw.decode())
     changed = []
-    targets = config.get("execution", {}).get("targets", {})
-    for name, target in targets.items():
-        structure = target.get("bindings", {}).get("structure")
-        local = target.get("transport") == "local" if target.get("driver") == "external" else target.get("type") == "local"
-        if not local or structure is None:
+    settings = _job_install.contract().validate_job_config(config)
+    for name, target in settings['targets'].items():
+        structure = target.get("backends", {}).get("structure")
+        if target["transport"] != "local" or structure is None:
             continue
         variables = structure.setdefault("environment", {})
-        # Explicit paths (including a target-specific installation root) win.
         if {"CORAGENT_NAME_RESOLVER_CONFIG", "CORAGENT_INSTALL_ROOT"} & variables.keys():
             continue
         variables["CORAGENT_NAME_RESOLVER_CONFIG"] = str(resolver)
         changed.append(name)
+    config = _job_install.contract().configuration_document(settings)
     if not changed:
         return
     installed = _job_config_bytes(config)
@@ -2931,6 +2940,7 @@ def build_component_summary(
             "status": "preserved" if (app_paths(root).job_config).is_file() else "not_configured",
             "path": str(app_paths(root).job_config),
         },
+        "qrun": backend_configs.get("qrun") if backend_configs else None,
         "name_resolver": backend_configs.get("name_resolver") if backend_configs else {
             "status": "preserved" if (app_paths(root).resolver_config).is_file() else "not_configured",
             "path": str(app_paths(root).resolver_config),
@@ -3018,6 +3028,10 @@ def show_installed_summary(
         note("Token values are not printed. Read the owner-only CoRAgent Web token file when pairing a browser.")
 
     job_config = components.get("job")
+    queues = components.get("qrun") or {}
+    for pool in queues.get('pools', []):
+        field('Qrun: ' + ', '.join(pool['targets']),
+              f"{queues['status']} on {pool['route'].get('ssh_host', 'local')}; runtime={pool.get('runtime', 'auto')} - {pool['state_dir']}", tone='success')
     if isinstance(job_config, dict):
         section("Job platforms")
         field("Unified config", job_config.get("path", "not configured"))
@@ -3129,7 +3143,7 @@ def _interactive_prepare_installation(
 def show_dry_run(args: argparse.Namespace) -> None:
     """Expose only configuration references, never credential contents."""
     scientific = _job_install.plan(args)
-    _validate_job_config(scientific['settings'])
+    _validate_job_config(_job_install.contract().configuration_document(scientific['settings']))
     validate_email_options(args)
     plan = {key: getattr(args, key) for key in (
         "install_root", "config", "config_dir", "workspace_root", "source_root", "coragent_repo",
@@ -3151,9 +3165,10 @@ def show_dry_run(args: argparse.Namespace) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
-        from . import _install_inputs, _install_relay
+        from . import _install_inputs, _install_relay, _qrun_install
     except ImportError:
-        import _install_inputs, _install_relay
+        import _install_inputs, _install_relay, _qrun_install
+    qrun_transaction = None
     relay_result = None
     relay_owned = False
     previous_release: dict[str, object] | None = None
@@ -3200,17 +3215,30 @@ def main(argv: list[str] | None = None) -> int:
         prepare(args)
         installed = run_install(args)
         package = Path(installed['package_root']) / 'agent'
-        args._prepared_job_plan = _job_install.prepare(_job_install.plan(args, package), args, package,
+        job_plan = _job_install.plan(args, package)
+        if job_plan.get('qrun'):
+            # Fence old clients before stopping/replacing their queue. Acceptance
+            # Jobs below may use the new handler while publication is still staged.
+            previous_release = snapshot_active_release(installation_root)
+            previous_configuration = snapshot_install_configuration(installation_root, args)
+            cutover_started = True
+            maintenance.transition("preparing", release_id=installed.get("release_id"))
+            stop_installation_services(args)
+            from research_agent.bootstrap.session_guard import guard_installation_upgrade
+            writer_guard.enter_context(guard_installation_upgrade(installation_root))
+        qrun_transaction = _qrun_install.prepare(job_plan, args, package)
+        args._prepared_job_plan = _job_install.prepare(job_plan, args, package,
                                                       installed['runtime']['python_executable'])
         app_server_runtime = prepare_app_server_runtime(installation_root, suite_root=Path(installed['package_root']), bind=False)
         _job_install.assert_inputs_unchanged(args._prepared_job_plan)
-        previous_release = snapshot_active_release(installation_root)
-        previous_configuration = snapshot_install_configuration(installation_root, args)
-        cutover_started = True
-        maintenance.transition("preparing", release_id=installed.get("release_id"))
-        stop_installation_services(args)
-        from research_agent.bootstrap.session_guard import guard_installation_upgrade
-        writer_guard.enter_context(guard_installation_upgrade(installation_root))
+        if not cutover_started:
+            previous_release = snapshot_active_release(installation_root)
+            previous_configuration = snapshot_install_configuration(installation_root, args)
+            cutover_started = True
+            maintenance.transition("preparing", release_id=installed.get("release_id"))
+            stop_installation_services(args)
+            from research_agent.bootstrap.session_guard import guard_installation_upgrade
+            writer_guard.enter_context(guard_installation_upgrade(installation_root))
         app_paths(installation_root).materialize()
         backend_configs = _job_install.publish(args._prepared_job_plan)
         try:
@@ -3261,6 +3289,8 @@ def main(argv: list[str] | None = None) -> int:
                 raise RuntimeError("installed release did not pass inspection")
             writer_guard.close()
             maintenance.transition("starting")
+            _qrun_install.commit(qrun_transaction)
+            qrun_transaction = None
             activity.update("Starting the verified services")
             services = activate_installed_services(args, services)
             readiness = verify_running_services(args, installed)
@@ -3268,6 +3298,8 @@ def main(argv: list[str] | None = None) -> int:
                 scope = [] if args.service_scope == "system" else ["--user"]
                 services = [_service_status(scope, args.service_scope, service["name"]) for service in services]
             activity.succeed("Installation finalized")
+        backend_configs["qrun"] = {"status": "configured" if args.service_scope == "none" else "running",
+                                   "pools": args._prepared_job_plan.get("qrun", [])}
         components = build_component_summary(
             args,
             installed,
@@ -3334,6 +3366,11 @@ def main(argv: list[str] | None = None) -> int:
             show_installed_summary(args, installed, components, credentials)
         return 0
     except (OSError, RuntimeError, ValueError, subprocess.CalledProcessError, json.JSONDecodeError) as error:
+        if qrun_transaction is not None and (maintenance is None or maintenance.rollback_allowed):
+            try:
+                _qrun_install.rollback(qrun_transaction)
+            except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as queue_error:
+                error = RuntimeError(f"{error}; Qrun recovery failed and its ownership record was retained: {queue_error}")
         if relay_owned and relay_result is not None:
             try:
                 _install_relay.rollback(args, relay_result)

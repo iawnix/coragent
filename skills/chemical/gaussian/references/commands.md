@@ -16,6 +16,6 @@ Read the applicable operation contract below for input formats, required argumen
 - [l101 input guide](l101_input_guide.md)
 - [relaxed scans](relaxed_scans.md)
 
-Use the table’s executor ID and version for `--executor` and `--version`, and actual roles for `--input role=path`. The execution target is inherited from the task; domain Skills omit `--target`. Consult that executor’s `--help` only for options absent from its contract.
+Use the table’s executor ID and version for `--executor` and `--version`, and actual roles for `--input role=path`. The execution target is inherited from the task; domain Skills omit `--platform` / `--scheduler-entry`. Consult that executor’s `--help` only for options absent from its contract.
 
 For preparation failures, correct inputs, arguments or software bindings first; successful preparation has not executed the calculation. Reconcile the existing Job and receipt after an uncertain submission. Collect available outputs after calculation failure and use the operation contract to decide whether to retry; failed outputs are not validated results.

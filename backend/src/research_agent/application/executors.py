@@ -16,7 +16,7 @@ import json
 import os
 from pathlib import Path
 
-from research_agent.jobs.config_contract import binding_digest, configured_targets, load_job_config, bound_target
+from research_agent.jobs.config_contract import binding_digest, configured_targets, load_job_config, bound_target, target_identity
 from research_agent.jobs.environment import probe_binding, guarded_command
 from research_agent.jobs.inputs import content_digest
 from research_agent.application.execution_catalog import installed_catalogs
@@ -37,6 +37,7 @@ def list_recipes(*, executor=None, version=None, backend=None, skill=None, detai
     settings = load_job_config(config) if config else None
     if config:
         target = preparation_target(settings, target)
+
     recipes = []
     for catalog in installed_catalogs():
         for entry in catalog['executors']:
@@ -50,7 +51,7 @@ def list_recipes(*, executor=None, version=None, backend=None, skill=None, detai
                     configured_targets(settings)[target].get('backends', {}) else 'not_configured')
             recipes.append(row)
     return {'scope': 'predefined_recipes', 'software_availability': 'not_checked',
-            **({'target': target} if target else {}), 'recipes': recipes}
+            **({'target': target_identity(target)} if target else {}), 'recipes': recipes}
 
 
 def _load_cli(base, descriptor):
@@ -165,6 +166,20 @@ def preparation_target(settings, requested=None):
 def _prepare(config, target, base, descriptor, resources, inputs, arguments, *, dependencies, collect, work_id, input_artifact_ids, submission):
     settings = load_job_config(config)
     target = preparation_target(settings, target)
+    context = json.loads(os.environ["CORAGENT_TASK_EXECUTION"]) if os.environ.get("CORAGENT_TASK_EXECUTION") else None
+    if context and context.get("item"):
+        item = context["item"]
+        if item.get("backend") and descriptor["backend"] != item["backend"]:
+            raise ValueError("execution_item_backend_mismatch")
+        if work_id is not None and work_id != item["work_id"]:
+            raise ValueError("execution_work_id_mismatch")
+        work_id = item["work_id"]
+        input_artifact_ids = list(dict.fromkeys([*input_artifact_ids, *item["input_artifact_ids"]]))
+        requested = (submission or {}).get("resources", {})
+        if any(key in requested and requested[key] != value for key, value in item["resources"].items()):
+            raise ValueError("execution_item_resources_mismatch")
+        submission = {**(submission or {}), "resources": {**requested, **item["resources"]}}
+
     if not isinstance(inputs, dict) or set(inputs) != set(descriptor["inputs"]):
         raise ValueError("executor_inputs_invalid: provide exactly the declared input roles")
     if not isinstance(arguments, (list, tuple)) or any(not isinstance(arg, str) or "\0" in arg for arg in arguments):
@@ -221,6 +236,12 @@ def _prepare(config, target, base, descriptor, resources, inputs, arguments, *, 
         if not separator:
             raise ValueError("executor_dependency_invalid: use source=destination")
         stage(source, destination)
+    if context and context.get("item"):
+        from research_agent.artifacts.registry import read_manifest
+        workspace = Path(context["workspace_root"])
+        for ref in context["item"]["input_artifact_ids"]:
+            manifest = read_manifest(workspace, ref)
+            stage(workspace / "artifacts" / ref / "payload", "inputs/artifacts/" + ref + "/payload", manifest["sha256"])
     outputs = copy.deepcopy(descriptor["outputs"])
     for path in collect:
         _relative(path)
@@ -257,7 +278,7 @@ def _prepare(config, target, base, descriptor, resources, inputs, arguments, *, 
     if not isinstance(work_id, str) or not work_id:
         raise ValueError("work_id_invalid")
     return {"request_id": "executor_" + hashlib.sha256(work_id.encode()).hexdigest()[:48],
-            "work_id": work_id, "command": argv, "execution_target": target,
+            "work_id": work_id, "command": argv, "execution_target": target_identity(target),
             "inputs": staged, "outputs": outputs, "environment": binding.get("environment", {}),
             **({"input_artifact_ids": list(input_artifact_ids)} if input_artifact_ids else {}),
             "metadata": {**submission,
@@ -279,7 +300,8 @@ def main():
     parser.add_argument("--details", action="store_true", help="Include full descriptors with --list")
     parser.add_argument("--skill", help="Filter --list by associated Skill")
     parser.add_argument("--config")
-    parser.add_argument("--target", help="Named execution target in job.toml; the executor or --backend selects its software/Python binding")
+    parser.add_argument("--platform", help="Named execution platform")
+    parser.add_argument("--scheduler-entry", help="Scheduler entry within the selected platform")
     parser.add_argument("--executor")
     parser.add_argument("--version")
     parser.add_argument("--script", help="Pin a task-specific Python script and run it in the --backend Python binding; requires --backend, not executor/version/input")
@@ -298,6 +320,9 @@ def main():
     parser.add_argument("--output", help="Save a Job request (not calculation results); relative paths resolve from the command cwd. Print request_file and request_sha256 for job_start")
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    if args.scheduler_entry and not args.platform:
+        parser.error("--scheduler-entry requires --platform")
+    selection = ({"platform": args.platform, **({"scheduler_entry": args.scheduler_entry} if args.scheduler_entry else {})} if args.platform else None)
     if args.help:
         if args.executor:
             if not args.version:
@@ -308,7 +333,7 @@ def main():
         return
     if args.list:
         print(json.dumps(list_recipes(executor=args.executor, version=args.version, backend=args.backend,
-            skill=args.skill, details=args.details, config=args.config, target=args.target), indent=2))
+            skill=args.skill, details=args.details, config=args.config, target=selection), indent=2))
         return
     if args.details or args.skill:
         parser.error("--details and --skill require --list")
@@ -331,9 +356,9 @@ def main():
         'cpus': args.cpus, 'memory_mb': args.job_memory_mb, 'gpus': args.gpus, 'walltime': args.walltime}.items() if value is not None},
         **{key: value for key, value in {'queue': args.queue, 'queue_wait_seconds': args.queue_wait_seconds}.items() if value is not None}}
     try:
-        target = preparation_target(load_job_config(args.config), args.target)
-        request = (prepare_script(args.config, target, args.backend, args.script, arguments, **options)
-                   if args.script else prepare(args.config, target, args.executor, args.version, inputs, arguments, **options))
+        target = preparation_target(load_job_config(args.config), selection)
+        request = (prepare_script(args.config, target_identity(target), args.backend, args.script, arguments, **options)
+                   if args.script else prepare(args.config, target_identity(target), args.executor, args.version, inputs, arguments, **options))
     except (RunnerArgumentsError, ValueError) as exc:
         parser.exit(2, str(exc) + '\n')
     encoded = (json.dumps(request, indent=2) + "\n").encode()

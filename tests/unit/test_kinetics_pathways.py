@@ -196,7 +196,7 @@ def test_kinetics_and_pathway_jobs(tmp_path,operation,factory):
     from research_agent.application.executors import prepare
     from tests.unit.test_job_recovery import workspace
     root=tmp_path/'work';workspace(root);path=root/'input.json';path.write_text(json.dumps(factory()))
-    request=prepare(Path(os.environ['CORAGENT_JOB_CONFIG']),'local','chemical.'+operation,'1',{'input':path})
+    request=prepare(Path(os.environ['CORAGENT_JOB_CONFIG']),{'platform': 'local', 'scheduler_entry': 'main'},'chemical.'+operation,'1',{'input':path})
     node=execute('research_create',root,{'goal':'Independent kinetic/pathway fixture'})['node']
     receipt=execute('job_start',root,{**request,'node_id':node['id']})
     try:

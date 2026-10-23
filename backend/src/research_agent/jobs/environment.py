@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 
 from .config_contract import binding_digest, configured_targets, python_command
-from .worker import supervisor_environment
+from .process_environment import supervisor_environment
 
 PROBE_FILE = Path(__file__).with_name("environment_probe.py")
 PROBE_DESTINATION = ".coragent/environment_probe.py"

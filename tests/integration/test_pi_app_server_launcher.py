@@ -181,7 +181,7 @@ def test_research_agent_launcher_preserves_validated_custom_compute_profile(
     workspace = installation.workspaces_root / "reaction-a"
     workspace.mkdir(parents=True)
     custom = tmp_path / "job.toml"
-    custom.write_text("[execution]\ndefault_target = 'local'\n[execution.targets.local]\ntype = 'local'\ndriver = 'process'\n", encoding="utf-8")
+    custom.write_text('[execution]\nschema_version = 2\ndefault_platform = \'local\'\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n', encoding="utf-8")
     monkeypatch.setenv("CORAGENT_JOB_CONFIG", str(custom))
 
     launcher.configure_process_environment(installation, workspace, "reaction-a")

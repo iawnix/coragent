@@ -51,7 +51,7 @@
       }
     },
     {
-      "command": "job_targets",
+      "command": "job_platforms",
       "params": {}
     },
     {
@@ -111,6 +111,10 @@
         "session_id": "session_example",
         "limit": 20
       }
+    },
+    {
+      "command": "job_resources",
+      "params": {}
     },
     {
       "command": "artifact_register",

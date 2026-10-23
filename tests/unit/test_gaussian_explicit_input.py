@@ -136,22 +136,11 @@ def test_preparer_argument_error_is_actionable_and_recoverable(tmp_path, monkeyp
     program = tmp_path/'g16'
     program.write_text(f'#!/bin/sh\ntouch "{marker}"\n')
     program.chmod(0o700)
-    config.write_text('''[execution]
-default_target = "local"
-[execution.targets.local]
-type = "local"
-driver = "process"
-[execution.targets.local.python]
-manager = "conda"
-conda_executable = "/fixture/conda"
-prefix = "/fixture/runner"
-lock_ref = "/fixture/runner.lock"
-[execution.targets.local.bindings.gaussian]
-command = ''' + json.dumps(str(program)) + '\n')
+    config.write_text('[execution]\nschema_version = 2\ndefault_platform = "local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n[execution.platforms.local.python]\nmanager = "conda"\nconda_executable = "/fixture/conda"\nprefix = "/fixture/runner"\nlock_ref = "/fixture/runner.lock"\n[execution.platforms.local.bindings.gaussian]\ncommand = ' + json.dumps(str(program)) + '\n')
     source = tmp_path/'input.xyz'
     source.write_text('3\nfixture\nO 0 0 0\nH 0 0 1\nH 0 1 0\n')
     output = tmp_path/'request.json'
-    args = ['--config', str(config), '--target', 'local', '--executor', 'chemical.gaussian',
+    args = ['--config', str(config), '--platform', 'local', '--executor', 'chemical.gaussian',
             '--version', '1', '--input', f'geometry={source}', '--output', str(output), '--', '--task', 'opt']
     # Exercise the actual CLI entrypoint: rejection occurs before any target probe or calculation.
     rejected = subprocess.run([sys.executable, '-m', executors.__name__, *args, *option],
@@ -191,23 +180,11 @@ def test_explicit_gjf_task_error_preserves_validation_mode(capsys):
 def test_prepared_gaussian_request_tracks_checkpoint_and_collection(tmp_path, mock_environment_probe):
     from research_agent.application.executors import prepare
     config = tmp_path/'job.toml'
-    config.write_text('''[execution]
-default_target = "local"
-[execution.targets.local]
-type = "local"
-driver = "process"
-[execution.targets.local.python]
-manager = "conda"
-conda_executable = "/opt/conda/bin/conda"
-prefix = "/opt/runner"
-lock_ref = "/opt/locks/runner.lock"
-[execution.targets.local.bindings.gaussian]
-command = ["/opt/g16"]
-''')
+    config.write_text('[execution]\nschema_version = 2\ndefault_platform = "local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n[execution.platforms.local.python]\nmanager = "conda"\nconda_executable = "/opt/conda/bin/conda"\nprefix = "/opt/runner"\nlock_ref = "/opt/locks/runner.lock"\n[execution.platforms.local.bindings.gaussian]\ncommand = ["/opt/g16"]\n')
     source = gjf(tmp_path/'input.gjf', 'IRC=(Forward,ReadFC)')
     checkpoint = tmp_path/'previous.chk'; checkpoint.write_bytes(b'checkpoint version 1')
     def request(collect=()):
-        return prepare(config, 'local', 'chemical.gaussian-input', '1', {'input': source}, ['--validation', 'irc'],
+        return prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, 'chemical.gaussian-input', '1', {'input': source}, ['--validation', 'irc'],
             dependencies=[str(checkpoint)+'=previous.chk'], collect=['results/' + name for name in collect])
     first = request(['irc.chk'])
     assert first == request(['irc.chk'])

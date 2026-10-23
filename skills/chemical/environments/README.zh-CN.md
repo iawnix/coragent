@@ -67,7 +67,7 @@ RDKit、Job 内的解析器配置路径和乙醇结构生成；其他环境执�
 
 可选 `path` profile 为显式配置的 `path_xtb` / `path_gaussian` 原生绑定使用
 path.lock，提供 RDKit/NumPy、ASE、SciPy，供扫描、梯度与 ASE NEB v2，不改变旧轻量包装器。
-例如为 `[execution.targets.local.bindings.path_xtb]` 配置
+例如为 `[execution.platforms.local.bindings.path_xtb]` 配置
 `command = "/opt/xtb/bin/xtb"`（需要时加 activation_script），再选择
 `--job-profile local:path`。该 profile 不默认进行原生科学计算冒烟测试；
 选定入口的环境检查与显式有界科学 Job 需要分别验收。

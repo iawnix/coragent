@@ -1,93 +1,131 @@
+import copy
 import pytest
 
-from research_agent.jobs.config_contract import resolve_target, validate_job_config, resolve_selection, bound_target
+from research_agent.jobs.config_contract import (
+    validate_job_config, resolve_target, resolve_selection, bound_target,
+    configuration_document, resolve_submission, target_identity,
+)
 
 
-def settings(default="tri"):
-    return validate_job_config({"execution": {
-        "default_target": default,
-        "targets": {
-            "local": {"type": "local", "driver": "systemd", "scheduler": "none", "location": "controller",
-                       "aliases": ["direct"]},
-            "tri": {"type": "local", "driver": "external", "transport": "local", "work_root": "/shared/jobs",
-                     "handler": ["/bin/true"], "scheduler": "tri", "location": "controller",
-                     "aliases": ["local-tri", "local-tri-queue"]},
-            "slurm": {"type": "remote", "driver": "external", "transport": "ssh", "ssh_host": "login",
-                       "work_root": "/shared/jobs", "handler": ["/bin/true"], "scheduler": "slurm",
-                       "location": "cluster"},
-        },
-    }})
+def document():
+    return {'execution': {'schema_version': 2, 'default_platform': 'FEDCluster', 'platforms': {
+        'FEDCluster': {'transport': 'local', 'aliases': ['fed'], 'default_scheduler': 'tri',
+            'storage': {'work_root': '/shared/jobs', 'scratch_root': '/scratch'},
+            'bindings': {'xtb': {'command': '/soft/xtb'}},
+            'submission': {'resources': {'cpus': 2, 'memory_mb': 2048}},
+            'schedulers': {'tri': {'executor': 'tri', 'handler': ['/bin/true']},
+                'qrun': {'executor': 'qrun', 'submission': {'resources': {'cpus': 4}},
+                    'limits': {'cpus': 8, 'memory_mb': 4096}}}},
+        'Com30': {'transport': 'ssh', 'ssh_host': 'agent.com30', 'default_scheduler': 'qrun',
+            'storage': {'work_root': '/home/agent/soft/Qrun/jobs'},
+            'schedulers': {'qrun': {'executor': 'qrun'}}},
+        '1WCluster': {'transport': 'ssh', 'ssh_host': 'agent.1w', 'enabled': False},
+    }}}
 
 
-def test_missing_target_uses_configured_default():
-    config = settings()
-    assert resolve_target(config) == "tri"
-    assert config["default_target"] == "tri"
-    assert config["targets"]["tri"]["scheduler"] == "tri"
-    assert resolve_target(validate_job_config({"execution": {
-        "default_target": "local", "targets": {"local": {"type": "local", "driver": "systemd"}}
-    }})) == "local"
+def test_platform_entry_resolution_has_no_composite_user_label():
+    settings = validate_job_config(document())
+    assert resolve_target(settings) == 'FEDCluster/tri'
+    assert resolve_target(settings, {'platform': 'FED'}) == 'FEDCluster/tri'
+    assert resolve_target(settings, {'platform': 'Com30'}, scheduler='Qrun') == 'Com30/qrun'
+    assert resolve_selection(settings, {'platform': 'Com30'})['target'] == {
+        'platform': 'Com30', 'scheduler_entry': 'qrun'}
+    with pytest.raises(ValueError):
+        resolve_target(settings, 'com30_qrun')
+    with pytest.raises(ValueError, match='unavailable'):
+        resolve_target(settings, {'platform': '1WCluster'})
 
 
-def test_legacy_environment_configuration_is_rejected():
-    with pytest.raises(ValueError, match="execution table"):
-        validate_job_config({"default_environment": "local", "environments": {"local": {"kind": "local"}}})
+def test_unknown_legacy_configuration_is_not_a_second_protocol():
+    with pytest.raises(ValueError, match='unsupported'):
+        validate_job_config({'execution': {'default_target': 'local', 'targets': {}}})
 
 
-@pytest.mark.parametrize("requested, expected", [
-    ("tri", "tri"), ("TRI", "tri"), ("local-tri", "tri"), ("local-tri-queue", "tri"), ("slurm", "slurm")
-])
-def test_target_resolves_by_name_scheduler_or_alias(requested, expected):
-    assert resolve_target(settings(), requested) == expected
+def test_entry_inheritance_and_limits():
+    settings = validate_job_config(document())
+    tri, qrun = settings['targets']['FEDCluster/tri'], settings['targets']['FEDCluster/qrun']
+    assert tri['work_root'] == qrun['work_root'] == '/shared/jobs'
+    assert tri['backends'] == qrun['backends'] == {'xtb': {'command': '/soft/xtb'}}
+    assert resolve_submission(settings, 'FEDCluster/qrun')['resources'] == {'cpus': 4, 'memory_mb': 2048}
+    with pytest.raises(ValueError, match='limit_exceeded'):
+        resolve_submission(settings, 'FEDCluster/qrun', requested={'resources': {'cpus': 9}})
 
 
-def test_unknown_and_ambiguous_scheduler_fail_closed():
-    config = settings()
-    with pytest.raises(ValueError, match="execution_target_not_configured"):
-        resolve_target(config, "pbs")
-    config["targets"]["tri-2"] = dict(config["targets"]["tri"])
-    config["targets"]["tri-2"]["aliases"] = ["queue"]
-    config["targets"]["tri"]["aliases"] = ["queue"]
-    with pytest.raises(ValueError, match="execution_target_ambiguous"):
-        resolve_target(config, "queue")
-
-
-def test_explicit_queue_is_not_direct_local_and_source_can_disambiguate():
-    config = settings()
-    assert resolve_selection(config, source_text="在local（Tri队列）计算资源上完整计算任务")['target'] == 'tri'
-    with pytest.raises(ValueError, match='execution_target_not_configured'):
-        resolve_selection(config, 'local', source_text="在local（Tri队列）计算资源上完整计算任务")
-    with pytest.raises(ValueError, match='execution_intent_ambiguous'):
-        resolve_selection(config, source_text="不要用 TRI，改用 Slurm")
-    assert resolve_selection(config, source_text="改用 Slurm")['target'] == 'slurm'
-    # Substrings are not scheduler names.
-    assert resolve_selection(settings('local'), source_text="compare trial geometries")['target'] == 'local'
-
-
-def test_scheduler_and_location_constraints_are_conjunctive():
-    config = settings()
-    assert resolve_selection(config, scheduler='tri', location='controller')['target'] == 'tri'
-    with pytest.raises(ValueError, match='not_configured'):
-        resolve_selection(config, scheduler='tri', location='cluster')
-    config['targets']['second'] = dict(config['targets']['slurm'])
+def test_platform_alias_collision_and_entry_connection_override_are_rejected():
+    raw = document(); raw['execution']['platforms']['Com30']['aliases'] = ['FED']
     with pytest.raises(ValueError, match='ambiguous'):
-        resolve_selection(config, scheduler='slurm')
+        validate_job_config(raw)
+    raw = document(); raw['execution']['platforms']['Com30']['schedulers']['qrun']['ssh_host'] = 'elsewhere'
+    with pytest.raises(ValueError, match='unsupported'):
+        validate_job_config(raw)
 
 
-def test_preparation_inherits_pinned_target_and_detects_route_drift(monkeypatch):
-    import json
-    from research_agent.application.executors import preparation_target
-    config = settings(); selection = resolve_selection(config)
-    monkeypatch.setenv('CORAGENT_TASK_EXECUTION', json.dumps(selection))
-    config['default_target'] = 'slurm'
-    assert preparation_target(config) == 'tri'
+def test_duplicate_executor_requires_matching_default_or_explicit_entry():
+    raw = document(); entries = raw['execution']['platforms']['FEDCluster']['schedulers']
+    entries['cpu'] = {'executor': 'slurm', 'handler': ['/bin/true']}
+    entries['gpu'] = {'executor': 'slurm', 'handler': ['/bin/true']}
+    settings = validate_job_config(raw)
+    with pytest.raises(ValueError, match='ambiguous'):
+        resolve_target(settings, {'platform': 'FEDCluster'}, scheduler='slurm')
+    assert resolve_target(settings, {'platform': 'FEDCluster', 'scheduler_entry': 'gpu'}, scheduler='slurm') == 'FEDCluster/gpu'
+
+
+def test_binding_survives_default_change_but_detects_route_change():
+    raw = document(); settings = validate_job_config(raw)
+    selection = resolve_selection(settings, {'platform': 'Com30'})
+    context = {'selection': selection}
+    raw['execution']['default_platform'] = 'Com30'
+    updated = validate_job_config(raw)
+    assert bound_target(updated, context=context) == 'Com30/qrun'
     with pytest.raises(ValueError, match='mismatch'):
-        preparation_target(config, 'slurm')
-    config['targets']['tri']['submission'] = {'resources': {'cpus': 24}}
-    assert bound_target(config, context=selection) == 'tri'
-    config['targets']['tri']['handler'] = ['/different/queue.py']
-    with pytest.raises(ValueError, match='execution_target_changed'):
-        preparation_target(config)
-    del config['targets']['tri']
-    with pytest.raises(ValueError, match='not_configured'):
-        preparation_target(config)
+        bound_target(updated, {'platform': 'FEDCluster'}, context=context)
+    raw['execution']['platforms']['Com30']['ssh_host'] = 'changed'
+    with pytest.raises(ValueError, match='changed'):
+        bound_target(validate_job_config(raw), context=context)
+
+
+def test_installer_publication_preserves_shared_values_and_entry_changes():
+    settings = validate_job_config(document())
+    candidate = copy.deepcopy(settings)
+    candidate['targets']['Com30/qrun']['handler'] = ['/installed/qrun', 'handler']
+    published = configuration_document(candidate)
+    assert 'targets' not in published['execution']
+    assert published['execution']['platforms']['FEDCluster']['bindings'] == {'xtb': {'command': '/soft/xtb'}}
+    assert validate_job_config(published)['targets']['Com30/qrun']['handler'] == ['/installed/qrun', 'handler']
+
+
+def test_source_intent_rejects_executor_contradiction():
+    settings = validate_job_config(document())
+    with pytest.raises(ValueError, match='conflict'):
+        resolve_selection(settings, {'platform': 'Com30'}, scheduler='tri', source_text='用 Qrun')
+    assert resolve_selection(settings, {'platform': 'FEDCluster'}, source_text='用 Tri')['target'] == target_identity('FEDCluster/tri')
+
+
+def test_unconfigured_scheduler_in_source_does_not_silently_use_default():
+    with pytest.raises(ValueError, match='scheduler_ambiguous_or_missing'):
+        resolve_selection(validate_job_config(document()), {'platform': 'Com30'}, source_text='Use PBS')
+
+
+def test_discovery_explains_shared_and_overridden_values_without_credentials():
+    from research_agent.jobs.config_contract import platform_catalog
+    raw = document()
+    entry = raw['execution']['platforms']['FEDCluster']['schedulers']['qrun']
+    entry.update(bindings={'xtb': {'command': '/alternate/xtb'}},
+                 storage={'work_root': '/alternate/jobs'}, handler_environment={'TOKEN': 'private-value'})
+    catalog = platform_catalog(validate_job_config(raw))
+    local = catalog['platforms']['FEDCluster']['schedulers']
+    assert local['tri']['sources']['bindings']['xtb'] == 'platform'
+    assert local['qrun']['sources']['bindings']['xtb'] == 'scheduler_entry'
+    assert local['qrun']['sources']['storage']['scratch_root'] == 'platform'
+    assert local['qrun']['storage']['work_root'] == '/alternate/jobs'
+    assert 'private-value' not in str(catalog)
+
+
+def test_opaque_pbs_select_cannot_bypass_entry_resource_limits():
+    raw = document()
+    entry = raw['execution']['platforms']['FEDCluster']['schedulers']['tri']
+    entry.update(executor='pbs', limits={'cpus': 4})
+    raw['execution']['platforms']['FEDCluster'].pop('submission')
+    with pytest.raises(ValueError, match='limit_unverifiable'):
+        resolve_submission(validate_job_config(raw), 'FEDCluster/tri',
+                           requested={'resources': {'select': '1:ncpus=20'}})

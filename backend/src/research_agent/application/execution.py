@@ -34,7 +34,8 @@ def _job_manager(root: Path) -> JobManager:
         except (OSError, TypeError, ValueError) as exc:
             raise ValueError(f"invalid job runtime configuration: {config}: {exc}") from exc
         _JOB_MANAGERS[key] = JobManager(platforms, default=default)
-    return _JOB_MANAGERS[key]
+    cached = _JOB_MANAGERS[key]
+    return JobManager(cached.platforms, default=cached.default)
 
 
 def _root(params: dict[str, Any]) -> Path:
@@ -149,12 +150,7 @@ def _spec(root: Path, params: dict[str, Any]) -> JobSpec:
     outputs = tuple(JobOutput(
         str(row["path"]), bool(row.get("required", False)), row.get("media_type"), int(row.get("min_bytes", 0)), row.get("recursive", False)
     ) for row in params.get("outputs", []))
-    configured_env = params.get("environment")
-    process_env = params.get("env")
-    if process_env is None and isinstance(configured_env, dict):
-        process_env = configured_env
-    if process_env is None:
-        process_env = {}
+    process_env = params.get("environment", {})
     if not isinstance(process_env, dict):
         raise ValueError("job environment variables must be an object")
     manifest_path = root / "workspace_manifest.json"
@@ -187,14 +183,20 @@ def _intent_path(root: Path, job_id: str) -> str:
 
 
 def _platform_name(params: dict[str, Any]) -> str | None:
-    target = params.get("execution_target")
-    if isinstance(target, str):
-        value = target
-    elif isinstance(target, dict):
-        value = target.get("target") or target.get("environment")
-    else:
-        value = params.get("environment") if isinstance(params.get("environment"), str) else None
-    return str(value) if value is not None else None
+    from research_agent.jobs.config_contract import target_key
+    return target_key(params["execution_target"]) if params.get("execution_target") else None
+
+
+def _recorded_platform(intent):
+    if intent["schema_version"] != "job_intent/4":
+        raise ValueError("job_intent_version_unsupported")
+    from research_agent.jobs.external import ExternalJobPlatform
+    platform = ExternalJobPlatform(intent["route"], platform_name=intent["platform"])
+    platform.target_config_digest = intent["target_config_digest"]
+    platform.cluster_name = intent["cluster_name"]
+    platform.scope = intent["target_scope"]
+    platform.driver = intent["target_driver"]
+    return platform
 
 
 def _receipt(root: Path, params: dict[str, Any]):
@@ -203,6 +205,8 @@ def _receipt(root: Path, params: dict[str, Any]):
     if not path.is_file():
         raise FileNotFoundError(f"job receipt not found: {job_id}")
     runtime = _job_manager(root)
+    intent = json.loads((root / _intent_path(root, job_id)).read_text())
+    runtime.platforms[intent["platform"]] = _recorded_platform(intent)
     return runtime.receipt_from_disk(str(path))
 
 
@@ -217,7 +221,7 @@ def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
     preparation = None
     if operation == "start" and (params.get("prepared_ref") or params.get("request_file")):
         from research_agent.application.references import read_prepared_file, resolve_prepared_job
-        transport = {key: params[key] for key in ("root", "workspace_root", "session_id", "user_task_id", "required_target", "required_route_digest") if key in params}
+        transport = {key: params[key] for key in ("root", "workspace_root", "session_id", "user_task_id", "execution_context") if key in params}
         controls = {key: params[key] for key in ("timeout_seconds", "repeat", "node_id") if key in params}
         allowed = {*transport, *controls, "prepared_ref"} if params.get("prepared_ref") else {
             *transport, *controls, "request_file", "request_sha256"}
@@ -231,7 +235,7 @@ def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
             )
         if params.get("prepared_ref"):
             request = resolve_prepared_job(root, {key: value for key, value in params.items()
-                                                  if key not in {"session_id", "user_task_id", "node_id", "required_target", "required_route_digest"}})
+                                                  if key not in {"session_id", "user_task_id", "node_id", "execution_context"}})
         else:
             if not isinstance(params.get("request_sha256"), str):
                 raise ValueError("prepared_request_digest_required")
@@ -241,36 +245,36 @@ def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
     if operation == "resolve_target":
         from research_agent.jobs.config_contract import load_job_config, resolve_selection
         return resolve_selection(load_job_config(os.environ["CORAGENT_JOB_CONFIG"]), params.get("target"),
-                                 scheduler=params.get("scheduler"), location=params.get("location"),
+                                 scheduler=params.get("scheduler"),
                                  source_text=params.get("source_text"))
     runtime = _job_manager(root)
-    if operation == "targets":
-        # Task state records the resolved default once, so a later installation
-        # config change cannot silently retarget an in-flight task. Expose only
-        # routing metadata; bindings and credentials remain private to Jobs.
-        from research_agent.jobs.config_contract import configured_targets, default_target, load_job_config
+    if operation == "platforms":
+        from research_agent.jobs.config_contract import load_job_config, platform_catalog
+        return platform_catalog(load_job_config(os.environ["CORAGENT_JOB_CONFIG"]))
+    if operation == "resources":
+        from datetime import datetime, timezone
+        from research_agent.jobs.config_contract import load_job_config, resolve_target, target_identity
         settings = load_job_config(os.environ["CORAGENT_JOB_CONFIG"])
-        return {"default_target": default_target(settings),
-                "targets": {name: {key: target.get(key) for key in ("scheduler", "location", "aliases")}
-                            for name, target in configured_targets(settings).items()}}
+        name = resolve_target(settings, params.get("execution_target"))
+        probe = runtime.job_probe(JobSpec(command=("true",), cwd=root), platform=name)
+        queue = probe.get("queue", {})
+        return {"target": target_identity(name), "executor": settings["targets"][name]["executor"],
+                "available": probe["available"], "observed_at": datetime.now(timezone.utc).isoformat(),
+                "capacity": queue.get("capacity"), "reserved": queue.get("reserved"), "free": queue.get("free"),
+                "usage": queue.get("job_usage"), "memory_enforcement": queue.get("memory_enforcement"),
+                "scheduler_observation": queue or None, "error": probe.get("error")}
     if operation == "start":
-        required = params.get("required_target")
-        from research_agent.jobs.config_contract import bound_target, load_job_config, resolve_target
+        from research_agent.jobs.config_contract import bound_target, load_job_config, target_identity
         settings = load_job_config(os.environ["CORAGENT_JOB_CONFIG"])
-        if required and params.get("required_route_digest"):
-            actual = bound_target(settings, _platform_name(params),
-                                  {"target": required, "route_digest": params["required_route_digest"]})
-        else:
-            actual = resolve_target(settings, _platform_name(params) or required)
-        if required and actual != required:
-            raise ValueError(f"execution_target_mismatch: task requires {required}, request selects {actual}; prepare for the required target")
-        params["execution_target"] = actual
+        actual = bound_target(settings, params.get("execution_target"), params.get("execution_context"))
+        params["execution_target"] = target_identity(actual)
         return _start(root, runtime, params, preparation=preparation)
     if operation == "probe":
         # Probe is a capability query and intentionally does not require a
         # command or a workspace job directory.
         if not params.get("command"):
-            platform = _platform_name(params) or "local"
+            from research_agent.jobs.config_contract import load_job_config, resolve_target
+            platform = resolve_target(load_job_config(os.environ["CORAGENT_JOB_CONFIG"]), params.get("execution_target"))
             if platform not in runtime.platforms:
                 return {"platform": platform, "available": False, "reason": "platform adapter is not configured"}
             spec = JobSpec(command=("true",), cwd=root)
@@ -286,7 +290,8 @@ def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
         recovered = None
         if operation == "reconcile" and intent_path.is_file():
             intent = json.loads(intent_path.read_text())
-            platform = runtime.platforms.get(intent.get("platform"))
+            platform = _recorded_platform(intent)
+            runtime.platforms[intent["platform"]] = platform
             recovery = getattr(platform, "recover_receipt", None)
             if recovery and (Path(intent["cwd"]) / "spec.json").is_file():
                 recovered = recovery(intent["job_id"], Path(intent["cwd"]))
@@ -302,6 +307,8 @@ def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
             return value
         else:
             raise
+    intent = json.loads((root / _intent_path(root, receipt.job_id)).read_text())
+    runtime.platforms[receipt.platform] = _recorded_platform(intent)
     value = getattr(runtime, f"job_{operation}")(receipt)
     def json_value(item):
         if hasattr(item, "value"):
@@ -434,7 +441,7 @@ def _prepare_start(root, runtime, params, preparation=None, prepared_params=None
 
 def _stage_start(root, runtime, params, job_id, preparation=None, prepared_params=None):
     staging_root = root / "runs/jobs" / job_id
-    if {"input_evidence_basis", "research_binding", "user_task_id"} & set(params.get("metadata") or {}):
+    if {"input_evidence_basis", "research_binding", "user_task_id", "execution_item"} & set(params.get("metadata") or {}):
         raise ValueError("job_input_basis_runtime_only: declare input_artifact_ids and stage their actual files")
     if params.get("validator_id"):
         from .validators import check_current_inputs
@@ -456,6 +463,20 @@ def _stage_start(root, runtime, params, job_id, preparation=None, prepared_param
             requested=requested)
         metadata.update(submission)
         prepared_params = {**prepared_params, 'metadata': metadata}
+    context = params.get("execution_context")
+    if context:
+        item = context.get("item")
+        if item:
+            if item.get("backend") and metadata.get("execution_binding", {}).get("backend") != item["backend"]:
+                raise ValueError("execution_item_backend_mismatch")
+            if params.get("work_id") != item["work_id"]:
+                raise ValueError("execution_work_id_mismatch")
+            if not set(item["input_artifact_ids"]) <= set(params.get("input_artifact_ids", [])):
+                raise ValueError("execution_dependency_inputs_missing")
+            if any(metadata["resources"].get(key) != value for key, value in item["resources"].items()):
+                raise ValueError("execution_item_resources_mismatch")
+            metadata["execution_item"] = item
+        prepared_params = {**prepared_params, "metadata": metadata}
     if params.get('node_id') is not None:
         from research_agent.research.nodes import get_node
         node = get_node(root, params['node_id'])
@@ -471,6 +492,10 @@ def _stage_start(root, runtime, params, job_id, preparation=None, prepared_param
     input_manifest = json.loads((spec.cwd / "input_manifest.json").read_text())
     target_name = _platform_name(prepared_params) or runtime.default
     target = runtime.platforms[target_name]
+    from research_agent.jobs.config_contract import load_job_config
+    route = {key: value for key, value in target.config.items()
+             if key in {"transport", "ssh_host", "ssh_config", "handler", "handler_environment", "work_root", "file_mode",
+                        "connect_timeout_seconds", "command_timeout_seconds", "transfer_timeout_seconds"}}
     target_digest = getattr(target, "target_config_digest", None)
     target_driver = getattr(target, "driver", None)
     target_scope = getattr(target, "scope", None)
@@ -488,6 +513,23 @@ def _stage_start(root, runtime, params, job_id, preparation=None, prepared_param
         "execution_environment": spec.metadata.get("execution_environment", {}).get("sha256")}
     execution_fingerprint = "sha256:" + hashlib.sha256(json.dumps(execution_content, sort_keys=True).encode()).hexdigest()
     prior_intents = [json.loads(path.read_text()) for path in (root / "operations/jobs").glob("*.json")]
+    from .job_state import execution as read_execution, TERMINAL
+    observations = {row["job_id"]: read_execution(root, row["job_id"]) for row in prior_intents}
+    def active(row):
+        observation = observations[row["job_id"]]
+        return observation["state"] not in TERMINAL or observation.get("execution_conflict")
+    from research_agent.jobs.config_contract import load_job_config
+    limit = load_job_config(os.environ["CORAGENT_JOB_CONFIG"])["targets"][target_name].get("limits", {}).get("max_in_flight")
+    if limit and sum(row["platform"] == target_name and bool(active(row)) for row in prior_intents) >= limit:
+        raise ValueError("execution_entry_capacity_reached")
+    if context and context.get("policy"):
+        owned = [row for row in prior_intents if row.get("user_task_id") == params.get("user_task_id")]
+        policy = context["policy"]
+        if len(owned) >= policy["max_attempts"] or sum(bool(active(row)) for row in owned) >= policy["max_in_flight"]:
+            raise ValueError("execution_task_budget_reached")
+        if context.get("item") and any(row.get("execution_item", {}).get("id") == context["item"]["id"] for row in owned):
+            raise ValueError("execution_item_already_submitted: reconcile its existing Job")
+
     duplicates = [i for i in prior_intents if i.get("execution_fingerprint") == execution_fingerprint]
     repeat = params.get("repeat")
     if repeat:
@@ -502,16 +544,18 @@ def _stage_start(root, runtime, params, job_id, preparation=None, prepared_param
                 "recovery": "Reuse job_status/collect or submit repeat with predecessor_job_id, reason and budget"}
 
     intent = {
-        "schema_version": "job_intent/3", "job_id": spec.job_id, "state": "dispatching",
+        "schema_version": "job_intent/4", "job_id": spec.job_id, "state": "dispatching",
         "request_id": request_id, "execution_fingerprint": execution_fingerprint,
         "fingerprint_complete": bool(spec.metadata.get("configuration_sha256") and spec.metadata.get("resources_sha256")),
         "repeat": repeat,
         "user_task_id": params.get("user_task_id"),
+        **({"execution_item": context["item"]} if context and context.get("item") else {}),
         **spec.metadata.get("research_binding", {"node_id": None, "node_revision": None}),
         "request_digest": _request_digest(params),
         "command": list(spec.command), "cwd": str(spec.cwd), "workspace_id": spec.workspace_id,
         "platform": target_name,
         "target_name": target_name,
+        "route": route,
         "target_driver": target_driver,
         "target_scope": target_scope,
         "cluster_name": target_cluster,

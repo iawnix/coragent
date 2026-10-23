@@ -1,4 +1,6 @@
 """Recipe discovery and target checks do not define a scientific allowlist."""
+
+from tests.support.platforms import execution_config
 import copy
 import hashlib
 import json
@@ -13,11 +15,10 @@ from tests.unit.test_declarative_executors import binding, catalog
 
 
 def targets():
-    return validate_job_config({'execution': {'default_target': 'local', 'targets': {
-        'local': {'type': 'local', 'driver': 'process', 'bindings': {'shell': {'command': '/bin/sh'}}},
-        'cluster': {'driver': 'external', 'transport': 'ssh', 'ssh_host': 'unreachable.invalid', 'work_root': '/scratch/jobs',
-                    'handler': ['/bin/true'], 'submission': {'queue': 'science'}, 'bindings': {'shell': {'command': '/cluster/bin/sh'}}},
-        'empty': {'driver': 'external', 'transport': 'local', 'work_root': '/scratch/empty', 'handler': ['/bin/true']}}}})
+    return validate_job_config({'execution': execution_config('local', {
+        'local': {'executor': 'qrun', 'bindings': {'shell': {'command': '/bin/sh'}}, 'transport': 'local', 'work_root': '/fixture/qrun/jobs'},
+        'cluster': {'executor': 'external', 'transport': 'ssh', 'ssh_host': 'unreachable.invalid', 'work_root': '/scratch/jobs', 'handler': ['/bin/true'], 'submission': {'queue': 'science'}, 'bindings': {'shell': {'command': '/cluster/bin/sh'}}},
+        'empty': {'executor': 'external', 'transport': 'local', 'work_root': '/scratch/empty', 'handler': ['/bin/true']}})})
 
 
 def cli(module, monkeypatch, capsys, *arguments):
@@ -44,25 +45,25 @@ def test_compact_index_preserves_all_recipe_identities_and_gaussian(monkeypatch,
 def test_recipe_index_honors_binding_selection_without_probing(tmp_path, monkeypatch, capsys):
     catalog(tmp_path / 'catalog', monkeypatch)
     config = tmp_path / 'job.toml'
-    config.write_text(binding(config) + '\n[execution.targets.empty]\ntype="local"\ndriver="external"\ntransport="local"\nwork_root="/tmp/empty"\nhandler=["/bin/true"]\n')
+    config.write_text(binding(config) + '\n[execution.platforms.empty]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="local"\nstorage.work_root="/tmp/empty"\nschedulers.main.handler=["/bin/true"]\n')
     monkeypatch.setattr(executors, 'probe_binding', lambda *_: pytest.fail('listing must not probe'))
     for target, status in [('local', 'configured'), ('empty', 'not_configured')]:
         report = json.loads(cli(executors, monkeypatch, capsys, '--list', '--config', str(config),
-                                '--target', target, '--backend', 'shell'))
-        assert report['target'] == target
+                                '--platform', target, '--backend', 'shell'))
+        assert report['target'] == {'platform': target, 'scheduler_entry': 'main'}
         assert report['recipes'] == [{'id': 'external.copy', 'version': '3', 'backend': 'shell',
             'runtime': 'native', 'inputs': {'data': 'input.txt'}, 'binding_status': status}]
     full = executors.list_recipes(details=True)['recipes']
     assert full == installed_catalogs()[0]['executors']
     assert executors.list_recipes(executor='external.missing')['recipes'] == []
-    with pytest.raises(ValueError, match='execution_target_not_configured'):
-        executors.list_recipes(config=config, target='typo')
+    with pytest.raises(ValueError, match='execution_platform_unavailable'):
+        executors.list_recipes(config=config, target={'platform': 'typo'})
 
 
 @pytest.mark.parametrize('executor', ['chemical.gaussian', 'chemical.gaussian-input'])
 def test_selected_gaussian_help_uses_runner_contract_without_target_access(monkeypatch, capsys, executor):
     monkeypatch.setattr(executors, 'probe_binding', lambda *_: pytest.fail('help must not probe'))
-    output = cli(executors, monkeypatch, capsys, '--config', '/missing/job.toml', '--target', 'remote',
+    output = cli(executors, monkeypatch, capsys, '--config', '/missing/job.toml', '--platform', 'remote',
                  '--executor', executor, '--version', '1', '--help')
     assert '--input-gjf' in output and '--validation' in output and 'saddle' in output
     assert executor + '@1' in output
@@ -74,12 +75,12 @@ def test_selected_gaussian_help_uses_runner_contract_without_target_access(monke
 
 def test_gaussian_recipes_check_wrapper_and_program_on_selected_local_target():
     settings = load_job_config(os.environ['CORAGENT_JOB_CONFIG'])
-    backends = settings['targets']['local']['backends']
+    backends = settings['targets']['local/main']['backends']
     backends['gaussian'] = {**copy.deepcopy(backends['validation']), 'command': '/bin/true'}
-    settings['targets']['local'].update(type='local', driver='process')
-    settings['targets']['cluster'] = targets()['targets']['cluster']
+    settings['targets']['local/main'].update(executor='qrun', transport='local')
+    settings['targets']['cluster/main'] = targets()['targets']['cluster/main']
     for recipe in ('chemical.gaussian', 'chemical.gaussian-input'):
-        report = environment_check.check_target(settings, 'local', executor=recipe, version='1', details=True)
+        report = environment_check.check_target(settings, {'platform': 'local', 'scheduler_entry': 'main'}, executor=recipe, version='1', details=True)
         if report.get('error') == 'environment_dependency_missing':
             pytest.skip('fixture Python environment does not include Gaussian recipe dependencies')
         assert report['status'] == 'verified' and report['backend'] == 'gaussian'
@@ -116,15 +117,15 @@ def test_target_check_contacts_only_selected_environment(tmp_path, monkeypatch):
     observed = []
 
     def run(settings, selected, script):
-        assert selected['environment'] == 'local'
+        assert selected['environment'] == 'local/main'
         observed.append(selected['backend'])
         return original(settings, selected, script)
 
     monkeypatch.setattr(environment, '_run_target', run)
     settings = targets()
-    settings['targets']['local']['backends']['broken'] = {'command': '/missing/unrelated'}
-    report = environment_check.check_target(settings, 'local', executor='external.copy', version='3')
-    assert report == {'target': 'local', 'scope': 'recipe_requirements',
+    settings['targets']['local/main']['backends']['broken'] = {'command': '/missing/unrelated'}
+    report = environment_check.check_target(settings, {'platform': 'local', 'scheduler_entry': 'main'}, executor='external.copy', version='3')
+    assert report == {'target': {'platform': 'local', 'scheduler_entry': 'main'}, 'scope': 'recipe_requirements',
         'executor': {'id': 'external.copy', 'version': '3'}, 'backend': 'shell',
         'runtime': 'native', 'status': 'verified'}
     assert observed == ['shell']
@@ -139,7 +140,7 @@ def test_target_check_uses_selected_remote_binding(tmp_path, monkeypatch):
         return {'fixture': 'remote observation'}
 
     monkeypatch.setattr(environment_check, 'probe_binding', probe)
-    report = environment_check.check_target(targets(), 'cluster', executor='external.copy', version='3', details=True)
+    report = environment_check.check_target(targets(), {'platform': 'cluster', 'scheduler_entry': 'main'}, executor='external.copy', version='3', details=True)
     assert report['status'] == 'verified'
     assert report['environment_evidence'] == {'fixture': 'remote observation'}
     assert len(seen) == 1 and seen[0]['kind'] == 'remote'
@@ -150,25 +151,25 @@ def test_target_check_uses_selected_remote_binding(tmp_path, monkeypatch):
 def test_missing_recipe_binding_and_failed_probe_are_distinct(tmp_path, monkeypatch):
     catalog(tmp_path / 'catalog', monkeypatch)
     settings = targets()
-    missing = environment_check.check_target(settings, 'local', executor='external.copy', version='missing')
+    missing = environment_check.check_target(settings, {'platform': 'local', 'scheduler_entry': 'main'}, executor='external.copy', version='missing')
     assert missing['status'] == 'recipe_not_found' and missing['software_availability'] == 'not_checked'
-    assert environment_check.check_target(settings, 'empty', backend='shell')['status'] == 'not_configured'
-    assert environment_check.check_target(settings, 'unknown', backend='shell')['error'] == 'execution_target_not_configured'
-    settings['targets']['local']['backends']['shell']['command'] = '/missing/scientific-program'
-    failed = environment_check.check_target(settings, 'local', executor='external.copy', version='3')
+    assert environment_check.check_target(settings, {'platform': 'empty', 'scheduler_entry': 'main'}, backend='shell')['status'] == 'not_configured'
+    assert environment_check.check_target(settings, {'platform': 'unknown', 'scheduler_entry': 'main'}, backend='shell')['error'] == 'execution_platform_unavailable'
+    settings['targets']['local/main']['backends']['shell']['command'] = '/missing/scientific-program'
+    failed = environment_check.check_target(settings, {'platform': 'local', 'scheduler_entry': 'main'}, executor='external.copy', version='3')
     assert failed['status'] == 'check_failed' and failed['error'] == 'environment_executable_missing'
 
 
 def test_generic_bindings_can_be_checked_without_loading_recipes(monkeypatch):
     monkeypatch.setattr(environment_check, 'installed_catalogs', lambda: pytest.fail('backend checks need no catalog'))
-    assert environment_check.check_target(targets(), 'local', backend='shell')['status'] == 'verified'
+    assert environment_check.check_target(targets(), {'platform': 'local', 'scheduler_entry': 'main'}, backend='shell')['status'] == 'verified'
     settings = load_job_config(os.environ['CORAGENT_JOB_CONFIG'])
-    python = copy.deepcopy(settings['targets']['local']['backends']['validation'])
-    settings['targets']['local']['backends'] = {'custom': {**python, 'command': '/bin/true'}}
-    report = environment_check.check_target(settings, 'local', backend='custom', details=True)
+    python = copy.deepcopy(settings['targets']['local/main']['backends']['validation'])
+    settings['targets']['local/main']['backends'] = {'custom': {**python, 'command': '/bin/true'}}
+    report = environment_check.check_target(settings, {'platform': 'local', 'scheduler_entry': 'main'}, backend='custom', details=True)
     assert report['status'] == 'verified' and report['runtime'] == 'python'
     assert report['environment_evidence']['observation']['python']
-    assert environment_check.check_target(settings, 'local', backend='custom', runtime='native')['status'] == 'verified'
+    assert environment_check.check_target(settings, {'platform': 'local', 'scheduler_entry': 'main'}, backend='custom', runtime='native')['status'] == 'verified'
 
 
 def test_recipe_checks_dependencies_and_command_compatibility(monkeypatch):
@@ -177,18 +178,18 @@ def test_recipe_checks_dependencies_and_command_compatibility(monkeypatch):
         'runtime': 'python', 'argv': ['{entry}', '{args}'],
         'requirements': {'packages': {'numpy': '>=9999'}}}
     monkeypatch.setattr(environment_check, 'installed_catalogs', lambda: [{'executors': [entry]}])
-    report = environment_check.check_target(settings, 'local', executor=entry['id'], version='1')
+    report = environment_check.check_target(settings, {'platform': 'local', 'scheduler_entry': 'main'}, executor=entry['id'], version='1')
     assert report['status'] == 'check_failed'
     assert report['error'] in {'environment_dependency_missing', 'environment_dependency_version_mismatch: numpy'}
-    settings['targets']['local']['backends']['validation']['command'] = '/bin/true'
-    report = environment_check.check_target(settings, 'local', executor=entry['id'], version='1')
+    settings['targets']['local/main']['backends']['validation']['command'] = '/bin/true'
+    report = environment_check.check_target(settings, {'platform': 'local', 'scheduler_entry': 'main'}, executor=entry['id'], version='1')
     assert report['error'] == 'execution_binding_command_mismatch'
 
 
 def test_target_cli_outputs_json_and_failure_exit_code(tmp_path, monkeypatch, capsys):
     config = tmp_path / 'job.toml'
     binding(config)
-    args = ['--config', str(config), '--target', 'local', '--backend', 'shell']
+    args = ['--config', str(config), '--platform', 'local', '--backend', 'shell']
     report = json.loads(cli(environment_check, monkeypatch, capsys, *args))
     assert report['status'] == 'verified' and 'environment_evidence' not in report
     report = json.loads(cli(environment_check, monkeypatch, capsys, *args, '--details'))

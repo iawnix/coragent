@@ -29,7 +29,7 @@ def prepare(root, params):
         raise ValueError('job_config_required')
     settings = load_job_config(config_path)
     from .execution_resources import resolve
-    from research_agent.jobs.config_contract import resolve_target
+    from research_agent.jobs.config_contract import resolve_target, target_identity
     requested_target = params.get('execution_target')
     selected, resource_metadata = resolve(settings, resolve_target(settings, requested_target),
                                           descriptor['backend'], 'python', submission=params.get('submission'))
@@ -126,7 +126,7 @@ def prepare(root, params):
     module_paths = descriptor.get('module_paths')
     command, guard_inputs = guarded_command(selected, argv, environment, module_paths=module_paths)
     inputs.extend(guard_inputs)
-    return {**{key: value for key, value in params.items() if key != 'submission'}, 'execution_target': selected['environment'],
+    return {**{key: value for key, value in params.items() if key != 'submission'}, 'execution_target': target_identity(selected['environment']),
         'command': command,
         'environment': selected['binding'].get('environment', {}),
         'inputs': inputs, 'outputs': [{'path': 'validator_result.json', 'required': True, 'min_bytes': 2}],

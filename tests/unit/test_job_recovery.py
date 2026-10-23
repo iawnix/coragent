@@ -3,68 +3,75 @@ import json
 import sys
 import time
 import pytest
-from research_agent.jobs import JobSpec, JobOutput, LocalProcessPlatform, JobState
 from research_agent.application.execution import dispatch
 from research_agent.research.workspace import admit_research_workspace
 from research_agent.application.job_state import execution
 from research_agent.artifacts.registry import manifests
 from research_agent.research.workspace import initialize_workspace
+from research_agent.jobs import platforms_from_config, JobSpec, JobOutput, JobState
 
 
-def wait_reaped(receipt):
-    # Check the OS, without poll()/wait()/status() helping the owner reap.
+def platform():
+    platforms, default = platforms_from_config()
+    return platforms[default]
+
+
+def finished(receipt):
+    runtime = platform()
     deadline = time.monotonic() + 5
-    while Path(f"/proc/{receipt.pid}").exists() and time.monotonic() < deadline:
+    while time.monotonic() < deadline:
+        status = runtime.status(receipt)
+        if status.state in {JobState.SUCCEEDED, JobState.FAILED, JobState.CANCELLED, JobState.TIMED_OUT}:
+            return status
         time.sleep(.02)
-    assert not Path(f"/proc/{receipt.pid}").exists(), "supervisor was not reaped"
+    raise AssertionError('Qrun job did not finish')
+
+
+def spec(root, command, **kwargs):
+    root.mkdir()
+    return JobSpec(job_id='job_1', cwd=root, command=(sys.executable, '-c', command),
+                   metadata={'resources': {'cpus': 1, 'memory_mb': 512}}, **kwargs)
 
 
 @pytest.mark.parametrize('code', [0, 23])
-def test_exit_receipt_survives_without_status_polling(tmp_path, code):
-    first=LocalProcessPlatform()
-    receipt=first.start(JobSpec(job_id="job_1", command=(sys.executable,'-c',f'raise SystemExit({code})'),cwd=tmp_path))
-    wait_reaped(receipt)
-    recovered=LocalProcessPlatform().status(receipt)
-    assert recovered.state==(JobState.FAILED if code else JobState.SUCCEEDED)
-    assert recovered.exit_code==code
+def test_exit_receipt_survives_without_controller_polling(tmp_path, code):
+    receipt = platform().start(spec(tmp_path / 'job', f'raise SystemExit({code})'))
+    # The durable runtime writes its own result before any status observation.
+    deadline = time.monotonic() + 5
+    while not Path(receipt.cwd, 'status.exit').exists() and time.monotonic() < deadline:
+        time.sleep(.02)
+    assert Path(receipt.cwd, 'status.exit').exists()
+    recovered = platform().recover_receipt(receipt.job_id, Path(receipt.cwd))
+    assert recovered.metadata['scheduler_id'] == receipt.metadata['scheduler_id']
+    result = finished(recovered)
+    assert result.state == (JobState.FAILED if code else JobState.SUCCEEDED)
+    assert result.exit_code == code
 
 
-def test_timeout_enforced_without_polling_and_restart_cancel(tmp_path):
-    first=LocalProcessPlatform()
-    receipt=first.start(JobSpec(job_id="job_1", command=(sys.executable,'-c','import time;time.sleep(30)'),cwd=tmp_path,timeout_seconds=.15))
-    wait_reaped(receipt)
-    assert LocalProcessPlatform().status(receipt).state==JobState.TIMED_OUT
-    second=tmp_path/'cancel';second.mkdir()
-    receipt=first.start(JobSpec(job_id="job_1", command=(sys.executable,'-c','import time;time.sleep(30)'),cwd=second))
-    try:assert LocalProcessPlatform().cancel(receipt).state==JobState.CANCELLED
-    finally:wait_reaped(receipt)
+def test_timeout_and_cancel_survive_controller_restart(tmp_path):
+    receipt = platform().start(spec(tmp_path / 'timeout', 'import time; time.sleep(60)', timeout_seconds=.15))
+    assert finished(receipt).state == JobState.TIMED_OUT
+    receipt = platform().start(spec(tmp_path / 'cancel', 'import time; time.sleep(60)'))
+    platform().cancel(receipt)
+    assert finished(receipt).state == JobState.CANCELLED
 
 
-def test_missing_or_empty_outputs_do_not_rewrite_exit_code(tmp_path):
-    runtime=LocalProcessPlatform()
-    receipt=runtime.start(JobSpec(job_id="job_1", command=(sys.executable,'-c',"open('empty','w').close()"),cwd=tmp_path,
-        outputs=(JobOutput('empty',required=True,min_bytes=1),JobOutput('missing',required=True))))
-    wait_reaped(receipt)
-    result=runtime.collect(receipt)
-    assert result['status']['exit_code']==0
-    assert result['output_validation']=={'complete':False,'errors':[{'path':'empty','error':'too_small'},{'path':'missing','error':'missing'}]}
+def test_missing_outputs_do_not_rewrite_successful_exit(tmp_path):
+    receipt = platform().start(spec(tmp_path / 'job', "open('empty','w').close()",
+        outputs=(JobOutput('empty', required=True, min_bytes=1), JobOutput('missing', required=True))))
+    assert finished(receipt).state == JobState.SUCCEEDED
+    result = platform().collect(receipt)
+    assert result['status']['exit_code'] == 0
+    assert result['output_validation'] == {'complete': False, 'errors': [
+        {'path': 'empty', 'error': 'too_small'}, {'path': 'missing', 'error': 'missing'}]}
 
 
-def test_same_job_name_in_distinct_directories_does_not_reuse_a_terminal_observation(tmp_path):
-    platform = LocalProcessPlatform()
-    first = tmp_path / 'first'; first.mkdir()
-    second = tmp_path / 'second'; second.mkdir()
-    old = platform.start(JobSpec(command=(sys.executable, '-c', 'pass'), cwd=first, job_id='job_1'))
-    wait_reaped(old)
-    assert platform.status(old).state == JobState.SUCCEEDED
-    new = platform.start(JobSpec(command=(sys.executable, '-c', 'import time; time.sleep(.3); raise SystemExit(23)'),
-                                 cwd=second, job_id='job_1'))
-    try:
-        assert platform.status(new).state == JobState.RUNNING
-    finally:
-        wait_reaped(new)
-    assert platform.status(new).state == JobState.FAILED
-    assert platform.status(old).state == JobState.SUCCEEDED
+def test_same_job_name_in_distinct_directories_keeps_separate_results(tmp_path):
+    old = platform().start(spec(tmp_path / 'first', 'pass'))
+    assert finished(old).state == JobState.SUCCEEDED
+    new = platform().start(spec(tmp_path / 'second', 'raise SystemExit(23)'))
+    assert finished(new).state == JobState.FAILED
+    assert platform().status(old).state == JobState.SUCCEEDED
 
 
 def workspace(root):
@@ -80,7 +87,7 @@ def test_job_attempt_collection_and_repeated_request_are_durable(tmp_path):
     receipt=dispatch('start',request)
     assert dispatch('start',request)['job_id']==receipt['job_id']
     for _ in range(100):
-        if dispatch('status',{'root':str(tmp_path),'job_id':'job_1'})['state']!='running':break
+        if dispatch('status',{'root':str(tmp_path),'job_id':'job_1'})['state'] not in {'queued', 'submitted', 'running'}:break
         time.sleep(.02)
     result=dispatch('collect',{'root':str(tmp_path),'job_id':'job_1'})
     materials=list(manifests(tmp_path))
@@ -102,22 +109,10 @@ def test_caller_request_id_replays_without_submitting_again(tmp_path):
     }
     first = dispatch('start', request)
     for _ in range(100):
-        if dispatch('status', {'root': str(tmp_path), 'job_id': first['job_id']})['state'] != 'running':
+        if dispatch('status', {'root': str(tmp_path), 'job_id': first['job_id']})['state'] not in {'queued', 'submitted', 'running'}:
             break
         time.sleep(.02)
     second = dispatch('start', request)
     assert second['job_id'] == first['job_id']
     assert (Path(first['cwd']) / 'count').read_text() == '1'
     assert len(list((tmp_path/'operations/executions').glob('*.json'))) == 1
-
-
-def test_terminal_receipt_arrives_during_supervisor_liveness_check(tmp_path, monkeypatch):
-    from research_agent.jobs import JobReceipt
-    from research_agent.jobs import local
-    receipt=JobReceipt('job_1','local','now',('true',),str(tmp_path),123,
-                       {'supervised':True,'supervisor_start':'original'})
-    def process_disappeared(pid):
-        (tmp_path/'status.json').write_text(json.dumps({'job_id':'job_1','state':'succeeded','exit_code':0}))
-        return None
-    monkeypatch.setattr(local,'identity',process_disappeared)
-    assert LocalProcessPlatform().status(receipt).state == JobState.SUCCEEDED

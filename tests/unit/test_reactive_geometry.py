@@ -267,7 +267,7 @@ def test_registered_job_collects_candidates_or_rejection_evidence(tmp_path, coll
     if collapse: spec['edit_hypotheses'][0]['operations'][0]['values']=[.2]
     source=root/'edits.json';source.write_text(json.dumps(spec))
     node=execute('research_create',root,{'goal':'Deterministic reactive geometry fixture'})['node']
-    request_file=prepare(os.environ['CORAGENT_JOB_CONFIG'],'local','chemical.reactive-geometry','1',{'input':source})
+    request_file=prepare(os.environ['CORAGENT_JOB_CONFIG'],{'platform': 'local', 'scheduler_entry': 'main'},'chemical.reactive-geometry','1',{'input':source})
     receipt=execute('job_start',root,{**request_file,'node_id':node['id']})
     try:
         deadline=time.monotonic()+20

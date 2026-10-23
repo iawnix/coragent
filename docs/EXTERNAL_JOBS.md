@@ -8,43 +8,48 @@ staging, restart recovery and collection. The bridge owns native submission
 syntax and state interpretation. It is an executable program, not a Python plugin
 imported into the CoRAgent process.
 
+[Qrun](QRUN.md) supplies a durable FIFO CPU/memory queue backed by systemd for
+both local and SSH hosts. It uses this same handler protocol, staging and
+collection. Configure it with `executor = "qrun"` and the chosen `transport`.
+
 ## Configure a target
 
 On a login node running both CoRAgent and the queue CLI:
 
 ```toml
 [execution]
-default_target = "compute"
+schema_version = 2
+default_platform = "compute"
 
-[execution.targets.compute]
-scheduler = "tri"
+[execution.platforms.compute]
+default_scheduler = "main"
 location = "cluster"
-driver = "external"
+schedulers.main.executor = "tri"
 transport = "local"
-cluster_name = "compute"
-work_root = "/absolute/shared/coragent-jobs"
-handler = ["/usr/bin/python3", "/absolute/coragent/skills/core/batch-schedulers/scripts/tri.py"]
+schedulers.main.cluster_name = "compute"
+storage.work_root = "/absolute/shared/coragent-jobs"
+schedulers.main.handler = ["/usr/bin/python3", "/absolute/coragent/skills/core/batch-schedulers/scripts/tri.py"]
 
-[execution.targets.compute.handler_environment]
+[execution.platforms.compute.schedulers.main.handler_environment]
 TRI_SOCKET = "/absolute/runtime/tri/server.sock"
 
-[execution.targets.compute.submission.resources]
+[execution.platforms.compute.schedulers.main.submission.resources]
 cpus = 4
 memory_mb = 4096
 ```
 
 Replace example paths with this installation's paths and create `work_root`.
-Add scientific software bindings under `execution.targets.compute.bindings` as
+Add scientific software bindings under `execution.platforms.compute.bindings` as
 for other execution targets. `transport = "local"` means commands run on the
 CoRAgent host; the queue chooses the compute node. Multiple local command targets
-can coexist with a direct process/systemd target and carry distinct cluster names.
+can coexist with Qrun targets and carry distinct cluster names.
 
 For submission from another host, change `transport` to `ssh` and set `ssh_host`
 and optionally `ssh_config`. `handler` and `work_root` are paths on that host.
 By default, SSH targets use rsync to stage and collect files. Local targets copy between the
 controller Job directory and `work_root`; this directory must be visible at the
 same path on compute nodes. The generic runtime does not provision shared mounts.
-Local process/systemd targets use their built-in drivers. Batch schedulers use
+Qrun and batch schedulers use
 external handlers.
 
 `handler_environment` configures the submission CLI separately from the
@@ -60,14 +65,14 @@ defaults to `"staged"`, preserving the copying behavior above. If the controller
 submission host and compute nodes share the workspace filesystem, configure:
 
 ```toml
-[execution.targets.compute]
-scheduler = "tri"
+[execution.platforms.compute]
+default_scheduler = "main"
 location = "cluster"
-driver = "external"
+schedulers.main.executor = "tri"
 transport = "local"
-file_mode = "shared"
-work_root = "/home/iaw/DATA/coragent/workspaces"
-handler = ["/usr/bin/python3", "/absolute/coragent/skills/core/batch-schedulers/scripts/tri.py"]
+storage.file_mode = "shared"
+storage.work_root = "/home/iaw/DATA/coragent/workspaces"
+schedulers.main.handler = ["/usr/bin/python3", "/absolute/coragent/skills/core/batch-schedulers/scripts/tri.py"]
 ```
 
 Merge this target into `config.toml`; retain the required connection environment

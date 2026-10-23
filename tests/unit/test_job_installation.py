@@ -1,5 +1,7 @@
 """Installation plans and ordinary Job acceptance use deterministic local inputs."""
 
+from tests.support.platforms import execution_config
+
 from research_agent.foundation.layout import paths as app_paths
 import importlib.util
 import json
@@ -26,62 +28,60 @@ def options(tmp_path, *extra):
         if value == '--job-profile': profiles.append(next(iterator))
         else: remaining.append(value)
     args = wizard.parse_args(['--install-root', str(tmp_path/'install'), '--conda-root', str(tmp_path/'conda'),
-                              '--job-software-root', 'local=' + str(tmp_path/'software'), *remaining], use_environment=False)
+                              '--job-software-root', 'local/main=' + str(tmp_path/'software'), *remaining], use_environment=False)
     args.job_profile = profiles
     return args
 
 
 def test_fresh_plan_only_references_execution_and_creates_no_environments(tmp_path):
     args = options(tmp_path)
+    args.job_software_root = ['local/qrun=' + str(tmp_path/'software')]
     plan = jobs.plan(args)
-    assert plan['settings']['targets']['local']['backends'] == {}
+    assert plan['settings']['targets']['local/qrun']['backends'] == {}
     assert plan['environments'] == []
-    assert plan['targets'] == ['local']
+    assert plan['targets'] == ['local/qrun']
     assert not (tmp_path/'install').exists()
     assert not (tmp_path/'software').exists()
 
 
 def test_profile_completes_partial_native_binding_and_rejects_unknown_target(tmp_path):
     config = tmp_path/'job.toml'
-    config.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\n'
-                      '[execution.targets.local.bindings.xtb]\ncommand="/native/xtb"\n')
-    value = jobs.plan(options(tmp_path, '--job-config',str(config),'--job-profile','local:wrapper'))
-    wizard._validate_job_config(value['settings'])
-    assert value['settings']['targets']['local']['backends']['xtb']['command'] == '/native/xtb'
+    config.write_text('[execution]\nschema_version = 2\ndefault_platform="local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n[execution.platforms.local.bindings.xtb]\ncommand="/native/xtb"\n')
+    value = jobs.plan(options(tmp_path, '--job-config',str(config),'--job-profile','local/main:wrapper'))
+    wizard._validate_job_config(jobs.contract().configuration_document(value['settings']))
+    assert value['settings']['targets']['local/main']['backends']['xtb']['command'] == '/native/xtb'
     with pytest.raises(ValueError, match='target is not configured'):
-        jobs.plan(options(tmp_path, '--job-conda', 'typo=/bin/conda'))
+        jobs.plan(options(tmp_path, '--job-conda', 'typo/main=/bin/conda'))
 
 
 def test_core_installer_rejects_cluster_provisioning_options(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match='separately'):
-        wizard.parse_args(['--job-profile','local:structure'])
-    monkeypatch.setenv('CORAGENT_JOB_PROFILE','local:render')
+        wizard.parse_args(['--job-profile','local/main:structure'])
+    monkeypatch.setenv('CORAGENT_JOB_PROFILE','local/main:render')
     with pytest.raises(ValueError, match='separately'):
         wizard.parse_args([])
 
 
 def test_existing_bindings_are_preserved_and_remote_is_not_contacted(tmp_path, monkeypatch):
     config = tmp_path/'job.toml'
-    config.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\n'
-                      '[execution.targets.local.bindings.shell]\ncommand="/bin/sh"\n'
-                      '[execution.targets.cluster]\ndriver="external"\ntransport="ssh"\nssh_host="fixture"\nwork_root="/jobs"\n'
-                      'handler=["/bin/true"]\n[execution.targets.cluster.submission]\nqueue="batch"\n')
+    config.write_text('[execution]\nschema_version = 2\ndefault_platform="local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n[execution.platforms.local.bindings.shell]\ncommand="/bin/sh"\n[execution.platforms.cluster]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="ssh"\nssh_host="fixture"\nstorage.work_root="/jobs"\nschedulers.main.handler=["/bin/true"]\n[execution.platforms.cluster.schedulers.main.submission]\nqueue="batch"\n')
     monkeypatch.setattr(subprocess, 'run', lambda *_a, **_k: pytest.fail('planning must not run commands'))
     value = jobs.plan(options(tmp_path, '--job-config', str(config)))
-    assert jobs.contract().configuration_document(value['settings'])['execution']['targets']['cluster']['work_root'] == '/jobs'
-    assert value['targets'] == ['local']
+    assert jobs.contract().configuration_document(value['settings'])['execution']['platforms']['cluster']['storage']['work_root'] == '/jobs'
+    assert value['targets'] == ['local/main']
     assert value['environments'] == []
     with pytest.raises(ValueError, match='job-software-root'):
-        jobs.plan(options(tmp_path, '--job-config', str(config), '--job-profile', 'cluster:pyscf'))
-    remote = jobs.plan(options(tmp_path, '--job-config', str(config), '--job-profile', 'cluster:pyscf',
-                              '--job-software-root', 'cluster=/remote/envs', '--job-conda', 'cluster=/remote/conda/bin/conda'))
+        jobs.plan(options(tmp_path, '--job-config', str(config), '--job-profile', 'cluster/main:pyscf'))
+    remote = jobs.plan(options(tmp_path, '--job-config', str(config), '--job-profile', 'cluster/main:pyscf',
+                              '--job-software-root', 'cluster/main=/remote/envs', '--job-conda', 'cluster/main=/remote/conda/bin/conda'))
     row = remote['environments'][0]
     assert row['binding']['prefix'].startswith('/remote/envs/pyscf-')
-    assert remote['targets'] == ['cluster', 'local']
+    assert remote['targets'] == ['cluster/main', 'local/main']
 
 
 def test_managed_upgrade_reuses_identity_and_detects_concurrent_config_change(tmp_path):
-    args = options(tmp_path, '--job-profile', 'local:structure')
+    args = options(tmp_path, '--job-profile', 'local/qrun:structure')
+    args.job_software_root = ['local/qrun=' + str(tmp_path/'software')]
     app_paths(args.install_root).initialize()
     first = jobs.plan(args)
     first['readiness'] = {'targets': {}}
@@ -96,35 +96,39 @@ def test_managed_upgrade_reuses_identity_and_detects_concurrent_config_change(tm
 
 def test_bootstrap_validation_works_without_site_packages(tmp_path):
     config = tmp_path/'job.toml'
-    config.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\n'
-                      '[execution.targets.local.bindings.shell]\ncommand="/bin/sh"\n')
+    config.write_text('[execution]\nschema_version = 2\ndefault_platform="local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n[execution.platforms.local.bindings.shell]\ncommand="/bin/sh"\n')
     result = subprocess.run([sys.executable, '-S', '-B', str(ROOT/'scripts/installer.py'), 'install',
                              '--source', 'local', '--dry-run', '--job-config', str(config),
                              '--install-root', str(tmp_path/'install')], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
-    assert json.loads(result.stdout)['plan']['scientific_execution']['verify_targets'] == ['local']
+    assert json.loads(result.stdout)['plan']['scientific_execution']['verify_targets'] == ['local/main']
     assert not (tmp_path/'install').exists()
 
 
 @pytest.mark.skipif(importlib.util.find_spec('numpy') is None, reason='fixture environment lacks NumPy for structure acceptance')
 def test_candidate_and_published_config_work_inside_real_jobs(tmp_path):
     config = tomllib.loads(Path(os.environ['CORAGENT_JOB_CONFIG']).read_text())
-    local = config['execution']['targets']['local']
+    local = config['execution']['platforms']['local']
     local['bindings'] = {'structure': local['bindings']['structure']}
     local['bindings']['structure'].pop('environment', None)
+    # Child acceptance processes need the actual fixture endpoint in their config.
+    from research_agent.jobs import platforms_from_config
+    route = platforms_from_config(Path(os.environ['CORAGENT_JOB_CONFIG']))[0]['local/main'].config
+    local['storage'] = {key: route[key] for key in ('work_root', 'file_mode')}
+    local['schedulers']['main'].update({key: route[key] for key in ('handler', 'handler_environment')})
     source = tmp_path/'job.toml'
-    source.write_bytes(jobs.toml_bytes({'execution': {'default_target':'local','targets':{'local':local}}}))
+    source.write_bytes(jobs.toml_bytes(config))
     args = options(tmp_path, '--job-config', str(source))
     plan = jobs.prepare(jobs.plan(args), args, ROOT, sys.executable)
     report = plan['readiness']
-    assert report['targets']['local']['status'] == 'execution_verified', report
-    assert len(report['targets']['local']['jobs']) == 2
+    assert report['targets']['local/main']['status'] == 'execution_verified', report
+    assert len(report['targets']['local/main']['jobs']) == 2
     assert report['external_services'] == 'not_checked'
     jobs.publish(plan)
     jobs.verify_publication(plan, sys.executable)
     record = json.loads((app_paths(Path(args.install_root)).state/jobs.RECORD).read_text())
     result = record['publication']
-    assert result['targets']['local']['status'] == 'execution_verified', result
+    assert result['targets']['local/main']['status'] == 'execution_verified', result
 
 
 def test_ssh_payload_contains_only_selected_target_resources(tmp_path, monkeypatch):
@@ -149,7 +153,7 @@ def test_remote_acceptance_uses_scheduler_collects_results_and_removes_test_jobs
     from scripts._job_acceptance import accept
     from research_agent.jobs import environment
     platform, calls, remote_root = cluster
-    local = tomllib.loads(Path(os.environ['CORAGENT_JOB_CONFIG']).read_text())['execution']['targets']['local']
+    local = tomllib.loads(Path(os.environ['CORAGENT_JOB_CONFIG']).read_text())['execution']['platforms']['local']
     resolver = tmp_path/'remote-resolver.toml'
     resolver.write_text('default_resolver="auto"\n')
     structure = {**local['bindings']['structure'],
@@ -158,15 +162,15 @@ def test_remote_acceptance_uses_scheduler_collects_results_and_removes_test_jobs
               'submission':{'queue':'batch','resources':{'cpus':1,'walltime':'00:00:20'}},
               'bindings':{'structure':structure}}
     config = tmp_path/'remote-job.toml'
-    config.write_bytes(jobs.toml_bytes({'execution':{'default_target':'cluster','targets':{'cluster':target}}}))
+    config.write_bytes(jobs.toml_bytes({'execution':execution_config('cluster', {'cluster':target})}))
     original_capture = environment._capture
     def transport(command, **kwargs):
         assert command[0] == 'ssh'
         return original_capture(['/bin/sh','-c',command[-1]], **kwargs)
     monkeypatch.setattr(environment, '_capture', transport)
-    result = accept(config, ROOT, tmp_path/'acceptance', ['cluster'], 20)
-    assert result['targets']['cluster']['status'] == 'execution_verified', result
-    assert len(result['targets']['cluster']['jobs']) == 2
+    result = accept(config, ROOT, tmp_path/'acceptance', ['cluster/main'], 20)
+    assert result['targets']['cluster/main']['status'] == 'execution_verified', result
+    assert len(result['targets']['cluster/main']['jobs']) == 2
     assert any(command[0] == 'rsync' for command, _ in calls) == (file_mode == 'staged')
     assert not list(remote_root.glob('job_*'))
     assert not list(remote_root.glob('.coragent-acceptance-*'))

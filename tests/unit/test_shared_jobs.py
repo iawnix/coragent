@@ -1,4 +1,6 @@
 """Shared execution uses ordinary queue lifecycle without copying Job files."""
+
+from tests.support.platforms import execution_config
 from dataclasses import replace
 import json
 from pathlib import Path
@@ -227,11 +229,11 @@ def test_batch_schedulers_execute_shared_jobs_without_copy(batch, monkeypatch):
 @pytest.mark.parametrize('mode', ['staged', 'shared', 'auto', False])
 def test_shared_config_schema_and_runtime_agree(queue, mode):
     config, _ = queue
-    document = {'execution':{'default_target':'compute','targets':{'compute':{**config,'file_mode':mode}}}}
+    document = {'execution':execution_config('compute', {'compute':{**config,'file_mode':mode}})}
     errors = list(Draft202012Validator(job_config_schema()).iter_errors(document))
     if mode in ('staged','shared'):
         assert not errors
-        assert validate_job_config(document)['targets']['compute']['file_mode'] == mode
+        assert validate_job_config(document)['targets']['compute/main']['file_mode'] == mode
     else:
         assert errors
         with pytest.raises(ValueError, match='file_mode'):
@@ -245,8 +247,8 @@ def test_shared_acceptance_retains_failed_or_interrupted_workspace(queue, tmp_pa
     config, _ = queue
     target = {**config, 'file_mode':'shared', 'bindings':{'shell':{'command':'/bin/true'}}}
     path = tmp_path / 'job.toml'
-    path.write_bytes(toml_bytes({'execution':{'default_target':'compute','targets':{'compute':target}}}))
-    monkeypatch.setattr(acceptance, 'check_environments', lambda _: {'compute':{}})
+    path.write_bytes(toml_bytes({'execution':execution_config('compute', {'compute':target})}))
+    monkeypatch.setattr(acceptance, 'check_environments', lambda _: {'compute/main':{}})
     monkeypatch.setattr(acceptance, 'profiles', lambda _: {'check':{'root':str(tmp_path),
         'checks':[{'backend':'shell','script':'example.py'}]}})
     monkeypatch.setattr(acceptance, 'resource', lambda *args: Path('/bin/true'))
@@ -259,11 +261,11 @@ def test_shared_acceptance_retains_failed_or_interrupted_workspace(queue, tmp_pa
     monkeypatch.setattr(acceptance, 'run_job', pending)
     if interrupted:
         with pytest.raises(KeyboardInterrupt):
-            acceptance.accept(path, tmp_path, tmp_path / 'acceptance', ['compute'], 1)
+            acceptance.accept(path, tmp_path, tmp_path / 'acceptance', ['compute/main'], 1)
     else:
-        result = acceptance.accept(path, tmp_path, tmp_path / 'acceptance', ['compute'], 1)
-        assert result['targets']['compute']['status'] == 'failed'
-        assert Path(result['targets']['compute']['retained_workspace']).is_dir()
+        result = acceptance.accept(path, tmp_path, tmp_path / 'acceptance', ['compute/main'], 1)
+        assert result['targets']['compute/main']['status'] == 'failed'
+        assert Path(result['targets']['compute/main']['retained_workspace']).is_dir()
     retained = list(Path(config['work_root']).glob('.coragent-acceptance-*/pending-job'))
     assert len(retained) == 1
     assert retained[0].read_text() == 'retain for recovery'

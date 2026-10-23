@@ -66,5 +66,6 @@ adapters.
 
 | Skill | Purpose |
 | --- | --- |
-| [tri-operations](core/tri-operations/SKILL.md) | Deploy and maintain TRI server and compute-node services, configure resources, and diagnose task scheduling, execution and recovery. |
-| [batch-schedulers](core/batch-schedulers/SKILL.md) | Configure TRI, PBS, Torque and Slurm targets, select resources and diagnose native queue/accounting results. |
+| [batch-schedulers](core/batch-schedulers/SKILL.md) | Configure Qrun, TRI, PBS, Torque and Slurm targets, select resources and diagnose native queue/accounting results. |
+
+- [execution-platforms](core/execution-platforms/SKILL.md): Named platforms, entries, environments, storage and multi-platform plans.

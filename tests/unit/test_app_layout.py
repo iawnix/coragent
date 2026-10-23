@@ -1,3 +1,5 @@
+
+from tests.support.platforms import execution_config
 import json
 from pathlib import Path
 import pytest
@@ -49,7 +51,7 @@ def test_generated_inputs_refresh_but_credentials_are_not_overwritten(layout):
     layout.initialize()
     config = layout.configuration
     config.update(models={'providers': {'test': {'apiKey': 'credential:provider_key'}}},
-                  execution={'default_target':'local', 'targets': {'local': {'type':'local', 'driver':'systemd'}}},
+                  execution=execution_config('local', {'local': {'executor': 'qrun', 'transport': 'local', 'work_root': '/fixture/qrun/jobs'}}),
                   notifications={'email': {'enabled':True, 'provider':'smtp', 'preset':'custom', 'host':'smtp.example.test',
                       'username':'sender@example.test', 'recipient':'recipient@example.test', 'password':'credential:smtp'}})
     original = {'models': {'test': {'type':'oauth', 'access':'refreshed-fake-token'}},
@@ -133,8 +135,8 @@ def test_unsupported_model_thinking_levels_survive_configuration_and_projection(
 
 def test_install_preview_uses_one_config_without_writing_runtime_files(layout, capsys):
     from scripts.install_wizard import parse_args, show_dry_run
-    layout.configuration.update(execution={'default_target': 'local', 'targets': {
-        'local': {'type':'local', 'driver':'process', 'bindings':{}}}},
+    layout.configuration.update(execution=execution_config('local', {
+        'local': {'executor': 'qrun', 'bindings': {}, 'transport': 'local', 'work_root': '/fixture/qrun/jobs'}}),
         web={'enabled':False}, notifications={'email':{'enabled':False}})
     args = parse_args(['--config', str(layout.config_file), '--dry-run', '--service-scope', 'none'])
     show_dry_run(args)
@@ -205,8 +207,8 @@ def test_install_prepare_preserves_live_component_inputs_until_cutover(layout):
     from scripts._configuration import prepare
     layout.initialize()
     layout.job_config.write_text('live configuration')
-    layout.configuration.update(execution={'default_target':'local', 'targets':{
-        'local':{'type':'local', 'driver':'process'}}})
+    layout.configuration.update(execution=execution_config('local', {
+        'local':{'executor': 'qrun', 'transport': 'local', 'work_root': '/fixture/qrun/jobs'}}))
     prepare(SimpleNamespace(install_root=str(layout.root)))
     assert layout.job_config.read_text() == 'live configuration'
 
@@ -250,16 +252,15 @@ def test_execution_import_preserves_unchanged_secret_references_and_accepts_repl
     from scripts.install_wizard import parse_args
     layout.initialize()
     layout.credentials.write_text(json.dumps({'models':{},'secrets':{'tri':'fake-original'}}))
-    execution = {'default_target':'cluster', 'targets':{'cluster':{
-        'driver':'external', 'transport':'local', 'handler_environment':{'TRI_AUTH_TOKEN':'credential:tri'}}}}
+    execution = execution_config('cluster', {'cluster':{'executor': 'external', 'transport': 'local', 'handler_environment': {'TRI_AUTH_TOKEN': 'credential:tri'}}})
     layout.configuration.update(execution=execution)
     args = parse_args(['--config',str(layout.config_file),'--without-web','--service-scope','none'])
     layout.materialize()
     publish(args)
-    value = layout.configuration.read()['execution']['targets']['cluster']['handler_environment']
+    value = layout.configuration.read()['execution']['platforms']['cluster']['schedulers']['main']['handler_environment']
     assert value['TRI_AUTH_TOKEN'] == 'credential:tri'
-    execution['targets']['cluster']['handler_environment']['TRI_AUTH_TOKEN'] = 'fake-replacement'
+    execution['platforms']['cluster']['schedulers']['main']['handler_environment']['TRI_AUTH_TOKEN'] = 'fake-replacement'
     layout.job_config.write_text(toml_text({'execution':execution}))
     publish(args)
-    value = layout.configuration.read()['execution']['targets']['cluster']['handler_environment']
+    value = layout.configuration.read()['execution']['platforms']['cluster']['schedulers']['main']['handler_environment']
     assert layout.configuration.resolve_credentials(value)['TRI_AUTH_TOKEN'] == 'fake-replacement'

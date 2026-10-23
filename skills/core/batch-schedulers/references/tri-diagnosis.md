@@ -54,4 +54,4 @@ A cancellation record can appear before a running process exits: the client rece
 
 Tasks receive a node-local `TRI_SCRATCH`; `--scratch-cwd` starts the command there. The original directory is `TRI_JOB_CWD`. Stage inputs and the runnable script where the node can read them, and copy final outputs/checkpoints back to the persistent job directory before task exit. Client cleanup is best effort, so inspect residual scratch only after locating the task attempt and its final outputs.
 
-Queue database retention and service maintenance belong to [TRI operations](../../tri-operations/SKILL.md).
+Queue database retention and service maintenance belong to [TRI operations](../../../../docs/TRI_OPERATIONS.md).

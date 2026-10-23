@@ -80,9 +80,7 @@ def test_long_queue_emits_one_diagnostic_event_without_poll_wakes(tmp_path, monk
     from research_agent.application import job_manager
     workspace(tmp_path)
     config = tmp_path/'job.toml'
-    config.write_text('[execution]\ndefault_target="cluster"\n[execution.targets.cluster]\n'
-                      'driver="external"\ntransport="ssh"\nssh_host="fixture"\nwork_root="/scratch"\n'
-                      'handler=["/bin/true"]\n[execution.targets.cluster.submission]\nqueue="batch"\nqueue_wait_seconds=60\n')
+    config.write_text('[execution]\nschema_version = 2\ndefault_platform="cluster"\n[execution.platforms.cluster]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="ssh"\nssh_host="fixture"\nstorage.work_root="/scratch"\nschedulers.main.handler=["/bin/true"]\n[execution.platforms.cluster.schedulers.main.submission]\nqueue="batch"\nqueue_wait_seconds=60\n')
     monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(config))
     # Exercise submission and Monitor registration with a queued remote Job;
     # local processes have no scheduler queue or queue-wait threshold.

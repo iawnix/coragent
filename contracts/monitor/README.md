@@ -58,7 +58,7 @@ type TaskState = "active" | "waiting" | "paused" | "blocked"
 type Criterion = { id: string; description: string };
 type CompletionEvidence = { criterion_id: string; evidence_refs: string[] };
 type UserTask = {
-  schema_version: "coragent-user-task/3";
+  schema_version: "coragent-user-task/4";
   user_task_id: string;
   workspace_id: string;
   session_id: string;
@@ -261,7 +261,7 @@ Job lifecycle. Missing collection or scientific-analysis evidence must not be
 presented as successful analysis merely because execution succeeded.
 
 A session without registered tasks returns no current task. This protocol requires
-`coragent-user-task/3` and `research-snapshot/3`. Run indexes
+`coragent-user-task/4` and `research-snapshot/3`. Run indexes
 cover execution observed by the Task Controller; runs without an index are not
 invented from the active task graph. The diagnostic view presents
 structured execution summaries, not model reasoning or secret tool arguments.

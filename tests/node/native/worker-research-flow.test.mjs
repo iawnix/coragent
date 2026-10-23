@@ -1,3 +1,4 @@
+import { startQrunFixture } from "./qrun-fixture.mjs";
 import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
@@ -24,6 +25,7 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
   const socketRoot = join(TEST_SOCKET_ROOT, "f");
   await mkdir(socketRoot);
   const saved = { ...process.env };
+  let closeQueue;
   let completed = false;
   let backend, server, monitorRequest;
   let nodeId, outputArtifact;
@@ -42,7 +44,7 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     Object.assign(process.env, { PI_CODING_AGENT_DIR: agentDir, PI_AGENT_DIR: agentDir, CORAGENT_PYTHON: python,
       PYTHONDONTWRITEBYTECODE: "1", CORAGENT_NOTIFICATION_CONFIG: config });
     const jobConfig = join(root, "job.toml");
-    await writeFile(jobConfig, '[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\nsupervisor="process"\n');
+    closeQueue = await startQrunFixture(jobConfig, root);
     process.env.CORAGENT_JOB_CONFIG = jobConfig;
     await execute(python, [join(packageRoot, "apps/agent-cli/workspace_mode.py"), "--root", workspace, "--workspace-id", "flow"]);
     const fixtureJobId = "job_1";
@@ -262,6 +264,7 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
   } finally {
     try { await backend?.close(); }
     finally {
+      await closeQueue?.();
       if (server) { server.closeAllConnections(); await new Promise(done => server.close(done)); }
       for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];
       Object.assign(process.env, saved);

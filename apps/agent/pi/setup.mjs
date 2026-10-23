@@ -1,3 +1,4 @@
+import { executionItemContext } from "../tasks/execution-plan.mjs";
 import { loadPi } from "./source.mjs";
 import { createContextManager, contextPolicy, contextInputBudget } from "../context/manager.mjs";
 import { createResearchSynthesis } from "../context/synthesis.mjs";
@@ -106,7 +107,8 @@ export async function createCoRAgentHarness(databasePath, options) {
     registry.install(defineExtension({ name: "coding-tools", tools:
       await createCodingTools(cwd, async context => {
         const task = await taskController.current(context);
-        return task && ["active", "waiting"].includes(task.state) ? task.execution_selection : null;
+        return task && ["active", "waiting"].includes(task.state)
+          ? (task.execution_plan && !task.active_execution_item ? { unselected: true } : executionItemContext(task, task.active_execution_item)) : null;
       }),
     }));
     registry.install(defineExtension({ name: "coragent-tools", tools: durableTools }));

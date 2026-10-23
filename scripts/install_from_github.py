@@ -144,6 +144,8 @@ def install_uninstaller(install_root: Path, source_root: Path) -> Path:
         (source_root / "scripts" / "_terminal_ui.py", private / "_terminal_ui.py", 0o600),
         (source_root / "scripts" / "_installation_metadata.py", private / "_installation_metadata.py", 0o600),
         (source_root / "scripts" / "_job_install.py", private / "_job_install.py", 0o600),
+        (source_root / "scripts" / "_qrun_install.py", private / "_qrun_install.py", 0o600),
+        (source_root / "backend/src/research_agent/jobs/qrun.py", private / "qrun.py", 0o600),
         (source_root / "backend/src/research_agent/foundation/layout.py", private / "app_layout.py", 0o600),
         (source_root / "backend/src/research_agent/foundation/configuration.py", private / "configuration.py", 0o600),
         (source_root / "scripts/_configuration.py", private / "_configuration.py", 0o600),

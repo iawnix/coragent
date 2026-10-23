@@ -9,6 +9,11 @@ from research_agent.application.job_manager import command
 from tests.unit.test_job_recovery import workspace
 
 
+def bound_context(selection):
+    return {'selection': {key: selection[key] for key in ('target', 'route_digest')},
+            'policy': {'max_in_flight': 4, 'max_attempts': 100}}
+
+
 def test_task_ownership_survives_job_submission_and_read_only_pagination(tmp_path):
     workspace(tmp_path)
     for suffix, task in [('a', 'task_1'), ('b', 'task_2')]:
@@ -68,25 +73,25 @@ def test_task_destination_is_checked_before_staging_even_for_prepared_jobs(tmp_p
     import hashlib
     from research_agent.application.references import prepare_job
     workspace(tmp_path)
-    request = {'request_id': 'wrong-destination', 'work_id': 'work', 'execution_target': 'local',
+    request = {'request_id': 'wrong-destination', 'work_id': 'work', 'execution_target': {'platform': 'local', 'scheduler_entry': 'main'},
                'command': [sys.executable, '-c', 'raise RuntimeError("must not execute")']}
     if form == 'target_alias':
-        request['execution_target'] = 'local'
+        request['execution_target'] = {'platform': 'local'}
     params = request
     if form in {'file', 'reference'}:
         source = tmp_path / 'request.json'; source.write_text(json.dumps(request))
         params = {'request_file': str(source), 'request_sha256': hashlib.sha256(source.read_bytes()).hexdigest()}
         if form == 'reference': params = {'prepared_ref': prepare_job(tmp_path, params)['prepared_ref']}
     with pytest.raises(ValueError, match='execution_target_mismatch'):
-        dispatch('start', {**params, 'root': str(tmp_path), 'required_target': 'tri', 'user_task_id': 'task_1'})
+        dispatch('start', {**params, 'root': str(tmp_path), 'execution_context': bound_context({'target': {'platform': 'tri', 'scheduler_entry': 'main'}, 'route_digest': 'sha256:' + 'a' * 64}), 'user_task_id': 'task_1'})
     assert not list((tmp_path / 'runs/jobs').glob('job_*'))
 
 
 def test_matching_task_destination_does_not_block_normal_execution(tmp_path):
     workspace(tmp_path)
-    result = dispatch('start', {'root': str(tmp_path), 'request_id': 'allowed', 'required_target': 'local',
+    result = dispatch('start', {'root': str(tmp_path), 'request_id': 'allowed', 'execution_context': bound_context(dispatch('resolve_target', {'root': str(tmp_path)})),
                               'user_task_id': 'task_1', 'command': [sys.executable, '-c', 'pass']})
-    assert result['platform'] == 'local'
+    assert result['platform'] == 'local/main'
 
 
 @pytest.mark.parametrize('prepared', [False, True])
@@ -103,8 +108,7 @@ def test_pinned_route_change_rejected_before_any_dispatch(tmp_path, prepared):
         path.write_text(json.dumps(request))
         request = {'request_file': str(path), 'request_sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
     config = Path(os.environ['CORAGENT_JOB_CONFIG'])
-    config.write_text(config.read_text().replace('driver = "process"', 'driver = "systemd"').replace('supervisor = "process"', 'supervisor = "systemd"'))
+    config.write_text(config.read_text().replace('executor = "qrun"', 'executor = "external"\nschedulers.main.handler = ["/bin/true"]'))
     with pytest.raises(ValueError, match='execution_target_changed'):
-        dispatch('start', {**request, 'root': str(tmp_path), 'required_target': selected['target'],
-                           'required_route_digest': selected['route_digest'], 'user_task_id': 'task_1'})
+        dispatch('start', {**request, 'root': str(tmp_path), 'execution_context': bound_context(selected), 'user_task_id': 'task_1'})
     assert not list((tmp_path / 'runs/jobs').glob('job_*'))

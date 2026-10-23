@@ -1,4 +1,6 @@
 """Real target probes and guards reject changed bindings before science runs."""
+
+from tests.support.platforms import execution_config
 import hashlib
 import json
 import os
@@ -13,7 +15,7 @@ import pytest
 
 from research_agent.jobs.config_contract import load_job_config, resolve_binding
 from research_agent.jobs.environment import guarded_command, probe_binding
-from research_agent.jobs.worker import supervisor_environment
+from research_agent.jobs.process_environment import supervisor_environment
 from research_agent.application.memory_context import read
 from research_agent.artifacts.registry import manifests
 from research_agent.application.job_state import execution
@@ -25,13 +27,13 @@ from tests.unit.test_job_recovery import workspace
 
 def target():
     settings = load_job_config(os.environ['CORAGENT_JOB_CONFIG'])
-    return settings, resolve_binding(settings, 'local', 'validation', runtime='python')
+    return settings, resolve_binding(settings, 'local/main', 'validation', runtime='python')
 
 
 def request(tmp_path):
     script = tmp_path / 'science.py'
     script.write_text("from pathlib import Path\nPath('result.txt').write_text('computed once')\n")
-    return prepare_script(os.environ['CORAGENT_JOB_CONFIG'], 'local', 'validation', script, collect=['result.txt'])
+    return prepare_script(os.environ['CORAGENT_JOB_CONFIG'], {'platform': 'local', 'scheduler_entry': 'main'}, 'validation', script, collect=['result.txt'])
 
 
 def stage(tmp_path, request):
@@ -120,9 +122,10 @@ def test_native_target_needs_no_python_and_checks_activation_before_sourcing(tmp
     binary.chmod(0o700)
     activation = tmp_path / 'activate.sh'
     activation.write_text('export SCIENCE_MODE=test\n')
-    settings = {'default_target': 'local', 'targets': {'local': {'kind': 'local', 'type': 'local', 'driver': 'process',
-        'backends': {'native': {'command': str(binary), 'activation_script': str(activation)}}}}}
-    selected = resolve_binding(settings, 'local', 'native', runtime='native')
+    settings = {'execution': execution_config('local', {'local': { 'executor': 'qrun', 'bindings': {'native': {'command': str(binary), 'activation_script': str(activation)}}, 'transport': 'local', 'work_root': '/fixture/qrun/jobs'}})}
+    from research_agent.jobs.config_contract import validate_job_config
+    settings = validate_job_config(settings)
+    selected = resolve_binding(settings, 'local/main', 'native', runtime='native')
     snapshot = probe_binding(settings, selected, {})
     command, inputs = guarded_command(selected, [str(binary)], snapshot)
     assert not inputs and snapshot['observation']['python'] is None
@@ -240,13 +243,13 @@ def test_guard_cannot_be_reused_for_a_different_script(tmp_path):
 
 def test_ssh_probe_runs_target_checks_and_cleans_remote_scratch(tmp_path, monkeypatch):
     settings, selected = target()
-    target_settings = settings['targets']['local']
-    target_settings.update(kind='remote', ssh_host='fixture.invalid', work_root=str(tmp_path / 'new-remote-root'), driver='external',
+    target_settings = settings['targets']['local/main']
+    target_settings.update(kind='remote', ssh_host='fixture.invalid', work_root=str(tmp_path / 'new-remote-root'), executor='external', transport='ssh',
                            ssh_config=str(tmp_path / 'ssh-config'), submission={'queue': 'science'})
     activation = tmp_path / 'activate.sh'
     activation.write_text('test -z "${CORAGENT_FIXTURE_PROVIDER_SECRET:-}"\nexport REMOTE_TEST_READY=1\n')
     target_settings['backends']['validation']['activation_script'] = str(activation)
-    selected = resolve_binding(settings, 'local', 'validation', runtime='python')
+    selected = resolve_binding(settings, 'local/main', 'validation', runtime='python')
     monkeypatch.setenv('CORAGENT_FIXTURE_PROVIDER_SECRET', 'test-only-secret')
     from research_agent.jobs import environment
     original, calls = environment._capture, []

@@ -18,10 +18,6 @@ Open the Skill for the capability you need. Each Skill owns its entrypoints, arg
 
 [research-workflow](../skills/core/research-workflow/SKILL.md)
 
-## tri-operations
-
-[tri-operations](../skills/core/tri-operations/SKILL.md)
-
 ## candidate-generation
 
 [candidate-generation](../skills/chemical/candidate-generation/SKILL.md) · [Operation entrypoints](../skills/chemical/candidate-generation/references/commands.md)

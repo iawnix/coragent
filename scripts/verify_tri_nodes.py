@@ -19,16 +19,20 @@ except ImportError:
 from research_agent.jobs.config_contract import validate_job_config, configuration_document, binding_digest
 
 
-def verify(config, package, directory, target, nodes, timeout):
+def settings_from_config(config):
     document = tomllib.loads(config.read_text())
     if 'schema_version' in document:
         from research_agent.foundation.configuration import Configuration
         operator = Configuration(config)
         document = {'execution': operator.resolve_credentials(operator.read()['execution'])}
-    settings = validate_job_config(document)
+    return validate_job_config(document)
+
+
+def verify(config, package, directory, target, nodes, timeout):
+    settings = settings_from_config(config)
     selected = settings['targets'].get(target)
-    if not selected or selected.get('driver') != 'external':
-        raise ValueError('TRI acceptance requires a configured external target')
+    if not selected or selected.get('executor') != 'tri':
+        raise ValueError('TRI acceptance requires executor=tri')
     if (not isinstance(nodes, list) or not nodes
             or any(not isinstance(node, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', node) for node in nodes)
             or len(set(nodes)) != len(nodes)):
@@ -46,8 +50,9 @@ def verify(config, package, directory, target, nodes, timeout):
             node_dir = directory / node
             pinned = copy.deepcopy(selected)
             pinned['handler_environment'] = {**pinned.get('handler_environment', {}), 'CORAGENT_TRI_NODE': node}
-            document = configuration_document({'execution': settings.get('execution', {}),
-                'default_target': target, 'targets': {target: pinned}})
+            candidate_settings = copy.deepcopy(settings)
+            candidate_settings['targets'][target] = pinned
+            document = configuration_document(candidate_settings)
             candidate = node_dir / 'config.toml'
             write_private(candidate, toml_bytes(document))
             # Retain the pinned configuration on failure for reconciliation.
@@ -74,12 +79,16 @@ def main():
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--package-root', type=Path, required=True)
     parser.add_argument('--directory', type=Path, required=True, help='New private acceptance directory')
-    parser.add_argument('--target', required=True, help='Target using the batch-schedulers TRI handler (tri.py)')
+    parser.add_argument('--platform', required=True)
+    parser.add_argument('--scheduler-entry', help='TRI scheduler entry in the selected platform')
     parser.add_argument('--nodes', type=json.loads, required=True, help='JSON array of exact TRI node names')
     parser.add_argument('--timeout', type=int, default=180)
     args = parser.parse_args()
+    from research_agent.jobs.config_contract import resolve_target
+    selected = resolve_target(settings_from_config(args.config), {"platform": args.platform,
+        **({"scheduler_entry": args.scheduler_entry} if args.scheduler_entry else {})}, scheduler="tri")
     report = verify(args.config.resolve(), args.package_root.resolve(), args.directory.resolve(),
-                    args.target, args.nodes, args.timeout)
+                    selected, args.nodes, args.timeout)
     # Incomplete backend coverage is not a successful cluster acceptance.
     return int(any(row['status'] != 'execution_verified' or row['untested_backends']
                    for row in report['nodes'].values()))

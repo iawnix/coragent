@@ -259,7 +259,7 @@ def test_analysis_jobs_execute_staged_dependencies_and_collect(tmp_path, executo
         material(root, 'right', 'O', [[0, 0, 0], [0, 0, 1], [0, 1, 0]], new_to_old=[2, 0, 1])
         inputs = {'left': root / 'left.json', 'right': root / 'right.json'}
     arguments = ['--mode', 'identity', '--max-candidates', '1'] if executor == 'chemical.map-candidates' else ['--rmsd-threshold', '0.05'] if executor == 'chemical.conformer-compare' else []
-    prepared = prepare(Path(os.environ['CORAGENT_JOB_CONFIG']), 'local', executor, '1', inputs, arguments)
+    prepared = prepare(Path(os.environ['CORAGENT_JOB_CONFIG']), {'platform': 'local', 'scheduler_entry': 'main'}, executor, '1', inputs, arguments)
     job = execute('job_start', root, {**prepared, 'node_id': node['id']})
     try:
         for _ in range(300):

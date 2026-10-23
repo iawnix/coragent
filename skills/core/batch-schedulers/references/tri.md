@@ -13,14 +13,14 @@ commands on the submission host. It reads one JSON request from stdin and writes
 one normalized JSON response to stdout. Supported actions are `probe`, `submit`,
 `status`, `cancel` and `recover`.
 
-For CoRAgent and TRI on the same login node, use `driver="external"` and
+For CoRAgent and TRI on the same login node, use `executor = "external"
 `transport="local"`. Set `work_root` to a persistent directory shared with compute
 nodes; set `handler` to the installed Python and this script's absolute path.
 See [target configuration and protocol](../../../../docs/EXTERNAL_JOBS.md) for a full
 configuration. Research calculations continue through `job_start`, `job_status`,
 `job_reconcile` and `job_collect`.
 
-For native task states, cancellation confirmation and log inspection, read [TRI task diagnosis](tri-diagnosis.md). For server or node deployment, use [TRI operations](../../tri-operations/SKILL.md).
+For native task states, cancellation confirmation and log inspection, read [TRI task diagnosis](tri-diagnosis.md). For server or node deployment, use [TRI operations](../../../../docs/TRI_OPERATIONS.md).
 
 ## Handler environment
 
@@ -108,7 +108,7 @@ private `TRI_ACCEPTANCE_DIR` (repository tests must use `local_debug/`):
 "$CORAGENT_PYTHON" "$CORAGENT_PACKAGE_ROOT/scripts/verify_tri_nodes.py" \
   --config "$HOME/.config/coragent/config.toml" \
   --package-root "$CORAGENT_PACKAGE_ROOT" --directory "$TRI_ACCEPTANCE_DIR" \
-  --target compute --nodes '["fed1","fed2"]' --timeout 180
+  --platform compute --scheduler-entry main --nodes '["fed1","fed2"]' --timeout 180
 ```
 
 Replace the target and node names with the deployment's exact names. This submits

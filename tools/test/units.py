@@ -54,6 +54,13 @@ def launch(args):
     atomic(path,record)
     command=args[boundary+1:]
     arguments=args[:boundary]
+    # Qrun validates native unit identity. Preserve only its exact, derived
+    # description; the guardian still records and verifies that identity.
+    match=re.fullmatch(r'coragent-qrun-([a-f0-9]{64})\.service',unit)
+    if match and '--property=Description=Qrun qr-'+match[1] in arguments:
+        description='Qrun qr-'+match[1]
+        record['description']=description
+        atomic(path,record)
     # These properties apply to the actual user-manager service; it cannot
     # escape the test namespace by asking the manager to start a new unit.
     writable=[str(root)]

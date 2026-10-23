@@ -55,7 +55,7 @@ Host Python bases and wheel overlays use
 `<env_root>/<installation-id>/{base,kernels}/<hash>`.
 `runtime.env_root` selects a dedicated store; the installer also accepts
 `CORAGENT_HOST_ENV_ROOT`. Scientific interpreters and programs are configured
-separately under `execution.targets.<target>.bindings` in `config.toml`.
+separately under `execution.platforms.<platform>.schedulers.<entry>.bindings` in `config.toml`.
 
 Sockets and process locks use the installation-scoped system runtime directory.
 Pi session history lives at

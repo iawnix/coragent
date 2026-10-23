@@ -1,4 +1,6 @@
 """Per-job allocation travels from preparation to the scheduler and program."""
+
+from tests.support.platforms import execution_config
 import hashlib
 import importlib.util
 import json
@@ -21,19 +23,19 @@ from tests.unit.test_job_recovery import workspace
 
 def configured(tmp_path, *, external=None):
     path = Path(os.environ['CORAGENT_JOB_CONFIG'])
-    source = tomllib.loads(path.read_text())['execution']['targets']['local']
+    source = tomllib.loads(path.read_text())['execution']['platforms']['local']
     python = source['bindings']['validation']['python']
     program = tmp_path / 'g16'
     program.write_text('#!/bin/sh\ncat > observed.gjf\nprintf "%s" "$OMP_NUM_THREADS" > observed.threads\n'
                        "printf '%s\\n' ' #p M062X/6-31G** SP SCF=Tight Int=UltraFine' ' ----------------' "
                        "' SCF Done: E(RM062X) = -76.0 A.U.' ' Normal termination of Gaussian'\n")
     program.chmod(0o700)
-    target = {**(external or {'driver': 'process', 'type': 'local'}),
+    target = {**(external or {'executor': 'qrun', 'transport': 'local', 'work_root': '/fixture/qrun/jobs'}),
               'python': python, 'submission': {'resources': {'cpus': 4, 'memory_mb': 4096}},
               'bindings': {key: {'command': str(program)} for key in ('gaussian', 'xtb', 'crest', 'path_gaussian', 'path_xtb')},
               }
     target['bindings'].update(pyscf={}, validation={})
-    path.write_bytes(_job_config_bytes({'execution': {'default_target': 'local', 'targets': {'local': target}}}))
+    path.write_bytes(_job_config_bytes({'execution': execution_config('local', {'local': target})}))
     return path
 
 
@@ -44,7 +46,7 @@ def geometry(tmp_path):
 
 
 def gaussian(config, tmp_path, **kw):
-    return prepare(config, 'local', 'chemical.gaussian', '1', {'geometry': geometry(tmp_path)}, ['--task', 'sp'], **kw)
+    return prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, 'chemical.gaussian', '1', {'geometry': geometry(tmp_path)}, ['--task', 'sp'], **kw)
 
 
 @pytest.mark.skipif(importlib.util.find_spec('numpy') is None, reason='fixture environment lacks NumPy for Gaussian execution')
@@ -72,7 +74,7 @@ def test_explicit_allocation_reaches_tri_and_gaussian_without_changing_defaults(
         assert '%mem=14745MB' in (output / 'observed.gjf').read_text()
         spec = json.loads((Path(receipt['cwd']) / 'spec.json').read_text())
         assert spec['metadata']['resources']['cpus'] == 12
-        assert load_job_config(config)['targets']['local']['submission']['resources']['cpus'] == 4
+        assert load_job_config(config)['targets']['local/main']['submission']['resources']['cpus'] == 4
         # Neither changing an existing file nor attaching an override can reuse its digest.
         prepared['metadata']['resources']['cpus'] = 16
         path.write_text(json.dumps(prepared))
@@ -88,7 +90,7 @@ def test_explicit_allocation_reaches_tri_and_gaussian_without_changing_defaults(
 def test_default_backend_and_partial_job_resources_share_one_resolver(tmp_path, mock_environment_probe):
     config = configured(tmp_path)
     with config.open('a') as stream:
-        stream.write('\n[execution.targets.local.bindings.gaussian.submission.resources]\ncpus=6\n')
+        stream.write('\n[execution.platforms.local.bindings.gaussian.submission.resources]\ncpus=6\n')
     normal = gaussian(config, tmp_path)
     override = gaussian(config, tmp_path, submission={'resources': {'cpus': 12}})
     assert normal['metadata']['resources'] == {'cpus': 6, 'memory_mb': 4096}
@@ -106,7 +108,7 @@ def test_script_resources_are_pinned_without_claiming_internal_parallelism(tmp_p
     config = configured(tmp_path)
     script = tmp_path / 'analysis.py'
     script.write_text('print("analysis")\n')
-    prepared = prepare_script(config, 'local', 'validation', script, submission={'resources': {'cpus': 12}})
+    prepared = prepare_script(config, {'platform': 'local', 'scheduler_entry': 'main'}, 'validation', script, submission={'resources': {'cpus': 12}})
     assert prepared['metadata']['resources'] == {'cpus': 12, 'memory_mb': 4096}
     assert prepared['metadata']['program_resources']['status'] == 'unverified'
     check_binding(prepared, probe=False)
@@ -119,13 +121,13 @@ def test_script_resources_are_pinned_without_claiming_internal_parallelism(tmp_p
 def test_target_activation_cannot_restore_stale_thread_defaults(tmp_path):
     from tests.unit.test_execution_environment import stage, run_guard
     config = configured(tmp_path)
-    conda = Path(load_job_config(config)['targets']['local']['python']['conda_executable'])
+    conda = Path(load_job_config(config)['targets']['local/main']['python']['conda_executable'])
     conda.write_text(conda.read_text().replace('else shift 5;',
         'else export OMP_NUM_THREADS=2 CORAGENT_JOB_CPUS=2 CORAGENT_JOB_MEMORY_MB=256; shift 5;'))
     script = tmp_path / 'analysis.py'
     variables = ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'CORAGENT_JOB_CPUS', 'CORAGENT_JOB_MEMORY_MB')
     script.write_text('import os, json\nprint(json.dumps([os.environ.get(k) for k in ' + repr(variables) + ']))\n')
-    prepared = prepare_script(config, 'local', 'validation', script, submission={'resources': {'cpus': 12, 'memory_mb': 16384}})
+    prepared = prepare_script(config, {'platform': 'local', 'scheduler_entry': 'main'}, 'validation', script, submission={'resources': {'cpus': 12, 'memory_mb': 16384}})
     result = run_guard(stage(tmp_path, prepared), prepared['command'])
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == ['12', '12', '12', '12', '16384']
@@ -136,7 +138,7 @@ def test_shortcut_program_threads_follow_job_allocation(tmp_path, mock_environme
     config = configured(tmp_path)
     inputs = {'material': geometry(tmp_path)} if executor == 'chemical.crest' else {'geometry': geometry(tmp_path)}
     arguments = [] if executor == 'chemical.crest' else ['--task', 'sp']
-    prepared = prepare(config, 'local', executor, '1', inputs, arguments, submission={'resources': {'cpus': 12}})
+    prepared = prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, executor, '1', inputs, arguments, submission={'resources': {'cpus': 12}})
     check_binding(prepared, probe=False)
     assert prepared['metadata']['program_resources']['threads'] == 12
     if executor != 'chemical.xtb':
@@ -150,7 +152,7 @@ def test_explicit_gaussian_input_drives_allocation_and_is_not_rewritten(tmp_path
     source.write_text('%nprocshared=12\n%mem=8GB\n#p HF/sto-3g SP\n\nwater\n\n0 1\n\n')
     before = source.read_bytes()
     def build(**kw):
-        return prepare(config, 'local', 'chemical.gaussian-input', '1', {'input': source}, **kw)
+        return prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, 'chemical.gaussian-input', '1', {'input': source}, **kw)
     request = build()
     assert request['metadata']['resources'] == {'cpus': 12, 'memory_mb': 9103}
     assert request['metadata']['program_resources']['program_memory_mb'] == 8192
@@ -170,7 +172,7 @@ def test_conflicting_scientific_flags_fail_before_probe(tmp_path, monkeypatch, a
     config = configured(tmp_path)
     monkeypatch.setattr('research_agent.application.executors.probe_binding', lambda *a: pytest.fail('conflict must fail before probe'))
     with pytest.raises(ValueError, match='job_resource_conflict'):
-        prepare(config, 'local', 'chemical.gaussian', '1', {'geometry': geometry(tmp_path)},
+        prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, 'chemical.gaussian', '1', {'geometry': geometry(tmp_path)},
                 ['--task', 'sp', *arguments], submission=submission)
 
 
@@ -180,18 +182,18 @@ def test_serial_path_resources_use_per_process_settings_not_image_count(tmp_path
     source = tmp_path / 'input.json'
     source.write_text(json.dumps({'settings': {'threads': 12, **({'memory_mb': 8000} if 'gaussian' in operation else {})},
                                  'image_count': 9}))
-    prepared = prepare(config, 'local', 'chemical.' + operation, version, {'input': source})
+    prepared = prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, 'chemical.' + operation, version, {'input': source})
     assert prepared['metadata']['resources']['cpus'] == 12
     assert prepared['metadata']['program_resources']['concurrent_processes'] == 1
     check_binding(prepared, probe=False)
     with pytest.raises(ValueError, match='job_resource_conflict'):
-        prepare(config, 'local', 'chemical.' + operation, version, {'input': source}, submission={'resources': {'cpus': 4}})
+        prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, 'chemical.' + operation, version, {'input': source}, submission={'resources': {'cpus': 4}})
 
 
 def test_binding_thread_override_cannot_hide_allocation_mismatch(tmp_path):
     config = configured(tmp_path)
     with config.open('a') as stream:
-        stream.write('\n[execution.targets.local.bindings.gaussian.environment]\nOMP_NUM_THREADS="4"\n')
+        stream.write('\n[execution.platforms.local.bindings.gaussian.environment]\nOMP_NUM_THREADS="4"\n')
     with pytest.raises(ValueError, match='job_resource_conflict: OMP_NUM_THREADS'):
         gaussian(config, tmp_path, submission={'resources': {'cpus': 12}})
 
@@ -217,7 +219,7 @@ def test_preparer_cli_has_a_single_job_resource_entry_point(tmp_path):
     config = configured(tmp_path)
     path = tmp_path / 'request.json'
     result = subprocess.run([sys.executable, '-m', 'research_agent.application.executors',
-        '--config', str(config), '--target', 'local', '--executor', 'chemical.gaussian', '--version', '1',
+        '--config', str(config), '--platform', 'local', '--executor', 'chemical.gaussian', '--version', '1',
         '--input', 'geometry=' + str(geometry(tmp_path)), '--cpus', '12', '--job-memory-mb', '16384',
         '--walltime', '01:00:00', '--output', str(path), '--', '--task', 'sp'], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr

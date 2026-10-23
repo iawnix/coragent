@@ -16,6 +16,8 @@ job_status
 job_collect
 job_cancel
 job_probe
+job_platforms
+job_resources
 job_reconcile
 artifact_register
 artifact_create

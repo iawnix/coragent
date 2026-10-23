@@ -81,7 +81,7 @@ Selecting `--executor` or `validator_id` requires a registered ID/version as the
 contract for that helper. For other methods, submit explicit command, inputs,
 outputs, and platform through `job_start`, or prepare a task with
 `--script <file.py> --backend <binding>`. Neither requires a new catalog entry.
-Bindings in `config.toml` under `execution.targets.<target>.bindings` configure
+Bindings in `config.toml` under `execution.platforms.<platform>.schedulers.<entry>.bindings` configure
 actual programs, Python, activation scripts and resources. The runtime consumes
 the generated component configuration through `CORAGENT_JOB_CONFIG`.
 

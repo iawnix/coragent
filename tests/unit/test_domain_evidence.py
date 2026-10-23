@@ -102,7 +102,7 @@ def test_registered_comparison_runs_as_job_and_mismatch_remains_publishable(tmp_
     target = structure(tmp_path / 'target.json', 'CC1CCC=CC1')
     actual = structure(tmp_path / 'actual.json', 'CC1=CCCCC1')
     refs = [execute('artifact_register', tmp_path, {'path': str(path)}) for path in (target, actual)]
-    prepared = prepare(os.environ['CORAGENT_JOB_CONFIG'], 'local', 'chemical.compare', '1',
+    prepared = prepare(os.environ['CORAGENT_JOB_CONFIG'], {'platform': 'local', 'scheduler_entry': 'main'}, 'chemical.compare', '1',
                        {'target': target, 'actual': actual}, input_artifact_ids=[r['artifact_id'] for r in refs])
     assert '.coragent/python_entrypoint.py' in prepared['command']
     assert set(prepared['metadata']['input_roles']) == {'target', 'actual'}

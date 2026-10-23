@@ -1,3 +1,4 @@
+import { startQrunFixture } from "./qrun-fixture.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -29,6 +30,7 @@ test("Memory create survives before Task binding and both stores replay their or
   const faux = fauxProvider(), models = createModels(); models.setProvider(faux.provider);
   const invocations = [], writes = [];
   const previousConfig = process.env.CORAGENT_JOB_CONFIG;
+  let closeQueue;
   let bridge, harness, controller, conversation, admission, tools;
   async function close() {
     await controller?.close(); controller = undefined;
@@ -66,7 +68,7 @@ test("Memory create survives before Task binding and both stores replay their or
   const replay = invocation => tools.find(tool => tool.name === invocation.name).execute(invocation.params, invocation.api, context);
   try {
     const config = join(root, "job.toml");
-    await writeFile(config, '[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\nsupervisor="process"\n');
+    closeQueue = await startQrunFixture(config, workspaceRoot);
     process.env.CORAGENT_JOB_CONFIG = config;
     await workspaces.initialize_workspace({ workspace_root: workspaceRoot, workspace_id: workspaceId });
     await workspaces.admit_workspace(workspaceRoot);
@@ -128,6 +130,7 @@ test("Memory create survives before Task binding and both stores replay their or
   } finally {
     try { await close(); }
     finally {
+      await closeQueue?.();
       if (previousConfig === undefined) delete process.env.CORAGENT_JOB_CONFIG;
       else process.env.CORAGENT_JOB_CONFIG = previousConfig;
       await rm(root, { recursive: true, force: true });

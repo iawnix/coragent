@@ -27,12 +27,13 @@ test("installed core works alone and chemical uses the same discovery without du
     const loaded = await loadProductSkills({ packageRoot: root });
     const names = loaded.skills.map(skill => skill.name);
     assert.equal(new Set(names).size, names.length);
-    for (const name of ["research-workflow", "research-memory", "batch-schedulers", "tri-operations", "email"]) {
+    for (const name of ["research-workflow", "research-memory", "batch-schedulers", "email"]) {
       assert.ok(names.includes(name));
     }
     assert.equal(names.includes("gaussian"), groups.includes("chemical"));
     assert.equal(names.includes("chemical-report"), groups.includes("chemical"));
     assert.equal(names.includes("report"), false);
+    assert.equal(names.includes("tri-operations"), false);
     assert.equal(names.includes("_shared"), false);
     const prompt = createSystemPromptManifest({ native: { source: "product", text: await readFile(join(root, "prompts/coragent.md"), "utf8") },
       skills: { source: root, items: loaded.skills } });

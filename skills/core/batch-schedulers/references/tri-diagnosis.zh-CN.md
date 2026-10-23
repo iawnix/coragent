@@ -54,4 +54,4 @@ tri_stat --json "$TRI_TASK_ID"
 
 任务获得节点本地的 `TRI_SCRATCH`，`--scratch-cwd` 会让命令从该目录启动，原始目录保存在 `TRI_JOB_CWD`。将输入和可执行脚本暂存到节点可读位置，在任务退出前把最终输出/checkpoint 复制回持久任务目录。客户端会尽力清理 scratch，检查残留目录前先定位任务 attempt 和最终输出。
 
-队列数据库历史清理与服务维护见[TRI 运维](../../tri-operations/SKILL.zh-CN.md)。
+队列数据库历史清理与服务维护见[TRI 运维](../../../../docs/TRI_OPERATIONS.zh-CN.md)。

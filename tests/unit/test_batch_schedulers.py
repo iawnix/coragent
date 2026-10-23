@@ -1,3 +1,5 @@
+
+from tests.support.platforms import execution_config
 import importlib.util
 import json
 from pathlib import Path
@@ -28,8 +30,7 @@ def batch(request, tmp_path, monkeypatch):
     (state / 'defer').touch()
     shared = tmp_path / 'shared'
     shared.mkdir()
-    config = {'driver': 'external', 'transport': 'local', 'work_root': str(shared),
-              'handler': [sys.executable, str(HANDLER), request.param], 'handler_environment': variables}
+    config = {'executor': 'external', 'transport': 'local', 'work_root': str(shared), 'handler': [sys.executable, str(HANDLER), request.param], 'handler_environment': variables}
     cwd = tmp_path / 'controller'
     cwd.mkdir()
     spec = JobSpec(job_id='job_1', command=('/bin/true',), cwd=cwd)
@@ -135,9 +136,9 @@ def test_resources_map_to_native_flags(scheduler):
 
 @pytest.mark.parametrize('driver', ['pbs','torque','slurm','tri','process','third-party'])
 def test_removed_plugin_configs_are_rejected(driver):
-    value = {'execution':{'default_target':'cluster','targets':{'cluster':{
-        'type':'remote','driver':driver,'ssh_host':'login','remote_root':'/scratch','cluster_name':'c'}}}}
-    with pytest.raises(ValueError, match='removed'):
+    value = {'execution':execution_config('cluster', {'cluster':{
+        'transport':'ssh','type':'remote','driver':driver,'ssh_host':'login','remote_root':'/scratch','cluster_name':'c'}})}
+    with pytest.raises(ValueError, match='unsupported'):
         validate_job_config(value)
     assert list(Draft202012Validator(job_config_schema()).iter_errors(value))
 
@@ -146,8 +147,8 @@ def test_old_distributions_are_never_loaded(tmp_path, monkeypatch):
     from importlib import metadata
     monkeypatch.setattr(metadata, 'entry_points', lambda **kw: pytest.fail('must not discover Python execution plugins'))
     path = tmp_path / 'job.toml'
-    path.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\n')
-    assert platforms_from_config(path)[1] == 'local'
+    path.write_text('[execution]\nschema_version = 2\ndefault_platform="local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n')
+    assert platforms_from_config(path)[1] == 'local/main'
 
 
 def test_unresolved_submission_intent_prevents_duplicate(batch):
@@ -188,11 +189,9 @@ def test_startup_reads_external_target_without_scheduler_plugins(tmp_path, monke
     from types import SimpleNamespace
     from research_agent.bootstrap import launcher
     path = tmp_path / 'job.toml'
-    path.write_text('[execution]\ndefault_target="batch"\n[execution.targets.batch]\n'
-                    'driver="external"\ntransport="ssh"\nssh_host="fixture"\ncluster_name="batch"\n'
-                    'work_root="/shared/jobs"\nhandler=["/bin/true"]\n')
+    path.write_text('[execution]\nschema_version = 2\ndefault_platform="batch"\n[execution.platforms.batch]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="ssh"\nssh_host="fixture"\nschedulers.main.cluster_name="batch"\nstorage.work_root="/shared/jobs"\nschedulers.main.handler=["/bin/true"]\n')
     path.chmod(0o600)
     monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(path))
     launcher.configure_remote(SimpleNamespace(job_config_default=path))
-    assert launcher.os.environ[launcher.REMOTE_ENVIRONMENT_ENV] == 'batch'
+    assert launcher.os.environ[launcher.REMOTE_ENVIRONMENT_ENV] == 'batch/main'
     assert launcher.os.environ['CORAGENT_REMOTE_DISPLAY_TARGET'] == 'fixture · Batch'

@@ -99,11 +99,13 @@ export interface CommandParameters {
     "session_id": string;
     "request_id": string;
   };
-  "job_targets": Record<string, never>;
+  "job_platforms": Record<string, never>;
   "job_resolve_target": {
-    "target"?: string;
+    "target"?: {
+      "platform": string;
+      "scheduler_entry"?: string;
+    };
     "scheduler"?: string;
-    "location"?: string;
     "source_text"?: string;
   };
   "job_start": {
@@ -112,13 +114,15 @@ export interface CommandParameters {
     "cwd"?: string | null;
     "inputs"?: Array<unknown>;
     "outputs"?: Array<Record<string, unknown>>;
-    "environment"?: Record<string, string> | string | null;
-    "env"?: Record<string, string> | null;
+    "environment"?: Record<string, string>;
     "timeout_seconds"?: number | null;
     "metadata"?: Record<string, unknown> | null;
     "workspace_id"?: string;
     "work_id"?: string;
-    "execution_target"?: string;
+    "execution_target"?: {
+      "platform": string;
+      "scheduler_entry"?: string;
+    };
     "session_id"?: string | null;
     "validator_id"?: string;
     "input_artifact_ids"?: Array<string>;
@@ -144,8 +148,31 @@ export interface CommandParameters {
       "queue"?: string;
       "queue_wait_seconds"?: number;
     };
-    "required_target"?: string;
-    "required_route_digest"?: string;
+    "execution_context"?: {
+      "selection": {
+        "target": {
+          "platform": string;
+          "scheduler_entry": string;
+        };
+        "route_digest": string;
+      };
+      "policy": {
+        "max_in_flight": number;
+        "max_attempts": number;
+      };
+      "item"?: {
+        "id": string;
+        "work_id": string;
+        "resources": {
+          "cpus": number;
+          "memory_mb": number;
+          "walltime"?: string;
+        };
+        "input_artifact_ids": Array<string>;
+        "plan_revision": number;
+        "backend"?: string;
+      };
+    };
   };
   "job_status": {
     "job_id"?: string;
@@ -166,13 +193,15 @@ export interface CommandParameters {
     "cwd"?: string | null;
     "inputs"?: Array<unknown>;
     "outputs"?: Array<Record<string, unknown>>;
-    "environment"?: Record<string, string> | string | null;
-    "env"?: Record<string, string> | null;
+    "environment"?: Record<string, string>;
     "timeout_seconds"?: number | null;
     "metadata"?: Record<string, unknown> | null;
     "workspace_id"?: string;
     "work_id"?: string;
-    "execution_target"?: string;
+    "execution_target"?: {
+      "platform": string;
+      "scheduler_entry"?: string;
+    };
   };
   "job_reconcile": {
     "job_id"?: string;
@@ -199,6 +228,12 @@ export interface CommandParameters {
     "user_task_id"?: string;
     "limit"?: number;
     "cursor"?: string;
+  };
+  "job_resources": {
+    "execution_target"?: {
+      "platform": string;
+      "scheduler_entry"?: string;
+    };
   };
   "artifact_register": {
     "path"?: string;
@@ -607,8 +642,33 @@ export interface CommandResults {
   "research_allocate_task": {
     "identifier": string;
   };
-  "job_targets": Record<string, unknown>;
-  "job_resolve_target": Record<string, unknown>;
+  "job_platforms": {
+    "default_platform": string;
+    "platforms": Record<string, {
+      "display_name": string;
+      "aliases": Array<string>;
+      "transport": "local" | "ssh";
+      "enabled": boolean;
+      "default_scheduler": string | null;
+      "schedulers": Record<string, {
+        "executor": string;
+        "software": Array<string>;
+        "storage": Record<string, unknown>;
+        "submission": Record<string, unknown>;
+        "limits": Record<string, unknown>;
+        "sources": Record<string, unknown>;
+      }>;
+    }>;
+  };
+  "job_resolve_target": {
+    "target": {
+      "platform": string;
+      "scheduler_entry": string;
+    };
+    "route_digest": string;
+    "executor": "qrun" | "pbs" | "torque" | "slurm" | "tri" | "external";
+    "selection_mode": "explicit" | "default";
+  };
   "job_start": {
     "job_id": string;
     "platform": string;
@@ -750,20 +810,15 @@ export interface CommandResults {
   };
   "job_probe": {
     "platform": string;
-    "cwd_exists": boolean;
-    "inputs_present": boolean;
-    "missing_inputs": Array<string>;
-    "command": Array<string>;
-  } | {
-    "platform": string;
     "available": boolean;
-    "ssh_host": string;
-    "scheduler": string;
-    "remote_root": string;
     "cwd_exists": boolean;
     "inputs_present": boolean;
     "missing_inputs": Array<string>;
     "error": string | null;
+    "transport": "local" | "ssh";
+    "work_root": string;
+    "file_mode": "staged" | "shared";
+    "queue"?: Record<string, unknown>;
   } | {
     "platform": string;
     "available": false;
@@ -812,7 +867,10 @@ export interface CommandResults {
     "workspace_id"?: string;
     "work_id": string;
     "platform"?: string;
-    "execution_target"?: Record<string, unknown>;
+    "execution_target"?: {
+      "platform": string;
+      "scheduler_entry"?: string;
+    };
     "session_id"?: string | null;
     "validator_id"?: string;
     "input_artifact_ids"?: Array<string>;
@@ -854,6 +912,40 @@ export interface CommandResults {
       [key: string]: unknown;
     }>;
     "next_cursor": string | null;
+  };
+  "job_resources": {
+    "target": {
+      "platform": string;
+      "scheduler_entry": string;
+    };
+    "executor": string;
+    "available": boolean;
+    "observed_at": string;
+    "capacity": {
+      "cpus": number;
+      "memory_mb": number;
+    } | {
+      "cpus": number;
+      "memory_mb": number;
+    };
+    "reserved": {
+      "cpus": number;
+      "memory_mb": number;
+    } | {
+      "cpus": number;
+      "memory_mb": number;
+    };
+    "free": {
+      "cpus": number;
+      "memory_mb": number;
+    } | {
+      "cpus": number;
+      "memory_mb": number;
+    };
+    "usage": Record<string, unknown> | null;
+    "memory_enforcement": string | null;
+    "scheduler_observation": Record<string, unknown> | null;
+    "error": string | null;
   };
   "artifact_register": {
     "artifact_id": string;

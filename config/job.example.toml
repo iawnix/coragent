@@ -1,63 +1,74 @@
-# Explicit component-import example for --job-config; target routing and
-# scientific bindings are configured independently.
-# Prepare scientific environments independently with install_job_environment.py,
-# then replace the example paths with their existing bindings.
+["execution"]
+"schema_version" = 2
+"default_platform" = "local"
 
-[execution]
-default_target = "local"
+["execution"."platforms"]
 
-[execution.targets.local]
-type = "local"
-driver = "systemd"
-scheduler = "none"
-location = "controller"
+["execution"."platforms"."local"]
+"transport" = "local"
+"default_scheduler" = "qrun"
 
-[execution.targets.local.python]
-manager = "conda"
-conda_executable = "/opt/conda/bin/conda"
-prefix = "/opt/coragent/envs/wrapper-20261009"
-lock_ref = "/opt/coragent/locks/wrapper.lock"
+["execution"."platforms"."local"."python"]
+"manager" = "conda"
+"conda_executable" = "/opt/conda/bin/conda"
+"prefix" = "/opt/coragent/envs/wrapper-20261009"
+"lock_ref" = "/opt/coragent/locks/wrapper.lock"
 
-# These Python-only methods use the selected target's RDKit/NumPy environment.
-[execution.targets.local.bindings.structure]
-# The installer binds its generated name-resolver.toml when no explicit resolver
-# configuration is supplied. Remote targets need their own target-local path.
-[execution.targets.local.bindings.structure.python]
-manager = "conda"
-conda_executable = "/opt/conda/bin/conda"
-prefix = "/opt/coragent/envs/structure-20261009"
-lock_ref = "/opt/coragent/locks/structure.lock"
-[execution.targets.local.bindings.validation]
-[execution.targets.local.bindings.validation.python]
-manager = "conda"
-conda_executable = "/opt/conda/bin/conda"
-prefix = "/opt/coragent/envs/structure-20261009"
-lock_ref = "/opt/coragent/locks/structure.lock"
+["execution"."platforms"."local"."bindings"]
 
-[execution.targets.local.bindings.gaussian]
-command = "/opt/gaussian/g16/g16"
-activation_script = "/opt/gaussian/activate.sh"
-[execution.targets.local.bindings.gaussian.environment]
-GAUSS_SCRDIR = "{scratch}"
+["execution"."platforms"."local"."bindings"."structure"]
 
-[execution.targets.local.bindings.xtb]
-command = "/opt/xtb/bin/xtb"
-activation_script = "/opt/xtb/activate.sh"
+["execution"."platforms"."local"."bindings"."structure"."python"]
+"manager" = "conda"
+"conda_executable" = "/opt/conda/bin/conda"
+"prefix" = "/opt/coragent/envs/structure-20261009"
+"lock_ref" = "/opt/coragent/locks/structure.lock"
 
-# CF22D uses its own complete Conda lock; no custom LD_PRELOAD is needed.
-[execution.targets.local.bindings.pyscf]
+["execution"."platforms"."local"."bindings"."validation"]
 
-[execution.targets.local.bindings.pyscf.python]
-manager = "conda"
-conda_executable = "/opt/conda/bin/conda"
-prefix = "/opt/coragent/envs/cf22d-20261009"
-lock_ref = "/opt/coragent/locks/cf22d.lock"
+["execution"."platforms"."local"."bindings"."validation"."python"]
+"manager" = "conda"
+"conda_executable" = "/opt/conda/bin/conda"
+"prefix" = "/opt/coragent/envs/structure-20261009"
+"lock_ref" = "/opt/coragent/locks/structure.lock"
 
-# Batch targets (local submission or SSH): see job.execution.example.toml.
+["execution"."platforms"."local"."bindings"."gaussian"]
+"command" = "/opt/gaussian/g16/g16"
+"activation_script" = "/opt/gaussian/activate.sh"
 
-# Optional molecular images; text reports need no rendering libraries.
-[execution.targets.local.bindings.render.python]
-manager = "conda"
-conda_executable = "/opt/conda/bin/conda"
-prefix = "/opt/coragent/envs/render-20261009"
-lock_ref = "/opt/coragent/locks/render.lock"
+["execution"."platforms"."local"."bindings"."gaussian"."environment"]
+"GAUSS_SCRDIR" = "{scratch}"
+
+["execution"."platforms"."local"."bindings"."xtb"]
+"command" = "/opt/xtb/bin/xtb"
+"activation_script" = "/opt/xtb/activate.sh"
+
+["execution"."platforms"."local"."bindings"."pyscf"]
+
+["execution"."platforms"."local"."bindings"."pyscf"."python"]
+"manager" = "conda"
+"conda_executable" = "/opt/conda/bin/conda"
+"prefix" = "/opt/coragent/envs/cf22d-20261009"
+"lock_ref" = "/opt/coragent/locks/cf22d.lock"
+
+["execution"."platforms"."local"."bindings"."render"]
+
+["execution"."platforms"."local"."bindings"."render"."python"]
+"manager" = "conda"
+"conda_executable" = "/opt/conda/bin/conda"
+"prefix" = "/opt/coragent/envs/render-20261009"
+"lock_ref" = "/opt/coragent/locks/render.lock"
+
+["execution"."platforms"."local"."storage"]
+"work_root" = "/opt/coragent/jobs"
+
+["execution"."platforms"."local"."schedulers"]
+
+["execution"."platforms"."local"."schedulers"."qrun"]
+"executor" = "qrun"
+
+["execution"."platforms"."local"."schedulers"."qrun"."submission"]
+
+["execution"."platforms"."local"."schedulers"."qrun"."submission"."resources"]
+"cpus" = 1
+"memory_mb" = 1024

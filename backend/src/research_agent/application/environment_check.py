@@ -2,7 +2,7 @@
 import argparse
 import json
 
-from research_agent.jobs.config_contract import binding_digest, configured_targets, load_job_config, resolve_binding, resolve_target, validate_job_config
+from research_agent.jobs.config_contract import binding_digest, configured_targets, load_job_config, resolve_binding, resolve_target, target_identity, validate_job_config
 from research_agent.jobs.environment import probe_binding, validate_requirements
 from research_agent.application.execution_catalog import installed_catalogs
 
@@ -19,7 +19,7 @@ def check_target(settings, target, *, backend=None, executor=None, version=None,
     except ValueError as exc:
         return {'target': requested_target, 'scope': 'recipe_requirements' if executor else 'binding',
                 'backend': backend, 'status': 'not_configured', 'error': str(exc).split(':', 1)[0]}
-    result = {'target': target, 'scope': 'recipe_requirements' if executor else 'binding'}
+    result = {'target': target_identity(target), 'scope': 'recipe_requirements' if executor else 'binding'}
     entry = None
     if executor:
         result['executor'] = {'id': executor, 'version': version}
@@ -102,7 +102,8 @@ def check_environments(settings, *, catalogs=None, probe=True):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', required=True)
-    parser.add_argument('--target', help='Check only this named execution target and selected backend or recipe')
+    parser.add_argument('--platform', help='Named execution platform')
+    parser.add_argument('--scheduler-entry', help='Scheduler entry within the platform')
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument('--backend', help='Check a binding even when no predefined recipe exists')
     selection.add_argument('--executor', help='Check prerequisites of one predefined recipe')
@@ -110,22 +111,25 @@ def main():
     parser.add_argument('--runtime', choices=['native', 'python'], help='Optional runtime for --backend')
     parser.add_argument('--details', action='store_true', help='Include full evidence in a targeted check')
     args = parser.parse_args()
-    if bool(args.target) != bool(args.backend or args.executor):
-        parser.error('--target requires --backend or --executor (and vice versa)')
+    if args.scheduler_entry and not args.platform:
+        parser.error("--scheduler-entry requires --platform")
+    selection = ({"platform": args.platform, **({"scheduler_entry": args.scheduler_entry} if args.scheduler_entry else {})} if args.platform else None)
+    if bool(selection) != bool(args.backend or args.executor):
+        parser.error('--platform requires --backend or --executor (and vice versa)')
     if bool(args.executor) != bool(args.version) or args.runtime and not args.backend:
         parser.error('--executor requires --version; --runtime is only for --backend')
-    if args.details and not args.target:
+    if args.details and not selection:
         parser.error('--details requires a targeted check; the full installation check already includes evidence')
     try:
         settings = load_job_config(args.config)
-        result = (check_target(settings, args.target, backend=args.backend, executor=args.executor,
+        result = (check_target(settings, selection, backend=args.backend, executor=args.executor,
                               version=args.version, runtime=args.runtime, details=args.details)
-                  if args.target else check_environments(settings))
+                  if selection else check_environments(settings))
     except (ValueError, OSError) as exc:
         # Probe errors are structured, sanitized codes; avoid tracebacks with argv.
         parser.exit(1, str(exc) + '\n')
     print(json.dumps(result, indent=2))
-    if args.target and result['status'] != 'verified':
+    if selection and result['status'] != 'verified':
         parser.exit(1)
 
 

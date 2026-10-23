@@ -26,6 +26,8 @@ export function projectMonitorTask(task, { list = false } = {}) {
     progress: task.progress ? { summary: text(task.progress.summary, 512), at: task.progress.at } : null,
     reason: text(task.reason, 512), resume_when: text(task.block_details?.resume_when, 512),
     wait: task.wait ? { mode: task.wait.mode, job_count: task.wait.job_ids.length } : null,
+    execution_plan: task.execution_plan ? { revision: task.execution_plan.revision, item_count: task.execution_plan.items.length,
+      completed_count: task.execution_plan.items.filter(item => item.completion).length, active_item_id: task.active_execution_item } : null,
     execution_recovery: task.execution_recovery ? { state: task.execution_recovery.state,
       phase: task.execution_recovery.phase, detail: text(task.execution_recovery.detail, 512),
       next_retry_at: task.execution_recovery.next_retry_at } : null,
@@ -91,8 +93,7 @@ export function projectUserTask(task) {
   const projection = {
     user_task_id: task.user_task_id, title: text(task.title, 256), objective: text(task.objective, 2048),
     execution_target: task.execution_target ?? null, execution_selection: task.execution_selection ? {
-      target: text(task.execution_selection.target, 128), scheduler: text(task.execution_selection.scheduler ?? null, 128),
-      location: text(task.execution_selection.location ?? null, 128), version: task.execution_selection.version,
+      target: task.execution_selection.target, executor: task.execution_selection.executor, version: task.execution_selection.version,
       selection_mode: task.execution_selection.selection_mode,
     } : null,
     requirements_revision: task.requirements_revision, completion_outcome: task.completion_outcome ?? null,

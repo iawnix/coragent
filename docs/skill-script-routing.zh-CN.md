@@ -18,10 +18,6 @@
 
 [research-workflow](../skills/core/research-workflow/SKILL.zh-CN.md)
 
-## tri-operations
-
-[tri-operations](../skills/core/tri-operations/SKILL.zh-CN.md)
-
 ## candidate-generation
 
 [candidate-generation](../skills/chemical/candidate-generation/SKILL.zh-CN.md) · [操作入口](../skills/chemical/candidate-generation/references/commands.zh-CN.md)

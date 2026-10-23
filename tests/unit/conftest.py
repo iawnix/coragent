@@ -30,39 +30,7 @@ def execution_target_fixture(tmp_path, monkeypatch):
     install = runpy.run_path(str(Path(__file__).resolve().parents[2] / 'scripts/install_job_environment.py'))['install']
     install({'manager': 'conda', 'conda_executable': str(conda), 'prefix': str(prefix), 'lock_ref': str(lock)}, adopt=True)
     config.write_text(
-        """[execution]
-default_target = "local"
-
-[execution.targets.local]
-type = "local"
-driver = "process"
-supervisor = "process"
-
-[execution.targets.local.bindings.validation]
-[execution.targets.local.bindings.validation.python]
-manager = "conda"
-conda_executable = CONDA_PATH
-prefix = PYTHON_PREFIX
-lock_ref = LOCK_PATH
-
-[execution.targets.local.bindings.structure.python]
-manager = "conda"
-conda_executable = CONDA_PATH
-prefix = PYTHON_PREFIX
-lock_ref = LOCK_PATH
-
-[execution.targets.local.bindings.gaussian]
-command = \"g16\"
-
-[execution.targets.local.bindings.xtb]
-command = \"xtb\"
-
-[execution.targets.local.bindings.crest]
-command = \"crest\"
-
-[execution.targets.local.bindings.ase_neb_xtb]
-command = \"xtb\"
-""".replace("CONDA_PATH", json.dumps(str(conda))).replace("PYTHON_PREFIX", json.dumps(str(prefix)))
+        '[execution]\nschema_version = 2\ndefault_platform = "local"\n\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n\n[execution.platforms.local.bindings.validation]\n[execution.platforms.local.bindings.validation.python]\nmanager = "conda"\nconda_executable = CONDA_PATH\nprefix = PYTHON_PREFIX\nlock_ref = LOCK_PATH\n\n[execution.platforms.local.bindings.structure.python]\nmanager = "conda"\nconda_executable = CONDA_PATH\nprefix = PYTHON_PREFIX\nlock_ref = LOCK_PATH\n\n[execution.platforms.local.bindings.gaussian]\ncommand = "g16"\n\n[execution.platforms.local.bindings.xtb]\ncommand = "xtb"\n\n[execution.platforms.local.bindings.crest]\ncommand = "crest"\n\n[execution.platforms.local.bindings.ase_neb_xtb]\ncommand = "xtb"\n'.replace("CONDA_PATH", json.dumps(str(conda))).replace("PYTHON_PREFIX", json.dumps(str(prefix)))
         .replace("LOCK_PATH", json.dumps(str(tmp_path / "fixture.lock"))),
         encoding="utf-8",
     )

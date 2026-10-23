@@ -112,7 +112,7 @@ test("canonical tool inventory excludes internal commands and rejects dotted ali
   for (const name of PUBLIC_TOOL_NAMES) {
     assert.equal(contracts[name].name, name);
     if (!name.startsWith("task_")) assert.ok(COMMAND_IDS.includes(name));
-    for (const field of ["session_id", "principal", "read_basis", "required_target", "required_route_digest"]) {
+    for (const field of ["session_id", "principal", "read_basis", "execution_context"]) {
       assert.equal(Object.hasOwn(contracts[name].parameters.properties, field), false, `${name}.${field}`);
     }
   }
@@ -140,13 +140,15 @@ test("core tool adapters preserve command identity and inject trusted bindings",
       calls.push({ command, params });
       return {};
     } },
-    getTaskBinding: async () => ({ user_task_id: "task_1", execution_target: "selected", route_digest: "sha256:" + "a".repeat(64) }),
+    getTaskBinding: async () => ({ user_task_id: "task_1", execution_context: {
+      selection: { target: { platform: "selected", scheduler_entry: "main" }, route_digest: "sha256:" + "a".repeat(64) },
+      policy: { max_in_flight: 1, max_attempts: 10 } } }),
   });
   const examples = {
     research_read: {}, research_search: { query: "evidence" }, research_create: { goal: "Investigate" },
     research_update: { node_id: "node_1", note: "Observed" }, research_result: { node_id: "node_1", conclusion: "Uncertain" },
     job_start: { node_id: "node_1", command: ["true"] }, job_status: { job_id: "job_1" },
-    job_collect: { job_id: "job_1" }, job_cancel: { job_id: "job_1" }, job_probe: {}, job_reconcile: { job_id: "job_1" },
+    job_collect: { job_id: "job_1" }, job_cancel: { job_id: "job_1" }, job_probe: {}, job_platforms: {}, job_resources: {}, job_reconcile: { job_id: "job_1" },
     artifact_create: { name: "report.txt", content: "Evidence" }, artifact_register: { path: "input.txt" }, artifact_read: { artifact_id: "art_1" },
   };
   for (const tool of tools) {
@@ -158,7 +160,7 @@ test("core tool adapters preserve command identity and inject trusted bindings",
   }
   const start = calls.find(call => call.command === "job_start").params;
   assert.equal(start.session_id, "trusted");
-  assert.equal(start.required_target, "selected");
-  assert.equal(start.required_route_digest, "sha256:" + "a".repeat(64));
+  assert.deepEqual(start.execution_context.selection.target, { platform: "selected", scheduler_entry: "main" });
+  assert.equal(start.execution_context.selection.route_digest, "sha256:" + "a".repeat(64));
   assert.equal(start.user_task_id, "task_1");
 });

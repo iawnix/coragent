@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import pwd
 from pathlib import PurePosixPath
 import re
 
@@ -44,3 +45,8 @@ def job_process_environment(root, metadata, variables, *, home=None):
     env.update(resource_environment(resources))
     env.update({key: value.replace('{scratch}', scratch) for key, value in variables.items()})
     return env, scratch
+
+
+def supervisor_environment():
+    """Clean environment for target probes; never forwards controller credentials."""
+    return minimum_environment(pwd.getpwuid(os.getuid()).pw_dir)

@@ -1,0 +1,2372 @@
+{
+  "tools": {
+    "research_read": {
+      "type": "object",
+      "properties": {
+        "root": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Exact Node, Result or research record reference. Omit for a snapshot. For Artifacts use artifact_read; for Jobs use job_status."
+        },
+        "field": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "goal"
+            },
+            {
+              "type": "string",
+              "const": "title"
+            },
+            {
+              "type": "string",
+              "const": "proposal"
+            },
+            {
+              "type": "string",
+              "const": "plan"
+            },
+            {
+              "type": "string",
+              "const": "progress"
+            },
+            {
+              "type": "string",
+              "const": "status"
+            },
+            {
+              "type": "string",
+              "const": "assessment_ref"
+            },
+            {
+              "type": "string",
+              "const": "relations"
+            },
+            {
+              "type": "string",
+              "const": "subjects"
+            }
+          ],
+          "description": "Read one editable field of a Node; requires ref pointing to a Node. Not supported for Results or records."
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Starting Unicode character offset for a referenced object, default 0. Continue with returned next_offset."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32000,
+          "description": "Maximum Unicode characters for a referenced object (default 16000); responses also have a byte budget. For snapshots this is a byte budget. Follow returned pagination."
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "field"
+            ]
+          },
+          "then": {
+            "required": [
+              "ref"
+            ]
+          }
+        }
+      ]
+    },
+    "research_search": {
+      "type": "object",
+      "properties": {
+        "root": {
+          "type": "string"
+        },
+        "query": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Case-insensitive literal substring, not a regular expression. Empty or omitted lists recent objects."
+        },
+        "node_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Exact object/record kind: node, result, or a returned record kind such as task, note, job or result_published. Omit for all kinds; record is not an aggregate filter. Use origin=user/runtime/agent to filter record authors."
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "user"
+            },
+            {
+              "type": "string",
+              "const": "runtime"
+            },
+            {
+              "type": "string",
+              "const": "agent"
+            }
+          ]
+        },
+        "after_sequence": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Return entries whose sequence is strictly greater than this value. Use a prior index_sequence to look for changes."
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of matching entries to skip, default 0. Continue with next_offset."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Maximum number of entries, default 20; this is not a byte or character count."
+        }
+      },
+      "additionalProperties": false
+    },
+    "research_create": {
+      "type": "object",
+      "required": [
+        "goal"
+      ],
+      "properties": {
+        "root": {
+          "type": "string"
+        },
+        "goal": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000,
+          "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,8000}(?![\\s\\S])",
+          "description": "Maximum 8000 Unicode characters (code points), not UTF-8 bytes.",
+          "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,1000}(?![\\s\\S])",
+          "description": "Maximum 1000 Unicode characters (code points), not UTF-8 bytes.",
+          "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+        },
+        "proposal": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 16000,
+          "description": "Maximum 16000 Unicode characters (code points), not UTF-8 bytes.",
+          "pattern": "^[\\s\\S]{0,16000}(?![\\s\\S])",
+          "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+        },
+        "plan": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 16000,
+          "description": "Maximum 16000 Unicode characters (code points), not UTF-8 bytes.",
+          "pattern": "^[\\s\\S]{0,16000}(?![\\s\\S])",
+          "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 64,
+          "uniqueItems": true,
+          "description": "Original user requirements: exact Research Memory user_* references returned by research_read/search. Never derive a user_* reference from a Task Controller submission ID; use source_submission_ids for current task inputs. Only user messages are accepted; use input_refs for background materials."
+        },
+        "source_submission_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 64,
+          "uniqueItems": true,
+          "description": "Current Pi/Task Controller user submission IDs, as strings. The runtime resolves these to exact Research Memory user_* references; never prefix these values with user_."
+        },
+        "input_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 64,
+          "uniqueItems": true,
+          "description": "Background references for this Node: existing Nodes, Results, user messages, notes, runtime records, Jobs, collection receipts or verified Artifacts. These create citations, not fixed Result input dependencies. Unlike research_result.inputs, this field accepts contextual records."
+        },
+        "relations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "target"
+            ],
+            "properties": {
+              "kind": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "const": "part_of"
+                  },
+                  {
+                    "type": "string",
+                    "const": "requires"
+                  },
+                  {
+                    "type": "string",
+                    "const": "alternative_to"
+                  }
+                ]
+              },
+              "target": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 4000,
+                "description": "Reason for this relation; maximum 4000 Unicode characters.",
+                "pattern": "^[\\s\\S]{0,4000}(?![\\s\\S])",
+                "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+              }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 64
+        },
+        "subjects": {
+          "type": "object",
+          "maxProperties": 32,
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+          },
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Named roles such as target and calculated, pointing only to existing result_* or verified Artifact references. Nodes, user messages, Jobs, receipts and file paths are not accepted. Labels do not certify identity."
+        }
+      },
+      "additionalProperties": false
+    },
+    "research_update": {
+      "type": "object",
+      "required": [
+        "node_id",
+        "note"
+      ],
+      "properties": {
+        "root": {
+          "type": "string"
+        },
+        "node_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Exact existing node_id returned by research_create or research_read. Reuse the returned reference; do not invent an ID."
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64000,
+          "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,64000}(?![\\s\\S])",
+          "description": "Maximum 64000 Unicode characters (code points), not UTF-8 bytes.",
+          "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+        },
+        "proposal": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 16000,
+          "description": "Maximum 16000 Unicode characters (code points), not UTF-8 bytes.",
+          "pattern": "^[\\s\\S]{0,16000}(?![\\s\\S])",
+          "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+        },
+        "plan": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 16000,
+          "description": "Maximum 16000 Unicode characters (code points), not UTF-8 bytes.",
+          "pattern": "^[\\s\\S]{0,16000}(?![\\s\\S])",
+          "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+        },
+        "progress": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 16000,
+          "description": "Maximum 16000 Unicode characters (code points), not UTF-8 bytes.",
+          "pattern": "^[\\s\\S]{0,16000}(?![\\s\\S])",
+          "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "open"
+            },
+            {
+              "type": "string",
+              "const": "paused"
+            },
+            {
+              "type": "string",
+              "const": "closed"
+            }
+          ]
+        },
+        "add_relations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "target"
+            ],
+            "properties": {
+              "kind": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "const": "part_of"
+                  },
+                  {
+                    "type": "string",
+                    "const": "requires"
+                  },
+                  {
+                    "type": "string",
+                    "const": "alternative_to"
+                  }
+                ]
+              },
+              "target": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 4000,
+                "description": "Reason for this relation; maximum 4000 Unicode characters.",
+                "pattern": "^[\\s\\S]{0,4000}(?![\\s\\S])",
+                "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+              }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 64
+        },
+        "remove_relations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 64,
+          "uniqueItems": true,
+          "description": "Exact link_* IDs of declared relations returned for this Node. Do not pass a target node_id or citation link; only part_of, requires and alternative_to relations can be removed."
+        },
+        "assessment_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Select an existing Result or agent-authored note/record belonging to this same Node as its current synthesis. Use its exact returned reference; a user message, Job or Artifact cannot be selected."
+        },
+        "subjects": {
+          "type": "object",
+          "maxProperties": 32,
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+          },
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Named roles such as target and calculated, pointing only to existing result_* or verified Artifact references. Nodes, user messages, Jobs, receipts and file paths are not accepted. Labels do not certify identity."
+        }
+      },
+      "additionalProperties": false
+    },
+    "research_result": {
+      "type": "object",
+      "required": [
+        "node_id",
+        "conclusion"
+      ],
+      "properties": {
+        "root": {
+          "type": "string"
+        },
+        "node_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Exact existing node_id returned by research_create or research_read. Reuse the returned reference; do not invent an ID."
+        },
+        "conclusion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64000,
+          "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,64000}(?![\\s\\S])",
+          "description": "Maximum 64000 Unicode characters (code points), not UTF-8 bytes.",
+          "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000,
+          "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,4000}(?![\\s\\S])",
+          "description": "Maximum 4000 Unicode characters (code points), not UTF-8 bytes.",
+          "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+        },
+        "observation": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 64000,
+          "description": "Maximum 64000 Unicode characters (code points), not UTF-8 bytes.",
+          "pattern": "^[\\s\\S]{0,64000}(?![\\s\\S])",
+          "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+        },
+        "limitations": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 32000,
+          "description": "Maximum 32000 Unicode characters (code points), not UTF-8 bytes.",
+          "pattern": "^[\\s\\S]{0,32000}(?![\\s\\S])",
+          "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 64,
+          "uniqueItems": true,
+          "description": "Fixed materials actually used to derive this Result: existing result_* references or verified Artifact references only. Omit if none. User messages (user_*), Nodes, notes, runtime records, Jobs and collection receipts belong in evidence_refs, not inputs."
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 64,
+          "uniqueItems": true,
+          "description": "Supporting citations: exact returned references to Artifacts, Results, user messages (user_*), Nodes, notes, runtime records, Jobs or collection receipts. User messages record requirements, not proof of a scientific claim. Unlike inputs, this field accepts contextual and execution records."
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "artifact_ref"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000,
+                "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,1000}(?![\\s\\S])",
+                "description": "File display name; 1–1000 Unicode characters, with non-whitespace text.",
+                "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+              },
+              "purpose": {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 16000,
+                "description": "Optional file purpose; maximum 16000 Unicode characters.",
+                "pattern": "^[\\s\\S]{0,16000}(?![\\s\\S])",
+                "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+              },
+              "artifact_ref": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "description": "Exact verified Artifact reference returned by artifact_create, artifact_register or job_collect; not a path, Job ID or collection receipt."
+              }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 128,
+          "description": "Files delivered with this Result. Register/create files as Artifacts or collect Job outputs first, then put their returned artifact_id values in artifact_ref. Mutable filesystem paths are not accepted as artifact_ref."
+        },
+        "supersedes": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Exact result_* reference of an older Result on this same Node being explicitly corrected. Does not delete the older Result or select the new assessment automatically."
+        },
+        "as_assessment": {
+          "type": "boolean",
+          "description": "Set true only to select this Result as the Node current synthesis using the Node revision last read. Defaults to false. Without progress, a selection conflict still saves the Result; with progress, a conflict saves neither."
+        },
+        "subjects": {
+          "type": "object",
+          "maxProperties": 32,
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+          },
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Named roles such as target and calculated, pointing only to existing result_* or verified Artifact references. Nodes, user messages, Jobs, receipts and file paths are not accepted. Labels do not certify identity."
+        },
+        "check_refs": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          },
+          "description": "Evidence for scoped checks: verified Artifact or Job collection receipt references only. Use the exact receipt returned by job_collect, not a job_id. A check may be inconclusive; citation does not certify a pass verdict."
+        },
+        "progress": {
+          "type": "string",
+          "description": "Requires as_assessment=true. Atomically revise the current assessment and progress using the last read Node. Maximum 16000 Unicode characters (code points), not UTF-8 bytes.",
+          "maxLength": 16000,
+          "minLength": 1,
+          "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,16000}(?![\\s\\S])",
+          "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
+        }
+      },
+      "additionalProperties": false
+    },
+    "job_start": {
+      "type": "object",
+      "required": [
+        "node_id"
+      ],
+      "properties": {
+        "node_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Existing research Node for this calculation. Required even with request_file or prepared_ref; reuse the exact returned node_id."
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Direct submission idempotency identity. Normally omit; the adapter supplies it. Reusing it replays the same request, not a new calculation. Prepared requests own this field."
+        },
+        "validator_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Registered validator identifier; pair with its exact validator_version and input_artifact_ids. Consult the validator input contract for input count, order, roles and allowed provenance."
+        },
+        "validator_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Exact registered version for validator_id, not an executor version or a software version guessed from its name."
+        },
+        "input_artifact_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 1,
+          "maxItems": 256,
+          "description": "Verified Artifact IDs/references actually staged as inputs. For validators, order and count must match the declared roles; collected_output roles require Artifacts in the producing Job current collection receipt. For prepared requests pass these through preparer --input-artifact, not as top-level overrides."
+        },
+        "work_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Direct submission work identity. For an intentional recalculation of a prepared request, rerun preparation with a new --work-id; do not override this field alongside request_file/prepared_ref."
+        },
+        "repeat": {
+          "type": "object",
+          "required": [
+            "predecessor_job_id",
+            "reason",
+            "budget"
+          ],
+          "properties": {
+            "predecessor_job_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "budget": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false,
+          "description": "Explicitly authorize another identical execution: identify the matching predecessor_job_id and explain reason and budget. Use a new request/work identity; replaying the same request still reuses its Job. On duplicate_execution normally use the returned job_id with job_status/job_collect."
+        },
+        "request_file": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "description": "Path returned by the executor preparer --output. Pair with its exact request_sha256. This file describes a calculation to submit, not a calculation result. Do not combine with prepared_ref or override command, inputs, outputs, execution_target, metadata, request_id or work_id; rerun preparation to change those fields. New requests belong under the Node work_dir, or research/work/ before association. Historical request paths remain readable; do not move a submitted request."
+        },
+        "prepared_ref": {
+          "type": "string",
+          "pattern": "^prepared_[1-9][0-9]*$",
+          "description": "Previously returned prepared request reference. Alternative to request_file plus request_sha256, not a Job or Artifact reference. Execution fields are fixed; supply only node_id and optional timeout_seconds, repeat or root alongside it."
+        },
+        "request_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "Exact 64-character SHA-256 returned with request_file. Both fields are required together; regenerate the request if its contents change. Omit when using prepared_ref."
+        },
+        "metadata": {
+          "type": "object",
+          "patternProperties": {
+            "^.*$": {}
+          },
+          "description": "Direct submission execution metadata. Reserved provenance and binding fields are runtime-verified; do not fabricate them. Prepared requests own this field."
+        },
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
+          },
+          "minItems": 1,
+          "maxItems": 256,
+          "description": "Direct submission only: executable and arguments as an argv array, not a shell command string. Declare staged inputs and outputs. Omit with request_file or prepared_ref; submit their pinned command unchanged. Direct commands do not select a scientific Python/backend automatically. For a scientific Python script, prepare with executors --script <file.py> --backend <binding> and submit the returned request file/digest."
+        },
+        "cwd": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "description": "Relative subdirectory of the isolated runs/jobs/<job_id> directory; omit for its root. Absolute workspace paths are invalid."
+        },
+        "environment": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Process environment variables; platform selection uses execution_target."
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              {
+                "type": "object",
+                "required": [
+                  "source",
+                  "destination"
+                ],
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "destination": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Relative path under Job cwd; source is absolute or workspace-relative and is copied before execution."
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
+          "maxItems": 256,
+          "description": "Direct submission only: files to stage before execution, using source paths and relative Job destinations. These are file staging declarations, not research_result.inputs references. Prepared requests already contain this field."
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "path"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096,
+                "description": "Relative to Job cwd; declare paths produced by the command, never absolute workspace paths."
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "min_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "recursive": {
+                "type": "boolean",
+                "description": "Collect every file in this declared output directory, preserving Job provenance."
+              },
+              "media_type": {
+                "type": "string",
+                "maxLength": 256
+              }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 256,
+          "description": "Direct submission only: files/directories the command will produce, relative to Job cwd. job_collect registers available declared outputs with producer provenance. Prepared requests already contain this field. Declarations do not create files or redirect stdout. print() goes to logs/stdout.log; write a result file explicitly before declaring it."
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 604800,
+          "description": "Execution time limit in seconds for the submitted Job, not the bash preparation timeout. May accompany either a direct or prepared submission."
+        },
+        "execution_target": {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+            },
+            "scheduler_entry": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+            }
+          },
+          "required": [
+            "platform"
+          ],
+          "additionalProperties": false,
+          "description": "Named platform and optional scheduler entry. Omitted entry resolves the platform default."
+        },
+        "root": {
+          "type": "string"
+        },
+        "submission": {
+          "type": "object",
+          "properties": {
+            "resources": {
+              "type": "object",
+              "properties": {
+                "cpus": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "memory_mb": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "gpus": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "walltime": {
+                  "type": "string",
+                  "pattern": "^[0-9]+:[0-5][0-9]:[0-5][0-9]$"
+                },
+                "select": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            },
+            "queue": {
+              "type": "string",
+              "minLength": 1
+            },
+            "queue_wait_seconds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false,
+          "description": "Direct Job or validator only: per-job resource request. Defaults are not limits. memory_mb is total MiB including program overhead. For prepared requests use preparer --cpus/--job-memory-mb/--walltime and re-prepare; never override a pinned request."
+        }
+      },
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "command"
+          ]
+        },
+        {
+          "required": [
+            "prepared_ref"
+          ]
+        },
+        {
+          "required": [
+            "request_file",
+            "request_sha256"
+          ]
+        },
+        {
+          "required": [
+            "validator_id",
+            "validator_version",
+            "input_artifact_ids"
+          ]
+        }
+      ]
+    },
+    "job_status": {
+      "type": "object",
+      "properties": {
+        "job_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Exact Job ID returned by job_start or research context; not a node_id, request_file, prepared_ref or collection receipt. Use job_id or event_id; if both are supplied they must resolve to the same Job."
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Exact existing Job monitor event ID from research context. Alternative selector for its Job; do not invent an event ID or pass a research record reference."
+        },
+        "root": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "job_id"
+          ]
+        },
+        {
+          "required": [
+            "event_id"
+          ]
+        }
+      ]
+    },
+    "job_collect": {
+      "type": "object",
+      "properties": {
+        "job_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Exact Job ID returned by job_start or research context; not a node_id, request_file, prepared_ref or collection receipt. Use job_id or event_id; if both are supplied they must resolve to the same Job."
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Exact existing Job monitor event ID from research context. Alternative selector for its Job; do not invent an event ID or pass a research record reference."
+        },
+        "root": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "job_id"
+          ]
+        },
+        {
+          "required": [
+            "event_id"
+          ]
+        }
+      ]
+    },
+    "job_cancel": {
+      "type": "object",
+      "properties": {
+        "job_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Exact Job ID returned by job_start or research context; not a node_id, request_file, prepared_ref or collection receipt. Use job_id or event_id; if both are supplied they must resolve to the same Job."
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Exact existing Job monitor event ID from research context. Alternative selector for its Job; do not invent an event ID or pass a research record reference."
+        },
+        "root": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "job_id"
+          ]
+        },
+        {
+          "required": [
+            "event_id"
+          ]
+        }
+      ]
+    },
+    "job_probe": {
+      "type": "object",
+      "properties": {
+        "execution_target": {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+            },
+            "scheduler_entry": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+            }
+          },
+          "required": [
+            "platform"
+          ],
+          "additionalProperties": false,
+          "description": "Named platform and optional scheduler entry. Omitted entry resolves the platform default."
+        },
+        "root": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "job_reconcile": {
+      "type": "object",
+      "properties": {
+        "job_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Exact Job ID returned by job_start or research context; not a node_id, request_file, prepared_ref or collection receipt. Use job_id or event_id; if both are supplied they must resolve to the same Job."
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Exact existing Job monitor event ID from research context. Alternative selector for its Job; do not invent an event ID or pass a research record reference."
+        },
+        "root": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "job_id"
+          ]
+        },
+        {
+          "required": [
+            "event_id"
+          ]
+        }
+      ]
+    },
+    "artifact_register": {
+      "type": "object",
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "description": "Existing file inside the current workspace, as an absolute or workspace-relative path. Imports its current bytes into a fixed Artifact; use the returned artifact_id in research_result. Read an existing workspace file; this does not grant permission to edit the source or write directly into artifact storage."
+        },
+        "job_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Optional actual producing Job. The path must be its declared output or stdout/stderr log inside its own Job directory. Prefer job_collect for scientific outputs; do not assign an unrelated Job to a file."
+        },
+        "media_type": {
+          "type": "string",
+          "maxLength": 256,
+          "description": "MIME type of the file, for example text/plain or application/json; does not validate scientific content."
+        },
+        "root": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "artifact_create": {
+      "type": "object",
+      "required": [
+        "content",
+        "name"
+      ],
+      "properties": {
+        "content": {
+          "type": "string",
+          "maxLength": 4000000,
+          "description": "Actual UTF-8 text to store, not a filesystem path. Use artifact_register to import existing files and job_collect to preserve raw calculation outputs."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "description": "Descriptive name recorded with the new text Artifact, not a destination path or producer Job identity."
+        },
+        "media_type": {
+          "type": "string",
+          "maxLength": 256,
+          "description": "MIME type of the supplied text, for example text/plain or application/json."
+        },
+        "root": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "artifact_read": {
+      "type": "object",
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Exact returned art_<number> Artifact ID. Job IDs and collection receipts are not Artifact IDs.",
+          "pattern": "^art_[1-9][0-9]*$"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Starting byte offset (default 0). For the next page, use next_offset from the prior response; null means the end."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000,
+          "description": "Maximum bytes to read (default 16000, maximum 1000000). The selected bytes are decoded as UTF-8 with replacement for invalid sequences."
+        },
+        "root": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "artifact_id"
+      ]
+    },
+    "task_begin": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "objective": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+        },
+        "source_submission_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "minItems": 1,
+          "uniqueItems": true,
+          "maxItems": 32,
+          "description": "Actual user submission IDs from this conversation, represented as decimal strings. These are not research user_* message references or task IDs."
+        },
+        "criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              }
+            },
+            "required": [
+              "id",
+              "description"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 32,
+          "description": "Concrete delivery criteria with distinct stable IDs. Completion must provide fixed Result/Artifact evidence for every criterion. Preserve the user-requested deliverables. Do not replace unfinished calculations or validation with an unsolicited alternative to explain limitations."
+        },
+        "initial_plan": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000,
+          "description": "Initial bounded plan covering the user's deliverables, the first evidence-producing action and the decision that will select the next action.",
+          "pattern": "\\S"
+        },
+        "next_action": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "The first concrete action to perform now. Do not use a status summary or a final answer.",
+          "pattern": "\\S"
+        },
+        "execution_target": {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+            },
+            "scheduler_entry": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+            }
+          },
+          "required": [
+            "platform"
+          ],
+          "additionalProperties": false,
+          "description": "Named platform and optional scheduler entry. Omitted entry resolves the platform default."
+        },
+        "execution_intent": {
+          "type": "object",
+          "properties": {
+            "source_submission_id": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            },
+            "source_text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "scheduler": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "required": [
+            "source_submission_id",
+            "source_text"
+          ],
+          "additionalProperties": false,
+          "description": "Quote the affirmative platform/scheduler instruction from an actual cited user submission."
+        },
+        "execution_policy": {
+          "type": "object",
+          "properties": {
+            "placements": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "platform": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                      },
+                      "scheduler_entry": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                      }
+                    },
+                    "required": [
+                      "platform"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Named platform and optional scheduler entry. Omitted entry resolves the platform default."
+                  },
+                  "intent": {
+                    "type": "object",
+                    "properties": {
+                      "source_submission_id": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "source_text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                      },
+                      "scheduler": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      }
+                    },
+                    "required": [
+                      "source_submission_id",
+                      "source_text"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Quote the affirmative platform/scheduler instruction from an actual cited user submission."
+                  }
+                },
+                "required": [
+                  "target",
+                  "intent"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "maxItems": 32
+            },
+            "max_in_flight": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "max_attempts": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "automatic_placement": {
+              "type": "boolean",
+              "description": "Allow resource-based selection only among explicit item candidates within the allowed placements."
+            }
+          },
+          "required": [
+            "placements",
+            "max_in_flight",
+            "max_attempts"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "title",
+        "objective",
+        "source_submission_ids",
+        "criteria",
+        "initial_plan",
+        "next_action"
+      ],
+      "additionalProperties": false
+    },
+    "task_read": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "task_update": {
+      "type": "object",
+      "properties": {
+        "expected_revision": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Current task revision returned by task_read, task_begin or task_update; not a research Node revision. On conflict read the task and reconsider the update."
+        },
+        "action": {
+          "enum": [
+            "refine",
+            "progress",
+            "wait",
+            "block",
+            "propose_completion",
+            "set_research",
+            "apply_user_control",
+            "correct_execution",
+            "set_execution_plan",
+            "select_execution_item",
+            "complete_execution_item"
+          ],
+          "description": "refine requires source_submission_ids; progress requires evidence_refs; wait requires wait; block requires reason, block_kind and resume_when; all kinds except missing_user_input also require evidence_refs; propose_completion requires completion; set_research requires research. Send only the fields for the selected action. apply_user_control applies an explicit user pause/resume/cancel instruction with control and source_submission_ids; cancel also requires jobs. correct_execution fixes an incorrect target interpretation using an original task source, execution_intent and reason; it does not authorize a new destination."
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "Progress summary, audit explanation or blocker description. Required and nonempty for block. For block: identify the concrete unmet prerequisite or exhausted budget, the change needed to resume, and why no independent authorized work remains. Missing results or an unfinished turn alone are not blockers.",
+          "pattern": "\\S"
+        },
+        "block_kind": {
+          "enum": [
+            "missing_user_input",
+            "resource_unavailable",
+            "execution_failure",
+            "budget_exhausted",
+            "scientific_dead_end"
+          ],
+          "description": "block only: classify the concrete reason work cannot continue."
+        },
+        "resume_when": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "block only: the concrete condition or user input that will allow the task to resume.",
+          "pattern": "\\S"
+        },
+        "objective": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000,
+          "description": "refine only: replacement objective supported by the cited user submissions."
+        },
+        "criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              }
+            },
+            "required": [
+              "id",
+              "description"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 32,
+          "description": "refine only: replacement delivery criteria. Keep stable unique IDs for criteria that remain applicable."
+        },
+        "source_submission_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "minItems": 1,
+          "uniqueItems": true,
+          "maxItems": 32,
+          "description": "refine or apply_user_control: actual user submission IDs as decimal strings, from runtime_control. For task control, cite the latest actual user instruction consumed by the current run; internal continuations, quotations and historical sources are not new authorization. For refine, a new instruction resolving a blocker reactivates work; a question alone does not."
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 1,
+          "uniqueItems": true,
+          "maxItems": 64,
+          "description": "progress or block: existing Result/Artifact references or Jobs owned by this task. Node/note/user references can provide context but do not establish new substantive progress. Job collection receipts are not accepted here; cite the Job or its collected Artifacts. Use owned job_id, Result or Artifact references. job_result_* receipts are not accepted here; use their job_id or collected Artifact references. For block, all kinds except missing_user_input require verified Result, Artifact or owned Job evidence; plans and notes alone are insufficient."
+        },
+        "next_action": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "progress or refine only: the next concrete evidence-producing action for the active task.",
+          "pattern": "\\S"
+        },
+        "wait": {
+          "type": "object",
+          "properties": {
+            "job_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "maxItems": 256
+            },
+            "mode": {
+              "enum": [
+                "all",
+                "any"
+              ]
+            }
+          },
+          "required": [
+            "job_ids",
+            "mode"
+          ],
+          "additionalProperties": false,
+          "description": "wait only: nonempty job_ids must belong to the current task. all waits for every listed Job, any for at least one; an unknown outcome wakes the task for reconciliation, not as scientific success. Use only when no independent work remains. Completed Jobs release this wait without requiring the current model run to end."
+        },
+        "completion": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "criterion_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "minItems": 1,
+                "uniqueItems": true,
+                "maxItems": 64
+              },
+              "status": {
+                "enum": [
+                  "met",
+                  "unmet",
+                  "undetermined"
+                ]
+              },
+              "assessment_ref": {
+                "type": "string",
+                "pattern": "^art_[1-9][0-9]*$",
+                "description": "Fixed task-assessment/1 JSON Artifact with current task/workspace/criterion scope, requirements_revision, status, reason, checks and conflicts. See research-workflow completion reference."
+              }
+            },
+            "required": [
+              "criterion_id",
+              "evidence_refs",
+              "status",
+              "assessment_ref"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 32,
+          "description": "Assess each current criterion exactly once with status, fixed evidence and a scoped task-assessment/1 Artifact. A failure report is evidence of an unmet requirement, not successful validation. The final response must still be delivered."
+        },
+        "research": {
+          "type": "object",
+          "properties": {
+            "entry_node_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^node_[1-9][0-9]*$"
+              },
+              "uniqueItems": true,
+              "maxItems": 128
+            },
+            "focus_node_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^node_[1-9][0-9]*$"
+              },
+              "uniqueItems": true,
+              "maxItems": 16
+            }
+          },
+          "required": [
+            "entry_node_ids",
+            "focus_node_ids"
+          ],
+          "additionalProperties": false,
+          "description": "set_research only: replace both entry_node_ids and focus_node_ids with complete lists of existing Nodes; [] clears a list. Does not start Jobs or provide completion evidence."
+        },
+        "control": {
+          "enum": [
+            "pause",
+            "resume",
+            "cancel"
+          ],
+          "description": "apply_user_control only: follow the explicit latest actual user instruction in this run. Never choose a stop merely because a search is difficult. Pause/resume changes task scheduling; cancel terminates the task."
+        },
+        "jobs": {
+          "enum": [
+            "keep",
+            "cancel"
+          ],
+          "description": "apply_user_control with control=cancel only: keep existing Jobs or request cancellation of all Jobs owned by this task, according to the user instruction. Cancellation failures remain pending; verify receipts before claiming Jobs stopped."
+        },
+        "execution_target": {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+            },
+            "scheduler_entry": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+            }
+          },
+          "required": [
+            "platform"
+          ],
+          "additionalProperties": false,
+          "description": "Named platform and optional scheduler entry. Omitted entry resolves the platform default."
+        },
+        "execution_intent": {
+          "type": "object",
+          "properties": {
+            "source_submission_id": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            },
+            "source_text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "scheduler": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "required": [
+            "source_submission_id",
+            "source_text"
+          ],
+          "additionalProperties": false,
+          "description": "Quote the affirmative platform/scheduler instruction from an actual cited user submission."
+        },
+        "completion_outcome": {
+          "enum": [
+            "full",
+            "partial"
+          ],
+          "description": "full requires all criteria met; partial retains at least one unmet/undetermined criterion and requires an evidenced stop_basis."
+        },
+        "stop_basis": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "user_requested",
+                "budget_exhausted",
+                "search_exhausted"
+              ]
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "evidence_refs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "maxItems": 64,
+              "description": "Fixed Results or Artifacts documenting the applicable limit and exhausted work."
+            },
+            "source_submission_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "^[1-9][0-9]*$"
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "maxItems": 32,
+              "description": "Actual user submissions containing the instruction to stop with a partial deliverable."
+            },
+            "source_text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          },
+          "required": [
+            "kind",
+            "reason"
+          ],
+          "additionalProperties": false,
+          "description": "Why this round can end partially. user_requested quotes a cited actual user instruction; exhausted budget/search cites fixed evidence. Ordinary progress or a retryable failure is not a stopping basis.",
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "user_requested"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "then": {
+                "required": [
+                  "source_submission_ids",
+                  "source_text"
+                ]
+              },
+              "else": {
+                "required": [
+                  "evidence_refs"
+                ],
+                "properties": {
+                  "source_submission_ids": false,
+                  "source_text": false
+                }
+              }
+            }
+          ]
+        },
+        "execution_policy": {
+          "type": "object",
+          "properties": {
+            "placements": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "platform": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                      },
+                      "scheduler_entry": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                      }
+                    },
+                    "required": [
+                      "platform"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Named platform and optional scheduler entry. Omitted entry resolves the platform default."
+                  },
+                  "intent": {
+                    "type": "object",
+                    "properties": {
+                      "source_submission_id": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$"
+                      },
+                      "source_text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                      },
+                      "scheduler": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      }
+                    },
+                    "required": [
+                      "source_submission_id",
+                      "source_text"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Quote the affirmative platform/scheduler instruction from an actual cited user submission."
+                  }
+                },
+                "required": [
+                  "target",
+                  "intent"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "maxItems": 32
+            },
+            "max_in_flight": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "max_attempts": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "automatic_placement": {
+              "type": "boolean",
+              "description": "Allow resource-based selection only among explicit item candidates within the allowed placements."
+            }
+          },
+          "required": [
+            "placements",
+            "max_in_flight",
+            "max_attempts"
+          ],
+          "additionalProperties": false
+        },
+        "execution_plan": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                  },
+                  "work_id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                  },
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "platform": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                      },
+                      "scheduler_entry": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                      }
+                    },
+                    "required": [
+                      "platform"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Named platform and optional scheduler entry. Omitted entry resolves the platform default."
+                  },
+                  "depends_on": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                    },
+                    "minItems": 0,
+                    "maxItems": 1000
+                  },
+                  "input_artifact_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^art_[1-9][0-9]*$"
+                    },
+                    "minItems": 0,
+                    "maxItems": 1000
+                  },
+                  "resources": {
+                    "type": "object",
+                    "properties": {
+                      "cpus": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "memory_mb": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "walltime": {
+                        "type": "string",
+                        "pattern": "^[0-9]+:[0-5][0-9]:[0-5][0-9]$"
+                      }
+                    },
+                    "required": [
+                      "cpus",
+                      "memory_mb"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "backend": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                  },
+                  "candidates": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "platform": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                        },
+                        "scheduler_entry": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                        }
+                      },
+                      "required": [
+                        "platform"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Named platform and optional scheduler entry. Omitted entry resolves the platform default."
+                    }
+                  }
+                },
+                "required": [
+                  "id",
+                  "work_id",
+                  "resources"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "maxItems": 1000
+            }
+          },
+          "required": [
+            "items"
+          ],
+          "additionalProperties": false
+        },
+        "execution_item_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+        },
+        "artifact_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^art_[1-9][0-9]*$"
+          },
+          "minItems": 1,
+          "maxItems": 1000
+        }
+      },
+      "required": [
+        "expected_revision",
+        "action"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "refine"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "required": [
+              "source_submission_ids"
+            ],
+            "properties": {
+              "completion": false,
+              "evidence_refs": false,
+              "block_kind": false,
+              "resume_when": false,
+              "next_action": true,
+              "research": false,
+              "wait": false,
+              "control": false,
+              "jobs": false,
+              "execution_intent": true,
+              "completion_outcome": false,
+              "stop_basis": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "progress"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "required": [
+              "evidence_refs"
+            ],
+            "properties": {
+              "completion": false,
+              "criteria": false,
+              "objective": false,
+              "block_kind": false,
+              "resume_when": false,
+              "next_action": true,
+              "research": false,
+              "source_submission_ids": false,
+              "wait": false,
+              "control": false,
+              "jobs": false,
+              "execution_target": false,
+              "execution_intent": false,
+              "completion_outcome": false,
+              "stop_basis": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "wait"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "required": [
+              "wait"
+            ],
+            "properties": {
+              "completion": false,
+              "criteria": false,
+              "evidence_refs": false,
+              "block_kind": false,
+              "resume_when": false,
+              "next_action": false,
+              "objective": false,
+              "research": false,
+              "source_submission_ids": false,
+              "control": false,
+              "jobs": false,
+              "execution_target": false,
+              "execution_intent": false,
+              "completion_outcome": false,
+              "stop_basis": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "block"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason",
+              "block_kind",
+              "resume_when"
+            ],
+            "properties": {
+              "completion": false,
+              "criteria": false,
+              "evidence_refs": true,
+              "block_kind": true,
+              "resume_when": true,
+              "next_action": false,
+              "objective": false,
+              "research": false,
+              "source_submission_ids": false,
+              "wait": false,
+              "control": false,
+              "jobs": false,
+              "execution_target": false,
+              "execution_intent": false,
+              "completion_outcome": false,
+              "stop_basis": false
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "block_kind": {
+                      "enum": [
+                        "resource_unavailable",
+                        "execution_failure",
+                        "budget_exhausted",
+                        "scientific_dead_end"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "block_kind"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "evidence_refs"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "propose_completion"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "required": [
+              "completion",
+              "completion_outcome"
+            ],
+            "properties": {
+              "criteria": false,
+              "evidence_refs": false,
+              "block_kind": false,
+              "resume_when": false,
+              "next_action": false,
+              "objective": false,
+              "research": false,
+              "source_submission_ids": false,
+              "wait": false,
+              "control": false,
+              "jobs": false,
+              "execution_target": false,
+              "execution_intent": false,
+              "completion_outcome": true,
+              "stop_basis": true
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "completion_outcome": {
+                      "const": "partial"
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "stop_basis"
+                  ]
+                },
+                "else": {
+                  "properties": {
+                    "stop_basis": false
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "set_research"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "required": [
+              "research"
+            ],
+            "properties": {
+              "completion": false,
+              "criteria": false,
+              "evidence_refs": false,
+              "block_kind": false,
+              "resume_when": false,
+              "next_action": false,
+              "objective": false,
+              "source_submission_ids": false,
+              "wait": false,
+              "control": false,
+              "jobs": false,
+              "execution_target": false,
+              "execution_intent": false,
+              "completion_outcome": false,
+              "stop_basis": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "apply_user_control"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "required": [
+              "control",
+              "source_submission_ids"
+            ],
+            "properties": {
+              "objective": false,
+              "criteria": false,
+              "evidence_refs": false,
+              "block_kind": false,
+              "resume_when": false,
+              "next_action": false,
+              "wait": false,
+              "completion": false,
+              "research": false,
+              "reason": false,
+              "execution_target": false,
+              "execution_intent": false,
+              "completion_outcome": false,
+              "stop_basis": false
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "control": {
+                      "const": "cancel"
+                    }
+                  },
+                  "required": [
+                    "control"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "jobs"
+                  ]
+                },
+                "else": {
+                  "properties": {
+                    "jobs": false
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "correct_execution"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "required": [
+              "execution_intent",
+              "reason"
+            ],
+            "properties": {
+              "block_kind": false,
+              "resume_when": false,
+              "objective": false,
+              "criteria": false,
+              "source_submission_ids": false,
+              "evidence_refs": false,
+              "next_action": false,
+              "wait": false,
+              "completion": false,
+              "research": false,
+              "control": false,
+              "jobs": false,
+              "completion_outcome": false,
+              "stop_basis": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "set_execution_plan"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "execution_plan"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "select_execution_item"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "execution_item_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "complete_execution_item"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "execution_item_id",
+              "artifact_ids",
+              "evidence_refs"
+            ]
+          }
+        },
+        {
+          "if": {
+            "not": {
+              "properties": {
+                "action": {
+                  "enum": [
+                    "set_execution_plan"
+                  ]
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "execution_plan": false
+            }
+          }
+        },
+        {
+          "if": {
+            "not": {
+              "properties": {
+                "action": {
+                  "enum": [
+                    "select_execution_item",
+                    "complete_execution_item"
+                  ]
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "execution_item_id": false
+            }
+          }
+        },
+        {
+          "if": {
+            "not": {
+              "properties": {
+                "action": {
+                  "enum": [
+                    "complete_execution_item"
+                  ]
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "artifact_ids": false
+            }
+          }
+        },
+        {
+          "if": {
+            "not": {
+              "properties": {
+                "action": {
+                  "enum": [
+                    "refine"
+                  ]
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "execution_policy": false
+            }
+          }
+        }
+      ]
+    },
+    "job_platforms": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "job_resources": {
+      "type": "object",
+      "properties": {
+        "execution_target": {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+            },
+            "scheduler_entry": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+            }
+          },
+          "required": [
+            "platform"
+          ],
+          "additionalProperties": false,
+          "description": "Named platform and optional scheduler entry. Omitted entry resolves the platform default."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

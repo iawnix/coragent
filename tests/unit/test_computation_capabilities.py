@@ -32,7 +32,7 @@ def native_fixture(tmp_path, monkeypatch):
     config = tmp_path / 'selected.toml'
     config.write_text(binding(config).replace('"/bin/sh"', json.dumps(str(program))))
     monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(config))
-    args = ['--config', str(config), '--target', 'local', '--executor', 'external.copy', '--version', '3', '--details']
+    args = ['--config', str(config), '--platform', 'local', '--executor', 'external.copy', '--version', '3', '--details']
     return config, program, marker, args
 
 
@@ -44,10 +44,10 @@ def test_probe_detects_missing_executable_in_actual_target_and_does_not_confuse_
     assert missing['error'] == 'environment_executable_missing'
     assert missing['backend'] == 'shell'
     assert not marker.exists()
-    status, unconfigured = run_cli('--config', str(config), '--target', 'local', '--backend', 'unconfigured')
+    status, unconfigured = run_cli('--config', str(config), '--platform', 'local', '--backend', 'unconfigured')
     assert status == 1 and unconfigured['status'] == 'not_configured'
     assert unconfigured['error'] == 'executor_binding_missing'
-    status, recipe = run_cli('--config', str(config), '--target', 'local', '--executor', 'external.unknown', '--version', '1')
+    status, recipe = run_cli('--config', str(config), '--platform', 'local', '--executor', 'external.unknown', '--version', '1')
     assert status == 1 and recipe['status'] == 'recipe_not_found'
     assert recipe['software_availability'] == 'not_checked'
 
@@ -62,7 +62,7 @@ def test_verified_native_prerequisites_do_not_execute_program_but_prepared_job_d
     assert not marker.exists(), 'prerequisite verification is not a solver execution or a scientific result'
     root = tmp_path / 'workspace'; workspace(root)
     data = root / 'input.txt'; data.write_text('Synthetic material; no scientific verdict\n')
-    prepared = prepare(config, 'local', 'external.copy', '3', {'data': data})
+    prepared = prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, 'external.copy', '3', {'data': data})
     receipt = execute('job_start', root, prepared)
     try:
         for _ in range(200):
@@ -85,7 +85,7 @@ def test_prepared_availability_evidence_cannot_authorize_a_stale_binding(tmp_pat
     config, program, marker, _ = native_fixture(tmp_path, monkeypatch)
     root = tmp_path / 'workspace'; workspace(root)
     data = root / 'input.txt'; data.write_text('input\n')
-    prepared = prepare(config, 'local', 'external.copy', '3', {'data': data})
+    prepared = prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, 'external.copy', '3', {'data': data})
     if change == 'configuration':
         config.write_text(config.read_text().replace(str(program), '/bin/sh'))
         expected = 'execution_binding_changed'
@@ -115,13 +115,13 @@ def test_actual_python_probe_distinguishes_missing_dependency_from_executable_an
     module = None
     if requirement == 'initialization':
         settings = load_job_config(config)
-        prefix = Path(settings['targets']['local']['backends']['validation']['python']['prefix'])
+        prefix = Path(settings['targets']['local/main']['backends']['validation']['python']['prefix'])
         module = next(prefix.glob('lib/python*/site-packages')) / 'coragent_initialization_fixture.py'
         module.write_text('raise RuntimeError("fixture-private-error-content")\n')
         entry['requirements'] = {'imports': ['coragent_initialization_fixture']}
     try:
         path.write_text(json.dumps(declaration))
-        status, result = run_cli('--config', str(config), '--target', 'local', '--executor', entry['id'], '--version', entry['version'])
+        status, result = run_cli('--config', str(config), '--platform', 'local', '--executor', entry['id'], '--version', entry['version'])
         assert status == 1 and result['status'] == 'check_failed'
         assert result['runtime'] == 'python'
         assert result['error'] == ('environment_import_failed' if requirement == 'initialization' else 'environment_dependency_missing')
@@ -144,7 +144,7 @@ def test_target_probe_does_not_claim_that_the_configured_software_is_installed(t
     config, program, _, args = native_fixture(tmp_path, monkeypatch)
     program.unlink()
     root = tmp_path / 'workspace'; workspace(root)
-    target = execute('job_probe', root, {'execution_target': 'local'})
+    target = execute('job_probe', root, {'execution_target': {'platform': 'local', 'scheduler_entry': 'main'}})
     assert target['cwd_exists'] and target['inputs_present']
     assert 'executable' not in target
     status, software = run_cli(*args)

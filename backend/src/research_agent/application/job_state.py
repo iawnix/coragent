@@ -37,6 +37,7 @@ def register_execution(root, spec, platform):
     value = {'schema_version': 'job-execution/1', 'job_id': spec.job_id, 'state': 'started',
              'platform': platform, 'command': list(spec.command), 'metadata': dict(spec.metadata),
              'collection_state': 'not_collected',
+             **({'execution_item': spec.metadata['execution_item']} if 'execution_item' in spec.metadata else {}),
              **spec.metadata.get('research_binding', {'node_id': None, 'node_revision': None})}
     write_json(Path(root) / 'operations/executions' / (spec.job_id + '.json'), value)
     persist_event(root, kind='job', title='Calculation submitted',

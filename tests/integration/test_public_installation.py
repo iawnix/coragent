@@ -1,5 +1,7 @@
 """Public installation uses independently prepared environments and preserves them."""
 
+from tests.support.platforms import execution_config
+
 from research_agent.foundation.layout import paths as app_paths
 import base64
 import importlib.util
@@ -37,9 +39,13 @@ def test_public_package_install_accepts_jobs_and_preserves_external_environment(
     subprocess.run(['cp','--reflink=auto','-a',os.environ['CORAGENT_TEST_PI_RUNTIME_ROOT']+'/.',str(pi_root)],check=True)
     config = tmp_path/'job.toml'
     settings = tomllib.loads(Path(os.environ['CORAGENT_JOB_CONFIG']).read_text())
-    local = settings['execution']['targets']['local']
+    local = settings['execution']['platforms']['local']
     local['bindings'] = {'structure': local['bindings']['structure']}
-    config.write_bytes(jobs.toml_bytes({'execution': {'default_target':'local', 'targets':{'local':local}}}))
+    from research_agent.jobs import platforms_from_config
+    route = platforms_from_config(Path(os.environ['CORAGENT_JOB_CONFIG']))[0]['local/main'].config
+    local['storage'] = {key: route[key] for key in ('work_root', 'file_mode')}
+    local['schedulers']['main'].update({key: route[key] for key in ('handler', 'handler_environment')})
+    config.write_bytes(jobs.toml_bytes(settings))
     prefix = Path(local['bindings']['structure']['python']['prefix'])
     stamp = (prefix/'bin/python').stat().st_ino
     conda = os.environ.get('CORAGENT_TEST_CONDA') or shutil.which('conda')
@@ -56,9 +62,9 @@ def test_public_package_install_accepts_jobs_and_preserves_external_environment(
                '--phone-access','disabled','--non-interactive','--yes','--allow-dirty','--json']
     subprocess.run([*command,'--job-config',str(config)],env=environment,check=True)
     record = json.loads((paths(root).state/jobs.RECORD).read_text())
-    assert record['readiness']['targets']['local']['status'] == 'execution_verified'
-    assert len(record['readiness']['targets']['local']['jobs']) == 2
-    assert record['publication']['targets']['local']['status'] == 'execution_verified'
+    assert record['readiness']['targets']['local/main']['status'] == 'execution_verified'
+    assert len(record['readiness']['targets']['local/main']['jobs']) == 2
+    assert record['publication']['targets']['local/main']['status'] == 'execution_verified'
     assert record['environments'] == []
     runtime = json.loads((paths(root).runtime_home/'env.json').read_text())
     python = runtime['python_executable']

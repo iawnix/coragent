@@ -1,3 +1,4 @@
+import { startQrunFixture } from "./qrun-fixture.mjs";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -303,7 +304,8 @@ test("Host relays real Job Monitor events and rejects old or mismatched identiti
   const root = join(env.workspaceRoot, "project-a");
   const { create_python_runtime_bridge } = await import("../../../apps/agent/bridge/client.mjs");
   const jobConfig = join(root, "job.toml");
-  await writeFile(jobConfig, '[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\nsupervisor="process"\n');
+  const closeQueue = await startQrunFixture(jobConfig, root);
+  t.after(closeQueue);
   const executionEnv = { ...process.env, CORAGENT_JOB_CONFIG: jobConfig };
   const bridge = create_python_runtime_bridge({ workspace_root: root, env: executionEnv });
   t.after(() => bridge.close());

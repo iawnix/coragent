@@ -1,0 +1,137 @@
+# Named execution platforms
+
+[简体中文](EXECUTION_PLATFORMS.zh-CN.md)
+
+CoRAgent separates a platform's connection, shared software and storage from its scheduler entries.
+The sole public configuration is `execution.schema_version = 2`. Selection is a structured object:
+`{"platform":"Com30","scheduler_entry":"qrun"}`. `Com30/qrun` is a derived adapter key used in
+installation options and Job records; it is not another configurable label.
+
+## Configuration
+
+```toml
+[execution]
+schema_version = 2
+default_platform = "FEDCluster"
+
+[execution.platforms.FEDCluster]
+transport = "local"
+default_scheduler = "tri"
+storage.work_root = "/ABS/fed/jobs"
+storage.file_mode = "staged"
+
+[execution.platforms.FEDCluster.schedulers.tri]
+executor = "tri"
+handler = ["/ABS/python3", "/ABS/tri.py"]
+
+[execution.platforms.Com30]
+transport = "ssh"
+ssh_host = "agent.com30"
+default_scheduler = "qrun"
+storage.work_root = "/home/agent/soft/Qrun/jobs"
+storage.file_mode = "staged"
+
+[execution.platforms.Com30.schedulers.qrun]
+executor = "qrun"
+# Use the exact handler returned by Qrun installation, including --state-dir.
+handler = ["/ABS/python3", "/home/agent/soft/Qrun/qrun.py", "--state-dir", "/home/agent/soft/Qrun/state", "handler"]
+submission.resources = {cpus = 4, memory_mb = 4096}
+limits = {cpus = 112, memory_mb = 377221, max_in_flight = 20}
+
+[execution.platforms.Com30.bindings.gaussian]
+command = "/ABS/gaussian/g16"
+activation_script = "/ABS/gaussian/activate.sh"
+
+[execution.platforms."1WCluster"]
+transport = "ssh"
+ssh_host = "agent.1w"
+enabled = false
+```
+
+Replace `/ABS` paths with verified installations. This example does not deploy services or assert that
+software is installed. Leave 1WCluster disabled until its scheduler and storage are established.
+
+Platform IDs/aliases match without case sensitivity; scheduler entry IDs are exact. An explicit entry wins;
+otherwise the platform's default entry applies. Scheduler-type selection is restricted to the selected
+platform. Entries share `python`, `bindings`, `storage`, `submission` and `allowed_queues`. An overridden
+software binding replaces the whole binding; storage and resource defaults merge by field. Entries cannot
+override the platform transport or SSH endpoint. Queue permissions and entry resource limits apply after
+merging. CPUs are logical CPUs and `memory_mb` is MiB.
+
+Python bindings retain explicit Conda executable, prefix and lock reference. Native software uses command,
+activation script and environment variables. `storage.scratch_root` supplies a default for software scratch.
+Keep handler credentials in the installation credential store; discovery does not expose their values.
+
+## Commands and task execution
+
+- `job_platforms` lists platforms, entries, software bindings, effective storage, submission defaults, limits
+  and whether storage/software values came from the platform or entry. Binding presence is not readiness.
+- `job_resolve_target` resolves the structured selection and pins its route digest.
+- `job_resources` queries the selected handler. Qrun reports pool capacity, reservation, free capacity,
+  observed usage and enforcement. Other current handlers return unknown capacity; unknown is not zero.
+- Preparation uses `--platform Com30 --scheduler-entry qrun`. Scientific `--executor chemical.xtb`
+  selects a recipe; it does not select the scheduler. Process variables use only `environment`.
+- `job_start` checks selection, software evidence, input hashes, resources and task admission budgets.
+  Prepared requests cannot override their pinned execution fields. Status/cancel/collect/reconcile use
+  the submitted Job's recorded route even after configuration changes.
+- Ordinary bash continues to execute on the controller. Platform selection does not SSH arbitrary bash.
+
+A Task can contain a durable execution plan with independently placed work items. Use the existing
+`task_begin` placement policy and `task_update` actions `set_execution_plan`, `select_execution_item`
+and `complete_execution_item`. See the [plan contract and examples](../skills/core/execution-platforms/references/plans.md).
+Job Manager remains the sole authority for actual execution state; `task_read.execution_progress`
+projects ready/blocked, native Job states, collecting and validating from those records.
+
+Task `max_in_flight` and `max_attempts`, and per-entry `limits.max_in_flight`, are checked under the
+workspace transaction lock. Entry admission limits cover that workspace; Qrun/schedulers enforce their
+shared pool across workspaces. Unknown or conflicting execution retains its slot. A lost response is
+reconciled under the original identity. Submitted items cannot be edited or removed. Deliberate retries
+use a new item/work ID, preserve the predecessor and consume the existing submission budget.
+
+Optional `automatic_placement=true` permits selection only among an item's explicit `candidates` inside
+the task's authorized placements. The item declares `backend` and CPU/memory requirements. Selection
+requires a configured binding and known sufficient free capacity, excludes paused/stale observations,
+and accounts for other items placed in that plan. The selected route and observation reason are recorded.
+Software is verified during preparation. GPU capacity and non-Qrun capacity are currently unknown, so
+these cannot justify automatic placement; explicitly selected PBS/Torque/Slurm/TRI entries remain usable.
+Resource snapshots are estimates, not reservations or guarantees of immediate execution.
+
+Dependencies are released only after a successful Job is collected and a current scientific Result cites
+every selected output Artifact. The preparer stages these immutable payloads at
+`inputs/artifacts/<artifact_id>/payload`, verifies their hashes and records existing Artifact provenance.
+The controller relays inputs and collected outputs; equal remote path strings do not imply shared storage.
+Rsync uses checksums, partial transfer files and delayed publication. Retry collection after transfer failure;
+do not rerun completed science. Scientific interpretation remains the responsibility of domain methods.
+
+## Installation and operation
+
+Publish the complete configuration through the main installer (`--config`, or explicit `--job-config`
+import). Scientific environments are prepared independently and referenced by platform/entry bindings.
+Existing PBS/Torque/Slurm/TRI services remain externally operated. Qrun installation and removal use the
+main installer's ownership registry for both local and SSH hosts; see [Qrun operations](QRUN.md).
+
+Installer options identify entries as `PLATFORM/ENTRY`, for example:
+
+```sh
+./install.sh --config /ABS/config.toml --manage-qrun Com30/qrun \
+  --qrun-state-dir Com30/qrun=/home/agent/soft/Qrun/state \
+  --qrun-cpus Com30/qrun=112 --qrun-memory-mb Com30/qrun=377221 \
+  --qrun-runtime Com30/qrun=portable
+```
+
+Use this only to provision an installer-owned pool, not to take over an independently installed handler.
+Uninstallation removes only owned services/environments; it does not stop external schedulers or delete
+research work roots. Active Qrun Jobs prevent removal unless cancellation is explicitly requested.
+Shared environment bindings refer to the same installed prefix; removing a configuration entry does not
+uninstall that environment.
+
+Flat target configuration and process/systemd executors are rejected. There is no automatic migration,
+legacy selector alias, or second editable target table. The durable Task and dispatch-intent versions are
+`coragent-user-task/4` and `job_intent/4`; deploy matching runtime/configuration together after settling
+work under the previous version. New-version Jobs preserve original routes; this is not conversion of old receipts.
+
+The [execution-platforms skill](../skills/core/execution-platforms/SKILL.md) owns selection, environments,
+storage and handoff. [batch-schedulers](../skills/core/batch-schedulers/SKILL.md) owns scheduler commands.
+TRI deployment/maintenance lives in [ordinary operations documentation](TRI_OPERATIONS.md).
+On CentOS 7, Qrun portable mode still uses CPU affinity and RSS sampling, not cgroup hard isolation.
+Its lifecycle remains independent of PBS. This source refactor does not register or redeploy production hosts.

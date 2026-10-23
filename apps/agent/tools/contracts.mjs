@@ -1,4 +1,4 @@
-import shared from "../../../contracts/commands/shared.json" with { type: "json" };
+import shared from "./tool-schemas.json" with { type: "json" };
 
 const TOOL_ROWS = [
   ["task_begin", "deterministic_runtime"],
@@ -14,6 +14,8 @@ const TOOL_ROWS = [
   ["job_collect", "execution_runtime"],
   ["job_cancel", "execution_runtime"],
   ["job_probe", "execution_runtime"],
+  ["job_platforms", "execution_runtime"],
+  ["job_resources", "execution_runtime"],
   ["job_reconcile", "execution_runtime"],
   ["artifact_register", "deterministic_artifact"],
   ["artifact_create", "deterministic_artifact"],
@@ -44,6 +46,8 @@ export const PUBLIC_TOOL_METADATA = Object.freeze({
   job_status: Object.freeze({ authority: "execution_runtime", effect: "read", replay: "safe", phase: "execute" }),
   job_collect: Object.freeze({ authority: "execution_runtime", effect: "result_collection", replay: "idempotent", phase: "interpret" }),
   job_cancel: Object.freeze({ authority: "execution_runtime", effect: "execution_control", replay: "idempotent", phase: "execute" }),
+  job_platforms: Object.freeze({ authority: "execution_runtime", effect: "read", replay: "safe", phase: "prepare" }),
+  job_resources: Object.freeze({ authority: "execution_runtime", effect: "read", replay: "safe", phase: "prepare" }),
   job_probe: Object.freeze({ authority: "execution_runtime", effect: "read", replay: "safe", phase: "prepare" }),
   job_reconcile: Object.freeze({ authority: "execution_runtime", effect: "execution_control", replay: "idempotent", phase: "execute" }),
   artifact_register: Object.freeze({ authority: "artifact_runtime", effect: "artifact_write", replay: "idempotent", phase: "prepare" }),
@@ -121,6 +125,8 @@ export function createPublicToolContracts(Type) {
     job_status: contract("job_status", "Job Status", "Observe an existing Job by job_id or event_id. Does not collect output or establish scientific validity. Respect the returned polling guidance; use task_update wait when no independent work remains. Collect terminal outputs with job_collect.", Type.Unsafe(shared.tools.job_status), { executionMode: "sequential" }),
     job_collect: contract("job_collect", "Collect Job", "Collect available Job outputs and logs with producer provenance, including partial or failed outputs. Does not rerun execution. Inspect output_validation and result_receipt.collection_state. artifacts supplies fixed file references; the collection receipt is evidence, not a Result input or file attachment.", Type.Unsafe(shared.tools.job_collect), { executionMode: "sequential" }),
     job_cancel: contract("job_cancel", "Cancel Job", "Request cancellation without deleting history or outputs. Inspect the returned state: unknown or pending does not confirm termination. Reconcile uncertain cancellation and collect available outputs after termination.", Type.Unsafe(shared.tools.job_cancel), { executionMode: "sequential" }),
+    job_platforms: contract("job_platforms", "Execution platforms", "List named platforms, scheduler entries and configured software bindings. This does not probe software readiness.", Type.Unsafe(shared.tools.job_platforms)),
+    job_resources: contract("job_resources", "Execution resources", "Query current resource capacity, reservations and usage. Unknown values are not zero; observations do not guarantee admission.", Type.Unsafe(shared.tools.job_resources)),
     job_probe: contract("job_probe", "Probe Job", "Check configured execution-target infrastructure, input availability, connectivity and transfer/scheduler commands as applicable. Does not verify scientific software; use its targeted environment check.", Type.Unsafe(shared.tools.job_probe), { executionMode: "sequential" }),
     job_reconcile: contract("job_reconcile", "Reconcile Job", "Recover the existing Job receipt/status after uncertain dispatch or interrupted observation. Reuse the original job_id/event_id; this does not submit a new calculation. Inspect diagnostics if state remains unknown.", Type.Unsafe(shared.tools.job_reconcile), { executionMode: "sequential" }),
     artifact_register: contract("artifact_register", "Register Artifact", "Import an existing workspace file as a fixed Artifact and return its references and metadata. Use job_collect for raw Job outputs to retain producer provenance. Registration does not prove a scientific claim.", Type.Unsafe(shared.tools.artifact_register), { executionMode: "sequential" }),
@@ -133,8 +139,8 @@ export function createPublicToolContracts(Type) {
       || PUBLIC_TOOL_NAMES.some(name => contracts[name]?.name !== name || !Object.hasOwn(shared.tools, name))) {
     throw new Error("model tool inventory does not match its canonical schemas");
   }
-  return Object.freeze(Object.fromEntries(Object.entries(contracts).map(
-    ([key, value]) => [key, Object.freeze(value)],
+  return Object.freeze(Object.fromEntries(PUBLIC_TOOL_NAMES.map(
+    key => [key, Object.freeze(contracts[key])],
   )));
 }
 

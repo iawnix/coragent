@@ -1120,18 +1120,19 @@ def test_job_toml_is_validated_and_written_private(tmp_path: Path) -> None:
     source = tmp_path / "job.toml"
     source.write_text("\n".join([
         '[execution]',
-        'default_target = "local"',
-        '[execution.targets."local"]',
-        'type = "local"',
-        'driver = "process"',
+        'schema_version = 2',
+        'default_platform = "local"',
+        '[execution.platforms."local"]',
+        'default_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"',
         '',
-        '[execution.targets."cluster"]',
-        'driver = "external"',
+        '[execution.platforms."cluster"]',
+        'default_scheduler = "main"',
+        'schedulers.main.executor = "external"',
         'transport = "ssh"',
-        'handler = ["/bin/true"]',
+        'schedulers.main.handler = ["/bin/true"]',
         'ssh_host = "cluster"',
         f'ssh_config = "{ssh_config}"',
-        'work_root = "/srv/coragent"',
+        'storage.work_root = "/srv/coragent"',
         'allowed_queues = ["batch"]',
         '',
     ]) + "\n", encoding="utf-8")
@@ -1148,7 +1149,7 @@ def test_job_toml_is_validated_and_written_private(tmp_path: Path) -> None:
 def test_invalid_scientific_binding_is_rejected_before_install_copy(tmp_path):
     root = tmp_path / "install"
     source = tmp_path / "job.toml"
-    source.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\n[execution.targets.local.bindings.pyscf]\ncommand="/old/python"\n')
+    source.write_text('[execution]\nschema_version = 2\ndefault_platform="local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n[execution.platforms.local.bindings.pyscf]\ncommand="/old/python"\n')
     args = wizard.parse_args(["--install-root", str(root), "--job-config", str(source),
                               "--service-scope", "none", "--non-interactive"])
     with pytest.raises(ValueError, match="python_binding_missing"):
@@ -1161,7 +1162,7 @@ def test_invalid_scientific_binding_is_rejected_before_install_copy(tmp_path):
 def test_configured_install_checks_science_before_relay_or_secret_copy(tmp_path, monkeypatch):
     from scripts import _install_inputs, _install_relay
     source = tmp_path / "config"; source.mkdir()
-    (source / "job.toml").write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\n[execution.targets.local.bindings.xtb]\ncommand="xtb"\n')
+    (source / "job.toml").write_text('[execution]\nschema_version = 2\ndefault_platform="local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n[execution.platforms.local.bindings.xtb]\ncommand="xtb"\n')
     def unexpected(*args):
         pytest.fail("invalid scientific config must fail before installation side effects")
     monkeypatch.setattr(_install_relay, "install", unexpected)
@@ -1175,7 +1176,7 @@ def _configured_email_fixture(tmp_path):
     config.mkdir()
     for name in ("models.json", "auth.json"):
         (config / name).write_text("{}\n")
-    (config / "job.toml").write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\n')
+    (config / "job.toml").write_text('[execution]\nschema_version = 2\ndefault_platform="local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n')
     root = tmp_path / "install"
     args = wizard.parse_args([
         "--import-config", str(config), "--install-root", str(root),
@@ -1255,8 +1256,7 @@ def test_installed_execution_readiness_probes_unregistered_native_binding(tmp_pa
     config.parent.mkdir(parents=True)
     binary = tmp_path / 'native-program'
     binary.write_text('#!/bin/sh\nexit 0\n'); binary.chmod(0o700)
-    config.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\n'
-                      '[execution.targets.local.bindings.fixture_native]\ncommand=' + json.dumps(str(binary)) + '\n')
+    config.write_text('[execution]\nschema_version = 2\ndefault_platform="local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n[execution.platforms.local.bindings.fixture_native]\ncommand=' + json.dumps(str(binary)) + '\n')
     monkeypatch.setenv('PYTHONPATH', os.pathsep.join(sys.path))
     # The installer returns a suite root whose Agent component owns extensions.
     suite_root = tmp_path / 'suite'
@@ -1265,7 +1265,7 @@ def test_installed_execution_readiness_probes_unregistered_native_binding(tmp_pa
     installed = {'runtime': {'python_executable': sys.executable}, 'package_root': str(suite_root)}
     backends = {'job': {'status': 'configured', 'path': str(config)}}
     wizard.verify_job_bindings(SimpleNamespace(install_root=str(root)), installed, backends)
-    row = backends['job']['readiness']['local']['binding:fixture_native']
+    row = backends['job']['readiness']['local/main']['binding:fixture_native']
     assert row['status'] == 'verified'
     assert row['environment_evidence']['observation']['files']['executable']['path'] == str(binary)
     assert (app_paths(root).state / 'installation/job-readiness.json').is_file()
@@ -1334,23 +1334,18 @@ def test_install_binds_local_resolver_and_preserves_explicit_and_remote_settings
     destination.parent.mkdir(parents=True)
     # Inline tables and dots in target names must survive configuration rewriting.
     python = '{manager="conda", conda_executable="/opt/conda/bin/conda", prefix="/opt/structure", lock_ref="/opt/structure.lock"}'
-    raw = ('[execution]\ndefault_target="local.cpu"\n[execution.targets."local.cpu"]\ndriver="external"\ntransport="local"\nwork_root="/shared/jobs"\nhandler=["/bin/true"]\npython=' + python + '\n'
-           '[execution.targets."local.cpu".bindings]\nstructure={environment={OMP_NUM_THREADS="2"}}\n'
-           '[execution.targets.custom]\ndriver="external"\ntransport="local"\nwork_root="/shared/jobs"\nhandler=["/bin/true"]\npython=' + python + '\n'
-           '[execution.targets.custom.bindings.structure.environment]\nCORAGENT_NAME_RESOLVER_CONFIG="/custom/resolver.toml"\n'
-           '[execution.targets.explicit_root]\ndriver="external"\ntransport="local"\nwork_root="/shared/jobs"\nhandler=["/bin/true"]\npython=' + python + '\n'
-           '[execution.targets.explicit_root.bindings.structure.environment]\nCORAGENT_INSTALL_ROOT="/custom/install"\n'
-           '[execution.targets.cluster]\ndriver="external"\ntransport="ssh"\nhandler=["/bin/true"]\nssh_host="example.invalid"\nwork_root="/scratch/jobs"\npython=' + python + '\n'
-           '[execution.targets.cluster.submission]\nqueue="batch"\n[execution.targets.cluster.bindings.structure]\n')
+    raw = ('[execution]\nschema_version = 2\ndefault_platform="local.cpu"\n[execution.platforms."local.cpu"]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="local"\nstorage.work_root="/shared/jobs"\nschedulers.main.handler=["/bin/true"]\npython=' + python + '\n[execution.platforms."local.cpu".bindings]\nstructure={environment={OMP_NUM_THREADS="2"}}\n[execution.platforms.custom]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="local"\nstorage.work_root="/shared/jobs"\nschedulers.main.handler=["/bin/true"]\npython=' + python + '\n[execution.platforms.custom.bindings.structure.environment]\nCORAGENT_NAME_RESOLVER_CONFIG="/custom/resolver.toml"\n[execution.platforms.explicit_root]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="local"\nstorage.work_root="/shared/jobs"\nschedulers.main.handler=["/bin/true"]\npython=' + python + '\n[execution.platforms.explicit_root.bindings.structure.environment]\nCORAGENT_INSTALL_ROOT="/custom/install"\n[execution.platforms.cluster]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="ssh"\nschedulers.main.handler=["/bin/true"]\nssh_host="example.invalid"\nstorage.work_root="/scratch/jobs"\npython=' + python + '\n[execution.platforms.cluster.schedulers.main.submission]\nqueue="batch"\n[execution.platforms.cluster.bindings.structure]\n')
     source = tmp_path / 'source.toml' if imported else destination
     source.write_text(raw)
     expected = copy.deepcopy(tomllib.loads(raw))
-    expected['execution']['targets']['local.cpu']['bindings']['structure']['environment']['CORAGENT_NAME_RESOLVER_CONFIG'] = str(app_paths(root).resolver_config)
+    target = expected['execution']['platforms']['local.cpu']
+    target['schedulers']['main']['bindings'] = copy.deepcopy(target['bindings'])
+    target['schedulers']['main']['bindings']['structure']['environment']['CORAGENT_NAME_RESOLVER_CONFIG'] = str(app_paths(root).resolver_config)
     args = SimpleNamespace(install_root=str(root), job_config=str(source) if imported else None)
     configs = wizard.configure_backend_configs(args)
     assert tomllib.loads(destination.read_text()) == expected
     assert configs['job']['sha256'] == hashlib.sha256(destination.read_bytes()).hexdigest()
-    assert configs['job']['resolver_bindings'] == ['local.cpu']
+    assert configs['job']['resolver_bindings'] == ['local.cpu/main']
     assert stat.S_IMODE(destination.stat().st_mode) == 0o600
     if imported:
         assert source.read_text() == raw
@@ -1367,6 +1362,8 @@ def test_install_uninstaller_copies_recovery_files_and_marks_ownership(tmp_path:
     assert uninstaller == root / "uninstall.sh"
     assert uninstaller.is_file()
     assert (root / "runtimes/maintenance/uninstall.py").is_file()
+    assert (root / "runtimes/maintenance/_qrun_install.py").is_file()
+    assert (root / "runtimes/maintenance/qrun.py").is_file()
     marker = json.loads((app_paths(root).marker).read_text(encoding="utf-8"))
     assert marker["schema_version"] == "coragent-installation/3"
 

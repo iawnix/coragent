@@ -53,7 +53,7 @@
 Host Python 基础环境和 wheel overlay 位于
 `<env_root>/<installation-id>/{base,kernels}/<hash>`。
 `runtime.env_root` 可指定专属存储目录；安装器也接受 `CORAGENT_HOST_ENV_ROOT`。
-科学解释器和程序通过 `config.toml` 的 `execution.targets.<target>.bindings` 单独配置。
+科学解释器和程序通过 `config.toml` 的 `execution.platforms.<platform>.schedulers.<entry>.bindings` 单独配置。
 
 Socket 和进程锁使用按安装身份隔离的系统 runtime 目录。Pi 会话历史位于
 `<state_root>/pi/sessions/<workspace-id>/<session-id>/session.sqlite`，

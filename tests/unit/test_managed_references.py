@@ -92,27 +92,15 @@ def test_preparation_cli_emits_only_a_file_and_digest_in_workspace(tmp_path):
     workspace(tmp_path)
     config = tmp_path / "job.toml"
     from research_agent.jobs.config_contract import load_job_config
-    python = load_job_config(config)['targets']['local']['backends']['validation']['python']
-    config.write_text('''[execution]
-default_target = "local"
-[execution.targets.local]
-type = "local"
-driver = "process"
-[execution.targets.local.python]
-manager = "conda"
-conda_executable = CONDA_PATH
-prefix = PREFIX_PATH
-lock_ref = LOCK_PATH
-[execution.targets.local.bindings.xtb]
-command = ["/bin/true"]
-'''.replace('CONDA_PATH', json.dumps(python['conda_executable']))
+    python = load_job_config(config)['targets']['local/main']['backends']['validation']['python']
+    config.write_text('[execution]\nschema_version = 2\ndefault_platform = "local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n[execution.platforms.local.python]\nmanager = "conda"\nconda_executable = CONDA_PATH\nprefix = PREFIX_PATH\nlock_ref = LOCK_PATH\n[execution.platforms.local.bindings.xtb]\ncommand = ["/bin/true"]\n'.replace('CONDA_PATH', json.dumps(python['conda_executable']))
        .replace('PREFIX_PATH', json.dumps(python['prefix'])).replace('LOCK_PATH', json.dumps(python['lock_ref'])))
     xyz = tmp_path / "water.xyz"
     xyz.write_text("1\nH\nH 0 0 0\n")
     output = tmp_path / "prepared" / "request.json"
     env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": os.pathsep.join(sys.path)}
     before = read(tmp_path)
-    result = subprocess.run([sys.executable, "-m", "research_agent.application.executors", "--config", str(config), "--target", "local",
+    result = subprocess.run([sys.executable, "-m", "research_agent.application.executors", "--config", str(config), "--platform", "local",
                              "--executor", "chemical.xtb", "--version", "1", "--input", "geometry=" + str(xyz), "--output", str(output),
                              "--", "--task", "sp"], env=env, capture_output=True, text=True, check=True)
     value = json.loads(result.stdout)

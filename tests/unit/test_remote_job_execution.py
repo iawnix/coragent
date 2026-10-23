@@ -1,4 +1,6 @@
 """Execute remote wrappers with real shells/rsync and a local scheduler fixture."""
+
+from tests.support.platforms import execution_config
 from dataclasses import replace
 import json
 import os
@@ -43,9 +45,7 @@ def cluster(tmp_path, monkeypatch):
         del local[index:index+2]
         local = [value.removeprefix('fixture:') for value in local]
         return original_capture(local, timeout=timeout)
-    config = {'driver': 'external', 'transport': 'ssh', 'ssh_host': 'fixture', 'work_root': str(target),
-              'handler': [sys.executable, str(Path(__file__).resolve().parents[2] / 'skills/core/batch-schedulers/scripts/batch.py'), 'torque'],
-              'allowed_queues': ['batch'], 'transfer_timeout_seconds': 900}
+    config = {'executor': 'external', 'transport': 'ssh', 'ssh_host': 'fixture', 'work_root': str(target), 'handler': [sys.executable, str(Path(__file__).resolve().parents[2] / 'skills/core/batch-schedulers/scripts/batch.py'), 'torque'], 'allowed_queues': ['batch'], 'transfer_timeout_seconds': 900}
     # All runtime-created transports (including installation acceptance) use the simulation.
     original_init = SSHTransport.__init__
     def init(self, config, **kwargs):
@@ -150,8 +150,7 @@ def test_raw_job_submission_resolves_defaults_before_recording_attempt(tmp_path,
     initialize_workspace(root, 'resources_test', 'research')
     admit_research_workspace(root)
     config = tmp_path / 'defaults.toml'
-    config.write_text('[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\nsupervisor="process"\n'
-                      '[execution.targets.local.submission.resources]\ncpus=1\nmemory_mb=256\nwalltime="00:00:15"\n')
+    config.write_text('[execution]\nschema_version = 2\ndefault_platform="local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\n[execution.platforms.local.schedulers.main.submission.resources]\ncpus=1\nmemory_mb=256\nwalltime="00:00:15"\n')
     monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(config))
     request = {'root': str(root), 'request_id': 'job_1',
                'command': ['/bin/true'], 'metadata': {'resources': {'memory_mb': 128}}}
@@ -165,30 +164,40 @@ def test_raw_job_submission_resolves_defaults_before_recording_attempt(tmp_path,
     assert dispatch('start', request)['metadata']['resources'] == expected
 
 
-@pytest.mark.parametrize('kind,scheduler,submission', [
-    ('local', None, {'queue': 'batch'}),
-    ('local', None, {'resources': {'select': '1:ncpus=2'}}),
-    ('remote', 'external', {'resources': {'select': '1:ncpus=2'}}),
-    ('remote', 'external', {'resources': {'select': '1:ncpus=2', 'cpus': 2}}),
-    ('remote', 'external', {'resources': {'walltime': '00:00:00'}}),
+@pytest.mark.parametrize('executor,transport,submission', [
+    ('qrun', 'local', {'queue': 'batch'}),
+    ('qrun', 'local', {'resources': {'select': '1:ncpus=2'}}),
+    ('pbs', 'ssh', {'resources': {'select': '1:ncpus=2', 'cpus': 2}}),
+    ('pbs', 'ssh', {'resources': {'walltime': '00:00:00'}}),
 ])
-def test_runtime_and_schema_agree_on_scheduler_resource_errors(kind, scheduler, submission):
+def test_runtime_and_schema_agree_on_scheduler_resource_errors(executor, transport, submission):
     from jsonschema import Draft202012Validator
-    target = {'kind': kind, 'submission': submission}
-    if kind == 'remote': target.update(ssh_host='fixture', remote_root='/scratch', scheduler=scheduler)
-    config = {'execution': {'default_target': 'test', 'targets': {'test': target}}}
-    with pytest.raises(ValueError): validate_job_config(config)
+    target = {'executor': executor, 'transport': transport, 'work_root': '/srv/jobs',
+              'handler': ['/bin/true'], 'submission': submission}
+    if transport == 'ssh':
+        target['ssh_host'] = 'fixture'
+    config = {'execution': execution_config('test', {'test': target})}
+    with pytest.raises(ValueError, match='Qrun|use PBS|walltime'):
+        validate_job_config(config)
     assert list(Draft202012Validator(job_config_schema()).iter_errors(config))
 
 
 def test_submission_merges_target_backend_and_requested_resources_once():
-    config = validate_job_config({'execution': {'default_target': 'cluster', 'targets': {'cluster': {
-        'type': 'remote', 'driver': 'external', 'transport': 'ssh', 'ssh_host': 'fixture',
-        'work_root': '/scratch/jobs', 'handler': ['/bin/true'], 'allowed_queues': ['batch'],
-        'submission': {'queue': 'batch', 'resources': {'cpus': 8, 'memory_mb': 1000, 'walltime': '00:05:00'}},
-        'bindings': {'method': {'command': ['/bin/true'], 'submission': {'resources': {'cpus': 2}}}},
-    }}}})
-    result = resolve_submission(config, 'cluster', 'method', requested={'resources': {'memory_mb': 500}})
+    config = validate_job_config({'execution': execution_config('cluster', {'cluster': {'executor': 'external', 'transport': 'ssh', 'ssh_host': 'fixture', 'work_root': '/scratch/jobs', 'handler': ['/bin/true'], 'allowed_queues': ['batch'], 'submission': {'queue': 'batch', 'resources': {'cpus': 8, 'memory_mb': 1000, 'walltime': '00:05:00'}}, 'bindings': {'method': {'command': ['/bin/true'], 'submission': {'resources': {'cpus': 2}}}}}})})
+    result = resolve_submission(config, 'cluster/main', 'method', requested={'resources': {'memory_mb': 500}})
     assert result == {'queue': 'batch', 'resources': {'cpus': 2, 'memory_mb': 500, 'walltime': '00:05:00'}}
     with pytest.raises(ValueError, match='not allowed'):
-        resolve_submission(config, 'cluster', 'method', requested={'queue': 'other'})
+        resolve_submission(config, 'cluster/main', 'method', requested={'queue': 'other'})
+
+
+def test_repeated_transfer_repairs_same_size_same_timestamp_destination(cluster, tmp_path):
+    import os
+    platform, calls, remote = cluster
+    source = remote / 'result.txt'
+    source.write_text('correct')
+    destination = tmp_path / 'recovered.txt'
+    destination.write_text('partial')
+    os.utime(destination, ns=(source.stat().st_atime_ns, source.stat().st_mtime_ns))
+    assert platform.transport.pull(str(source), destination)
+    assert destination.read_text() == 'correct'
+    assert not (tmp_path / '.coragent-transfer').exists()

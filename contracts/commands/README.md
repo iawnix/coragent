@@ -21,7 +21,7 @@ results.json declares JSON response DTOs, including read variants and unsuccessf
 | `research_source` | `session_id`, `message_id`, `text` | write |
 | `research_observe` | `read_basis` | write |
 | `research_allocate_task` | `session_id`, `request_id` | write |
-| `job_targets` |  |  |
+| `job_platforms` |  |  |
 | `job_resolve_target` |  |  |
 | `job_start` |  |  |
 | `job_status` |  |  |
@@ -33,6 +33,7 @@ results.json declares JSON response DTOs, including read variants and unsuccessf
 | `job_resolve_prepared` | `prepared_ref` | read |
 | `job_manager_assess` | `event_id`, `session_id` | read |
 | `job_list` |  | read |
+| `job_resources` |  |  |
 | `artifact_register` |  |  |
 | `artifact_create` |  |  |
 | `artifact_read` | `artifact_id` |  |

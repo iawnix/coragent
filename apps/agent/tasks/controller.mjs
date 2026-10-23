@@ -1,15 +1,16 @@
 import { createHash } from "node:crypto";
 import { defineDoc, defineDocFamily } from "@earendil-works/pi-durable";
+import { resolveExecutionPolicy, resolveExecutionPlan, executionItemContext, projectExecutionPlan } from "./execution-plan.mjs";
 import { resolveTaskSelection } from "./execution-selection.mjs";
 import { verifyAssessment, checkCompletion } from "./assessment.mjs";
 import { taskRecoveryPolicy, retryableSubmission, recoveryReady } from "./recovery.mjs";
 import { hasPendingInput } from "../host/admission/input.mjs";
-import shared from "../../../contracts/commands/shared.json" with { type: "json" };
+import shared from "../tools/tool-schemas.json" with { type: "json" };
 
 export const UserTasks = defineDoc({ kind: "coragent.user-tasks", version: 1,
   scope: "conversation", history: "latest", fork: "initial",
   initial: () => ({ current: null, ids: [], cancellation_tasks: [], job_cancellations: [], automatic_suppressed: false, user_epoch: 0, latest_user_submission_id: null }) });
-export const UserTask = defineDocFamily({ kind: "coragent.user-task", version: 3, family: true,
+export const UserTask = defineDocFamily({ kind: "coragent.user-task", version: 4, family: true,
   scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
 const ControlReceipt = defineDocFamily({ kind: "coragent.task-control-receipt", version: 1, family: true,
   scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
@@ -49,7 +50,7 @@ const contextProjection = data => {
     refresh_reason: data.refresh_reason, updated_at: stamp() };
 };
 const taskRecord = task => {
-  if (task) requireValue(task.schema_version === "coragent-user-task/3", "task_schema_unsupported", "User tasks require coragent-user-task/3");
+  if (task) requireValue(task.schema_version === "coragent-user-task/4", "task_schema_unsupported", "User tasks require coragent-user-task/4");
   return task;
 };
 const resultIdentity = ref => `result:${ref}`;
@@ -449,19 +450,24 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       }
       return { events: eligible, basis: task ? { task_revision: task.revision, control_epoch: task.control_epoch } : {} };
     },
-    current: settleWait, pauseInTransaction,
+    async current(ctx) {
+      const task = await settleWait(ctx);
+      return task?.execution_plan
+        ? { ...task, execution_progress: projectExecutionPlan(task, await ownedJobs(task.user_task_id)) } : task;
+    },
+    pauseInTransaction,
     async binding(ctx) {
       requireValue(!await controller.toolRestriction(ctx), "task_not_active", "This run may only finalize the user's stop request");
       const task = await settleWait(ctx);
       if (!task || terminal.has(task.state)) return null;
       requireValue(task.state === "active", "task_not_active", "Only an active user task may start new Jobs");
       return { user_task_id: task.user_task_id,
-        ...(task.execution_target ? { execution_target: task.execution_target, route_digest: task.execution_selection?.route_digest } : {}) };
+        execution_context: executionItemContext(task, task.active_execution_item) };
     },
     async read({ user_task_id }, ctx) {
       const task = await harness.snapshot(UserTask, conversation.id, user_task_id, ctx);
       requireValue(task?.user_task_id, "task_not_found", "User task does not exist in this conversation");
-      return taskRecord(task);
+      return { ...taskRecord(task), execution_progress: task.execution_plan ? projectExecutionPlan(task, await ownedJobs(task.user_task_id)) : null };
     },
     /** Bind the first research Node to an otherwise unbound active task.
      * This is a derived runtime convenience: it deliberately does not advance
@@ -511,16 +517,18 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       if (replayed !== null) return replayed;
       const sources = await sourceRecords(params.source_submission_ids, ctx);
       const selection = await resolveTaskSelection(kernel, params, sources);
+      const policy = await resolveExecutionPolicy(kernel, params.execution_policy, selection, sources);
       requireValue(new Set(params.criteria.map(c => c.id)).size === params.criteria.length, "task_criteria_invalid", "Criterion IDs must be unique");
       return conversation.commit(tx => receipt(tx, requestId, params, async () => {
         const { index, task: existing } = await currentTx(tx);
         requireValue(!existing || terminal.has(existing.state), "task_already_exists", "This conversation already has a nonterminal user task; update it");
         const { identifier: id } = await kernel.execute_command("research_allocate_task", { session_id: sessionId, request_id: requestId });
         const task = await tx.doc(UserTask, conversation.id, id, null);
-        Object.assign(task, { schema_version: "coragent-user-task/3", user_task_id: id,
+        Object.assign(task, { schema_version: "coragent-user-task/4", user_task_id: id,
           workspace_id: workspaceId, session_id: sessionId, conversation_id: conversation.id,
           title: params.title, objective: params.objective, sources, criteria: params.criteria,
-          execution_target: selection.target, execution_selection: selection, requirements_revision: 1,
+          execution_target: selection.target, execution_selection: selection, execution_policy: policy,
+          execution_plan: null, active_execution_item: null, requirements_revision: 1,
           initial_plan: params.initial_plan || "Preserve the user's deliverables, establish the research scope, and produce evidence for the first decision before choosing the next action.",
           next_action: params.next_action || "Read the current requirements and perform the first concrete evidence-producing action.",
           state: "active", reason: null, revision: 1, control_epoch: 1, wait: null,
@@ -546,12 +554,48 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       }
       const sources = params.action === "refine" ? await sourceRecords(params.source_submission_ids, ctx) : null;
       requireValue(params.action === "set_research" || params.research === undefined, "task_research_invalid", "Research bindings use set_research");
-      requireValue(["refine", "correct_execution"].includes(params.action) || (params.execution_target === undefined && params.execution_intent === undefined), "task_constraint_invalid", "Execution target changes require refine and a new user source");
-      const changingTarget = params.execution_target !== undefined || params.execution_intent !== undefined;
+      requireValue(["refine", "correct_execution"].includes(params.action) || (params.execution_target === undefined && params.execution_intent === undefined && params.execution_policy === undefined), "task_constraint_invalid", "Execution target changes require refine and a new user source");
+      const changingTarget = params.execution_target !== undefined || params.execution_intent !== undefined || params.execution_policy !== undefined;
+      requireValue(!changingTarget || !basis.execution_plan, "execution_policy_pinned", "An existing plan pins its placement policy");
       const selection = changingTarget && ["refine", "correct_execution"].includes(params.action)
-        ? await resolveTaskSelection(kernel, params, params.action === "correct_execution" ? basis.sources : sources, basis.execution_selection) : null;
+        ? await resolveTaskSelection(kernel, { ...params,
+          execution_target: params.execution_target || (params.execution_intent
+            ? { platform: basis.execution_target.platform } : basis.execution_target) },
+          params.action === "correct_execution" ? basis.sources : sources, basis.execution_selection) : null;
       if (params.action === "correct_execution") requireValue(params.reason?.trim() && selection
         && selection.selection_mode === "explicit", "execution_correction_invalid", "Correction needs the original explicit instruction and an audit reason");
+      const policy = changingTarget ? { ...await resolveExecutionPolicy(kernel, params.execution_policy,
+        selection || basis.execution_selection, params.action === "correct_execution" ? basis.sources : sources),
+        ...(!params.execution_policy ? { max_in_flight: basis.execution_policy.max_in_flight,
+          max_attempts: basis.execution_policy.max_attempts } : {}) } : null;
+      const planJobs = ["set_execution_plan", "select_execution_item", "complete_execution_item"].includes(params.action)
+        ? await ownedJobs(basis.user_task_id) : [];
+      const executionPlan = params.action === "set_execution_plan"
+        ? await resolveExecutionPlan(kernel, params.execution_plan, basis.execution_policy, basis.execution_plan, planJobs) : null;
+      if (params.action === "select_execution_item") executionItemContext(basis, params.execution_item_id);
+      if (params.action === "complete_execution_item") {
+        executionItemContext(basis, params.execution_item_id);
+        const job = planJobs.findLast(row => row.execution_item?.id === params.execution_item_id);
+        requireValue(job?.state === "succeeded" && job.collection_state === "complete" && !job.execution_conflict,
+          "execution_item_unsettled", "Collect a successfully completed Job before validating the item");
+        requireValue(params.artifact_ids.every(id => job.artifact_refs.includes(id)),
+          "execution_item_artifacts_invalid", "Handoff artifacts must come from the item's collected Job");
+        requireValue(params.evidence_refs.some(ref => ref.startsWith("result_")),
+          "execution_item_validation_required", "Publish scientific validation as a Result before releasing dependencies");
+        await verifyEvidence(params.evidence_refs, ctx, { completion: true, current: true, userTaskId: basis.user_task_id });
+        const cited = new Set();
+        for (const ref of params.evidence_refs.filter(ref => ref.startsWith("result_"))) {
+          let offset = 0, text = "";
+          do {
+            const page = await kernel.execute_command("research_read", { ref, offset, limit: 32000 });
+            text += page.text; offset = page.next_offset;
+          } while (offset !== null);
+          const result = JSON.parse(text);
+          for (const artifact of [...result.inputs, ...result.evidence_refs]) cited.add(artifact);
+        }
+        requireValue(params.artifact_ids.every(id => cited.has(id)), "execution_item_validation_unrelated",
+          "Validation Results must cite every handoff Artifact as input or evidence");
+      }
       if (params.criteria) requireValue(new Set(params.criteria.map(c => c.id)).size === params.criteria.length,
         "task_criteria_invalid", "Criterion IDs must be unique");
       if (params.action === "set_research") await verifyResearch(params.research);
@@ -614,6 +658,10 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           if (params.objective !== undefined) task.objective = params.objective;
           if (params.criteria !== undefined) task.criteria = params.criteria;
           if (selection) { task.execution_target = selection.target; task.execution_selection = selection; }
+          if (policy) {
+            requireValue(!task.execution_plan, "execution_policy_pinned", "An existing plan pins its placement policy");
+            task.execution_policy = policy;
+          }
           if (params.objective !== undefined || params.criteria !== undefined) task.requirements_revision += 1;
           task.execution_recovery = null;
           task.block_details = null;
@@ -622,12 +670,23 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           task.sources.push(...sources); task.control_epoch += 1;
           if (params.next_action !== undefined) task.next_action = params.next_action;
         } else if (params.action === "correct_execution") {
-          requireValue(selection.target !== task.execution_target, "execution_correction_invalid", "Correction must fix a different target, not silently accept changed routing");
+          requireValue(JSON.stringify(selection.target) !== JSON.stringify(task.execution_target), "execution_correction_invalid", "Correction must fix a different target, not silently accept changed routing");
           task.execution_target = selection.target; task.execution_selection = selection;
+          task.execution_policy = policy;
           task.control_epoch += 1;
           task.completion = null; task.completion_outcome = null; task.completion_stop_basis = null;
           delete task.completion_submission_id; delete task.completion_control_epoch;
           if (task.state === "completing") task.state = "active";
+        } else if (params.action === "set_execution_plan") {
+          task.execution_plan = executionPlan;
+          task.active_execution_item = null;
+          task.control_epoch += 1;
+        } else if (params.action === "select_execution_item") {
+          task.active_execution_item = params.execution_item_id;
+        } else if (params.action === "complete_execution_item") {
+          const item = task.execution_plan.items.find(row => row.id === params.execution_item_id);
+          item.completion = { artifact_ids: params.artifact_ids, evidence_refs: params.evidence_refs, at: stamp() };
+          if (task.active_execution_item === item.id) task.active_execution_item = null;
         } else if (params.action === "progress") {
           if (recordProgress(task, identities)) await recordUserRecoveryProgress(tx, task);
           task.progress = { summary: params.reason ?? null, evidence_refs: params.evidence_refs, at: stamp() };

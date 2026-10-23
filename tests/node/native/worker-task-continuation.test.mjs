@@ -1,3 +1,4 @@
+import { startQrunFixture } from "./qrun-fixture.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createServer } from "node:http";
@@ -17,6 +18,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
   const socketRoot = join(TEST_SOCKET_ROOT, "t");
   await mkdir(socketRoot);
   const saved = { ...process.env };
+  let closeQueue;
   let backend, server, requests = 0, fixtureError, failureRequests = 0, recoveryRestarted = false, blockedWrite = false;
   let scope, assessmentPending = false;
   const blockedStopCalls = new Set();
@@ -29,7 +31,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
       CORAGENT_PYTHON: managedPython(), PYTHONDONTWRITEBYTECODE: "1",
       CORAGENT_TASK_RECOVERY_BASE_DELAY_MS: "500", CORAGENT_TASK_RECOVERY_MAX_DELAY_MS: "500" });
     const jobConfig = join(root, "job.toml");
-    await writeFile(jobConfig, '[execution]\ndefault_target="local"\n[execution.targets.local]\ntype="local"\ndriver="process"\nsupervisor="process"\n');
+    closeQueue = await startQrunFixture(jobConfig, root);
     process.env.CORAGENT_JOB_CONFIG = jobConfig;
     await execute(managedPython(), [join(packageRoot, "apps/agent-cli/workspace_mode.py"),
       "--root", join(workspaceRoot, "task-flow"), "--workspace-id", "task-flow"]);
@@ -345,6 +347,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
   } finally {
     try { await backend?.close(); }
     finally {
+      await closeQueue?.();
       if (server) { server.closeAllConnections(); await new Promise(done => server.close(done)); }
       for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];
       Object.assign(process.env, saved);

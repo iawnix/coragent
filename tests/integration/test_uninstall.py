@@ -341,3 +341,49 @@ def test_installed_uninstaller_removes_owned_relay_without_source_tree(tmp_path:
     assert result['link_relay']['ok'] is True
     assert not relay_root.exists()
     assert (state / 'relay.db').read_bytes() == b'preserved state'
+
+
+@pytest.mark.parametrize('purge', [False, True])
+def test_recovery_uninstaller_removes_qrun_without_application_runtime(tmp_path, monkeypatch, purge):
+    from scripts import _qrun_install
+    from research_agent.jobs import qrun
+    root = tmp_path / 'installation'
+    options = _args(root)
+    monkeypatch.setenv('XDG_CONFIG_HOME', str(tmp_path / 'unit-config'))
+    install_uninstaller(root, Path(__file__).resolve().parents[2])
+    pool = {'route': {'transport': 'local'}, 'targets': ['local'],
+            'state_dir': str(tmp_path / 'queue'), 'cpus': 2, 'memory_mb': 1024,
+            'work_roots': [str(tmp_path / 'calculations')]}
+    record = qrun.maintain(Path(pool['state_dir']), {'operation': 'install',
+        'owner': _qrun_install.owner(root), 'start': False,
+        **{k: pool[k] for k in ('cpus', 'memory_mb', 'work_roots')}})
+    qrun.maintain(Path(pool['state_dir']), {'operation': 'commit', 'owner': _qrun_install.owner(root)})
+    registry = _qrun_install.registry(root)
+    registry['pools'] = [{**pool, 'handler': record['handler'], 'unit': record['unit']}]
+    _qrun_install.save(root, registry)
+    command = [str(root / 'uninstall.sh'), '--install-root', str(root), '--service-scope', 'none',
+               '--non-interactive', '--yes', '--json']
+    if purge:
+        command.append('--purge-qrun-state')
+    completed = subprocess.run(command, cwd=tmp_path, text=True, capture_output=True)
+    assert completed.returncode == 0
+    assert json.loads(completed.stdout)['qrun'][0]['removed']
+    assert not Path(record['unit_path']).exists()
+    assert Path(pool['state_dir']).exists() != purge
+    assert Path(pool['work_roots'][0]).exists()
+
+
+def test_qrun_removal_failure_prevents_application_deletion(tmp_path, monkeypatch):
+    root = tmp_path / 'installation'
+    options = _args(root)
+    release = root / 'releases/fixture'
+    release.mkdir(parents=True)
+
+    def refused(*_args):
+        raise ValueError('fixture unfinished jobs')
+
+    monkeypatch.setattr(uninstaller._qrun_install, 'remove', refused)
+    monkeypatch.setattr(uninstaller, 'stop_services', lambda *_a: pytest.fail('Qrun refusal must precede app changes'))
+    with pytest.raises(ValueError, match='unfinished jobs'):
+        uninstall(options)
+    assert release.exists()

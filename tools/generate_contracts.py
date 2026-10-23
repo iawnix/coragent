@@ -168,6 +168,7 @@ export function slashCompletions(name: string, prefix?: string): Array<{ value: 
         ROOT / 'backend/src/research_agent/application/command_catalog.json': encoded(catalog),
         ROOT / 'apps/agent/tools/command-catalog.json': encoded(catalog),
         ROOT / 'apps/agent/tools/parameters.d.mts': tool_types,
+        ROOT / 'apps/agent/tools/tool-schemas.json': encoded({'tools': tools}),
         ROOT / 'apps/agent/tools/commands.d.mts': command_types,
         ROOT / 'tests/fixtures/contracts/command-fixtures.json': encoded({'schema_version': 'coragent-command-fixtures/1', 'cases': examples}),
         ROOT / 'contracts/commands/README.md': '\n'.join(index) + '\n',

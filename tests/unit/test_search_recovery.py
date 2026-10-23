@@ -116,7 +116,7 @@ def test_registered_recovery_executor_prepares_a_pinned_job(tmp_path):
 
     source = tmp_path / "input.json"
     source.write_text(json.dumps(spec()), encoding="utf-8")
-    request = prepare(os.environ["CORAGENT_JOB_CONFIG"], "local", "chemical.search-recovery", "1", {"input": source})
+    request = prepare(os.environ["CORAGENT_JOB_CONFIG"], {'platform': 'local', 'scheduler_entry': 'main'}, "chemical.search-recovery", "1", {"input": source})
     assert request["metadata"]["executor"] == {"id": "chemical.search-recovery", "version": "1"}
     assert request["outputs"] == [{"path": "results", "recursive": True, "required": False, "min_bytes": 0},
                                   {"path": "results/result.json", "required": True, "min_bytes": 2,

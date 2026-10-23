@@ -11,6 +11,11 @@ selected file. `execution` uses the target schema from
 [job.execution.example.toml](job.execution.example.toml), without another nested
 `execution` table. `models.providers` uses Pi provider definitions.
 
+For local or SSH queues backed by systemd, see
+[job.qrun.example.toml](job.qrun.example.toml) and the [Qrun guide](../docs/QRUN.md).
+Every target selects `transport` and `executor` independently. Bare-host Jobs use
+Qrun; the old driver/supervisor configuration and direct executors have been removed.
+
 `credentials.json` has two objects: `models` holds native Pi provider credentials
 (including refreshed OAuth credentials), and `secrets` holds named strings.
 Use `credential:NAME` in a secret-valued configuration field to reference a named

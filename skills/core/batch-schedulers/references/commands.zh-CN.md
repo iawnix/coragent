@@ -2,6 +2,7 @@
 
 | 调度器 | 提交 | 查询 | 取消 |
 | --- | --- | --- | --- |
+| Qrun | CoRAgent `job_start` → `qrun handler` | `qrun resources`; `qrun jobs`; `qrun show 12` | `qrun cancel 12` |
 | OpenPBS / PBS Pro | `qsub -q batch -l select=1:ncpus=4:mem=4096mb -l walltime=01:00:00 run.sh` | `qstat -x -f -F json JOB_ID` | `qdel JOB_ID` |
 | Torque | `qsub -q batch -l nodes=1:ppn=4 -l mem=4096mb -l walltime=01:00:00 run.sh` | `qstat -x JOB_ID` | `qdel JOB_ID` |
 | Slurm | `sbatch --partition=batch --cpus-per-task=4 --mem=4096 --time=60 run.sh` | `squeue -j JOB_ID`；`sacct -X -j JOB_ID -o JobID,State,ExitCode` | `scancel JOB_ID` |

@@ -141,13 +141,17 @@ def _offline_conda_lock(lock):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--config", required=True)
-    p.add_argument("--target", required=True)
+    p.add_argument("--platform", required=True)
+    p.add_argument("--scheduler-entry")
     p.add_argument("--backend", required=True)
     p.add_argument("--adopt", action="store_true", help="Verify an explicitly seeded/cloned environment against its exported locks before recording it")
     p.add_argument('--package-cache', type=Path, help='Directory for pinned pip wheels/source archives; defaults below the environment parent')
     p.add_argument('--offline', action='store_true', help='Install only from the Conda and pip package caches')
     a = p.parse_args()
-    print(json.dumps(install(resolve_python(load_job_config(a.config), a.target, a.backend), adopt=a.adopt,
+    settings = load_job_config(a.config)
+    target = contract.resolve_target(settings, {"platform": a.platform,
+        **({"scheduler_entry": a.scheduler_entry} if a.scheduler_entry else {})})
+    print(json.dumps(install(resolve_python(settings, target, a.backend), adopt=a.adopt,
                              package_cache=a.package_cache, offline=a.offline), indent=2))
 
 

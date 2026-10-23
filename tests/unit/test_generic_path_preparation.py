@@ -211,7 +211,7 @@ def test_generic_irc_preparer_runs_from_declared_staged_resources(tmp_path):
     workspace(tmp_path)
     source = tmp_path/'spec.json'; source.write_text(json.dumps(RING_OPENING))
     checkpoint = tmp_path/'fixture.chk'; checkpoint.write_bytes(b'synthetic checkpoint')
-    request = prepare_job(os.environ['CORAGENT_JOB_CONFIG'], 'local', 'chemical.path-irc', '1',
+    request = prepare_job(os.environ['CORAGENT_JOB_CONFIG'], {'platform': 'local', 'scheduler_entry': 'main'}, 'chemical.path-irc', '1',
                           {'spec': source, 'checkpoint': checkpoint}, ['--max-points', '12'])
     request_file = tmp_path/'request.json'; request_file.write_text(json.dumps(request))
     collected = run_job(tmp_path, {'request_file':str(request_file),

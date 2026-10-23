@@ -670,13 +670,10 @@
         },
         "environment": {
           "type": "object",
-          "patternProperties": {
-            "^.*$": {
-              "type": "string",
-              "maxLength": 16384
-            }
+          "additionalProperties": {
+            "type": "string"
           },
-          "description": "Direct submission only: environment variable name/value map, not the execution target name (use execution_target). Prepared requests own this field."
+          "description": "Process environment variables; platform selection uses execution_target."
         },
         "inputs": {
           "type": "array",
@@ -757,10 +754,7 @@
           "description": "Execution time limit in seconds for the submitted Job, not the bash preparation timeout. May accompany either a direct or prepared submission."
         },
         "execution_target": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128,
-          "description": "Direct submission only: configured execution target name, such as local, tri or slurm. Prepared requests already select their target. Selects routing, not a Conda environment or scientific backend."
+          "$ref": "shared.json#/definitions/execution_target"
         },
         "root": {
           "type": "string"
@@ -937,10 +931,7 @@
       "type": "object",
       "properties": {
         "execution_target": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128,
-          "description": "Configured execution target name. Checks routing infrastructure, not whether a scientific executable or method works. Use the executor targeted environment check for backend availability."
+          "$ref": "shared.json#/definitions/execution_target"
         },
         "root": {
           "type": "string"
@@ -1136,14 +1127,7 @@
           "pattern": "\\S"
         },
         "execution_target": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "minLength": 1,
-          "maxLength": 128,
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
-          "description": "Optional configured target or alias, checked against the cited execution intent. When omitted, resolve the intent or snapshot the installation default. Tasks pin the result; omitted does not mean unrestricted."
+          "$ref": "shared.json#/definitions/execution_target"
         },
         "execution_intent": {
           "type": "object",
@@ -1161,11 +1145,6 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 128
-            },
-            "location": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
             }
           },
           "required": [
@@ -1173,7 +1152,10 @@
             "source_text"
           ],
           "additionalProperties": false,
-          "description": "Quote the affirmative execution instruction from a cited user submission; scheduler and location are independent constraints (for example tri and controller). Use an exact excerpt to disambiguate alternatives or negations."
+          "description": "Quote the affirmative platform/scheduler instruction from an actual cited user submission."
+        },
+        "execution_policy": {
+          "$ref": "shared.json#/definitions/execution_policy"
         }
       },
       "required": [
@@ -1208,7 +1190,10 @@
             "propose_completion",
             "set_research",
             "apply_user_control",
-            "correct_execution"
+            "correct_execution",
+            "set_execution_plan",
+            "select_execution_item",
+            "complete_execution_item"
           ],
           "description": "refine requires source_submission_ids; progress requires evidence_refs; wait requires wait; block requires reason, block_kind and resume_when; all kinds except missing_user_input also require evidence_refs; propose_completion requires completion; set_research requires research. Send only the fields for the selected action. apply_user_control applies an explicit user pause/resume/cancel instruction with control and source_submission_ids; cancel also requires jobs. correct_execution fixes an incorrect target interpretation using an original task source, execution_intent and reason; it does not authorize a new destination."
         },
@@ -1419,14 +1404,7 @@
           "description": "apply_user_control with control=cancel only: keep existing Jobs or request cancellation of all Jobs owned by this task, according to the user instruction. Cancellation failures remain pending; verify receipts before claiming Jobs stopped."
         },
         "execution_target": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "minLength": 1,
-          "maxLength": 128,
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
-          "description": "Optional configured target or alias, checked against the cited execution intent. When omitted, resolve the intent or snapshot the installation default. Tasks pin the result; omitted does not mean unrestricted."
+          "$ref": "shared.json#/definitions/execution_target"
         },
         "execution_intent": {
           "type": "object",
@@ -1444,11 +1422,6 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 128
-            },
-            "location": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
             }
           },
           "required": [
@@ -1456,7 +1429,7 @@
             "source_text"
           ],
           "additionalProperties": false,
-          "description": "Quote the affirmative execution instruction from a cited user submission; scheduler and location are independent constraints (for example tri and controller). Use an exact excerpt to disambiguate alternatives or negations."
+          "description": "Quote the affirmative platform/scheduler instruction from an actual cited user submission."
         },
         "completion_outcome": {
           "enum": [
@@ -1546,6 +1519,110 @@
               }
             }
           ]
+        },
+        "execution_policy": {
+          "$ref": "shared.json#/definitions/execution_policy"
+        },
+        "execution_plan": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                  },
+                  "work_id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                  },
+                  "target": {
+                    "$ref": "shared.json#/definitions/execution_target"
+                  },
+                  "depends_on": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                    },
+                    "minItems": 0,
+                    "maxItems": 1000
+                  },
+                  "input_artifact_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^art_[1-9][0-9]*$"
+                    },
+                    "minItems": 0,
+                    "maxItems": 1000
+                  },
+                  "resources": {
+                    "type": "object",
+                    "properties": {
+                      "cpus": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "memory_mb": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "walltime": {
+                        "type": "string",
+                        "pattern": "^[0-9]+:[0-5][0-9]:[0-5][0-9]$"
+                      }
+                    },
+                    "required": [
+                      "cpus",
+                      "memory_mb"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "backend": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                  },
+                  "candidates": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "items": {
+                      "$ref": "shared.json#/definitions/execution_target"
+                    }
+                  }
+                },
+                "required": [
+                  "id",
+                  "work_id",
+                  "resources"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "maxItems": 1000
+            }
+          },
+          "required": [
+            "items"
+          ],
+          "additionalProperties": false
+        },
+        "execution_item_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+        },
+        "artifact_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^art_[1-9][0-9]*$"
+          },
+          "minItems": 1,
+          "maxItems": 1000
         }
       },
       "required": [
@@ -1895,8 +1972,350 @@
               "stop_basis": false
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "set_execution_plan"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "execution_plan"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "select_execution_item"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "execution_item_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "complete_execution_item"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "execution_item_id",
+              "artifact_ids",
+              "evidence_refs"
+            ]
+          }
+        },
+        {
+          "if": {
+            "not": {
+              "properties": {
+                "action": {
+                  "enum": [
+                    "set_execution_plan"
+                  ]
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "execution_plan": false
+            }
+          }
+        },
+        {
+          "if": {
+            "not": {
+              "properties": {
+                "action": {
+                  "enum": [
+                    "select_execution_item",
+                    "complete_execution_item"
+                  ]
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "execution_item_id": false
+            }
+          }
+        },
+        {
+          "if": {
+            "not": {
+              "properties": {
+                "action": {
+                  "enum": [
+                    "complete_execution_item"
+                  ]
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "artifact_ids": false
+            }
+          }
+        },
+        {
+          "if": {
+            "not": {
+              "properties": {
+                "action": {
+                  "enum": [
+                    "refine"
+                  ]
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "execution_policy": false
+            }
+          }
         }
       ]
+    },
+    "job_platforms": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "job_resources": {
+      "type": "object",
+      "properties": {
+        "execution_target": {
+          "$ref": "shared.json#/definitions/execution_target"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "definitions": {
+    "execution_target": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+        },
+        "scheduler_entry": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "description": "Named platform and optional scheduler entry. Omitted entry resolves the platform default."
+    },
+    "resolved_execution_target": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+        },
+        "scheduler_entry": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+        }
+      },
+      "required": [
+        "platform",
+        "scheduler_entry"
+      ],
+      "additionalProperties": false
+    },
+    "execution_policy": {
+      "type": "object",
+      "properties": {
+        "placements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "target": {
+                "$ref": "shared.json#/definitions/execution_target"
+              },
+              "intent": {
+                "type": "object",
+                "properties": {
+                  "source_submission_id": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]*$"
+                  },
+                  "source_text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "scheduler": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                },
+                "required": [
+                  "source_submission_id",
+                  "source_text"
+                ],
+                "additionalProperties": false,
+                "description": "Quote the affirmative platform/scheduler instruction from an actual cited user submission."
+              }
+            },
+            "required": [
+              "target",
+              "intent"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 32
+        },
+        "max_in_flight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "automatic_placement": {
+          "type": "boolean",
+          "description": "Allow resource-based selection only among explicit item candidates within the allowed placements."
+        }
+      },
+      "required": [
+        "placements",
+        "max_in_flight",
+        "max_attempts"
+      ],
+      "additionalProperties": false
+    },
+    "execution_context": {
+      "type": "object",
+      "properties": {
+        "selection": {
+          "type": "object",
+          "properties": {
+            "target": {
+              "$ref": "shared.json#/definitions/resolved_execution_target"
+            },
+            "route_digest": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "target",
+            "route_digest"
+          ],
+          "additionalProperties": false
+        },
+        "policy": {
+          "type": "object",
+          "properties": {
+            "max_in_flight": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "max_attempts": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "max_in_flight",
+            "max_attempts"
+          ],
+          "additionalProperties": false
+        },
+        "item": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+            },
+            "work_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+            },
+            "resources": {
+              "type": "object",
+              "properties": {
+                "cpus": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "memory_mb": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "walltime": {
+                  "type": "string",
+                  "pattern": "^[0-9]+:[0-5][0-9]:[0-5][0-9]$"
+                }
+              },
+              "required": [
+                "cpus",
+                "memory_mb"
+              ],
+              "additionalProperties": false
+            },
+            "input_artifact_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^art_[1-9][0-9]*$"
+              },
+              "minItems": 0,
+              "maxItems": 1000
+            },
+            "plan_revision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "backend": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+            }
+          },
+          "required": [
+            "id",
+            "work_id",
+            "resources",
+            "input_artifact_ids",
+            "plan_revision"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "selection",
+        "policy"
+      ],
+      "additionalProperties": false
     }
   }
 }

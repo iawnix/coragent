@@ -12,12 +12,12 @@
 脚本从 stdin 读取一个 JSON 请求，向 stdout 输出一个统一 JSON 响应，支持
 `probe`、`submit`、`status`、`cancel` 和 `recover`。
 
-CoRAgent 与 TRI 位于同一登录节点时，使用 `driver="external"` 和
+CoRAgent 与 TRI 位于同一登录节点时，使用 `executor = "external"
 `transport="local"`。`work_root` 指向与计算节点共享的持久目录，`handler`
 指定已安装 Python 和本脚本的绝对路径。完整配置见[目标配置与协议](../../../../docs/EXTERNAL_JOBS.zh-CN.md)。
 研究计算继续通过 `job_start`、`job_status`、`job_reconcile` 和 `job_collect` 管理。
 
-原生任务状态、取消确认和日志检查见[TRI 任务诊断](tri-diagnosis.zh-CN.md)；服务端与节点部署见[TRI 运维](../../tri-operations/SKILL.zh-CN.md)。
+原生任务状态、取消确认和日志检查见[TRI 任务诊断](tri-diagnosis.zh-CN.md)；服务端与节点部署见[TRI 运维](../../../../docs/TRI_OPERATIONS.zh-CN.md)。
 
 ## Handler 环境
 
@@ -93,7 +93,7 @@ TRI 成功提交回执必须包含 `driver="external"` 和非空 `scheduler_id`�
 "$CORAGENT_PYTHON" "$CORAGENT_PACKAGE_ROOT/scripts/verify_tri_nodes.py" \
   --config "$HOME/.config/coragent/config.toml" \
   --package-root "$CORAGENT_PACKAGE_ROOT" --directory "$TRI_ACCEPTANCE_DIR" \
-  --target compute --nodes '["fed1","fed2"]' --timeout 180
+  --platform compute --scheduler-entry main --nodes '["fed1","fed2"]' --timeout 180
 ```
 
 将目标和节点名替换为部署的准确名称。脚本通过私有配置副本设置

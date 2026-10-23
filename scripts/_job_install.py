@@ -10,6 +10,7 @@ try:
 except ImportError:
     from app_layout import paths as app_paths
 
+from functools import lru_cache
 import base64
 import copy
 import hashlib
@@ -30,6 +31,7 @@ RECORD = 'installation/job-environments.json'
 STORES = 'installation/job-environment-stores.json'
 
 
+@lru_cache
 def contract(root=ROOT):
     spec = importlib.util.spec_from_file_location('installation_job_contract',
         root / 'backend/src/research_agent/jobs/config_contract.py')
@@ -122,8 +124,8 @@ def assignments(values, label):
     result = {}
     for value in values or []:
         name, separator, path = value.partition('=')
-        if not separator or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', name) or name in result:
-            raise ValueError(label + ' requires unique TARGET=/absolute/path values')
+        if not separator or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*', name) or name in result:
+            raise ValueError(label + ' requires unique PLATFORM/ENTRY=/absolute/path values')
         contract()._absolute(path, label)
         result[name] = path
     return result
@@ -150,9 +152,12 @@ def plan(args, package=ROOT):
                      if 'execution' in document else None)
     raw = read_input(args.job_config, inputs, required=True) if args.job_config else installed_job
     settings = tomllib.loads(raw.decode()) if raw is not None else {'execution': {
-        'default_target': 'local', 'targets': {'local': {'type': 'local', 'driver': 'systemd', 'bindings': {}}}}}
-    if "execution" in settings:
-        settings = contract().validate_job_config(settings)
+        'schema_version': 2, 'default_platform': 'local', 'platforms': {'local': {
+            'transport': 'local', 'default_scheduler': 'qrun',
+            'storage': {'work_root': str(layout.state / 'jobs')},
+            'schedulers': {'qrun': {'executor': 'qrun',
+                'submission': {'resources': {'cpus': 1, 'memory_mb': 1024}}}}}}}}
+    settings = contract().validate_job_config(settings)
     settings = copy.deepcopy(settings)
     previous_raw = read_input(app_paths(root).state / RECORD, inputs)
     previous = json.loads(previous_raw) if previous_raw else {'environments': []}
@@ -184,7 +189,7 @@ def plan(args, package=ROOT):
     for selection in dict.fromkeys(selections):
         target_name, separator, identifier = selection.partition(':')
         if not separator or target_name not in settings['targets'] or identifier not in available:
-            raise ValueError('--job-profile requires a configured TARGET:PROFILE: ' + selection)
+            raise ValueError('--job-profile requires a configured PLATFORM/ENTRY:PROFILE: ' + selection)
         target, profile = settings['targets'][target_name], available[identifier]
         selected_targets.add(target_name)
         backends = target.setdefault('backends', {})
@@ -258,7 +263,12 @@ def plan(args, package=ROOT):
             remote_resolvers[name] = {'path': variables['CORAGENT_NAME_RESOLVER_CONFIG'], 'content': remote_content.decode()}
             resolver_bindings.append(name)
     contract().validate_job_config(settings)
-    return {'schema_version': 'coragent-job-install/1', 'settings': settings,
+    try:
+        from . import _qrun_install
+    except ImportError:
+        import _qrun_install
+    pools = _qrun_install.plan(args, settings)
+    return {'schema_version': 'coragent-job-install/1', 'settings': settings, 'qrun': pools,
             'environments': rows, 'targets': sorted(selected_targets), 'inputs': inputs,
             'resolver': resolver.decode(), 'resolver_bindings': resolver_bindings, 'remote_resolvers': remote_resolvers,
             'configuration_source': 'supplied' if args.job_config else 'preserved' if raw else 'generated',
@@ -267,6 +277,7 @@ def plan(args, package=ROOT):
 
 def preview(value):
     return {'configuration_source': value['configuration_source'], 'verify_targets': value['targets'],
+            'qrun_pools': value.get('qrun', []),
             'environments': [{**{k: row[k] for k in ('target', 'profile', 'managed')},
                               'prefix': row['binding']['prefix'], 'action': 'prepare_or_reuse' if row['managed'] and row.get('prepare') else 'preserve_existing'}
                              for row in value['environments']],
@@ -351,7 +362,7 @@ def prepare(value, args, package, python):
                    'owner': digest(os.fsencode(root))[:16], 'offline': bool(getattr(args, 'job_offline', False))}
         if row['target'] in value['remote_resolvers']:
             request['resolver'] = value['remote_resolvers'][row['target']]
-        log_path = stage / (row['target'] + '-' + row['profile'] + '-provision.log')
+        log_path = stage / (row['target'].replace('/', '-') + '-' + row['profile'] + '-provision.log')
         try:
             row['receipt'] = invoke_target(target, request, package, log_path=log_path)
         except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:

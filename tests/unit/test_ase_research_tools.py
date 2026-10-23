@@ -317,12 +317,12 @@ def test_registered_tools_through_real_jobs(tmp_path,monkeypatch,operation):
     from tests.unit.test_job_recovery import workspace
     root=tmp_path/'work';workspace(root)
     config=Path(os.environ['CORAGENT_JOB_CONFIG']);text=config.read_text()
-    binding=tomllib.loads(text)['execution']['targets']['local']['bindings']['structure']['python']
+    binding=tomllib.loads(text)['execution']['platforms']['local']['bindings']['structure']['python']
     if operation.startswith('neb-'):
         backend='path_'+operation.split('-')[1]
         native=fake_xtb(tmp_path/'xtb') if backend=='path_xtb' else fake_gaussian(tmp_path/'g16')
-        text+='\n[execution.targets.local.bindings.'+backend+']\ncommand='+json.dumps(str(native))+'\n'
-        text+='[execution.targets.local.bindings.'+backend+'.python]\n'+''.join(k+'='+json.dumps(v)+'\n' for k,v in binding.items())
+        text+='\n[execution.platforms.local.bindings.'+backend+']\ncommand='+json.dumps(str(native))+'\n'
+        text+='[execution.platforms.local.bindings.'+backend+'.python]\n'+''.join(k+'='+json.dumps(v)+'\n' for k,v in binding.items())
         spec={'schema_version':'chemical-neb-input/2','reactant':h2(.8,center=True),'product':h2(1.2,center=True),
             'mapping':[['atom_1','atom_1'],['atom_2','atom_2']],
             'settings':settings() if backend=='path_xtb' else gaussian_settings(), 'image_count':3,'max_steps':0}
@@ -331,7 +331,7 @@ def test_registered_tools_through_real_jobs(tmp_path,monkeypatch,operation):
     else:spec=report_spec()
     config=tmp_path/'job.toml';config.write_text(text);monkeypatch.setenv('CORAGENT_JOB_CONFIG',str(config))
     source=root/'input.json';source.write_text(json.dumps(spec))
-    prepared=prepare(config,'local','chemical.'+operation,'2' if operation.startswith('neb-') else '1',{'input':source})
+    prepared=prepare(config,{'platform': 'local', 'scheduler_entry': 'main'},'chemical.'+operation,'2' if operation.startswith('neb-') else '1',{'input':source})
     node=execute('research_create',root,{'goal':'ASE and analysis operation fixture'})['node']
     receipt=execute('job_start',root,{**prepared,'node_id':node['id']})
     try:

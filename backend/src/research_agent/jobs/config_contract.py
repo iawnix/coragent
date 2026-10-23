@@ -9,10 +9,8 @@ import tomllib
 
 NAME_PATTERN = r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}"
 QUEUE_PATTERN = r"[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}"
-SCHEDULER_PATTERN = r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}"
 TIMEOUT_LIMITS = {"connect_timeout_seconds": 300, "command_timeout_seconds": 3600,
                   "transfer_timeout_seconds": 86400}
-TARGET_FIELDS = {"kind", "supervisor", "python", "backends", "submission"}
 BACKEND_FIELDS = {"command", "python", "activation_script", "environment", "submission", "allowed_queues", "scratch_root"}
 
 
@@ -45,185 +43,258 @@ def validate_python(binding, label="python"):
     return binding
 
 
+EXECUTORS = {"qrun", "pbs", "torque", "slurm", "tri", "external"}
+CONNECTION_FIELDS = {"transport", "ssh_host", "ssh_config", *TIMEOUT_LIMITS}
+SHARED_FIELDS = {"python", "bindings", "submission", "allowed_queues", "storage"}
+ENTRY_FIELDS = {"executor", "handler", "handler_environment", "cluster_name", "limits", *SHARED_FIELDS}
+PLATFORM_FIELDS = {"display_name", "aliases", "enabled", "default_scheduler", "schedulers", *CONNECTION_FIELDS, *SHARED_FIELDS}
+STORAGE_FIELDS = {"work_root", "scratch_root", "file_mode"}
+
+
+class ExecutionConfig(dict):
+    """Validated configuration and its derived adapter index, never a wire format."""
+
+
+def target_identity(name):
+    platform, entry = name.split("/")
+    return {"platform": platform, "scheduler_entry": entry}
+
+
+def target_key(identity):
+    _keys(identity, {"platform", "scheduler_entry"}, "execution target")
+    for field in ("platform", "scheduler_entry"):
+        if not isinstance(identity.get(field), str) or not re.fullmatch(NAME_PATTERN, identity[field]):
+            raise ValueError("execution_target_invalid: requires platform and scheduler_entry")
+    return identity["platform"] + "/" + identity["scheduler_entry"]
+
+
+def _merge(platform, entry):
+    from copy import deepcopy
+    platform, entry = deepcopy(platform), deepcopy(entry)
+    result = {key: value for key, value in platform.items() if key in CONNECTION_FIELDS | SHARED_FIELDS}
+    result.update(entry)
+    if platform.get("allowed_queues") and entry.get("allowed_queues") and set(entry["allowed_queues"]) - set(platform["allowed_queues"]):
+        raise ValueError("scheduler queues exceed platform permissions")
+    for field in ("bindings", "storage"):
+        result[field] = {**platform.get(field, {}), **entry.get(field, {})}
+    if "submission" in platform or "submission" in entry:
+        base, override = platform.get("submission", {}), entry.get("submission", {})
+        result["submission"] = {**base, **override, "resources": {**base.get("resources", {}), **override.get("resources", {})}}
+    result.update(result.pop("storage", {}))
+    return result
+
+
+def _validate_effective_target(name, target):
+    executor = target.get('executor')
+    if not isinstance(executor, str) or executor not in {'qrun', 'pbs', 'torque', 'slurm', 'tri', 'external'}:
+        raise ValueError('executor must be qrun, pbs, torque, slurm, tri or external; process/systemd drivers were removed')
+    _keys(target, {"executor", "transport", "file_mode", "work_root", "handler", "handler_environment",
+                   "cluster_name", "ssh_host", "ssh_config", "submission", "bindings", "python",
+                   "allowed_queues", "scratch_root", "platform", "scheduler_entry", "limits", *TIMEOUT_LIMITS}, f"execution.platforms.{name}")
+    transport = target.get('transport')
+    if transport not in {'local', 'ssh'}:
+        raise ValueError('executor requires transport=local or transport=ssh')
+    scope = 'remote' if transport == 'ssh' else 'local'
+    if executor == 'qrun':
+        target.setdefault('handler', ['qrun', 'handler'])
+    for field, limit in TIMEOUT_LIMITS.items():
+        if field in target and (type(target[field]) is not int or not 1 <= target[field] <= limit):
+            raise ValueError(f"external target {field} must be between 1 and {limit}")
+    if "ssh_config" in target:
+        _absolute(target["ssh_config"], f"execution.platforms.{name}.ssh_config")
+    if "allowed_queues" in target:
+        _queues(target["allowed_queues"], f"execution.platforms.{name}.allowed_queues")
+    if transport == "local" and {"ssh_host", "ssh_config"} & target.keys():
+        raise ValueError("local transport does not use SSH settings")
+    if transport == "ssh" and (not isinstance(target.get("ssh_host"), str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.@:-]*", target["ssh_host"])):
+        raise ValueError("external ssh_host is invalid")
+    if "cluster_name" in target and (not isinstance(target["cluster_name"], str) or not re.fullmatch(NAME_PATTERN, target["cluster_name"])):
+        raise ValueError("external cluster_name is invalid")
+    root = target.get("work_root")
+    _absolute(root, f"execution.platforms.{name}.work_root")
+    if target.get('file_mode', 'staged') not in ('staged', 'shared'):
+        raise ValueError('external file_mode must be staged or shared')
+    handler = target.get("handler")
+    if not isinstance(handler, list) or not handler or any(not isinstance(arg, str) or not arg or "\0" in arg for arg in handler):
+        raise ValueError("external target requires a handler argv")
+    variables = target.get("handler_environment", {})
+    if not isinstance(variables, dict):
+        raise ValueError("handler_environment must be a table")
+    if any(not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', key) or
+           not isinstance(item, str) or '\0' in item for key, item in variables.items()):
+        raise ValueError("handler_environment contains invalid variables")
+    bindings = target.get("bindings", {})
+    if not isinstance(bindings, dict):
+        raise ValueError(f"execution.platforms.{name}.bindings must be a table")
+    normalized = dict(target)
+    normalized.update({"kind": scope, "backends": bindings})
+    if "scratch_root" in normalized:
+        _absolute(normalized["scratch_root"], "storage.scratch_root")
+    limits = normalized.get("limits", {})
+    _keys(limits, {"max_in_flight", "cpus", "memory_mb", "gpus", "walltime"}, "scheduler limits")
+    for key, limit in limits.items():
+        if key == "walltime":
+            walltime_seconds(limit)
+        elif type(limit) is not int or limit < 1:
+            raise ValueError("scheduler limits must be positive")
+    return normalized
+
+
 def _validate_execution_config(value):
-    """Validate the target-oriented schema and expose its binding view."""
-    if set(value) != {"execution"}:
-        raise ValueError("job config must contain only the execution table")
+    _keys(value, {"execution"}, "job config")
     execution = value.get("execution")
-    if not isinstance(execution, dict) or set(execution) - {"default_target", "targets"}:
-        raise ValueError("execution contains unsupported fields")
-    default = execution.get("default_target")
-    targets = execution.get("targets")
-    if not isinstance(default, str) or not re.fullmatch(NAME_PATTERN, default):
-        raise ValueError("execution.default_target is invalid")
-    if not isinstance(targets, dict) or not targets or default not in targets:
-        raise ValueError("execution.targets must define the default target")
-    local_count = 0
-    normalized_targets = {}
-    for name, raw in targets.items():
-        if not isinstance(name, str) or not re.fullmatch(NAME_PATTERN, name):
-            raise ValueError(f"invalid execution target name: {name!r}")
-        if not isinstance(raw, dict):
-            raise ValueError(f"execution.targets.{name} must be a table")
-        target = dict(raw)
-        driver = target.get("driver")
-        external = driver == "external"
-        if driver not in {"external", "local", "process", "systemd"} or (not external and target.get("type") != "local"):
-            raise ValueError("execution plugin drivers were removed; use driver=external with transport and handler")
-        if not external:
-            _keys(target, {"type", "driver", "supervisor", "python", "bindings", "submission", "scheduler", "location", "aliases"}, f"execution.targets.{name}")
-        transport = target.get("transport", "ssh" if target.get("type") == "remote" else "local")
-        if external and transport not in {"local", "ssh"}:
-            raise ValueError("external transport must be local or ssh")
-        scope = target.get("type", "remote" if transport == "ssh" else "local") if external else target.get("type")
-        if external:
-            _keys(target, {"type", "driver", "transport", "file_mode", "work_root", "handler", "handler_environment",
-                           "cluster_name", "ssh_host", "ssh_config", "submission", "bindings", "python",
-                           "allowed_queues", "scheduler", "location", "aliases", *TIMEOUT_LIMITS}, f"execution.targets.{name}")
-            if "transport" not in target:
-                raise ValueError("external target requires transport=local or transport=ssh")
-            if scope != ("remote" if transport == "ssh" else "local"):
-                raise ValueError("external type must match its command transport")
-            for field, limit in TIMEOUT_LIMITS.items():
-                if field in target and (type(target[field]) is not int or not 1 <= target[field] <= limit):
-                    raise ValueError(f"external target {field} must be between 1 and {limit}")
-            if "ssh_config" in target:
-                _absolute(target["ssh_config"], f"execution.targets.{name}.ssh_config")
-            if "allowed_queues" in target:
-                _queues(target["allowed_queues"], f"execution.targets.{name}.allowed_queues")
-            if transport == "local" and {"ssh_host", "ssh_config"} & target.keys():
-                raise ValueError("local transport does not use SSH settings")
-            if transport == "ssh" and (not isinstance(target.get("ssh_host"), str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.@:-]*", target["ssh_host"])):
-                raise ValueError("external ssh_host is invalid")
-            if "cluster_name" in target and (not isinstance(target["cluster_name"], str) or not re.fullmatch(NAME_PATTERN, target["cluster_name"])):
-                raise ValueError("external cluster_name is invalid")
-            target.update(type=scope, transport=transport)
-            root = target.get("work_root")
-            _absolute(root, f"execution.targets.{name}.work_root")
-            if target.get('file_mode', 'staged') not in ('staged', 'shared'):
-                raise ValueError('external file_mode must be staged or shared')
-            handler = target.get("handler")
-            if not isinstance(handler, list) or not handler or any(not isinstance(arg, str) or not arg or "\0" in arg for arg in handler):
-                raise ValueError("external target requires a handler argv")
-            variables = target.get("handler_environment", {})
-            if not isinstance(variables, dict):
-                raise ValueError("handler_environment must be a table")
-            if any(not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', key) or
-                   not isinstance(item, str) or '\0' in item for key, item in variables.items()):
-                raise ValueError("handler_environment contains invalid variables")
-        if not external:
-            local_count += 1
-        bindings = target.get("bindings", {})
-        if not isinstance(bindings, dict):
-            raise ValueError(f"execution.targets.{name}.bindings must be a table")
-        normalized = dict(target)
-        scheduler = normalized.get("scheduler", "none" if not external else "external")
-        if not isinstance(scheduler, str) or not re.fullmatch(SCHEDULER_PATTERN, scheduler):
-            raise ValueError(f"execution.targets.{name}.scheduler is invalid")
-        aliases = normalized.get("aliases", [])
-        if (not isinstance(aliases, list) or len(aliases) != len(set(aliases))
-                or any(not isinstance(alias, str) or not re.fullmatch(NAME_PATTERN, alias) for alias in aliases)):
-            raise ValueError(f"execution.targets.{name}.aliases must be unique target names")
-        location = normalized.get("location", "controller" if scope == "local" else "cluster")
-        if not isinstance(location, str) or not re.fullmatch(NAME_PATTERN, location):
-            raise ValueError(f"execution.targets.{name}.location is invalid")
-        normalized.update({"scheduler": scheduler, "location": location, "aliases": aliases})
-        normalized.update({"kind": scope, "backends": bindings, "driver": driver})
-        if not external:
-            normalized.setdefault("supervisor", "process" if driver == "process" else "systemd")
-            if normalized["supervisor"] not in {"process", "systemd"}:
-                raise ValueError("local supervisor must be process or systemd")
-        normalized_targets[name] = normalized
-    if local_count > 1:
-        raise ValueError("execution configuration may define at most one local target")
-    normalized_config = {
-        "default_target": default,
-        "targets": normalized_targets,
-        "execution": value["execution"],
-    }
-    for name, target in normalized_targets.items():
-        _validate_bindings(normalized_config, name, target)
-    return normalized_config
-
-
-def resolve_target(settings, requested=None, *, scheduler=None, location=None):
-    """Resolve an explicit target name, scheduler name or alias.
-
-    A missing request uses the installation default. Ambiguous scheduler and
-    alias matches fail closed so a queue cannot be selected by guesswork.
-    """
-    targets = settings["targets"]
-    if not requested and not scheduler and not location:
-        return settings["default_target"]
-    value = str(requested or "").strip().casefold()
-    matches = []
+    _keys(execution, {"schema_version", "default_platform", "platforms"}, "execution")
+    if execution.get("schema_version") != 2:
+        raise ValueError("execution.schema_version must be 2; flat targets are not supported")
+    platforms = execution.get("platforms")
+    if not isinstance(platforms, dict) or not platforms:
+        raise ValueError("execution.platforms must define named platforms")
+    default = execution.get("default_platform")
+    if default not in platforms:
+        raise ValueError("execution.default_platform must name a configured platform")
+    targets, names = {}, {}
+    for name, platform in platforms.items():
+        if not re.fullmatch(NAME_PATTERN, name):
+            raise ValueError("invalid platform ID: " + name)
+        _keys(platform, PLATFORM_FIELDS, "platform " + name)
+        aliases = platform.get("aliases", [])
+        if not isinstance(aliases, list):
+            raise ValueError("platform aliases must be an array")
+        for alias in [name, *aliases]:
+            if not isinstance(alias, str) or not re.fullmatch(NAME_PATTERN, alias):
+                raise ValueError("invalid platform alias")
+            folded = alias.casefold()
+            if folded in names and names[folded] != name:
+                raise ValueError("platform_alias_ambiguous: " + alias)
+            names[folded] = name
+        if "display_name" in platform and (not isinstance(platform["display_name"], str) or not platform["display_name"].strip()):
+            raise ValueError("platform display_name must be nonempty")
+        if type(platform.get("enabled", True)) is not bool:
+            raise ValueError("platform enabled must be boolean")
+        if platform.get("transport") not in {"local", "ssh"}:
+            raise ValueError("platform requires local or ssh transport")
+        if platform["transport"] == "ssh":
+            host = platform.get("ssh_host")
+            if not isinstance(host, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.@:-]*", host):
+                raise ValueError("platform ssh_host is invalid")
+        elif {"ssh_host", "ssh_config"} & platform.keys():
+            raise ValueError("local platform does not use SSH settings")
+        _keys(platform.get("storage", {}), STORAGE_FIELDS, "platform storage")
+        entries = platform.get("schedulers", {})
+        if not isinstance(entries, dict):
+            raise ValueError("platform schedulers must be a table")
+        if platform.get("enabled", True) and platform.get("default_scheduler") not in entries:
+            raise ValueError("enabled platform requires a configured default_scheduler")
+        for entry, raw in entries.items():
+            if not re.fullmatch(NAME_PATTERN, entry):
+                raise ValueError("invalid scheduler entry ID")
+            _keys(raw, ENTRY_FIELDS, "scheduler " + entry)
+            _keys(raw.get("storage", {}), STORAGE_FIELDS, "scheduler storage")
+            key = name + "/" + entry
+            effective = _merge(platform, raw)
+            effective.update(platform=name, scheduler_entry=entry)
+            target = _validate_effective_target(key, effective)
+            if platform.get("enabled", True):
+                targets[key] = target
+    if not platforms[default].get("enabled", True):
+        raise ValueError("default platform must be enabled")
+    settings = ExecutionConfig(execution=execution, targets=targets,
+        default_target=default + "/" + platforms[default]["default_scheduler"])
     for name, target in targets.items():
-        aliases = [name, *target.get("aliases", [])]
-        if requested in targets:
-            named = name == requested
-        else:
-            named = not value or any(value == str(item).casefold() for item in aliases) or value == str(target.get("scheduler")).casefold()
-        if (named and (not scheduler or str(target.get("scheduler")).casefold() == scheduler.casefold())
-                and (not location or target.get("location") == location)):
-            matches.append(name)
-    if not matches:
-        raise ValueError("execution_target_not_configured: " + str(requested))
-    if len(set(matches)) != 1:
-        raise ValueError("execution_target_ambiguous: " + str(requested) + " -> " + ",".join(sorted(set(matches))))
-    return matches[0]
+        _validate_bindings(settings, name, target)
+    return settings
+
+
+def resolve_target(settings, requested=None, *, scheduler=None):
+    """Resolve one structured platform/entry selection to an internal adapter key."""
+    if requested is None:
+        requested = {}
+    _keys(requested, {"platform", "scheduler_entry"}, "execution target")
+    platforms = settings["execution"]["platforms"]
+    requested_platform = requested.get("platform", settings["execution"]["default_platform"])
+    matches = [name for name, platform in platforms.items()
+               if requested_platform.casefold() in {name.casefold(), *(alias.casefold() for alias in platform.get("aliases", []))}]
+    if len(matches) != 1 or not platforms[matches[0]].get("enabled", True):
+        raise ValueError("execution_platform_unavailable: " + requested_platform)
+    name = matches[0]
+    entries = platforms[name]["schedulers"]
+    candidates = [entry for entry in entries
+                  if (not requested.get("scheduler_entry") or entry == requested["scheduler_entry"])
+                  and (not scheduler or entries[entry]["executor"].casefold() == scheduler.casefold())]
+    preferred = platforms[name]["default_scheduler"]
+    if len(candidates) > 1 and preferred in candidates:
+        candidates = [preferred]
+    if len(candidates) != 1:
+        raise ValueError("execution_scheduler_ambiguous_or_missing: " + name)
+    return name + "/" + candidates[0]
 
 
 def target_route_digest(settings, name):
-    """Pin routing identity, independently of resource defaults and software bindings."""
     target = settings["targets"][name]
-    keys = ("type", "driver", "supervisor", "scheduler", "location", "transport", "ssh_host",
-            "ssh_config", "cluster_name", "work_root", "file_mode", "handler", "handler_environment")
-    return binding_digest({"target": name, **{key: target.get(key) for key in keys}})
+    keys = ("executor", "transport", "ssh_host", "ssh_config", "cluster_name", "work_root", "file_mode", "handler", "handler_environment")
+    return binding_digest({"target": target_identity(name), **{key: target.get(key) for key in keys}})
 
 
-def resolve_selection(settings, requested=None, *, scheduler=None, location=None, source_text=None):
-    # The model selects an exact excerpt from a verified user submission. This
-    # catches explicit scheduler/target contradictions; it is not an NLP parser.
+def resolve_selection(settings, requested=None, *, scheduler=None, source_text=None):
     if source_text:
-        mentioned = {str(t["scheduler"]).casefold() for t in settings["targets"].values()
-                     if t.get("scheduler") not in (None, "none") and re.search(
-                         r"(?<![A-Za-z0-9_])" + re.escape(t["scheduler"]) + r"(?![A-Za-z0-9_])", source_text, re.I)}
+        mentioned = {executor for executor in EXECUTORS - {"external"}
+                     if re.search(r"(?<![A-Za-z0-9_])" + re.escape(executor) + r"(?![A-Za-z0-9_])", source_text, re.I)}
         if len(mentioned) > 1:
-            raise ValueError("execution_intent_ambiguous: select the affirmative execution instruction, excluding alternatives and quotations")
+            raise ValueError("execution_intent_ambiguous: quote one affirmative placement instruction")
         if mentioned:
             explicit = next(iter(mentioned))
             if scheduler and scheduler.casefold() != explicit:
-                raise ValueError("execution_intent_conflict: scheduler differs from the cited instruction")
+                raise ValueError("execution_intent_conflict: scheduler differs from cited instruction")
             scheduler = explicit
-    name = resolve_target(settings, requested, scheduler=scheduler, location=location)
-    target = settings["targets"][name]
-    return {"target": name, "scheduler": target.get("scheduler"), "location": target.get("location"),
+    name = resolve_target(settings, requested, scheduler=scheduler)
+    return {"target": target_identity(name), "executor": settings["targets"][name]["executor"],
             "route_digest": target_route_digest(settings, name),
-            "selection_mode": "explicit" if requested or scheduler or location else "default"}
+            "selection_mode": "explicit" if requested or scheduler else "default"}
 
 
 def bound_target(settings, requested=None, context=None):
-    """Apply a task binding before preparation or dispatch; never re-read its default."""
     if not context:
         return resolve_target(settings, requested)
-    required = context["target"]
-    if required not in settings["targets"]:
-        raise ValueError("execution_target_not_configured: " + required)
+    if context.get("unselected"):
+        raise ValueError("execution_item_required: select a task execution item before preparation")
+    selection = context["selection"]
+    required = target_key(selection["target"])
     actual = resolve_target(settings, requested) if requested else required
     if actual != required:
-        raise ValueError(f"execution_target_mismatch: task requires {required}, request selects {actual}")
-    if context.get("route_digest") != target_route_digest(settings, required):
-        raise ValueError("execution_target_changed: routing changed; review and resolve the task target before preparing or submitting new work")
+        raise ValueError("execution_target_mismatch: request differs from the bound work item")
+    if selection["route_digest"] != target_route_digest(settings, required):
+        raise ValueError("execution_target_changed: rebind before preparing new work")
     return required
 
 
 def configured_targets(settings):
-    """Return the canonical execution target map."""
     return settings["targets"]
 
 
+def platform_catalog(settings):
+    platforms = {}
+    for name, platform in settings["execution"]["platforms"].items():
+        entries = {}
+        for entry, raw in platform.get("schedulers", {}).items():
+            key = name + "/" + entry
+            if key not in settings["targets"]:
+                continue
+            target = settings["targets"][key]
+            entries[entry] = {"executor": target["executor"], "software": sorted(target["backends"]),
+                "storage": {field: target[field] for field in STORAGE_FIELDS if field in target},
+                "submission": target.get("submission", {}), "limits": target.get("limits", {}),
+                "sources": {"bindings": {backend: "scheduler_entry" if backend in raw.get("bindings", {}) else "platform"
+                                         for backend in target["backends"]},
+                            "storage": {field: "scheduler_entry" if field in raw.get("storage", {}) else "platform"
+                                        for field in STORAGE_FIELDS if field in target}}}
+        platforms[name] = {"display_name": platform.get("display_name", name),
+            "aliases": platform.get("aliases", []), "transport": platform["transport"],
+            "enabled": platform.get("enabled", True), "default_scheduler": platform.get("default_scheduler"),
+            "schedulers": entries}
+    return {"default_platform": settings["execution"]["default_platform"], "platforms": platforms}
+
+
 def default_target(settings):
-    """Return the installation default execution target."""
     return settings["default_target"]
 
 
@@ -269,25 +340,29 @@ def _validate_bindings(value, name, target):
 
 
 def configuration_document(settings):
-    """Convert the internal binding view to installation TOML fields."""
-    if "execution" not in settings:
-        return settings
-    targets = {}
+    """Publish installer changes into the single platform configuration document."""
+    import copy
+    document = {"execution": copy.deepcopy(settings["execution"])}
     for name, target in settings["targets"].items():
-        targets[name] = {key: value for key, value in target.items() if key not in {"kind", "backends", "bindings"}}
-        targets[name]["bindings"] = target.get("backends", {})
-    return {"execution": {"default_target": settings["default_target"], "targets": targets}}
+        identity = target_identity(name)
+        platform = document["execution"]["platforms"][identity["platform"]]
+        entry = platform["schedulers"][identity["scheduler_entry"]]
+        baseline = _merge(platform, entry)
+        for field in ENTRY_FIELDS - {"storage", "bindings"}:
+            if field in target and target[field] != baseline.get(field):
+                entry[field] = copy.deepcopy(target[field])
+        for backend, binding in target.get("backends", {}).items():
+            if binding != baseline.get("bindings", {}).get(backend):
+                entry.setdefault("bindings", {})[backend] = copy.deepcopy(binding)
+        for field in STORAGE_FIELDS:
+            if field in target and target[field] != baseline.get(field):
+                entry.setdefault("storage", {})[field] = target[field]
+    return document
 
 
 def validate_job_config(value):
-    if not isinstance(value, dict):
-        raise ValueError("job config must contain only the execution table")
-    if set(value) == {"execution", "default_target", "targets"}:
-        if value["default_target"] not in value["targets"]:
-            raise ValueError("execution.targets must define the default target")
+    if isinstance(value, ExecutionConfig):
         return value
-    if set(value) != {"execution"}:
-        raise ValueError("job config must contain only the execution table")
     return _validate_execution_config(value)
 
 
@@ -350,11 +425,12 @@ def resolve_binding(config, environment, backend, *, runtime, requested=None):
     binding = target.get("backends", {}).get(backend)
     if binding is None:
         raise ValueError("executor_binding_missing: configure the selected environment backend " + str(backend))
+    binding = {**({"scratch_root": target["scratch_root"]} if "scratch_root" in target else {}), **binding}
     python = resolve_python(config, environment, backend) if runtime == "python" else None
     return {"environment": environment, "kind": target["kind"], "backend": backend,
             "runtime": runtime, "binding": binding, "python": python,
             "submission": resolve_submission(config, environment, backend, requested=requested),
-            **({"supervisor": target.get("supervisor", "systemd")} if target["kind"] == "local" and target.get("driver") != "external" else {}),
+            "executor": target["executor"], "transport": target["transport"],
             **{key: target[key] for key in ("ssh_host", "work_root") if key in target}}
 
 
@@ -369,13 +445,21 @@ def resolve_submission(config, environment, backend=None, *, requested=None):
     override = binding.get("submission", {})
     result = {"resources": {}}
     for settings in (base, override, {} if requested is None else requested):
-        validate_submission(settings, kind=target['kind'], driver=target.get('driver', 'local'))
+        validate_submission(settings, executor=target['executor'])
         result = {**result, **settings, "resources": {**result['resources'], **settings.get('resources', {})}}
-    return validate_submission(result, kind=target['kind'], driver=target.get('driver', 'local'),
-                               allowed_queues=(target.get('allowed_queues', []), binding.get('allowed_queues', [])))
+    result = validate_submission(result,
+                               allowed_queues=(target.get('allowed_queues', []), binding.get('allowed_queues', [])),
+                               executor=target['executor'])
+    if 'select' in result['resources'] and {'cpus', 'memory_mb', 'gpus'} & target.get('limits', {}).keys():
+        raise ValueError('submission_resource_limit_unverifiable: use explicit resources with entry allocation limits')
+    for key, limit in target.get('limits', {}).items():
+        amount = result['resources'].get(key)
+        if amount is not None and (walltime_seconds(amount) > walltime_seconds(limit) if key == 'walltime' else amount > limit):
+            raise ValueError('submission_resource_limit_exceeded: ' + key)
+    return result
 
 
-def validate_submission(result, *, kind, driver='local', allowed_queues=()):
+def validate_submission(result, *, allowed_queues=(), executor=None):
     """Validate resolved resources; platform adapters never merge defaults."""
     _keys(result, SUBMISSION_FIELDS, "submission")
     if "queue_wait_seconds" in result and (type(result["queue_wait_seconds"]) is not int or result["queue_wait_seconds"] < 1):
@@ -383,24 +467,20 @@ def validate_submission(result, *, kind, driver='local', allowed_queues=()):
     queue = result.get("queue")
     if "queue" in result and (not isinstance(queue, str) or not re.fullmatch(QUEUE_PATTERN, queue)):
         raise ValueError("submission.queue is invalid")
-    if kind == 'local' and driver != "external" and {'queue', 'queue_wait_seconds'} & result.keys():
-        raise ValueError('local submission does not support a scheduler queue')
     for allowed in allowed_queues:
         if queue and allowed and queue not in allowed:
             raise ValueError("submission queue is not allowed")
     resources = result.get("resources", {})
     if not isinstance(resources, dict):
         raise ValueError("submission.resources must be a table")
+    if executor == 'qrun' and ('queue' in result or {'gpus', 'select'} & resources.keys()):
+        raise ValueError('Qrun supports CPU, memory and walltime; named queues, GPUs and PBS select are unsupported')
     if set(resources) - {"cpus", "memory_mb", "gpus", "walltime", "select"}:
         raise ValueError("unsupported submission resource")
-    if "gpus" in resources and driver != "external":
-        raise ValueError("submission.resources.gpus requires an external target")
     if "select" in resources and (not isinstance(resources['select'], str)
             or not re.fullmatch(r'[A-Za-z0-9_=:+.-]+', resources['select'])):
         raise ValueError("submission.resources.select is invalid")
     if 'select' in resources:
-        if driver != "external":
-            raise ValueError('submission.resources.select requires an external target')
         if {'cpus', 'memory_mb'} & resources.keys():
             raise ValueError('use PBS select or cpus/memory_mb, not both')
     for field in ("cpus", "memory_mb", "gpus"):
@@ -450,53 +530,40 @@ def job_config_schema():
                       'allowed_queues': queues, 'submission': submission,
                       'environment': {'type': 'object', 'propertyNames': {'pattern': r'^[A-Za-z_][A-Za-z0-9_]*$'},
                                       'additionalProperties': {'type': 'string', 'pattern': r'^[^\u0000]*$'}}})
-    local_submission = {"not": {"anyOf": [{"required": [key]} for key in ("queue", "queue_wait_seconds")]},
-                        "properties": {"resources": {"not": {"anyOf": [{"required": [key]} for key in ("select", "gpus")]}}}}
-    target = record({"kind": {"const": "local"}, "supervisor": {"enum": ["process", "systemd"]},
-                     "python": python, "submission": submission,
-                     "backends": {"type": "object", "propertyNames": text("^" + NAME_PATTERN + "$"), "additionalProperties": backend}}, ("kind",))
-    target["allOf"] = [{"properties": {"submission": local_submission,
-        "backends": {"additionalProperties": {"properties": {"submission": local_submission}}}}}]
-    execution_target = record({
-        "type": {"const": "local"}, "driver": {"enum": ["local", "process", "systemd"]},
-        "supervisor": {"enum": ["process", "systemd"]}, "python": python, "submission": submission,
-        "bindings": {"type": "object", "propertyNames": text("^" + NAME_PATTERN + "$"), "additionalProperties": backend},
-        "scheduler": text("^" + SCHEDULER_PATTERN + "$"), "location": text("^" + NAME_PATTERN + "$"),
-        "aliases": {"type": "array", "uniqueItems": True, "items": text("^" + NAME_PATTERN + "$")},
-    }, ("type", "driver"))
-    local_submission = {"not": {"anyOf": [{"required": [key]} for key in ("queue", "queue_wait_seconds")]},
-                        "properties": {"resources": {"not": {"anyOf": [{"required": [key]} for key in ("select", "gpus")]}}}}
-    execution_target["allOf"] = [{"properties": {"submission": local_submission,
-        "bindings": {"additionalProperties": {"properties": {"submission": local_submission}}}}}]
-    external_target = record({
-        'type': {'enum': ['local', 'remote']}, 'driver': {'const': 'external'},
-        'transport': {'enum': ['local', 'ssh']}, 'work_root': absolute,
-        'file_mode': {'enum': ['staged', 'shared'], 'default': 'staged'},
-        'handler': {'type': 'array', 'minItems': 1, 'items': text()},
-        'handler_environment': backend['properties']['environment'],
-        'cluster_name': text('^' + NAME_PATTERN + '$'),
-        'ssh_host': text(r'^[A-Za-z0-9][A-Za-z0-9_.@:-]*$'), 'ssh_config': absolute,
-        'python': python, 'submission': submission, 'bindings': execution_target['properties']['bindings'],
-        'allowed_queues': queues,
-        'scheduler': text('^' + SCHEDULER_PATTERN + '$'), 'location': text('^' + NAME_PATTERN + '$'),
+    storage = record({'work_root': absolute, 'scratch_root': absolute,
+                      'file_mode': {'enum': ['staged', 'shared']}})
+    bindings = {'type': 'object', 'propertyNames': {'pattern': '^' + NAME_PATTERN + '$'}, 'additionalProperties': backend}
+    shared = {'python': python, 'bindings': bindings, 'storage': storage,
+              'submission': submission, 'allowed_queues': queues}
+    limits = record({'max_in_flight': integer(), 'cpus': integer(), 'memory_mb': integer(),
+                     'gpus': integer(), 'walltime': resources['properties']['walltime']})
+    entry = record({**shared, 'executor': {'enum': sorted(EXECUTORS)},
+                    'handler': {'type': 'array', 'minItems': 1, 'items': text()},
+                    'handler_environment': backend['properties']['environment'],
+                    'cluster_name': text('^' + NAME_PATTERN + '$'), 'limits': limits}, ('executor',))
+    qrun_submission = {'not': {'required': ['queue']}, 'properties': {'resources': {
+        'not': {'anyOf': [{'required': [key]} for key in ('gpus', 'select')]}}}}
+    entry['allOf'] = [{'if': {'properties': {'executor': {'const': 'qrun'}}},
+                      'then': {'properties': {'submission': qrun_submission,
+                          'bindings': {'additionalProperties': {'properties': {'submission': qrun_submission}}}}},
+                      'else': {'required': ['handler']}}]
+    platform = record({**shared, 'display_name': text(), 'enabled': {'type': 'boolean'},
         'aliases': {'type': 'array', 'uniqueItems': True, 'items': text('^' + NAME_PATTERN + '$')},
-        **{name: integer(limit) for name, limit in TIMEOUT_LIMITS.items()},
-    }, ('driver', 'transport', 'work_root', 'handler'))
-    external_target['allOf'] = [
-        {'if': {'properties': {'transport': {'const': 'ssh'}}},
-         'then': {'required': ['ssh_host'], 'properties': {'type': {'const': 'remote'}}},
-         'else': {'properties': {'type': {'const': 'local'}}, 'not': {'anyOf': [{'required': [key]} for key in ('ssh_host', 'ssh_config')]}}},
-    ]
-    for schema, key in ((target, 'backends'), (execution_target, 'bindings'), (external_target, 'bindings')):
-        schema.setdefault('allOf', []).append({
-            'if': {'not': {'required': ['python']}},
-            'then': {'properties': {key: {'additionalProperties': {
-                'anyOf': [{'required': ['command']}, {'required': ['python']}]}}}},
-        })
-    execution = record({'default_target': text('^' + NAME_PATTERN + '$'),
-                        'targets': {'type': 'object', 'minProperties': 1,
-                                    'propertyNames': text('^' + NAME_PATTERN + '$'),
-                                    'additionalProperties': {'oneOf': [execution_target, external_target]}}},
-                       ('default_target', 'targets'))
-    return {'$schema': 'https://json-schema.org/draft/2020-12/schema', 'title': 'Job installation configuration',
+        'transport': {'enum': ['local', 'ssh']},
+        'ssh_host': text(r'^[A-Za-z0-9][A-Za-z0-9_.@:-]*$'), 'ssh_config': absolute,
+        'default_scheduler': text('^' + NAME_PATTERN + '$'),
+        'schedulers': {'type': 'object', 'propertyNames': {'pattern': '^' + NAME_PATTERN + '$'}, 'additionalProperties': entry},
+        **{name: integer(limit) for name, limit in TIMEOUT_LIMITS.items()}}, ('transport',))
+    platform['allOf'] = [
+        {'if': {'properties': {'transport': {'const': 'ssh'}}}, 'then': {'required': ['ssh_host']},
+         'else': {'not': {'anyOf': [{'required': [key]} for key in ('ssh_host', 'ssh_config')]}}},
+        {'if': {'properties': {'enabled': {'const': False}}, 'required': ['enabled']},
+         'else': {'required': ['schedulers', 'default_scheduler'],
+                  'properties': {'schedulers': {'minProperties': 1}}}}]
+    execution = record({'schema_version': {'const': 2}, 'default_platform': text('^' + NAME_PATTERN + '$'),
+                        'platforms': {'type': 'object', 'minProperties': 1,
+                                      'propertyNames': {'pattern': '^' + NAME_PATTERN + '$'},
+                                      'additionalProperties': platform}},
+                       ('schema_version', 'default_platform', 'platforms'))
+    return {'$schema': 'https://json-schema.org/draft/2020-12/schema', 'title': 'Execution platforms',
             **record({'execution': execution}, ('execution',))}

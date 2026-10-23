@@ -18,7 +18,7 @@ def command_workspace(tmp_path, monkeypatch):
     initialize_workspace(root, 'ws_command_results', 'research')
     admit_research_workspace(root)
     config = tmp_path / 'job.toml'
-    config.write_text('[execution]\ndefault_target = "local"\n[execution.targets.local]\ntype = "local"\ndriver = "process"\nsupervisor = "process"\n')
+    config.write_text('[execution]\nschema_version = 2\ndefault_platform = "local"\n[execution.platforms.local]\ndefault_scheduler = "main"\nschedulers.main.executor = "qrun"\ntransport = "local"\nstorage.work_root = "/fixture/qrun/jobs"\nsubmission = {resources = {cpus = 1, memory_mb = 512}}\n')
     monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(config))
     return root
 
@@ -63,7 +63,8 @@ def test_all_command_results_match_actual_api_replies(command_workspace):
     prepared = call('job_prepare', request_file='prepared.json')
     call('job_resolve_prepared', prepared_ref=prepared['prepared_ref'])
     call('job_probe', job_id='job_999', command=[sys.executable, '-c', 'pass'])
-    call('job_targets')
+    call('job_platforms')
+    call('job_resources')
     call('job_resolve_target')
     job = call('job_start', request_id='contract', node_id=node, session_id='fixture',
                command=[sys.executable, '-c', "print('local contract fixture')"])
@@ -107,12 +108,12 @@ def test_result_schemas_cover_non_success_variants():
                           'execution_fingerprint': 'fixture-digest', 'recovery': 'Reuse existing job'})
     checked('job_status', {'job_id': 'job_fixture', 'platform': 'local', 'state': 'unknown', 'error': 'No receipt'})
     checked('job_probe', {'platform': 'unconfigured', 'available': False, 'reason': 'No adapter'})
-    checked('job_probe', {'platform': 'remote', 'available': False, 'ssh_host': 'fixture.invalid',
-                          'scheduler': 'torque', 'remote_root': '/fixture', 'cwd_exists': True,
+    checked('job_probe', {'platform': 'remote', 'available': False, 'transport': 'ssh',
+                          'file_mode': 'staged', 'work_root': '/fixture', 'cwd_exists': True,
                           'inputs_present': True, 'missing_inputs': [], 'error': 'Unreachable'})
 
 
 def test_result_catalog_is_complete_and_schemas_are_well_formed():
-    assert len(COMMAND_DEFINITIONS) == 23
+    assert len(COMMAND_DEFINITIONS) == 24
     for definition in COMMAND_DEFINITIONS.values():
         Draft202012Validator.check_schema(definition['result'])

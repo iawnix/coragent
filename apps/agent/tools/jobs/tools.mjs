@@ -8,7 +8,7 @@ export function createJobTools({ commandBridge, getTaskBinding = async () => nul
   const observations = new Map();
   return [
     "job_start", "job_status", "job_collect",
-    "job_cancel", "job_probe", "job_reconcile",
+    "job_cancel", "job_probe", "job_reconcile", "job_platforms", "job_resources",
   ].map((name) => ({
     ...TOOL_CONTRACTS[name],
     async execute(params, api, context) {
@@ -22,8 +22,7 @@ export function createJobTools({ commandBridge, getTaskBinding = async () => nul
         ...(!params.prepared_ref && !params.request_file ? { request_id: params.request_id || `${toolContext.operation_id}:${api.callId}` } : {}),
         session_id: toolContext.session_id,
         ...(taskBinding === null ? {} : { user_task_id: taskBinding.user_task_id }),
-        ...(taskBinding?.execution_target ? { required_target: taskBinding.execution_target } : {}),
-        ...(taskBinding?.route_digest ? { required_route_digest: taskBinding.route_digest } : {}),
+        ...(taskBinding ? { execution_context: taskBinding.execution_context } : {}),
       } : request);
       const result = await (["job_status", "job_collect", "job_reconcile"].includes(name)
         ? withJobQueryRecovery(root, name, params, invoke) : invoke());

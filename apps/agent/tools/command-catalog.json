@@ -3070,7 +3070,7 @@
       }
     },
     {
-      "id": "job_targets",
+      "id": "job_platforms",
       "domain": "runtime",
       "allowed": [],
       "required": [],
@@ -3081,7 +3081,96 @@
         "additionalProperties": false
       },
       "result": {
-        "type": "object"
+        "type": "object",
+        "properties": {
+          "default_platform": {
+            "type": "string"
+          },
+          "platforms": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "display_name": {
+                  "type": "string"
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "transport": {
+                  "enum": [
+                    "local",
+                    "ssh"
+                  ]
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "default_scheduler": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "schedulers": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "executor": {
+                        "type": "string"
+                      },
+                      "software": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "storage": {
+                        "type": "object"
+                      },
+                      "submission": {
+                        "type": "object"
+                      },
+                      "limits": {
+                        "type": "object"
+                      },
+                      "sources": {
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "executor",
+                      "software",
+                      "storage",
+                      "submission",
+                      "limits",
+                      "sources"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "display_name",
+                "aliases",
+                "transport",
+                "enabled",
+                "default_scheduler",
+                "schedulers"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "default_platform",
+          "platforms"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -3090,7 +3179,6 @@
       "allowed": [
         "target",
         "scheduler",
-        "location",
         "source_text"
       ],
       "required": [],
@@ -3098,16 +3186,24 @@
         "type": "object",
         "properties": {
           "target": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 128
+            "type": "object",
+            "properties": {
+              "platform": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+              },
+              "scheduler_entry": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+              }
+            },
+            "required": [
+              "platform"
+            ],
+            "additionalProperties": false,
+            "description": "Named platform and optional scheduler entry. Omitted entry resolves the platform default."
           },
           "scheduler": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 128
-          },
-          "location": {
             "type": "string",
             "minLength": 1,
             "maxLength": 128
@@ -3121,7 +3217,54 @@
         "additionalProperties": false
       },
       "result": {
-        "type": "object"
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "object",
+            "properties": {
+              "platform": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+              },
+              "scheduler_entry": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+              }
+            },
+            "required": [
+              "platform",
+              "scheduler_entry"
+            ],
+            "additionalProperties": false
+          },
+          "route_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "executor": {
+            "enum": [
+              "qrun",
+              "pbs",
+              "torque",
+              "slurm",
+              "tri",
+              "external"
+            ]
+          },
+          "selection_mode": {
+            "enum": [
+              "explicit",
+              "default"
+            ]
+          }
+        },
+        "required": [
+          "target",
+          "route_digest",
+          "executor",
+          "selection_mode"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -3134,7 +3277,6 @@
         "inputs",
         "outputs",
         "environment",
-        "env",
         "timeout_seconds",
         "metadata",
         "workspace_id",
@@ -3151,8 +3293,7 @@
         "node_id",
         "user_task_id",
         "submission",
-        "required_target",
-        "required_route_digest"
+        "execution_context"
       ],
       "required": [],
       "schema": {
@@ -3185,26 +3326,7 @@
             "description": "Direct submission only: files/directories the command will produce, relative to Job cwd. job_collect registers available declared outputs with producer provenance. Prepared requests already contain this field. Declarations do not create files or redirect stdout. print() goes to logs/stdout.log; write a result file explicitly before declaring it."
           },
           "environment": {
-            "anyOf": [
-              {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
-              },
-              {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              }
-            ]
-          },
-          "env": {
-            "type": [
-              "object",
-              "null"
-            ],
+            "type": "object",
             "additionalProperties": {
               "type": "string"
             }
@@ -3228,8 +3350,22 @@
             "type": "string"
           },
           "execution_target": {
-            "type": "string",
-            "description": "Direct submission only: configured execution target name, such as local, tri or slurm. Prepared requests already select their target. This selects routing, not a Conda environment or scientific backend."
+            "type": "object",
+            "properties": {
+              "platform": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+              },
+              "scheduler_entry": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+              }
+            },
+            "required": [
+              "platform"
+            ],
+            "additionalProperties": false,
+            "description": "Named platform and optional scheduler entry. Omitted entry resolves the platform default."
           },
           "session_id": {
             "type": [
@@ -3337,16 +3473,126 @@
             "additionalProperties": false,
             "description": "Direct Job or validator only: per-job resource request. Defaults are not limits. memory_mb is total MiB including program overhead. For prepared requests use preparer --cpus/--job-memory-mb/--walltime and re-prepare; never override a pinned request."
           },
-          "required_target": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 128,
-            "description": "Runtime task constraint injected by the tool adapter; checked after resolving any prepared request."
-          },
-          "required_route_digest": {
-            "type": "string",
-            "pattern": "^sha256:[a-f0-9]{64}$",
-            "description": "Runtime routing identity injected from the pinned task selection; not a model override."
+          "execution_context": {
+            "type": "object",
+            "properties": {
+              "selection": {
+                "type": "object",
+                "properties": {
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "platform": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                      },
+                      "scheduler_entry": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                      }
+                    },
+                    "required": [
+                      "platform",
+                      "scheduler_entry"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "route_digest": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "target",
+                  "route_digest"
+                ],
+                "additionalProperties": false
+              },
+              "policy": {
+                "type": "object",
+                "properties": {
+                  "max_in_flight": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  },
+                  "max_attempts": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "max_in_flight",
+                  "max_attempts"
+                ],
+                "additionalProperties": false
+              },
+              "item": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                  },
+                  "work_id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                  },
+                  "resources": {
+                    "type": "object",
+                    "properties": {
+                      "cpus": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "memory_mb": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "walltime": {
+                        "type": "string",
+                        "pattern": "^[0-9]+:[0-5][0-9]:[0-5][0-9]$"
+                      }
+                    },
+                    "required": [
+                      "cpus",
+                      "memory_mb"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "input_artifact_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^art_[1-9][0-9]*$"
+                    },
+                    "minItems": 0,
+                    "maxItems": 1000
+                  },
+                  "plan_revision": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "backend": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+                  }
+                },
+                "required": [
+                  "id",
+                  "work_id",
+                  "resources",
+                  "input_artifact_ids",
+                  "plan_revision"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "selection",
+              "policy"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [],
@@ -4272,7 +4518,6 @@
         "inputs",
         "outputs",
         "environment",
-        "env",
         "timeout_seconds",
         "metadata",
         "workspace_id",
@@ -4311,26 +4556,7 @@
             }
           },
           "environment": {
-            "anyOf": [
-              {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
-              },
-              {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              }
-            ]
-          },
-          "env": {
-            "type": [
-              "object",
-              "null"
-            ],
+            "type": "object",
             "additionalProperties": {
               "type": "string"
             }
@@ -4354,7 +4580,22 @@
             "type": "string"
           },
           "execution_target": {
-            "type": "string"
+            "type": "object",
+            "properties": {
+              "platform": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+              },
+              "scheduler_entry": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+              }
+            },
+            "required": [
+              "platform"
+            ],
+            "additionalProperties": false,
+            "description": "Named platform and optional scheduler entry. Omitted entry resolves the platform default."
           }
         },
         "required": [],
@@ -4368,51 +4609,8 @@
               "platform": {
                 "type": "string"
               },
-              "cwd_exists": {
-                "type": "boolean"
-              },
-              "inputs_present": {
-                "type": "boolean"
-              },
-              "missing_inputs": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "command": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              }
-            },
-            "required": [
-              "platform",
-              "cwd_exists",
-              "inputs_present",
-              "missing_inputs",
-              "command"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "platform": {
-                "type": "string"
-              },
               "available": {
                 "type": "boolean"
-              },
-              "ssh_host": {
-                "type": "string"
-              },
-              "scheduler": {
-                "type": "string"
-              },
-              "remote_root": {
-                "type": "string"
               },
               "cwd_exists": {
                 "type": "boolean"
@@ -4435,18 +4633,37 @@
                     "type": "null"
                   }
                 ]
+              },
+              "transport": {
+                "enum": [
+                  "local",
+                  "ssh"
+                ]
+              },
+              "work_root": {
+                "type": "string"
+              },
+              "file_mode": {
+                "enum": [
+                  "staged",
+                  "shared"
+                ]
+              },
+              "queue": {
+                "type": "object",
+                "description": "Qrun queue budget, reservations, host samples and dispatch state."
               }
             },
             "required": [
               "platform",
               "available",
-              "ssh_host",
-              "scheduler",
-              "remote_root",
               "cwd_exists",
               "inputs_present",
               "missing_inputs",
-              "error"
+              "error",
+              "transport",
+              "work_root",
+              "file_mode"
             ],
             "additionalProperties": false
           },
@@ -4812,7 +5029,22 @@
             "type": "string"
           },
           "execution_target": {
-            "type": "object"
+            "type": "object",
+            "properties": {
+              "platform": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+              },
+              "scheduler_entry": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+              }
+            },
+            "required": [
+              "platform"
+            ],
+            "additionalProperties": false,
+            "description": "Named platform and optional scheduler entry. Omitted entry resolves the platform default."
           },
           "session_id": {
             "type": [
@@ -5085,6 +5317,165 @@
         "required": [
           "jobs",
           "next_cursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "job_resources",
+      "domain": "runtime",
+      "allowed": [
+        "execution_target"
+      ],
+      "required": [],
+      "schema": {
+        "type": "object",
+        "properties": {
+          "execution_target": {
+            "type": "object",
+            "properties": {
+              "platform": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+              },
+              "scheduler_entry": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+              }
+            },
+            "required": [
+              "platform"
+            ],
+            "additionalProperties": false,
+            "description": "Named platform and optional scheduler entry. Omitted entry resolves the platform default."
+          }
+        },
+        "additionalProperties": false
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "object",
+            "properties": {
+              "platform": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+              },
+              "scheduler_entry": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+              }
+            },
+            "required": [
+              "platform",
+              "scheduler_entry"
+            ],
+            "additionalProperties": false
+          },
+          "executor": {
+            "type": "string"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "observed_at": {
+            "type": "string"
+          },
+          "capacity": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "cpus": {
+                "type": "number"
+              },
+              "memory_mb": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "cpus",
+              "memory_mb"
+            ]
+          },
+          "reserved": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "cpus": {
+                "type": "number"
+              },
+              "memory_mb": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "cpus",
+              "memory_mb"
+            ]
+          },
+          "free": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "cpus": {
+                "type": "number"
+              },
+              "memory_mb": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "cpus",
+              "memory_mb"
+            ]
+          },
+          "usage": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "memory_enforcement": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scheduler_observation": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "target",
+          "executor",
+          "available",
+          "observed_at",
+          "capacity",
+          "reserved",
+          "free",
+          "usage",
+          "memory_enforcement",
+          "scheduler_observation",
+          "error"
         ],
         "additionalProperties": false
       }

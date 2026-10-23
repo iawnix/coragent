@@ -70,7 +70,7 @@ Python 的 `backend/src/research_agent/application/execution_catalog.py` 独立�
 对目录外的方法，可以直接通过 `job_start` 提交明确的 command、inputs、outputs 和 platform，
 或使用准备器的 `--script <file.py> --backend <binding>`。无需为每个新任务修改此 JSON。
 实际程序、Python、激活脚本和计算资源由 `config.toml` 的
-`execution.targets.<target>.bindings` 配置，运行时通过 `CORAGENT_JOB_CONFIG` 读取生成的组件配置。
+`execution.platforms.<platform>.schedulers.<entry>.bindings` 配置，运行时通过 `CORAGENT_JOB_CONFIG` 读取生成的组件配置。
 
 完整的准备、提交、收集与恢复过程见[科学计算指南](SCIENTIFIC_CAPABILITIES_OPERATIONS.zh-CN.md)。
 

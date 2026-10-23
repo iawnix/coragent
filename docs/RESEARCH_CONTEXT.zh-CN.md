@@ -52,5 +52,5 @@ Research Memory 是持久研究记录。Research Context 是 Agent Runtime 内�
 ## 单一合同
 
 当前只接受 view="brief" 和 research-brief/1，旧 view="review" 与调用方指定的
-trigger 不再接受。Task 的上下文指针属于 coragent-user-task/3，记录实际注入版本，
+trigger 不再接受。Task 的上下文指针属于 coragent-user-task/4，记录实际注入版本，
 不声称记录已经被科学审查。旧会话协议不自动翻译，不创建双接口或双写记录。

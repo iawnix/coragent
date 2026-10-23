@@ -186,8 +186,8 @@ def test_native_runner_retains_receipt_and_kills_descendants(tmp_path, mode):
         command = json.loads((out / 'args.json').read_text())
         assert '--quick' in command and command[-2:] == ['--alpb', 'water']
     if mode == 'timeout':
-        pid = int((out / 'child.pid').read_text()); status = Path(f'/proc/{pid}/stat')
-        assert not status.exists() or status.read_text().split()[2] == 'Z'
+        from tests.support.processes import assert_stopped
+        assert_stopped(int((out / 'child.pid').read_text()))
         assert result['primary']['members'] and not result['primary']['complete']
     imported = import_crest(read_material(source), result, 'sha256:'+'b'*64)
     assert imported['complete'] == (mode == 'success')
@@ -211,17 +211,17 @@ def test_registered_pipeline_stages_collects_and_exports_refinement(tmp_path, mo
     text = config.read_text(); data = tomllib.loads(text)
     # Extend only this test's native binding; all environments stay runner-managed.
     native = fake_crest(tmp_path / 'crest')
-    binding = data['execution']['targets']['local']['bindings']['structure']['python']
-    text = re.sub(r'(?ms)^\[execution\.targets\.local\.bindings\.crest\]\n.*?(?=^\[|\Z)', '', text)
-    text += '\n[execution.targets.local.bindings.crest]\ncommand = '+json.dumps(str(native))+'\n'
-    text += '[execution.targets.local.bindings.crest.python]\n' + ''.join(k+' = '+json.dumps(v)+'\n' for k,v in binding.items())
+    binding = data['execution']['platforms']['local']['bindings']['structure']['python']
+    text = re.sub(r'(?ms)^\[execution\.platforms\.local\.bindings\.crest\]\n.*?(?=^\[|\Z)', '', text)
+    text += '\n[execution.platforms.local.bindings.crest]\ncommand = '+json.dumps(str(native))+'\n'
+    text += '[execution.platforms.local.bindings.crest.python]\n' + ''.join(k+' = '+json.dumps(v)+'\n' for k,v in binding.items())
     text = text.replace('command = \"xtb\"', 'command = '+json.dumps(str(native)))
-    text += '[execution.targets.local.bindings.xtb.python]\n' + ''.join(k+' = '+json.dumps(v)+'\n' for k,v in binding.items())
+    text += '[execution.platforms.local.bindings.xtb.python]\n' + ''.join(k+' = '+json.dumps(v)+'\n' for k,v in binding.items())
     config = tmp_path / 'job.toml'; config.write_text(text); monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(config))
     node = execute('research_create', root, {'goal': 'Independent conformer and complex preparation'})['node']
     source = root / 'material.json'; source.write_text(json.dumps(water()['value']))
     def job(executor, inputs, args=()):
-        prepared = prepare(config, 'local', executor, '1', inputs, list(args))
+        prepared = prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, executor, '1', inputs, list(args))
         receipt = execute('job_start', root, {**prepared, 'node_id': node['id']})
         try:
             for _ in range(500):
@@ -239,7 +239,7 @@ def test_registered_pipeline_stages_collects_and_exports_refinement(tmp_path, mo
     assert (selected / refined['geometry']).is_file() and refined['multiplicity'] == 1
     # Existing SP/optimization preparation consumes exported XYZ independently.
     for task in ('sp', 'opt'):
-        request = prepare(config, 'local', 'chemical.xtb', '1', {'geometry': selected / refined['geometry']}, ['--task', task])
+        request = prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, 'chemical.xtb', '1', {'geometry': selected / refined['geometry']}, ['--task', task])
         assert request['command']
     sampling = root / 'sampling.json'; sampling.write_text(json.dumps(spec()))
     sampled = job('chemical.complex-sample', {'input': sampling}, ['--mode', 'assemble', '--samples', '2'])

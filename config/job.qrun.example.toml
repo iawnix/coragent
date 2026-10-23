@@ -1,0 +1,47 @@
+["execution"]
+"schema_version" = 2
+"default_platform" = "local"
+
+["execution"."platforms"]
+
+["execution"."platforms"."local"]
+"transport" = "local"
+"default_scheduler" = "qrun"
+
+["execution"."platforms"."local"."storage"]
+"work_root" = "/home/USER/DATA/qrun-jobs"
+
+["execution"."platforms"."local"."schedulers"]
+
+["execution"."platforms"."local"."schedulers"."qrun"]
+"executor" = "qrun"
+"handler" = ["qrun", "handler"]
+
+["execution"."platforms"."local"."schedulers"."qrun"."submission"]
+
+["execution"."platforms"."local"."schedulers"."qrun"."submission"."resources"]
+"cpus" = 2
+"memory_mb" = 2048
+"walltime" = "01:00:00"
+
+["execution"."platforms"."com30"]
+"transport" = "ssh"
+"default_scheduler" = "qrun"
+"ssh_host" = "agent.com30"
+
+["execution"."platforms"."com30"."storage"]
+"work_root" = "/home/USER/DATA/qrun-jobs"
+"file_mode" = "staged"
+
+["execution"."platforms"."com30"."schedulers"]
+
+["execution"."platforms"."com30"."schedulers"."qrun"]
+"executor" = "qrun"
+"handler" = ["qrun", "handler"]
+
+["execution"."platforms"."com30"."schedulers"."qrun"."submission"]
+
+["execution"."platforms"."com30"."schedulers"."qrun"."submission"."resources"]
+"cpus" = 4
+"memory_mb" = 4096
+"walltime" = "02:00:00"

@@ -102,7 +102,10 @@ export interface ToolParameters {
       "media_type"?: string;
     }>;
     "timeout_seconds"?: number;
-    "execution_target"?: string;
+    "execution_target"?: {
+      "platform": string;
+      "scheduler_entry"?: string;
+    };
     "root"?: string;
     "submission"?: {
       "resources"?: {
@@ -132,7 +135,10 @@ export interface ToolParameters {
     "root"?: string;
   };
   job_probe: {
-    "execution_target"?: string;
+    "execution_target"?: {
+      "platform": string;
+      "scheduler_entry"?: string;
+    };
     "root"?: string;
   };
   job_reconcile: {
@@ -168,18 +174,36 @@ export interface ToolParameters {
     }>;
     "initial_plan": string;
     "next_action": string;
-    "execution_target"?: string | null;
+    "execution_target"?: {
+      "platform": string;
+      "scheduler_entry"?: string;
+    };
     "execution_intent"?: {
       "source_submission_id": string;
       "source_text": string;
       "scheduler"?: string;
-      "location"?: string;
+    };
+    "execution_policy"?: {
+      "placements": Array<{
+        "target": {
+          "platform": string;
+          "scheduler_entry"?: string;
+        };
+        "intent": {
+          "source_submission_id": string;
+          "source_text": string;
+          "scheduler"?: string;
+        };
+      }>;
+      "max_in_flight": number;
+      "max_attempts": number;
+      "automatic_placement"?: boolean;
     };
   };
   task_read: Record<string, never>;
   task_update: {
     "expected_revision": number;
-    "action": "refine" | "progress" | "wait" | "block" | "propose_completion" | "set_research" | "apply_user_control" | "correct_execution";
+    "action": "refine" | "progress" | "wait" | "block" | "propose_completion" | "set_research" | "apply_user_control" | "correct_execution" | "set_execution_plan" | "select_execution_item" | "complete_execution_item";
     "reason"?: string;
     "block_kind"?: "missing_user_input" | "resource_unavailable" | "execution_failure" | "budget_exhausted" | "scientific_dead_end";
     "resume_when"?: string;
@@ -207,12 +231,14 @@ export interface ToolParameters {
     };
     "control"?: "pause" | "resume" | "cancel";
     "jobs"?: "keep" | "cancel";
-    "execution_target"?: string | null;
+    "execution_target"?: {
+      "platform": string;
+      "scheduler_entry"?: string;
+    };
     "execution_intent"?: {
       "source_submission_id": string;
       "source_text": string;
       "scheduler"?: string;
-      "location"?: string;
     };
     "completion_outcome"?: "full" | "partial";
     "stop_basis"?: {
@@ -221,6 +247,53 @@ export interface ToolParameters {
       "evidence_refs"?: Array<string>;
       "source_submission_ids"?: Array<string>;
       "source_text"?: string;
+    };
+    "execution_policy"?: {
+      "placements": Array<{
+        "target": {
+          "platform": string;
+          "scheduler_entry"?: string;
+        };
+        "intent": {
+          "source_submission_id": string;
+          "source_text": string;
+          "scheduler"?: string;
+        };
+      }>;
+      "max_in_flight": number;
+      "max_attempts": number;
+      "automatic_placement"?: boolean;
+    };
+    "execution_plan"?: {
+      "items": Array<{
+        "id": string;
+        "work_id": string;
+        "target"?: {
+          "platform": string;
+          "scheduler_entry"?: string;
+        };
+        "depends_on"?: Array<string>;
+        "input_artifact_ids"?: Array<string>;
+        "resources": {
+          "cpus": number;
+          "memory_mb": number;
+          "walltime"?: string;
+        };
+        "backend"?: string;
+        "candidates"?: Array<{
+          "platform": string;
+          "scheduler_entry"?: string;
+        }>;
+      }>;
+    };
+    "execution_item_id"?: string;
+    "artifact_ids"?: Array<string>;
+  };
+  job_platforms: Record<string, never>;
+  job_resources: {
+    "execution_target"?: {
+      "platform": string;
+      "scheduler_entry"?: string;
     };
   };
 }

@@ -16,3 +16,5 @@ dependencies:
   - ase
   - pillow>=10,<13
   - matplotlib>=3.9,<4
+
+# cclib/periodictable use the shared hash-pinned structure.requirements.txt in prepare.

@@ -251,7 +251,7 @@ def test_energy_executors_through_jobs(tmp_path,operation,spec_factory):
     root=tmp_path/'work';workspace(root)
     source=root/'energy.json';source.write_text(json.dumps(spec_factory()))
     config=Path(os.environ['CORAGENT_JOB_CONFIG'])
-    prepared=prepare(config,'local','chemical.'+operation,'1',{'input':source})
+    prepared=prepare(config,{'platform': 'local', 'scheduler_entry': 'main'},'chemical.'+operation,'1',{'input':source})
     node=execute('research_create',root,{'goal':'Independent energy analysis fixture'})['node']
     receipt=execute('job_start',root,{**prepared,'node_id':node['id']})
     try:

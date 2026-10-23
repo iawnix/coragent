@@ -15,7 +15,7 @@ export async function createCodingTools(cwd, getExecutionSelection = async () =>
         async execute(params, api, context) {
           const selection = await getExecutionSelection(context);
           const prefix = selection
-            ? `export CORAGENT_TASK_EXECUTION='${JSON.stringify({ target: selection.target, route_digest: selection.route_digest }).replaceAll("'", "'\\''")}'\n`
+            ? `export CORAGENT_TASK_EXECUTION='${JSON.stringify({ ...selection, workspace_root: cwd }).replaceAll("'", "'\\''")}'\n`
             : "unset CORAGENT_TASK_EXECUTION\n";
           return tool.execute({ ...params, command: prefix + params.command }, api, context);
         },

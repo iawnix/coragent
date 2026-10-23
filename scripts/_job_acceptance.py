@@ -19,7 +19,7 @@ except ImportError:
 from research_agent.application.api import execute
 from research_agent.application.environment_check import check_environments
 from research_agent.application.executors import prepare, prepare_script
-from research_agent.jobs.config_contract import binding_digest, configured_targets, load_job_config
+from research_agent.jobs.config_contract import binding_digest, configured_targets, load_job_config, target_identity, target_key
 from research_agent.research.workspace import initialize_workspace, admit_research_workspace
 
 
@@ -76,13 +76,13 @@ def run_job(root, request, timeout):
                 execute('job_collect', root, {'job_id': receipt['job_id']})
             from research_agent.jobs import platforms_from_config
             settings = load_job_config(os.environ['CORAGENT_JOB_CONFIG'])
-            target = configured_targets(settings)[request['execution_target']]
+            target = configured_targets(settings)[target_key(request['execution_target'])]
             remote = receipt['metadata']['remote_dir']
             scope = hashlib.sha256(str(Path(receipt['cwd']).resolve()).encode()).hexdigest()[:24]
             expected = target['work_root'].rstrip('/') + '/' + receipt['job_id'] + '-' + scope
             if remote != expected:
                 raise RuntimeError('acceptance_cleanup_path_mismatch')
-            platform = platforms_from_config(Path(os.environ['CORAGENT_JOB_CONFIG']))[0][request['execution_target']]
+            platform = platforms_from_config(Path(os.environ['CORAGENT_JOB_CONFIG']))[0][target_key(request['execution_target'])]
             platform.run_command('rm -rf -- ' + shlex.quote(remote))
 
 
@@ -114,8 +114,8 @@ def accept(config, package, directory, targets, timeout, *, bindings_only=False,
                 root = shared_workspace
             else:
                 root = directory / name
-                root.mkdir(mode=0o700)
-            initialize_workspace(root, 'installation_' + name, 'research')
+                root.mkdir(mode=0o700, parents=True)
+            initialize_workspace(root, 'installation_' + name.replace('/', '_'), 'research')
             admit_research_workspace(root)
             expected_checks = Counter(check['backend'] for profile in available.values()
                 for check in profile.get('checks', []) if not bindings_only or check.get('script'))
@@ -129,7 +129,7 @@ def accept(config, package, directory, targets, timeout, *, bindings_only=False,
                         continue
                     if check.get('script'):
                         script = resource(Path(profile['root']), check['script'])
-                        request = prepare_script(config, name, backend, script, check.get('arguments', []),
+                        request = prepare_script(config, target_identity(name), backend, script, check.get('arguments', []),
                                                  collect=check.get('collect', []))
                     else:
                         inputs = {}
@@ -137,7 +137,7 @@ def accept(config, package, directory, targets, timeout, *, bindings_only=False,
                             source = root / (check['executor'] + '-' + role)
                             write_private(source, value.encode())
                             inputs[role] = source
-                        request = prepare(config, name, check['executor'], '1', inputs, check.get('arguments', []))
+                        request = prepare(config, target_identity(name), check['executor'], '1', inputs, check.get('arguments', []))
                     # The bound walltime and cancellation cover both process
                     # execution and queue waits; no live research workspace is used.
                     request['timeout_seconds'] = timeout

@@ -1,3 +1,5 @@
+
+from tests.support.platforms import execution_config
 import json
 import os
 from pathlib import Path
@@ -29,10 +31,7 @@ def queue(tmp_path):
         (state / name).symlink_to(executable)
     shared = tmp_path / "shared files"
     shared.mkdir()
-    config = {"driver": "external", "transport": "local", "work_root": str(shared),
-              "cluster_name": "compute", "handler": [sys.executable, str(HANDLER)],
-              "handler_environment": {"QUEUE_FIXTURE_ROOT": str(state),
-                  **{"CORAGENT_" + name.upper(): str(state / name) for name in ("tri_sub", "tri_stat", "tri_del")}}}
+    config = {'executor': 'tri', 'transport': 'local', 'work_root': str(shared), 'cluster_name': 'compute', 'handler': [sys.executable, str(HANDLER)], 'handler_environment': {'QUEUE_FIXTURE_ROOT': str(state), **{'CORAGENT_' + name.upper(): str(state / name) for name in ('tri_sub', 'tri_stat', 'tri_del')}}}
     return config, state
 
 
@@ -129,7 +128,7 @@ def application_queue(queue, tmp_path, monkeypatch, file_mode='staged'):
     config, state = queue
     config = {**config, 'file_mode': file_mode, 'submission': {'queue_wait_seconds': 60}}
     path = tmp_path / 'external.toml'
-    path.write_bytes(toml_bytes({'execution': {'default_target': 'compute', 'targets': {'compute': config}}}))
+    path.write_bytes(toml_bytes({'execution': execution_config('compute', {'compute': config})}))
     monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(path))
     root = (Path(config['work_root']) if file_mode == 'shared' else tmp_path) / 'research'
     workspace(root)
@@ -375,18 +374,15 @@ def test_execution_preserves_assigned_gpu_but_scrubs_provider_env(queue, tmp_pat
 
 def test_external_config_supports_multiple_local_clusters_and_gpu(queue, tmp_path):
     config, state = queue
-    value = {"execution": {"default_target": "tri", "targets": {
-        "tri": config, "second": config, "direct": {"type": "local", "driver": "process"}}}}
+    value = {"execution": execution_config("tri", {
+        "tri": config, "second": config, "direct": {'executor': 'qrun', 'transport': 'local', 'work_root': '/fixture/qrun/jobs'}})}
     Draft202012Validator(job_config_schema()).validate(value)
     normalized = validate_job_config(value)
-    assert validate_catalog_bindings(value, []) == {"tri": {}, "second": {}, "direct": {}}
-    assert validate_catalog_bindings(normalized, []) == {"tri": {}, "second": {}, "direct": {}}
-    assert resolve_submission(normalized, "tri", requested={"resources": {"gpus": 1}})["resources"]["gpus"] == 1
+    assert validate_catalog_bindings(value, []) == {"tri/main": {}, "second/main": {}, "direct/main": {}}
+    assert validate_catalog_bindings(normalized, []) == {"tri/main": {}, "second/main": {}, "direct/main": {}}
+    assert resolve_submission(normalized, 'tri/main', requested={"resources": {"gpus": 1}})["resources"]["gpus"] == 1
     path = tmp_path / "job.toml"
-    path.write_text('[execution]\ndefault_target="tri"\n[execution.targets.tri]\n'
-                    'driver="external"\ntransport="local"\ncluster_name="compute"\n'
-                    f'work_root={json.dumps(config["work_root"])}\nhandler={json.dumps(config["handler"])}\n'
-                    '[execution.targets.tri.handler_environment]\n' +
+    path.write_text(f"""[execution]\nschema_version = 2\ndefault_platform="tri"\n[execution.platforms.tri]\ndefault_scheduler = "main"\nschedulers.main.executor="external"\ntransport="local"\nschedulers.main.cluster_name="compute"\nstorage.work_root={json.dumps(config['work_root'])}\nschedulers.main.handler={json.dumps(config['handler'])}\n[execution.platforms.tri.schedulers.main.handler_environment]\n""" +
                     ''.join(f'{key}={json.dumps(value)}\n' for key, value in config['handler_environment'].items()))
     platforms, default = platforms_from_config(path)
     assert isinstance(platforms[default], ExternalJobPlatform)
@@ -408,7 +404,7 @@ def test_external_config_supports_multiple_local_clusters_and_gpu(queue, tmp_pat
 ])
 def test_invalid_external_targets_fail_schema_and_runtime(queue, change):
     config, _ = queue
-    value = {"execution": {"default_target": "tri", "targets": {"tri": {**config, **change}}}}
+    value = {"execution": execution_config("tri", {"tri": {**config, **change}})}
     assert list(Draft202012Validator(job_config_schema()).iter_errors(value))
     with pytest.raises(ValueError):
         validate_job_config(value)
@@ -444,7 +440,7 @@ def test_application_jobs_reconcile_and_collect_external_tasks(queue, tmp_path, 
     config, state = queue
     config = {**config, "file_mode": file_mode}
     path = tmp_path / "external.toml"
-    path.write_bytes(toml_bytes({"execution": {"default_target": "compute", "targets": {"compute": config}}}))
+    path.write_bytes(toml_bytes({"execution": execution_config("compute", {"compute": config})}))
     monkeypatch.setenv("CORAGENT_JOB_CONFIG", str(path))
     root = (Path(config["work_root"]) if file_mode == "shared" else tmp_path) / "research"
     workspace(root)
@@ -486,15 +482,15 @@ def test_node_acceptance_checks_each_selected_node_and_keeps_unverified_backends
         {'backend': 'fixture', 'script': 'check.py', 'collect': ['result.json'],
          'result': {'path': 'result.json', 'fields': {'ok': True}}}]}})
     settings = load_job_config(os.environ['CORAGENT_JOB_CONFIG'])
-    python = resolve_binding(settings, 'local', 'validation', runtime='python')['python']
+    python = resolve_binding(settings, 'local/main', 'validation', runtime='python')['python']
     config = {**config, 'file_mode': 'shared', 'bindings': {
         'fixture': {'python': python}, 'uncovered': {'python': python}}}
     path = tmp_path / 'source.toml'
     original = toml_bytes({'schema_version': 1,
-        'execution': {'default_target': 'compute', 'targets': {'compute': config}}})
+        'execution': execution_config('compute', {'compute': config})})
     path.write_bytes(original)
     original_env = os.environ.get('CORAGENT_JOB_CONFIG')
-    report = verify(path, ROOT, tmp_path / 'acceptance', 'compute', ['fed1', 'fed2'], 10)
+    report = verify(path, ROOT, tmp_path / 'acceptance', 'compute/main', ['fed1', 'fed2'], 10)
     assert report['unselected_nodes'] == 'not_verified'
     assert set(report['nodes']) == {'fed1', 'fed2'}
     assert path.read_bytes() == original

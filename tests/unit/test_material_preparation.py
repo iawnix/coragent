@@ -168,7 +168,7 @@ def test_material_executor_runs_staged_code_and_collects_reusable_geometry(tmp_p
     node = execute('research_create', root, {'goal': 'Preserve the supplied complex for later calculation'})['node']
     source = root / 'material-input.json'
     source.write_text(json.dumps(request(arrangement='complex')))
-    prepared = prepare(Path(os.environ['CORAGENT_JOB_CONFIG']), 'local', 'chemical.material', '1', {'material': source})
+    prepared = prepare(Path(os.environ['CORAGENT_JOB_CONFIG']), {'platform': 'local', 'scheduler_entry': 'main'}, 'chemical.material', '1', {'material': source})
     assert not list((root / 'operations/executions').glob('*.json'))
     job = execute('job_start', root, {**prepared, 'node_id': node['id']})
     try:

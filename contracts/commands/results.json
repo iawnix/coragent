@@ -1345,94 +1345,6 @@
       ],
       "additionalProperties": false
     },
-    "JobLocalProbe": {
-      "type": "object",
-      "properties": {
-        "platform": {
-          "type": "string"
-        },
-        "cwd_exists": {
-          "type": "boolean"
-        },
-        "inputs_present": {
-          "type": "boolean"
-        },
-        "missing_inputs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "command": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "required": [
-        "platform",
-        "cwd_exists",
-        "inputs_present",
-        "missing_inputs",
-        "command"
-      ],
-      "additionalProperties": false
-    },
-    "JobRemoteProbe": {
-      "type": "object",
-      "properties": {
-        "platform": {
-          "type": "string"
-        },
-        "available": {
-          "type": "boolean"
-        },
-        "ssh_host": {
-          "type": "string"
-        },
-        "scheduler": {
-          "type": "string"
-        },
-        "remote_root": {
-          "type": "string"
-        },
-        "cwd_exists": {
-          "type": "boolean"
-        },
-        "inputs_present": {
-          "type": "boolean"
-        },
-        "missing_inputs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "error": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "platform",
-        "available",
-        "ssh_host",
-        "scheduler",
-        "remote_root",
-        "cwd_exists",
-        "inputs_present",
-        "missing_inputs",
-        "error"
-      ],
-      "additionalProperties": false
-    },
     "JobUnavailableProbe": {
       "type": "object",
       "properties": {
@@ -1573,7 +1485,7 @@
           "type": "string"
         },
         "execution_target": {
-          "type": "object"
+          "$ref": "shared.json#/definitions/execution_target"
         },
         "session_id": {
           "type": [
@@ -2350,6 +2262,70 @@
         "projection_status"
       ],
       "additionalProperties": false
+    },
+    "JobExecutionProbe": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string"
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "cwd_exists": {
+          "type": "boolean"
+        },
+        "inputs_present": {
+          "type": "boolean"
+        },
+        "missing_inputs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transport": {
+          "enum": [
+            "local",
+            "ssh"
+          ]
+        },
+        "work_root": {
+          "type": "string"
+        },
+        "file_mode": {
+          "enum": [
+            "staged",
+            "shared"
+          ]
+        },
+        "queue": {
+          "type": "object",
+          "description": "Qrun queue budget, reservations, host samples and dispatch state."
+        }
+      },
+      "required": [
+        "platform",
+        "available",
+        "cwd_exists",
+        "inputs_present",
+        "missing_inputs",
+        "error",
+        "transport",
+        "work_root",
+        "file_mode"
+      ],
+      "additionalProperties": false
     }
   },
   "commands": {
@@ -2434,10 +2410,7 @@
     "job_probe": {
       "anyOf": [
         {
-          "$ref": "results.json#/definitions/JobLocalProbe"
-        },
-        {
-          "$ref": "results.json#/definitions/JobRemoteProbe"
+          "$ref": "results.json#/definitions/JobExecutionProbe"
         },
         {
           "$ref": "results.json#/definitions/JobUnavailableProbe"

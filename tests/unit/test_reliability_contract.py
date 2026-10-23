@@ -21,7 +21,7 @@ def finished(root, *, code=0, session_id='session', job_id='job_one'):
         'outputs':[{'path':'result','required':True}]})
     for _ in range(200):
         status=dispatch('status', {'root':str(root),'job_id':receipt['job_id']})
-        if status['state'] not in {'running','started','queued'}:break
+        if status['state'] not in {'running','started','queued','submitted'}:break
         time.sleep(.02)
     assert status['state'] in {'succeeded','failed'}
     return receipt
@@ -72,11 +72,11 @@ def test_terminal_conflict_is_preserved_until_reconciled(tmp_path):
 
 
 def test_lost_submission_receipt_never_resubmits(tmp_path, monkeypatch):
-    from research_agent.jobs import LocalProcessPlatform
+    from research_agent.jobs import ExternalJobPlatform
     workspace(tmp_path)
     calls=[]
     def lost(self,spec): calls.append(spec.job_id); raise RuntimeError('lost')
-    monkeypatch.setattr(LocalProcessPlatform,'start',lost)
+    monkeypatch.setattr(ExternalJobPlatform,'start',lost)
     request={'root':str(tmp_path),'request_id':'job_uncertain','command':['true']}
     with pytest.raises(RuntimeError): dispatch('start',request)
     assert dispatch('start',request)['state']=='unknown'

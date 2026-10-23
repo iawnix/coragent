@@ -386,7 +386,7 @@ def test_independent_checks_execute_and_collect_through_real_jobs(tmp_path, exec
     if executor == 'chemical.gaussian-evidence':
         inputs['evidence'].write_text(gaussian_log()); args = ['--constraints', 'none']
     if executor == 'chemical.ts-connectivity-inputs': inputs['log'].write_text(gaussian_log())
-    prepared = prepare(Path(os.environ['CORAGENT_JOB_CONFIG']), 'local', executor, '1', inputs, args)
+    prepared = prepare(Path(os.environ['CORAGENT_JOB_CONFIG']), {'platform': 'local', 'scheduler_entry': 'main'}, executor, '1', inputs, args)
     job = execute('job_start', root, {**prepared, 'node_id': node['id']})
     try:
         for _ in range(300):
