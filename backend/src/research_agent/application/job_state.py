@@ -1,6 +1,7 @@
 """Runtime-owned Job observations and automatic research journal entries."""
 from pathlib import Path
 from research_agent.foundation.transactions import read_json, write_json, workspace_transaction
+from research_agent.foundation.path_safety import path_has_symlink
 from datetime import datetime, timezone
 from research_agent.research.operational_ids import allocate_id
 
@@ -8,7 +9,28 @@ TERMINAL = {'succeeded', 'failed', 'timed_out', 'cancelled'}
 
 
 def execution(root, job_id):
-    return read_json(Path(root) / 'operations/executions' / (job_id + '.json'))
+    path = Path(root) / 'operations/executions' / (job_id + '.json')
+    if path_has_symlink(path):
+        raise ValueError('reference_symlink')
+    return read_json(path)
+
+
+def list_execution_summaries(root):
+    """Read local observations, including interrupted dispatches, for research views."""
+    rows = []
+    for path in sorted((Path(root) / 'operations/jobs').glob('*.json')):
+        intent = read_json(path)
+        try:
+            current = execution(root, intent['job_id'])
+        except FileNotFoundError:
+            current = {}
+        row = {key: current.get(key, intent.get(key)) for key in (
+            'job_id', 'node_id', 'node_revision', 'state', 'collection_state',
+            'latest_result_receipt_ref', 'error', 'execution_conflict')}
+        row['state'] = current.get('state', 'unknown')
+        row['collection_state'] = current.get('collection_state', 'not_collected')
+        rows.append(row)
+    return rows
 
 
 def list_executions(root, *, session_id=None, user_task_id=None, limit=50, cursor=None):
@@ -26,7 +48,7 @@ def list_executions(root, *, session_id=None, user_task_id=None, limit=50, curso
             continue
         if user_task_id is not None and binding.get('user_task_id') != user_task_id:
             continue
-        rows.append({**read_json(path), 'session_id': binding.get('session_id'),
+        rows.append({**execution(root, path.stem), 'session_id': binding.get('session_id'),
                      'user_task_id': binding.get('user_task_id')})
         if len(rows) > limit:
             break

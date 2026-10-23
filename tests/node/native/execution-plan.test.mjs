@@ -29,7 +29,7 @@ test("plan cannot expand destinations beyond the pinned user policy", async () =
 
 test("dependency handoff requires completion and carries exact artifact references", async () => {
   const plan = await resolveExecutionPlan(kernel, { items: [item("a", "FEDCluster"), item("b", "Com30", ["a"])] }, policy, null, []);
-  const task = { execution_policy: policy, execution_plan: plan };
+  const task = { execution_selection: policy.selections[0], execution_policy: policy, execution_plan: plan };
   assert.throws(() => executionItemContext(task, "b"), /not been collected/);
   plan.items[0].completion = { artifact_ids: ["art_1"], evidence_refs: ["result_1"] };
   const context = executionItemContext(task, "b");

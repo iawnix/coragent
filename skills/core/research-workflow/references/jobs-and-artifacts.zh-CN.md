@@ -4,7 +4,7 @@
 
 原始输入保留在 `inputs/`，保留运行时管理的 Job/Artifact 文件，不移动历史请求和证据。避免在工作区根目录散落生成文件。SSH 或远程 Job 使用配置的远程工作、scratch 目录或用户指定目标，本地 `work_dir` 不能当作远程路径。scp/rsync 应区分本地与远程两端，本地下载和重定向输出放入本地草稿或报告目录。这些约定指导 agent 选择文件位置，不增加文件系统隔离，也不改变已有工具权限。
 
-按已安装领域 Skill 准备请求，把返回的 request_file 和 request_sha256 交给 job_start；用 node_id 明确研究归属。其它执行字段已固定在请求文件中。直接 argv 提交需声明实际输入、输出和 execution_target。准备与诊断允许不关联 Node。
+活动 Task 已有持久化计算位置后，按已安装领域 Skill 准备请求；位置为 null 时先用 `task_update action=bind_execution` 或创建执行计划，有计划时还须选中可执行项。把返回的 request_file 和 request_sha256 交给 job_start；用 node_id 明确研究归属。其它执行字段已固定在请求文件中。直接 argv 提交需声明实际输入、输出和 execution_target。准备允许不关联研究 Node，这与 Task 的计算位置绑定是不同事项；普通 bash 和平台诊断不要求该绑定。
 
 自定义科学脚本通过配置的执行准备入口使用 `--script <file.py> --backend <binding>`。直接 argv 提交不会选择科学 Python 或软件后端。准备请求和报告排版使用原生工具，科学计算使用受管 Job。
 

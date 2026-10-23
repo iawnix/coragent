@@ -18,40 +18,35 @@ glibc >=2.28。CF22D 选择通用 x86_64 PySCF 构建，不绑定维护者的 CP
 基础文本报告 helper 使用 Host 标准库；图文报告/轨迹 Job 使用 structure，均不需要渲染锁。渲染环境中的 notebook 依赖来自
 xyzrender 上游要求，只安装在渲染目标中。这些环境均不安装 CoRAgent wheel。
 
-统一入口 `install.sh` 根据 `manifest.json` 准备环境。首次安装没有提供 `job.toml`
-时，默认选择本地 `structure`；已有绑定保留。其他环境显式选择：
+在执行机器上独立准备这些环境，再将 Python 前缀、锁文件和原生求解器的绝对路径
+绑定到 `config.toml` 中平台或调度入口的 `bindings`。主安装器校验已配置绑定；
+未配置时不创建科学环境，也不创建 Qrun 队列。
+
+目标机器上的安装工具使用显式绑定：
 
 ```bash
-./install.sh --source local --job-profile local:pyscf --job-profile local:render
-./install.sh --job-config /absolute/job.toml --job-profile cluster:pyscf \
-  --job-software-root cluster=/absolute/managed-science \
-  --job-conda cluster=/absolute/conda/bin/conda
+python3 -B packaging/coragent_packaging/installer/install_job_environment.py \
+  --config /absolute/job.toml --platform PLATFORM --scheduler-entry ENTRY --backend structure
 ```
 
-先在 `job.toml` 配置远端、队列与原生求解器路径。远端路径属于目标机器。准备阶段
-通过 SSH 执行，目标需要 Python 3.11+、Conda、`timeout`、Linux x86_64 及声明的
-glibc；执行阶段使用已配置的 PBS/Torque 和 rsync。本机 Python 路径不会复制给远端。
-`wrapper` 只为已配置的 Gaussian/xTB/CREST 后端准备 Python，原生程序仍由管理员提供。
+在执行机器上运行，所有路径属于该机器，本机控制端的 Python 路径不能当作远端环境。
+`wrapper` 为已配置的 Gaussian/xTB/CREST 包装脚本提供 Python，原生求解器仍单独安装。
+使用专用、版本化的前缀。该工具保存核验后的归属与包清单，不负责 CoRAgent 版本切换，
+也不提交验收 Job。structure 与 validation 可共用前缀；CF22D 不需要自定义激活脚本
+或 `LD_PRELOAD` 补丁。
 
-安装器把固定锁和不可变的版本化环境保存在专用受管目录，本机默认是
-`~/soft/coragent/job-envs/<installation-id>`，再将绝对路径写入 `etc/job.toml`。
-PubChem/OPSIN 服务参数位于 `etc/name-resolver.toml`。本地完成名称解析和结构准备后，
-可以交给远端计算，不要求每个计算目标都安装名称解析服务。
+主配置是唯一维护入口，`generated/job.toml` 只是生成输入。在线 PubChem/OPSIN 查询可选，
+安装器不会默认启用。显式设置 `[name_resolver]`，再在 structure 后端环境中绑定
+`CORAGENT_NAME_RESOLVER_CONFIG`，路径必须能被所选平台读取。本地结构准备可交给远端计算，
+不要求每个平台都启用名称查询；已有结构输入不要求该服务。
 
-切换当前版本或停止服务前，先完成准备与有时限的实际验收 Job。structure 检查
-RDKit、Job 内的解析器配置路径和乙醇结构生成；其他环境执行声明的最小计算或渲染。
-报告区分环境验证、已测试后端和未验证目标。离线验收不访问外部名称服务。已有远端
-仅在选择准备该目标或显式传入 `--verify-job-target cluster` 时验证。
-
-管理员维护时仍可使用底层目标端工具：
-`python3 packaging/coragent_packaging/installer/install_job_environment.py --config /absolute/job.toml --backend structure`。
-它要求已有显式绑定，不负责统一安装器的版本切换或 Job 验收。结构与验证可以共用
-前缀；CF22D 不需要自定义激活脚本或 `LD_PRELOAD` 补丁。
+structure 验收检查 RDKit 和结构生成，不要求解析器配置。安装时通过
+`--verify-job-target PLATFORM/ENTRY` 显式请求有时限的验收 Job。报告区分环境检查
+与实际执行，离线验收不访问外部名称服务。
 
 安装时不重新求解依赖。固定的 pip 产物下载到环境父目录下的缓存，再以
 `--require-hashes`、`--no-deps` 安装，并用 `pip check` 检查依赖完整性。
-主入口的 `--job-offline` 仅使用预先准备的缓存。底层工具的 `--package-cache`
-可指定产物目录；`--offline` 仅使用该目录与 Conda 缓存
+目标端工具的 `--package-cache` 可指定产物目录；`--offline` 仅使用该目录与 Conda 缓存
 （`CONDA_PKGS_DIRS`）。锁与发行文件保持只读。新建安装中断后删除该次创建的前缀，
 已有前缀不就地更新。显式 `--adopt` 才会核验预先准备的环境并发布安装回执。
 
@@ -68,8 +63,8 @@ RDKit、Job 内的解析器配置路径和乙醇结构生成；其他环境执�
 可选 `path` profile 为显式配置的 `path_xtb` / `path_gaussian` 原生绑定使用
 path.lock，提供 RDKit/NumPy、ASE、SciPy，供扫描、梯度与 ASE NEB v2，不改变旧轻量包装器。
 例如为 `[execution.platforms.local.bindings.path_xtb]` 配置
-`command = "/opt/xtb/bin/xtb"`（需要时加 activation_script），再选择
-`--job-profile local:path`。该 profile 不默认进行原生科学计算冒烟测试；
+`command = "/opt/xtb/bin/xtb"`（需要时加 activation_script），绑定基于 `path.lock`
+准备的前缀，再用目标端工具安装该后端。该 profile 不默认进行原生科学计算冒烟测试；
 选定入口的环境检查与显式有界科学 Job 需要分别验收。
 
 Gaussian 数值解析还使用固定版本 cclib 1.8.1：wrapper、structure、path 配套的 `.requirements.txt` 包含锁定哈希的依赖；wrapper/structure 补充 SciPy。更新需创建新的不可变环境，不能直接覆盖正在运行的环境。cclib 只提取数值，不决定优化阶段、IRC 完整性或化学连通性。

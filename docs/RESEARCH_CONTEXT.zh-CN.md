@@ -3,6 +3,9 @@
 Research Memory 是持久研究记录。Research Context 是 Agent Runtime 内部的上下文准备模块，
 通过唯一的 `research_read(view="brief")` 接口读取 `research-brief/1` 研究概览。
 概览是程序筛选和摘取的结果，模型可附加 Research Synthesis（研究综合摘要）；两者都不代表科学评估。
+研究记录、工作区与上下文仍属于完整研究核心。普通 Task 没有计算位置时也会建立研究概览；
+上下文读取只组合本地研究事实和已记录的 Job 观察，不解析平台或连接队列。Job Manager 负责
+刷新外部状态；本地事件投影负责将已持久化事实同步到研究记录，两者不另建一份 Job 状态。
 
 ## 选择与刷新
 
@@ -52,5 +55,5 @@ Research Memory 是持久研究记录。Research Context 是 Agent Runtime 内�
 ## 单一合同
 
 当前只接受 view="brief" 和 research-brief/1，旧 view="review" 与调用方指定的
-trigger 不再接受。Task 的上下文指针属于 coragent-user-task/4，记录实际注入版本，
+trigger 不再接受。Task 的上下文指针属于 coragent-user-task/5，记录实际注入版本，
 不声称记录已经被科学审查。旧会话协议不自动翻译，不创建双接口或双写记录。

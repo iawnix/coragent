@@ -20,51 +20,43 @@ The basic text report helper uses the Host's standard library. Illustrated repor
 Rendering's notebook dependencies are upstream xyzrender requirements; they
 are confined to the rendering target. No environment includes the CoRAgent wheel.
 
-The public `install.sh` entry prepares these profiles using `manifest.json`.
-A fresh installation without supplied `job.toml` selects `structure` locally;
-existing bindings are preserved. Select other profiles explicitly:
+Prepare these environments independently on their execution hosts, then record the
+absolute Python prefix, lock and native solver paths in `config.toml` under the
+platform or scheduler entry's `bindings`. The main installer validates configured
+bindings; an unconfigured installation creates neither a scientific environment
+nor a Qrun queue.
+
+The target-local helper consumes explicit bindings:
 
 ```bash
-./install.sh --source local --job-profile local:pyscf --job-profile local:render
-./install.sh --job-config /absolute/job.toml --job-profile cluster:pyscf \
-  --job-software-root cluster=/absolute/managed-science \
-  --job-conda cluster=/absolute/conda/bin/conda
+python3 -B packaging/coragent_packaging/installer/install_job_environment.py \
+  --config /absolute/job.toml --platform PLATFORM --scheduler-entry ENTRY --backend structure
 ```
 
-Configure the remote target, queue and native solver paths in `job.toml` first.
-Remote paths belong to that target. Provisioning uses SSH and requires Python
-3.11+, Conda, `timeout`, Linux x86_64 and the declared glibc; execution uses the
-configured PBS/Torque scheduler and rsync. No controller Python path is copied
-to the target. `wrapper` prepares Python for already configured Gaussian/xTB/CREST
-backends; their native binaries remain operator-provided.
+Run it on the execution host. Its paths belong to that host; a controller Python
+path is not a remote environment. `wrapper` provides Python for configured
+Gaussian/xTB/CREST wrappers, while their native binaries remain operator-provided.
+Use a dedicated, versioned prefix. The helper records verified environment
+ownership and inventory; it does not activate a CoRAgent release or submit an
+acceptance Job. Structure and validation may share a prefix. CF22D needs no
+activation script or `LD_PRELOAD` workaround.
 
-The installer stores pinned locks and immutable, versioned prefixes in a
-dedicated owned directory (locally `~/soft/coragent/job-envs/<installation-id>`).
-It writes their absolute bindings to `etc/job.toml`. PubChem/OPSIN service
-settings live in `etc/name-resolver.toml`; local preparation can feed a remote
-calculation without installing name services on every compute target.
+The main configuration is authoritative; `generated/job.toml` is a derived input.
+Online PubChem/OPSIN lookup is optional and has no automatic installation default.
+Configure `[name_resolver]` explicitly and bind `CORAGENT_NAME_RESOLVER_CONFIG`
+in the structure backend to a path readable on the selected platform. Local
+preparation may feed a remote calculation without enabling name lookup on every
+platform. Supplied structures do not require this service.
 
-Preparation and ordinary bounded acceptance Jobs complete before the current
-release is switched or services stopped. The structure profile checks RDKit,
-the resolver configuration path inside a Job, and ethanol geometry generation.
-Optional profiles execute their declared minimal calculation/render. Reports
-separate environment verification, tested backends, and unverified targets.
-External name services are not contacted during this offline acceptance.
-An existing remote target is only tested when selected for provisioning or with
-`--verify-job-target cluster`.
-
-For administrator maintenance, the lower-level target-local helper is still
-available as `python3 packaging/coragent_packaging/installer/install_job_environment.py --config /absolute/job.toml
---backend structure`. It requires existing explicit bindings
-and does not perform the public installer's release activation or Job acceptance.
-Structure and validation may share a prefix. CF22D needs no activation script
-or `LD_PRELOAD` workaround.
+The structure acceptance check validates RDKit and geometry generation without
+requiring a resolver configuration. `--verify-job-target PLATFORM/ENTRY` requests
+bounded acceptance Jobs during installation. Reports distinguish environment
+checks from actual execution; offline acceptance does not contact name services.
 
 Installation never solves dependencies again. Pinned pip artifacts download
 to a cache below the environment parent and install with `--require-hashes`
-and `--no-deps`; `pip check` verifies dependency completeness. The public
-`--job-offline` flag uses only prepared caches; the lower-level helper's `--package-cache`
-selects another artifact directory and `--offline` uses only that directory and
+and `--no-deps`; `pip check` verifies dependency completeness. The helper's
+`--package-cache` selects another artifact directory and `--offline` uses only that directory and
 the Conda cache (`CONDA_PKGS_DIRS`). Locks and release files remain read-only.
 An interrupted new prefix is removed; an existing prefix is never updated in
 place. `--adopt` explicitly verifies a previously seeded environment against
@@ -87,8 +79,8 @@ The optional `path` profile uses path.lock for explicitly configured
 `path_xtb` / `path_gaussian` native bindings. It provides RDKit/NumPy, ASE and SciPy for scans,
 gradients and ASE NEB v2 without changing the existing lightweight wrappers. For example,
 configure `[execution.platforms.local.bindings.path_xtb]` with `command = "/opt/xtb/bin/xtb"`
-(and activation_script if needed), then select `--job-profile local:path`.
-This profile has no default native scientific smoke calculation; the selected
+(and activation_script if needed), bind a prefix based on `path.lock`, and prepare
+that backend with the target-local helper. This profile has no default native scientific smoke calculation; the selected
 recipe's environment check and an explicit bounded scientific Job are separate.
 
 Gaussian numerical parsing uses pinned cclib 1.8.1 through the wrapper, structure and path `.requirements.txt` supplements; wrapper/structure also add SciPy. Provision a new immutable environment when updating. cclib extracts numerical data; it does not decide optimization phases, IRC completeness or chemical connectivity.

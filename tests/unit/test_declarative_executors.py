@@ -344,15 +344,15 @@ def test_installed_resolver_is_used_by_an_isolated_name_resolution_job(tmp_path,
         thread.start()
         try:
             root = tmp_path / 'install'
-            job = app_paths(root).job_config
-            job.parent.mkdir(parents=True)
+            layout = app_paths(root).initialize()
+            job, resolver = layout.job_config, layout.resolver_config
             settings = tomllib.loads(Path(os.environ['CORAGENT_JOB_CONFIG']).read_text())
             local = settings['execution']['platforms']['local']
             local['bindings'] = {'structure': local['bindings']['structure']}
-            job.write_bytes(wizard._job_config_bytes(settings))
-            resolver = app_paths(root).resolver_config
-            resolver.write_text('default_resolver="opsin"\n[backends.opsin]\ncache=false\nendpoint=' +
-                                json.dumps(f'http://127.0.0.1:{server.server_port}/opsin') + '\n')
+            local['bindings']['structure']['environment'] = {'CORAGENT_NAME_RESOLVER_CONFIG': str(resolver)}
+            layout.configuration.update(execution=settings['execution'], name_resolver={
+                'default_resolver': 'opsin', 'backends': {'opsin': {
+                    'cache': False, 'endpoint': f'http://127.0.0.1:{server.server_port}/opsin'}}})
             wizard.configure_backend_configs(SimpleNamespace(install_root=str(root)))
             monkeypatch.setenv('CORAGENT_JOB_CONFIG', str(job))
             # Ambient Host configuration must not substitute for the installed binding.

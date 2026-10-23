@@ -3,10 +3,12 @@
 同一个研究 Task 包含多个工作项，每个 Job 固定一个平台与入口。这不表示把一个紧耦合 MPI
 进程自动拆到互不相通的集群。
 
-task_begin 使用 execution_target 指定默认位置，使用 execution_policy 指定明确允许的位置：
+未绑定的 Task 实际需要计算时，通过 `task_update action=bind_execution` 指定默认位置和明确允许的位置：
 
 ```json
 {
+  "action": "bind_execution",
+  "expected_revision": 1,
   "execution_target": {"platform": "Com30", "scheduler_entry": "qrun"},
   "execution_intent": {"source_submission_id": "1", "source_text": "在 Com30 用 Qrun"},
   "execution_policy": {
@@ -22,13 +24,17 @@ task_begin 使用 execution_target 指定默认位置，使用 execution_policy 
 }
 ```
 
-这是 task_begin 的位置配置部分，不是完整调用。来源必须引用该任务用户提交中实际存在的原文，
-默认位置必须包含在允许位置中，不能虚构授权。
+修订号替换为当前 Task 的实际版本，来源必须引用该任务用户提交中实际存在的原文，
+默认位置必须包含在允许位置中，不能虚构授权。已明确需要计算时，task_begin 也可接收相同的
+execution 字段；普通研究任务创建时省略这些字段。
 
 通过 task_update action=set_execution_plan 设置 execution_plan.items。每项必填 id、work_id
 和 resources（cpus、memory_mb），可选 target、depends_on、input_artifact_ids。
 depends_on 引用工作项 ID，不能有循环或不存在的依赖。省略 target 使用策略默认位置。
 计划修订不能修改或移除已提交、已完成的项。
+未绑定任务的首次 set_execution_plan 可同时传入 execution_target、execution_intent、execution_policy，
+将绑定与计划一起保存；省略时在用户原始要求约束下解析配置默认位置。计划失败不会留下半完成绑定。
+已绑定任务沿用已有策略；需要变更时，在建计划前先用 refine 和新用户来源修改。已有计划固定其位置策略。
 
 使用 task_update action=select_execution_item 和 execution_item_id 选择可执行项。
 准备命令会获得可信 CORAGENT_TASK_EXECUTION 上下文，普通 bash 仍在本机执行。

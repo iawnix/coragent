@@ -691,8 +691,12 @@
                         "properties": {
                           "submission": {
                             "not": {
-                              "required": [
-                                "queue"
+                              "anyOf": [
+                                {
+                                  "required": [
+                                    "queue"
+                                  ]
+                                }
                               ]
                             },
                             "properties": {
@@ -719,8 +723,12 @@
                               "properties": {
                                 "submission": {
                                   "not": {
-                                    "required": [
-                                      "queue"
+                                    "anyOf": [
+                                      {
+                                        "required": [
+                                          "queue"
+                                        ]
+                                      }
                                     ]
                                   },
                                   "properties": {
@@ -744,6 +752,17 @@
                                 }
                               }
                             }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "if": {
+                        "properties": {
+                          "executor": {
+                            "enum": [
+                              "qrun"
+                            ]
                           }
                         }
                       },

@@ -62,12 +62,9 @@ DEFAULT_REPO = "git@github.com:iawnix/coragent.git"
 PROGRESS_PREFIX = "@@coragent-progress@@"
 MINIMUM_NODE_VERSION = (22, 19, 0)
 EMAIL_PROVIDERS = {"smtp"}
-SMTP_PRESETS = {
-    "163": "smtp.163.com",
-    "qq": "smtp.qq.com",
-    "custom": None,
-}
-ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+from research_agent.integrations.email_config import (
+    SMTP_PRESETS, parse_email_config, parse_notification_config, validate_email_address, validate_password_file,
+)
 WEB_TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{8,100}$")
 SERVICE_CONFIG_SCHEMA = "coragent-service/1"
 REMOTE_HOST_CONFIG_SCHEMA = "coragent-remote-host/1"
@@ -190,7 +187,7 @@ def inspect_installation(root: Path) -> dict[str, str | None]:
 def parse_args(argv: list[str] | None = None, *, use_environment: bool = True) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--install-root")
-    parser.add_argument("--config", help="Single CoRAgent config.toml (default: ~/.config/coragent/config.toml).")
+    parser.add_argument("--config", help="Single CoRAgent config.toml (default: <install-root>/config/config.toml).")
     parser.add_argument("--import-config", dest="config_dir", help="Explicit one-time import of component configuration files.")
     parser.add_argument("--dry-run", action="store_true", help="Print a redacted plan without downloading, installing or starting services.")
     parser.add_argument("--workspace-root", help="Absolute directory containing named research workspaces.")
@@ -340,7 +337,7 @@ def interactive_options(args: argparse.Namespace) -> argparse.Namespace:
         args.job_config or "",
     ).strip() or None
     args.name_resolver_config = ask(
-        "Chemical name resolver TOML path (blank uses the bundled PubChem default for a new install)",
+        "Chemical name resolver TOML path (blank preserves an explicit configuration)",
         args.name_resolver_config or "",
     ).strip() or None
     section("Phone connection")
@@ -437,13 +434,18 @@ def _load_existing_email_defaults(args: argparse.Namespace, root: Path) -> None:
     if args.email_binding is not None or getattr(args, "_clear_email", False):
         return
     layout = app_paths(root)
-    email = layout.configuration.read(required=False).get('notifications', {}).get('email', {})
-    if not email or not email.get('enabled', True):
+    document = layout.configuration.read(required=False)
+    if 'notifications' not in document:
         return
-    email = layout.configuration.resolve_credentials(email)
-    provider = email.get("provider", "smtp")
-    if provider != "smtp":
-        raise ValueError("invalid email configuration")
+    try:
+        email = parse_notification_config({'notifications': document['notifications']}, base_dir=layout.config)
+        if not email['enabled']:
+            return
+        email = layout.configuration.resolve_credentials(email)
+    except ValueError:
+        args._email_configuration_error = True
+        note("Email configuration is invalid; reconfigure or disable it in the Email menu.", tone="warning")
+        return
     args.email_binding = "smtp"
     args.email_recipient = email.get("recipient")
     args.email_preset = email.get("preset", "qq")
@@ -466,7 +468,11 @@ def _menu_choice(args: argparse.Namespace) -> str:
     field("CoRAgent Web", "enabled" if args.with_web else "disabled")
     field("Phone", "Link Relay" if args.phone_access == "link" else "disabled")
     field("Services", args.service_scope or "none")
-    field("Email", args.email_binding or ("configured" if (app_paths(root).email_config).is_file() else "not configured"))
+    email_state = ("invalid; reconfigure or disable" if getattr(args, '_email_configuration_error', False)
+                   else "disabled" if getattr(args, '_clear_email', False)
+                   else args.email_binding or ("configured" if 'notifications' in app_paths(root).configuration.read(required=False)
+                                               else "not configured"))
+    field("Email", email_state, tone="warning" if getattr(args, '_email_configuration_error', False) else "muted")
     field("Job platform", "configured" if (app_paths(root).job_config).is_file() else "not configured")
     field("Chemical name resolver", "configured" if (app_paths(root).resolver_config).is_file() else "not configured")
     print()
@@ -600,7 +606,7 @@ def interactive_menu_options(args: argparse.Namespace) -> argparse.Namespace:
                 args.job_config or "",
             ).strip() or None
             args.name_resolver_config = ask(
-                "Chemical name resolver TOML path (blank uses the bundled PubChem default for a new install)",
+                "Chemical name resolver TOML path (blank preserves an explicit configuration)",
                 args.name_resolver_config or "",
             ).strip() or None
             args.job_profile = [value.strip() for value in ask(
@@ -628,17 +634,20 @@ def interactive_menu_options(args: argparse.Namespace) -> argparse.Namespace:
 def configure_email_interactively(args: argparse.Namespace, *, force: bool = False) -> None:
     if args.email_binding is not None and not force:
         return
-    args.__dict__.pop("_email_password", None)
-    args.__dict__.pop("_clear_email", None)
     root = Path(args.install_root)
-    existing = app_paths(root).email_config
-    prompt = "Reconfigure email notifications" if existing.is_file() else "Configure email notifications"
+    existing = 'notifications' in app_paths(root).configuration.read(required=False)
+    prompt = "Reconfigure email notifications" if existing else "Configure email notifications"
     if not ask_yes_no(prompt, False):
-        if force and existing.is_file() and ask_yes_no("Disable email notifications", False):
+        if force and existing and ask_yes_no("Disable email notifications", False):
             args.email_binding = None
             _clear_email_options(args)
             args._clear_email = True
+            args.__dict__.pop("_email_password", None)
+            args.__dict__.pop("_email_configuration_error", None)
         return
+    args.__dict__.pop("_email_password", None)
+    args.__dict__.pop("_clear_email", None)
+    args.__dict__.pop("_email_configuration_error", None)
     args.email_binding = "smtp"
     args.email_recipient = _ask_email_address("Notification recipient", getattr(args, "email_recipient", None) or "")
     args.email_preset = ask("SMTP mailbox preset (163, qq, or custom)", getattr(args, "email_preset", None) or "qq").lower()
@@ -722,7 +731,7 @@ def show_install_plan(args: argparse.Namespace, installation: dict[str, str | No
     field("Scientific execution", "verify configured targets and declared dependencies", tone="muted")
     field("Pi App Server", "install pinned runtime and verify", tone="success")
     field("Local backend policy", "automatic structure environment on a fresh install; native tools use supplied paths", tone="muted")
-    field("Job platform config", args.job_config or "preserve existing bindings or generate local defaults", tone="muted")
+    field("Job platform config", args.job_config or "preserve existing bindings or leave calculation unconfigured", tone="muted")
     scientific = _job_install.preview(_job_install.plan(args))
     for row in scientific['environments']:
         field(row['target'] + ':' + row['profile'], row['action'] + ' - ' + row['prefix'], tone='muted')
@@ -732,7 +741,7 @@ def show_install_plan(args: argparse.Namespace, installation: dict[str, str | No
               f"manage on {host}; runtime={row.get('runtime', 'auto')}; {row['cpus']} CPUs, {row['memory_mb']} MiB; {row['state_dir']}", tone='success')
     field(
         "Chemical name resolver config",
-        args.name_resolver_config or "bundled PubChem default for a new install; preserve existing otherwise",
+        args.name_resolver_config or "preserve existing or leave name lookup unconfigured",
         tone="muted",
     )
     field(
@@ -745,10 +754,12 @@ def show_install_plan(args: argparse.Namespace, installation: dict[str, str | No
     if args.email_binding is None:
         if getattr(args, "_clear_email", False):
             configuration = "disable existing"
+        elif getattr(args, "_email_configuration_error", False):
+            configuration = "invalid; reconfigure or disable"
         else:
             configuration = (
                 "preserve existing"
-                if (app_paths(Path(args.install_root)).email_config).is_file()
+                if 'notifications' in app_paths(args.install_root).configuration.read(required=False)
                 else "not configured"
             )
         field("Configuration", configuration, tone="muted")
@@ -949,6 +960,7 @@ def validate_options(args: argparse.Namespace) -> None:
     if args.service_scope != "none" and shutil.which("systemctl") is None:
         raise ValueError("the managed App Server Host requires systemctl; install on a systemd host or use an explicit staging scope")
     validate_email_options(args)
+    validate_configured_services(args)
 
 
 def _validate_workspace_root(value: object, install_root: Path) -> Path:
@@ -1021,25 +1033,19 @@ def configure_service_runtime(args: argparse.Namespace) -> dict[str, str | None]
 
 
 def configure_remote_host(args: argparse.Namespace) -> dict[str, object]:
-    """Persist the optional SSH terminal profile without storing credentials."""
-    destination = app_paths(args.install_root).remote_config
+    """Persist the optional terminal connection in the authoritative document."""
+    from coragent_packaging.installer._configuration import commit_sections
+    layout = app_paths(args.install_root)
     if args.remote_host is None:
-        if destination.exists() or destination.is_symlink():
-            destination.unlink()
-        return {"status": "disabled", "path": str(destination)}
-    document = {
-        "schema_version": REMOTE_HOST_CONFIG_SCHEMA,
-        "ssh_host": args.remote_host,
-        "host_socket": args.remote_host_socket,
-        "proxy_path": args.remote_proxy_path,
-        "ssh_config": args.ssh_config,
-        "ssh_options": list(args.ssh_option or []),
-    }
-    _write_private_config_bytes(
-        (json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8"),
-        destination,
-    )
-    return {"status": "configured", "path": str(destination), "ssh_host": args.remote_host}
+        commit_sections(args.install_root, remote_host=None).materialize()
+        return {'status': 'disabled', 'path': str(layout.remote_config)}
+    document = {'schema_version': REMOTE_HOST_CONFIG_SCHEMA, 'ssh_host': args.remote_host,
+                'host_socket': args.remote_host_socket, 'proxy_path': args.remote_proxy_path,
+                'ssh_options': list(args.ssh_option or [])}
+    if args.ssh_config:
+        document['ssh_config'] = args.ssh_config
+    commit_sections(args.install_root, remote_host=document).materialize()
+    return {'status': 'configured', 'path': str(layout.remote_config), 'ssh_host': args.remote_host}
 
 
 def _existing_link_configuration(root: Path) -> tuple[str, str] | None:
@@ -1102,139 +1108,77 @@ def _validate_link_url(value: object) -> str:
     return value.rstrip("/")
 
 
+def _email_candidate(args):
+    fields = {'preset': 'email_preset', 'host': 'email_host', 'recipient': 'email_recipient',
+              'username': 'email_username', 'port': 'email_port', 'security': 'email_security',
+              'password_env': 'email_password_env', 'password_file': 'email_password_file'}
+    candidate = {'enabled': True, 'provider': args.email_binding}
+    candidate.update({key: getattr(args, option) for key, option in fields.items()
+                      if getattr(args, option) is not None})
+    if hasattr(args, '_email_password'):
+        if args.email_password_env is not None:
+            raise ValueError('an interactive SMTP password must use a password file')
+        candidate.pop('password_file', None)
+        candidate['password'] = args._email_password
+    return parse_email_config(candidate)
+
+
+def validate_configured_services(args):
+    """Validate selected service settings before installation mutates files."""
+    layout = app_paths(args.install_root)
+    document = layout.configuration.read(required=False)
+    if args.email_binding is None and not getattr(args, '_clear_email', False) and 'notifications' in document:
+        from research_agent.integrations.email_config import parse_notification_config
+        email = parse_notification_config({'notifications': document['notifications']}, base_dir=layout.config)
+        if email['enabled']:
+            layout.configuration.resolve_credentials(email)
+    if not getattr(args, 'name_resolver_config', None) and 'name_resolver' in document:
+        _validate_name_resolver_config(document['name_resolver'])
+
+
 def validate_email_options(args: argparse.Namespace) -> None:
-    values = (
-        args.email_preset,
-        args.email_host,
-        args.email_recipient,
-        args.email_username,
-        args.email_port,
-        args.email_security,
-        args.email_password_env,
-        args.email_password_file,
-    )
+    values = (args.email_preset, args.email_host, args.email_recipient, args.email_username,
+              args.email_port, args.email_security, args.email_password_env, args.email_password_file)
     if args.email_binding is None:
         if any(value is not None for value in values):
-            raise ValueError("email options require --email-binding")
+            raise ValueError('email options require --email-binding')
         return
-    if args.email_binding not in EMAIL_PROVIDERS:
-        raise ValueError("invalid email configuration")
-    _validate_email_address(args.email_recipient, "--email-recipient")
-    if args.email_preset not in SMTP_PRESETS:
-        raise ValueError("--email-preset must be 163, qq, or custom for SMTP")
-    if args.email_preset == "custom":
-        _validate_smtp_host(args.email_host, "--email-host")
-    elif args.email_host is not None:
-        expected_host = SMTP_PRESETS[args.email_preset]
-        if args.email_host != expected_host:
-            raise ValueError(f"--email-host must be {expected_host} for preset {args.email_preset}")
-    if args.email_port is None:
-        args.email_port = 465
-    if not isinstance(args.email_port, int) or isinstance(args.email_port, bool) or not 1 <= args.email_port <= 65535:
-        raise ValueError("--email-port must be between 1 and 65535")
-    args.email_security = args.email_security or "ssl"
-    if args.email_security not in {"ssl", "starttls"}:
-        raise ValueError("--email-security must be ssl or starttls")
-    _validate_email_address(args.email_username, "--email-address")
-    if (args.email_password_env is None) == (args.email_password_file is None):
-        raise ValueError("SMTP requires exactly one of --email-password-env or --email-password-file")
-    if args.email_password_env is not None and not ENV_NAME.fullmatch(args.email_password_env):
-        raise ValueError("--email-password-env must be an environment variable name")
-    if args.email_password_file is not None:
-        password_path = Path(args.email_password_file).expanduser()
-        if not password_path.is_absolute() or password_path.is_symlink():
-            raise ValueError("--email-password-file must be an absolute non-symbolic-link path")
-        if not password_path.exists() and not hasattr(args, "_email_password"):
-            raise ValueError("--email-password-file must exist for non-interactive installation")
-        if password_path.exists():
-            if not password_path.is_file() or stat.S_IMODE(password_path.stat().st_mode) != 0o600:
-                raise ValueError("--email-password-file must be a regular file with mode 0600")
-    if hasattr(args, "_email_password") and args.email_password_env is not None:
-        raise ValueError("an interactive SMTP password must use a password file")
+    candidate = _email_candidate(args)
+    args.email_port, args.email_security = candidate['port'], candidate['security']
+    if 'password_file' in candidate:
+        validate_password_file(candidate['password_file'])
 
 
 def _validate_email_address(value: object, label: str) -> None:
-    if not isinstance(value, str) or not value.strip() or any(character.isspace() for character in value):
-        raise ValueError(f"{label} must be one email address")
-    if value.count("@") != 1:
-        raise ValueError(f"{label} must be one email address")
-    local, domain = value.split("@")
-    if not local or "." not in domain or domain.startswith(".") or domain.endswith("."):
-        raise ValueError(f"{label} must be one email address")
-
-
-def _validate_smtp_host(value: object, label: str) -> None:
-    if (
-        not isinstance(value, str)
-        or not value
-        or len(value) > 255
-        or any(character.isspace() or ord(character) < 32 for character in value)
-        or "/" in value
-        or "@" in value
-    ):
-        raise ValueError(f"{label} must be a hostname")
+    validate_email_address(value, label)
 
 
 def configure_notification_config(args: argparse.Namespace) -> dict[str, str]:
-    """Write installation-owned notification configuration without exposing secrets."""
-
+    """Publish the email candidate to the primary config before deriving files."""
+    from coragent_packaging.installer._configuration import commit_sections
     root = Path(args.install_root).expanduser().resolve()
-    config_path = app_paths(root).email_config
-    if getattr(args, "_clear_email", False):
-        if config_path.is_symlink():
-            raise ValueError(f"notification file cannot be a symbolic link: {config_path}")
-        config_path.unlink(missing_ok=True)
-        return {"status": "disabled", "path": str(config_path)}
+    layout = app_paths(root)
+    config_path = layout.email_config
+    if getattr(args, '_clear_email', False):
+        commit_sections(root, notifications={'email': {'enabled': False}}).materialize()
+        return {'status': 'disabled', 'path': str(config_path)}
     if args.email_binding is None:
-        return {
-            "status": "preserved" if config_path.is_file() else "not_configured",
-            "path": str(config_path),
-        }
-
-    from coragent_packaging.installer._install_inputs import provision_config_credentials
-    provision_config_credentials(args)
-
-    password_file: Path | None = None
-    if args.email_password_file is not None:
-        password_file = Path(args.email_password_file).expanduser()
-        if hasattr(args, "_email_password"):
-            _write_private_text(password_file, f"{args._email_password}\n")
-        _validate_private_secret_file(password_file)
-
-    lines = [
-        "[notifications.email]",
-        "enabled = true",
-        "provider = \"smtp\"",
-        f"preset = {_toml_string(args.email_preset)}",
-        f"port = {args.email_port}",
-        f"security = {_toml_string(args.email_security)}",
-        f"recipient = {_toml_string(args.email_recipient)}",
-        f"username = {_toml_string(args.email_username)}",
-    ]
-    if args.email_preset == "custom":
-        lines.append(f"host = {_toml_string(args.email_host)}")
-    if args.email_password_env is not None:
-        lines.append(f"password_env = {_toml_string(args.email_password_env)}")
-        credential = args.email_password_env
-        env_path = app_paths(root).generated / 'secrets' / "service.env"
-        value = os.environ.get(args.email_password_env)
-        if value:
-            escaped = value.replace("\\", "\\\\").replace('"', '\\"')
-            _write_private_text(env_path, f'{args.email_password_env}="{escaped}"\n')
-    else:
-        assert password_file is not None
-        lines.append(f"password_file = {_toml_string(str(password_file.resolve()))}")
-        credential = str(password_file.resolve())
-    lines.append("")
-    _write_private_text(config_path, "\n".join(lines))
-    return {
-        "status": "configured",
-        "binding": "smtp",
-        "preset": args.email_preset,
-        "credential": credential,
-        "environment_file": str(app_paths(root).generated / 'secrets' / "service.env") if args.email_password_env else None,
-        "path": str(config_path),
-    }
+        layout.materialize()
+        return {'status': 'preserved' if 'notifications' in layout.configuration.read() else 'not_configured',
+                'path': str(config_path)}
+    candidate = _email_candidate(args)
+    if 'password_file' in candidate:
+        password_file = validate_password_file(candidate['password_file'])
+        password = password_file.read_text().strip()
+        if not password:
+            raise ValueError('notifications.email.password_file must not be empty')
+        # Explicit imports become credentials, not references to disposable files.
+        candidate.pop('password_file')
+        candidate['password'] = password
+    commit_sections(root, notifications={'email': candidate}).materialize()
+    credential = candidate.get('password_env') or str(layout.generated / 'secrets/smtp-password')
+    return {'status': 'configured', 'binding': 'smtp', 'preset': candidate['preset'],
+            'credential': credential, 'path': str(config_path)}
 
 
 def _toml_string(value: str) -> str:
@@ -1285,56 +1229,17 @@ def _validate_private_secret_file(path: Path) -> None:
         raise ValueError(f"--email-password-file must not be empty: {path}")
 
 
-def _copy_private_config(source_value: str, destination: Path, *, kind: str) -> dict[str, str]:
+def _read_config_input(source_value, *, kind):
     source = Path(source_value).expanduser()
     if not source.is_absolute() or source.is_symlink() or not source.is_file():
-        raise ValueError(f"--{kind}-config must be an existing absolute regular file")
+        raise ValueError(f'--{kind}-config must be an existing absolute regular file')
+    raw = source.read_bytes()
+    if len(raw) > 2 * 1024 * 1024:
+        raise ValueError('configuration is too large')
     try:
-        with source.open("rb") as handle:
-            raw = handle.read()
-            if len(raw) > 2 * 1024 * 1024:
-                raise ValueError("configuration is too large")
-            parsed = tomllib.loads(raw.decode("utf-8"))
-    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
-        raise ValueError(f"invalid {kind} TOML configuration: {source}: {error}") from error
-    readiness = None
-    if kind == "job":
-        readiness = _validate_job_config(parsed)
-    elif kind == "name-resolver":
-        _validate_name_resolver_config(parsed)
-    elif kind == "remote":
-        _validate_remote_config(parsed, source.parent)
-    elif kind == "local":
-        table = parsed.get("backends", parsed.get("local", parsed))
-        if not isinstance(table, dict):
-            raise ValueError("local config must contain a [backends] table")
-        for name, entry in table.items():
-            activation = None
-            command = entry
-            if isinstance(entry, dict):
-                command = entry.get("command")
-                activation = entry.get("activation_script")
-            if not isinstance(name, str) or not isinstance(command, str) or not command.strip():
-                raise ValueError("local backend commands must be non-empty strings")
-            if activation is not None:
-                activation_path = Path(activation).expanduser() if isinstance(activation, str) else None
-                if (
-                    activation_path is None
-                    or not activation_path.is_absolute()
-                    or activation_path.is_symlink()
-                    or not activation_path.is_file()
-                    or not os.access(activation_path, os.R_OK)
-                ):
-                    raise ValueError(f"local backend {name!r} activation_script must be an absolute readable regular file")
-    previous_sha256 = hashlib.sha256(destination.read_bytes()).hexdigest() if destination.is_file() else None
-    _write_private_config_bytes(raw, destination)
-    result = {"status": "configured", "path": str(destination), "source": str(source)}
-    if readiness is not None:
-        result.update(sha256=hashlib.sha256(raw).hexdigest(), previous_sha256=previous_sha256,
-                      configuration_changed=previous_sha256 is not None and previous_sha256 != hashlib.sha256(raw).hexdigest(),
-                      readiness=readiness)
-        _write_job_readiness(destination, result)
-    return result
+        return tomllib.loads(raw.decode('utf-8'))
+    except (UnicodeError, tomllib.TOMLDecodeError) as error:
+        raise ValueError(f'invalid {kind} TOML configuration') from error
 
 
 def _validate_job_config(parsed: dict[str, object]) -> dict:
@@ -1369,54 +1274,18 @@ def verify_job_bindings(args, installed, backend_configs):
     if completed.returncode:
         raise RuntimeError("job environment verification failed: " + completed.stderr.strip())
     job["readiness"] = json.loads(completed.stdout)
-    _write_job_readiness(Path(job["path"]), job)
+    _write_job_readiness(Path(args.install_root), job)
 
 
-def _write_job_readiness(destination: Path, result: dict) -> None:
-    record = destination.parent.parent / "installation/job-readiness.json"
+def _write_job_readiness(root: Path, result: dict) -> None:
+    record = app_paths(root).state / "installation/job-readiness.json"
     _write_private_config_bytes((json.dumps(result, indent=2) + "\n").encode(), record)
 
 
 def _validate_name_resolver_config(parsed: object) -> None:
-    """Validate the installation-owned deterministic name resolver contract."""
-
-    if not isinstance(parsed, dict):
-        raise ValueError("name-resolver config must be a TOML table")
-    default = parsed.get("default_resolver", "auto")
-    if default not in {"auto", "pubchem", "opsin"}:
-        raise ValueError("name-resolver default_resolver must be auto, pubchem, or opsin")
-    backends = parsed.get("backends", {})
-    if not isinstance(backends, dict):
-        raise ValueError("name-resolver config backends must be a table")
-    for name, value in backends.items():
-        if name not in {"pubchem", "opsin"} or not isinstance(value, dict):
-            raise ValueError(f"unsupported name-resolver backend: {name}")
-        enabled = value.get("enabled", True)
-        if not isinstance(enabled, bool):
-            raise ValueError(f"name-resolver backends.{name}.enabled must be boolean")
-        endpoint = value.get(
-            "endpoint",
-            "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
-            if name == "pubchem"
-            else "https://opsin.ch.cam.ac.uk/opsin",
-        )
-        if not isinstance(endpoint, str) or not endpoint.strip():
-            raise ValueError(f"name-resolver backends.{name}.endpoint must be a URL")
-        parsed_endpoint = urllib.parse.urlparse(endpoint)
-        if parsed_endpoint.scheme not in {"http", "https"} or not parsed_endpoint.netloc:
-            raise ValueError(f"name-resolver backends.{name}.endpoint must be an absolute HTTP(S) URL")
-        timeout = value.get("timeout_seconds", 10)
-        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 1 <= timeout <= 60:
-            raise ValueError(f"name-resolver backends.{name}.timeout_seconds must be between 1 and 60")
-        cache = value.get("cache", True)
-        if not isinstance(cache, bool):
-            raise ValueError(f"name-resolver backends.{name}.cache must be boolean")
-        cache_dir = value.get("cache_dir")
-        if cache_dir is not None and (not isinstance(cache_dir, str) or not Path(cache_dir).is_absolute()):
-            raise ValueError(f"name-resolver backends.{name}.cache_dir must be an absolute path")
-        user_agent = value.get("user_agent", "CoRAgent-chemical-name-resolver/1")
-        if not isinstance(user_agent, str) or not user_agent.strip() or len(user_agent) > 256:
-            raise ValueError(f"name-resolver backends.{name}.user_agent must be a non-empty string")
+    """Use the same standalone contract shipped to scientific workers."""
+    from research_agent.bootstrap.name_resolver_config import parse_config
+    parse_config(parsed, package_root=ROOT)
 
 
 def _name_resolver_details(path: Path) -> dict[str, str]:
@@ -1430,15 +1299,6 @@ def _name_resolver_details(path: Path) -> dict[str, str]:
         "enabled_backends": ",".join(enabled),
         "automatic_lookup": "ready" if enabled else "unavailable",
     }
-
-
-def _validate_remote_config(parsed: dict[str, object], base: Path) -> None:
-    # Structural validation is identical before installation and every runtime load.
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("research_agent_job_config", ROOT / "backend/src/research_agent/jobs/config_contract.py")
-    contract = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(contract)
-    contract.validate_job_config(parsed)
 
 
 def _write_private_config_bytes(raw: bytes, destination: Path) -> None:
@@ -1463,122 +1323,43 @@ def _write_private_config_bytes(raw: bytes, destination: Path) -> None:
 
 
 def _job_config_bytes(config: dict) -> bytes:
-    """Serialize validated Job tables, including quoted target names and env keys."""
-    lines = []
-
-    def table(path, values):
-        if path:
-            lines.append("[" + ".".join(_toml_string(key) for key in path) + "]")
-        for key, value in values.items():
-            if not isinstance(value, dict):
-                lines.append(_toml_string(key) + " = " + json.dumps(value, ensure_ascii=False))
-        lines.append("")
-        for key, value in values.items():
-            if isinstance(value, dict):
-                table((*path, key), value)
-
-    table((), config)
-    return ("\n".join(lines) + "\n").encode()
-
-
-def _bind_local_name_resolver(job: dict, resolver: Path) -> None:
-    """Jobs receive explicit target bindings, never the Host's ambient config."""
-    destination = Path(job["path"])
-    if not destination.is_file() or not resolver.is_file():
-        return
-    raw = destination.read_bytes()
-    config = tomllib.loads(raw.decode())
-    changed = []
-    settings = _job_install.contract().validate_job_config(config)
-    for name, target in settings['targets'].items():
-        structure = target.get("backends", {}).get("structure")
-        if target["transport"] != "local" or structure is None:
-            continue
-        variables = structure.setdefault("environment", {})
-        if {"CORAGENT_NAME_RESOLVER_CONFIG", "CORAGENT_INSTALL_ROOT"} & variables.keys():
-            continue
-        variables["CORAGENT_NAME_RESOLVER_CONFIG"] = str(resolver)
-        changed.append(name)
-    config = _job_install.contract().configuration_document(settings)
-    if not changed:
-        return
-    installed = _job_config_bytes(config)
-    readiness = _validate_job_config(tomllib.loads(installed.decode()))
-    previous = job.get("previous_sha256", hashlib.sha256(raw).hexdigest())
-    _write_private_config_bytes(installed, destination)
-    job.update(status="configured", source_sha256=hashlib.sha256(raw).hexdigest(),
-               sha256=hashlib.sha256(installed).hexdigest(), previous_sha256=previous,
-               configuration_changed=previous is not None and previous != hashlib.sha256(installed).hexdigest(),
-               resolver_bindings=changed, readiness=readiness)
-    _write_job_readiness(destination, job)
+    from research_agent.configuration.configuration import toml_text
+    return toml_text(config).encode()
 
 
 def configure_backend_configs(args: argparse.Namespace) -> dict[str, dict[str, str]]:
+    """Apply explicit imports to the primary configuration, then derive inputs."""
+    from coragent_packaging.installer._configuration import commit_sections
     root = Path(args.install_root).expanduser().resolve()
-    result: dict[str, dict[str, str]] = {}
-    job_config = getattr(args, "job_config", None)
-    if job_config:
-        result["job"] = _copy_private_config(
-            job_config,
-            app_paths(root).job_config,
-            kind="job",
-        )
+    layout = app_paths(root)
+    document = layout.configuration.read(required=False)
+    updates = {}
+    job_input = getattr(args, 'job_config', None)
+    resolver_input = getattr(args, 'name_resolver_config', None)
+    if job_input:
+        updates['execution'] = _read_config_input(job_input, kind='job')['execution']
+    if resolver_input:
+        updates['name_resolver'] = _read_config_input(resolver_input, kind='name-resolver')
+    candidate = {**document, **updates}
+    readiness = None
+    if 'execution' in candidate:
+        readiness = _validate_job_config({'execution': candidate['execution']})
+    if 'name_resolver' in candidate:
+        _validate_name_resolver_config(candidate['name_resolver'])
+    commit_sections(root, **updates).materialize()
+    result = {}
+    for name, section, target, imported in (
+            ('job', 'execution', layout.job_config, job_input),
+            ('name_resolver', 'name_resolver', layout.resolver_config, resolver_input)):
+        result[name] = {'status': ('configured' if imported else 'preserved') if section in candidate else 'not_configured',
+                        'path': str(target)}
+    if readiness is not None:
+        result['job'].update(sha256=hashlib.sha256(layout.job_config.read_bytes()).hexdigest(), readiness=readiness)
+        _write_job_readiness(root, result['job'])
+    if 'name_resolver' in candidate:
+        result['name_resolver'].update(_name_resolver_details(layout.resolver_config))
     else:
-        destination = app_paths(root).job_config
-        result["job"] = {"status": "preserved" if destination.is_file() else "not_configured", "path": str(destination)}
-        if destination.is_file():
-            raw = destination.read_bytes()
-            readiness = _validate_job_config(tomllib.loads(raw.decode()))
-            result["job"].update(sha256=hashlib.sha256(raw).hexdigest(), readiness=readiness)
-            _write_job_readiness(destination, result["job"])
-
-    resolver_config = getattr(args, "name_resolver_config", None)
-    resolver_destination = app_paths(root).resolver_config
-    if resolver_config:
-        result["name_resolver"] = _copy_private_config(
-            resolver_config,
-            resolver_destination,
-            kind="name-resolver",
-        )
-        result["name_resolver"].update(_name_resolver_details(resolver_destination))
-    elif resolver_destination.is_symlink():
-        raise ValueError(f"existing name-resolver configuration must be a regular file: {resolver_destination}")
-    elif resolver_destination.exists() and not resolver_destination.is_file():
-        raise ValueError(f"existing name-resolver configuration must be a regular file: {resolver_destination}")
-    elif resolver_destination.is_file():
-        # Validate preserved state as part of installation so a stale or
-        # malformed resolver file cannot silently make the capability unusable.
-        try:
-            _validate_name_resolver_config(tomllib.loads(resolver_destination.read_text(encoding="utf-8")))
-        except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError, ValueError) as error:
-            raise ValueError(f"invalid existing name-resolver configuration: {resolver_destination}: {error}") from error
-        result["name_resolver"] = {
-            "status": "preserved",
-            "path": str(resolver_destination),
-            **_name_resolver_details(resolver_destination),
-        }
-    else:
-        # Name resolution is a registered deterministic capability. A fresh
-        # installation must therefore have a usable backend; otherwise every
-        # automatic `chemical.name.resolve` call can only return
-        # unsupported/unresolved until the user discovers a private config
-        # file that the installer never created. The bundled TOML contains no
-        # credentials and remains replaceable with --name-resolver-config.
-        if DEFAULT_NAME_RESOLVER_CONFIG.is_file():
-            result["name_resolver"] = _copy_private_config(
-                str(DEFAULT_NAME_RESOLVER_CONFIG),
-                resolver_destination,
-                kind="name-resolver",
-            )
-            result["name_resolver"].update(_name_resolver_details(resolver_destination))
-        else:
-            result["name_resolver"] = {
-                "status": "not_configured",
-                "path": str(resolver_destination),
-                "enabled_backends": "",
-                "automatic_lookup": "unavailable",
-            }
-    _bind_local_name_resolver(result["job"], resolver_destination)
+        result['name_resolver'].update(enabled_backends='', automatic_lookup='unavailable')
     return result
 
 
@@ -1829,7 +1610,8 @@ def snapshot_install_configuration(root: Path, args: argparse.Namespace) -> dict
         layout.remote_config, layout.host_state / 'server-id', layout.host_state / 'link.json',
         layout.host_state / 'host.token', layout.generated / 'web/auth.token',
         layout.pi_config / 'models.json', layout.pi_config / 'auth.json', layout.email_config, layout.generated / 'secrets/service.env',
-        layout.generated / 'secrets/smtp-password', layout.job_config, layout.resolver_config]
+        layout.generated / 'secrets/smtp-password', layout.job_config, layout.resolver_config,
+        layout.generated / 'configuration-status.json']
     snapshot_paths += [layout.state / 'installation' / name for name in
         ('source-provenance.json', 'job-environments.json', 'job-readiness.json')]
     paths = {str(path): _snapshot_file(path) for path in snapshot_paths}
@@ -2187,25 +1969,29 @@ def provision_pi_agent_configuration(args: argparse.Namespace) -> dict[str, obje
     source_dir = source_dir.resolve()
     destination_dir = app_paths(root).pi_config
     _ensure_private_directory(destination_dir)
+    from coragent_packaging.installer._configuration import commit_sections
+    layout = app_paths(root)
+    document = layout.configuration.read(required=False)
+    credentials = layout.configuration.credentials()
     files: dict[str, str] = {}
-
     for name in PI_AGENT_CONFIG_FILES:
-        destination = destination_dir / name
-        if _preserve_pi_agent_configuration(destination):
-            files[name] = "preserved"
+        existing = document.get('models') if name == 'models.json' else credentials.get('models')
+        if existing:
+            files[name] = 'preserved'
             continue
         raw = _read_pi_agent_configuration_directory(source_dir, name)
         if raw is None:
-            files[name] = "not_configured"
+            files[name] = 'not_configured'
             continue
-        if _install_new_private_config_bytes(raw, destination):
-            files[name] = "imported"
-        elif _preserve_pi_agent_configuration(destination):
-            # Another installer or the service won the create race. Never
-            # replace configuration that appeared after our initial check.
-            files[name] = "preserved"
+        value = json.loads(raw)
+        if name == 'models.json':
+            commit_sections(root, models=value)
+            credentials = layout.configuration.credentials()
         else:
-            raise RuntimeError(f"Pi agent configuration changed while it was being installed: {destination}")
+            credentials['models'] = value
+            _write_private_config_bytes((json.dumps(credentials, indent=2) + '\n').encode(), layout.credentials)
+        files[name] = 'imported'
+    layout.materialize()
 
     configured = [status for status in files.values() if status != "not_configured"]
     if not configured:
@@ -2476,6 +2262,8 @@ ProtectHome=read-only
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 ReadWritePaths={_systemd_quote(app_paths(root).cache)}
 ReadWritePaths={_systemd_quote(app_paths(root).state)}
+ReadWritePaths={_systemd_quote(app_paths(root).generated)}
+ReadWritePaths={_systemd_quote(app_paths(root).jobs)}
 ReadWritePaths={_systemd_quote(app_paths(root).log)}
 ReadWritePaths={_systemd_quote(Path('/run/coragent') if args.service_scope == 'system' else Path(runtime_dir) / 'coragent')}
 ReadWritePaths={_systemd_quote(app_paths(root).pi_config)}
@@ -2541,18 +2329,12 @@ WantedBy={wanted_by}
 
 
 def _notification_environment_directive(args: argparse.Namespace) -> str:
-    root = Path(args.install_root)
-    config = app_paths(root).email_config
-    if not config.is_file():
+    layout = app_paths(args.install_root)
+    document = layout.configuration.read(required=False)
+    if 'notifications' not in document:
         return ""
-    try:
-        raw = tomllib.loads(config.read_text(encoding="utf-8"))
-        email = raw.get("notifications", {}).get("email", {})
-    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError, AttributeError):
-        return ""
-    if isinstance(email, dict) and isinstance(email.get("password_env"), str):
-        return f"EnvironmentFile=-{_systemd_value(app_paths(root).generated / 'secrets/service.env')}"
-    return ""
+    email = parse_notification_config({'notifications': document['notifications']}, base_dir=layout.config)
+    return f"PassEnvironment={email['password_env']}" if 'password_env' in email else ""
 
 
 def _systemd_quote(value: object) -> str:
@@ -3107,8 +2889,10 @@ def _interactive_prepare_installation(
 def show_dry_run(args: argparse.Namespace) -> None:
     """Expose only configuration references, never credential contents."""
     scientific = _job_install.plan(args)
-    _validate_job_config(_job_install.contract().configuration_document(scientific['settings']))
+    if scientific['settings'] is not None:
+        _validate_job_config(_job_install.contract().configuration_document(scientific['settings']))
     validate_email_options(args)
+    validate_configured_services(args)
     plan = {key: getattr(args, key) for key in (
         "install_root", "config", "config_dir", "workspace_root", "source_root", "coragent_repo",
         "coragent_ref", "coragent_commit", "job_config", "agent_config_dir",
@@ -3183,7 +2967,8 @@ def main(argv: list[str] | None = None) -> int:
             stop_installation_services(args)
             from research_agent.bootstrap.session_guard import guard_installation_upgrade
             writer_guard.enter_context(guard_installation_upgrade(installation_root))
-        qrun_transaction = _qrun_install.prepare(job_plan, args, package)
+        if job_plan.get('qrun'):
+            qrun_transaction = _qrun_install.prepare(job_plan, args, package)
         args._prepared_job_plan = _job_install.prepare(job_plan, args, package,
                                                       installed['runtime']['python_executable'])
         app_server_runtime = prepare_app_server_runtime(installation_root, suite_root=Path(installed['package_root']), bind=False)
@@ -3233,7 +3018,8 @@ def main(argv: list[str] | None = None) -> int:
             activity.update("Installing backend configuration")
             activity.update("Verifying declared execution environments")
             verify_job_bindings(args, installed, backend_configs)
-            _write_job_readiness(Path(backend_configs['job']['path']), backend_configs['job'])
+            if backend_configs['job']['status'] != 'not_configured':
+                _write_job_readiness(installation_root, backend_configs['job'])
             publish_configuration(args)
             activity.update("Configuring services")
             services = configure_services(args, start=False)
@@ -3243,8 +3029,9 @@ def main(argv: list[str] | None = None) -> int:
                 raise RuntimeError("installed release did not pass inspection")
             writer_guard.close()
             maintenance.transition("starting")
-            _qrun_install.commit(qrun_transaction)
-            qrun_transaction = None
+            if qrun_transaction is not None:
+                _qrun_install.commit(qrun_transaction)
+                qrun_transaction = None
             activity.update("Starting the verified services")
             services = activate_installed_services(args, services)
             readiness = verify_running_services(args, installed)
@@ -3252,7 +3039,7 @@ def main(argv: list[str] | None = None) -> int:
                 scope = [] if args.service_scope == "system" else ["--user"]
                 services = [_service_status(scope, args.service_scope, service["name"]) for service in services]
             activity.succeed("Installation finalized")
-        backend_configs["qrun"] = {"status": "configured" if args.service_scope == "none" else "running",
+        backend_configs["qrun"] = {"status": ("configured" if args.service_scope == "none" else "running") if args._prepared_job_plan.get("qrun") else "not_configured",
                                    "pools": args._prepared_job_plan.get("qrun", [])}
         components = build_component_summary(
             args,

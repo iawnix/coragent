@@ -144,8 +144,6 @@ def validate_settings(document):
         'web': {'enabled', 'host', 'port', 'allow_remote'},
         'runtime': {'env_root', 'conda_root'},
         'phone': {'access', 'relay_url'},
-        'execution': {'schema_version', 'default_platform', 'platforms'},
-        'notifications': {'email'},
     }
     for section, allowed in fields.items():
         if set(document.get(section, {})) - allowed:
@@ -156,28 +154,3 @@ def validate_settings(document):
         for key in keys:
             if key in document.get(section, {}) and type(document[section][key]) is not bool:
                 raise ValueError(f'{section}.{key} must be a boolean')
-    if 'notifications' not in document: return
-    email = document['notifications'].get('email')
-    allowed = {'enabled', 'provider', 'preset', 'host', 'port', 'security', 'recipient',
-               'username', 'from_address', 'password', 'password_env', 'password_file'}
-    if not isinstance(email, dict) or set(email) - allowed:
-        raise ValueError('notifications.email requires supported SMTP settings')
-    if type(email.get('enabled', True)) is not bool:
-        raise ValueError('notifications.email.enabled must be a boolean')
-    if email.get('enabled') is False: return
-    if email.get('provider') != 'smtp' or email.get('preset') not in {'163', 'qq', 'custom'}:
-        raise ValueError('notifications.email requires provider=smtp and a supported preset')
-    for field in ('username', 'recipient'):
-        value = email.get(field)
-        if not isinstance(value, str) or value.count('@') != 1 or any(c.isspace() for c in value):
-            raise ValueError(f'notifications.email.{field} must be an email address')
-    if email['preset'] == 'custom' and not isinstance(email.get('host'), str):
-        raise ValueError('notifications.email.host is required for custom SMTP')
-    port = email.get('port', 465)
-    if type(port) is not int or not 1 <= port <= 65535:
-        raise ValueError('notifications.email.port must be an integer between 1 and 65535')
-    if email.get('security', 'ssl') not in {'ssl', 'starttls'}:
-        raise ValueError('notifications.email.security must be ssl or starttls')
-    selected = [key for key in ('password', 'password_file', 'password_env') if key in email]
-    if len(selected) != 1 or not isinstance(email[selected[0]], str) or not email[selected[0]]:
-        raise ValueError('notifications.email requires exactly one password source')

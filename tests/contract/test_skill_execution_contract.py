@@ -33,4 +33,4 @@ def test_job_runtime_contract_accepts_argv_without_scientific_registry() -> None
         encoding="utf-8"
     )
     assert "argv command" in text
-    assert "No research object is required" in text
+    assert "Preparation may remain unassociated with a research Node" in text

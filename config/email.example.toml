@@ -1,5 +1,7 @@
 # All addresses are fictional. Save your private copy as email.toml.
 # SMTP authorization codes belong in a separate mode-0600 file, not this file.
+# --import-config explicitly imports these settings into config.toml and the password
+# into credentials.json; generated/email.toml and its secret file are derived outputs.
 [notifications.email]
 enabled = true
 provider = "smtp"

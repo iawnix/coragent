@@ -28,20 +28,90 @@ def options(tmp_path, *extra):
         if value == '--job-profile': profiles.append(next(iterator))
         else: remaining.append(value)
     args = wizard.parse_args(['--install-root', str(tmp_path/'install'), '--conda-root', str(tmp_path/'conda'),
-                              '--job-software-root', 'local/main=' + str(tmp_path/'software'), *remaining], use_environment=False)
+                              *remaining], use_environment=False)
     args.job_profile = profiles
     return args
 
 
-def test_fresh_plan_only_references_execution_and_creates_no_environments(tmp_path):
+def test_fresh_installation_has_no_execution_services_or_environment_provisioning(tmp_path, monkeypatch):
     args = options(tmp_path)
-    args.job_software_root = ['local/qrun=' + str(tmp_path/'software')]
+    monkeypatch.setattr(subprocess, 'run', lambda *_a, **_k: pytest.fail('empty installation must not run commands'))
     plan = jobs.plan(args)
-    assert plan['settings']['targets']['local/qrun']['backends'] == {}
+    assert plan['settings'] is None and plan['resolver'] is None
+    assert plan['qrun'] == []
     assert plan['environments'] == []
-    assert plan['targets'] == ['local/qrun']
+    assert plan['targets'] == []
     assert not (tmp_path/'install').exists()
     assert not (tmp_path/'software').exists()
+    layout = app_paths(args.install_root).initialize()
+    prepared = jobs.prepare(jobs.plan(args), args, ROOT, '/unused/python')
+    result = jobs.publish(prepared)
+    assert result['job']['status'] == result['name_resolver']['status'] == 'not_configured'
+    assert 'execution' not in layout.configuration.read()
+    assert 'name_resolver' not in layout.configuration.read()
+    assert not layout.job_config.exists() and not layout.resolver_config.exists()
+    assert not (layout.cache / 'job-install').exists()
+    assert not (layout.state / jobs.RECORD).exists()
+
+
+@pytest.mark.parametrize('option,value', [
+    ('--job-software-root', 'local/main=/fixture/software'),
+    ('--verify-job-target', 'local/main'),
+    ('--manage-qrun', 'local/main'),
+])
+def test_execution_options_require_an_explicit_platform_configuration(tmp_path, option, value):
+    with pytest.raises(ValueError, match='execution configuration required'):
+        jobs.plan(options(tmp_path, option, value))
+
+
+@pytest.mark.parametrize('old_configuration', ['malformed', 'missing_credential'])
+def test_explicit_execution_import_repairs_invalid_previous_configuration(tmp_path, monkeypatch, old_configuration):
+    source = tmp_path/'replacement.toml'
+    args = options(tmp_path, '--job-config', str(source))
+    layout = app_paths(args.install_root).initialize()
+    previous = execution_config('cluster', {'cluster': {
+        'executor': 'tri', 'transport': 'ssh', 'ssh_host': 'old-cluster',
+        'work_root': '/fixture/jobs', 'handler': ['/fixture/tri-handler']}})
+    scheduler = previous['platforms']['cluster']['schedulers']['main']
+    if old_configuration == 'malformed':
+        scheduler['executor'] = 'unsupported'
+    else:
+        scheduler['handler_environment'] = {'TRI_AUTH_TOKEN': 'credential:missing_token'}
+    layout.configuration.update(execution=previous)
+    replacement = execution_config('cluster', {'cluster': {
+        'executor': 'external', 'transport': 'ssh', 'ssh_host': 'replacement-cluster',
+        'work_root': '/fixture/jobs', 'handler': ['/fixture/replacement-handler']}})
+    source.write_bytes(jobs.toml_bytes({'execution': replacement}))
+    monkeypatch.setattr(subprocess, 'run', lambda *_a, **_k: pytest.fail('repair planning must not contact a cluster'))
+
+    with pytest.raises(ValueError):
+        jobs.plan(options(tmp_path))
+    plan = jobs.plan(args)
+    plan['readiness'] = {'targets': {}}
+    result = jobs.publish(plan)['job']
+
+    assert layout.configuration.read()['execution'] == replacement
+    assert tomllib.loads(layout.job_config.read_text())['execution'] == replacement
+    assert result['configuration_changed'] is True
+    assert result['previous_sha256'] is not None
+    assert result['previous_sha256'] != result['sha256']
+
+
+@pytest.mark.parametrize('source', ['configuration', 'import'])
+def test_resolver_configuration_is_validated_without_execution(tmp_path, source):
+    args = options(tmp_path)
+    layout = app_paths(args.install_root).initialize()
+    invalid = {'default_resolver': 'unsupported'}
+    if source == 'configuration':
+        layout.configuration.update(name_resolver=invalid)
+    else:
+        imported = tmp_path/'resolver.toml'
+        imported.write_bytes(jobs.toml_bytes(invalid))
+        args.name_resolver_config = str(imported)
+
+    with pytest.raises(ValueError, match='default_resolver'):
+        jobs.plan(args)
+    assert not layout.job_config.exists() and not layout.resolver_config.exists()
 
 
 def test_profile_completes_partial_native_binding_and_rejects_unknown_target(tmp_path):
@@ -82,7 +152,10 @@ def test_existing_bindings_are_preserved_and_remote_is_not_contacted(tmp_path, m
 def test_managed_upgrade_reuses_identity_and_detects_concurrent_config_change(tmp_path):
     args = options(tmp_path, '--job-profile', 'local/qrun:structure')
     args.job_software_root = ['local/qrun=' + str(tmp_path/'software')]
-    app_paths(args.install_root).initialize()
+    layout = app_paths(args.install_root).initialize()
+    layout.configuration.update(execution={'schema_version': 2, 'default_platform': 'local',
+        'platforms': {'local': {'transport': 'local', 'default_scheduler': 'qrun',
+            'storage': {'work_root': str(layout.jobs)}, 'schedulers': {'qrun': {'executor': 'qrun'}}}}})
     first = jobs.plan(args)
     first['readiness'] = {'targets': {}}
     jobs.publish(first)
@@ -119,6 +192,7 @@ def test_candidate_and_published_config_work_inside_real_jobs(tmp_path):
     source = tmp_path/'job.toml'
     source.write_bytes(jobs.toml_bytes(config))
     args = options(tmp_path, '--job-config', str(source))
+    app_paths(args.install_root).initialize()
     plan = jobs.prepare(jobs.plan(args), args, ROOT, sys.executable)
     report = plan['readiness']
     assert report['targets']['local/main']['status'] == 'execution_verified', report
@@ -129,6 +203,36 @@ def test_candidate_and_published_config_work_inside_real_jobs(tmp_path):
     record = json.loads((app_paths(Path(args.install_root)).state/jobs.RECORD).read_text())
     result = record['publication']
     assert result['targets']['local/main']['status'] == 'execution_verified', result
+
+
+def test_execution_publication_preserves_secret_references_and_ignores_generated_edits(tmp_path, monkeypatch):
+    args = options(tmp_path)
+    layout = app_paths(args.install_root).initialize()
+    layout.credentials.write_text(json.dumps({'models': {}, 'secrets': {'tri_token': 'fake-tri-token'}}))
+    configured = execution_config('cluster', {'cluster': {
+        'executor': 'tri', 'transport': 'ssh', 'ssh_host': 'fixture',
+        'work_root': '/fixture/jobs', 'handler': ['/fixture/tri-handler'],
+        'handler_environment': {'TRI_AUTH_TOKEN': 'credential:tri_token'}}})
+    layout.configuration.update(execution=configured)
+    monkeypatch.setattr(subprocess, 'run', lambda *_a, **_k: pytest.fail('publication must not contact a cluster'))
+    plan = jobs.plan(args)
+    plan['readiness'] = {'targets': {}}
+    publication = jobs.publish(plan)['job']
+    assert publication['configuration_changed'] is False
+    assert publication['previous_sha256'] == publication['sha256']
+    published = layout.configuration.read()['execution']
+    assert published == configured
+    assert 'fake-tri-token' not in layout.config_file.read_text()
+    assert tomllib.loads(layout.job_config.read_text())['execution']['platforms']['cluster']['schedulers']['main']['handler_environment']['TRI_AUTH_TOKEN'] == 'fake-tri-token'
+    layout.job_config.write_text('invalid derived file')
+    next_plan = jobs.plan(args)
+    assert next_plan['settings']['targets']['cluster/main']['handler_environment']['TRI_AUTH_TOKEN'] == 'fake-tri-token'
+    next_plan['readiness'] = {'targets': {}}
+    next_publication = jobs.publish(next_plan)['job']
+    assert next_publication['configuration_changed'] is False
+    assert next_publication['previous_sha256'] == next_publication['sha256'] == publication['sha256']
+    assert layout.configuration.read()['execution'] == configured
+    assert tomllib.loads(layout.job_config.read_text())['execution']['platforms']['cluster']['ssh_host'] == 'fixture'
 
 
 def test_ssh_payload_contains_only_selected_target_resources(tmp_path, monkeypatch):

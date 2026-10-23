@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 export function formatTerminalFailure(error, {
   installRoot,
   diagnosticFile,
-  configFile = process.env.CORAGENT_CONFIG || resolve(process.env.HOME || ".", ".config/coragent/config.toml"),
+  configFile = process.env.CORAGENT_CONFIG || resolve(installRoot || process.env.CORAGENT_INSTALL_ROOT || resolve(process.env.HOME || ".", "soft/coragent"), "config/config.toml"),
   credentialsFile = process.env.CORAGENT_CREDENTIALS_FILE || resolve(dirname(configFile), "credentials.json"),
   fileExists = existsSync,
   readFile = readFileSync,

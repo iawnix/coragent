@@ -6,7 +6,6 @@ import fcntl
 import json
 import mimetypes
 import os
-import re
 import smtplib
 import socket
 import ssl
@@ -22,6 +21,10 @@ from email.utils import formatdate
 from pathlib import Path
 from typing import Any
 
+from research_agent.integrations.email_config import (
+    parse_notification_config, validate_password_file,
+)
+
 from .artifacts import bounded_content, bounded_text, sha256_json, sha256_path, workspace_path, workspace_root
 from .errors import NotificationError
 
@@ -30,14 +33,7 @@ SMTP_CONFIG_SCHEMA = "ts-notification-config/2"
 REQUEST_SCHEMA = "ts-email-message/1"
 RECEIPT_SCHEMA = "ts-email-receipt/1"
 DELIVERY_DIR_REF = "artifacts/email/deliveries"
-SMTP_PRESETS: dict[str, dict[str, Any]] = {
-    "163": {"host": "smtp.163.com", "port": 465, "security": "ssl"},
-    "qq": {"host": "smtp.qq.com", "port": 465, "security": "ssl"},
-    "custom": {"host": None, "port": 465, "security": "ssl"},
-}
-SMTP_SECURITY = frozenset({"ssl", "starttls"})
 SMTP_CONNECT_TIMEOUT = 120
-ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _SYSTEM_SMTP = smtplib.SMTP
 _SYSTEM_SMTP_SSL = smtplib.SMTP_SSL
 @dataclass(frozen=True)
@@ -254,174 +250,29 @@ def load_notification_config(path: str | Path | None = None) -> EmailConfig:
             raw = tomllib.load(handle)
     except tomllib.TOMLDecodeError as exc:
         raise ValueError(f"invalid notification configuration: {source}: {exc}") from exc
-    if set(raw) != {"notifications"}:
-        raise ValueError("notification configuration must contain only [notifications]")
-    notifications = _mapping(raw.get("notifications"), "notifications")
-    if set(notifications) != {"email"}:
-        raise ValueError("notification configuration must contain only [notifications.email]")
-    email = _mapping(notifications.get("email"), "notifications.email")
-    email = _normalize_notification_provider(email)
-    enabled = email.get("enabled")
-    if not isinstance(enabled, bool):
-        raise ValueError("notifications.email.enabled must be true or false")
-    recipient = _email_address(email.get("recipient"))
-    return _load_smtp_config(source, email, enabled=enabled, recipient=recipient)
-
-
-def _normalize_notification_provider(email: dict[str, Any]) -> dict[str, Any]:
-    """Read configs emitted with the short-lived installer-only binding key."""
-    if "binding" not in email:
-        return email
-    if "provider" in email:
-        raise ValueError("notifications.email cannot set both provider and binding")
-    normalized = dict(email)
-    normalized["provider"] = normalized.pop("binding")
-    return normalized
-
-
-def _load_smtp_config(
-    source: Path,
-    email: dict[str, Any],
-    *,
-    enabled: bool,
-    recipient: str,
-) -> EmailConfig:
-    allowed = {
-        "enabled",
-        "provider",
-        "preset",
-        "recipient",
-        "from_address",
-        "username",
-        "password_env",
-        "password_file",
-        "host",
-        "port",
-        "security",
-    }
-    _validate_config_fields(email, allowed, required={"provider", "preset", "username"})
-    if email.get("provider") != "smtp":
-        raise ValueError("invalid notifications.email configuration")
-    preset = bounded_text(email.get("preset"), "notifications.email.preset", 32).lower()
-    if preset not in SMTP_PRESETS:
-        raise ValueError(
-            "notifications.email.preset must be one of: "
-            + ", ".join(sorted(SMTP_PRESETS))
-        )
-    defaults = SMTP_PRESETS[preset]
-    host = bounded_text(email.get("host", defaults["host"]), "notifications.email.host", 255)
-    if any(character.isspace() for character in host) or "/" in host or "@" in host:
-        raise ValueError("notifications.email.host must be a hostname")
-    if preset != "custom" and host != defaults["host"]:
-        raise ValueError(f"notifications.email.host must be {defaults['host']} for preset {preset}")
-    port = email.get("port", defaults["port"])
-    if not isinstance(port, int) or isinstance(port, bool) or not 1 <= port <= 65535:
-        raise ValueError("notifications.email.port must be an integer from 1 to 65535")
-    security = bounded_text(
-        email.get("security", defaults["security"]),
-        "notifications.email.security",
-        16,
-    ).lower()
-    if security not in SMTP_SECURITY:
-        raise ValueError("notifications.email.security must be ssl or starttls")
-    username = _email_address(email.get("username"))
-    from_address = _email_address(email.get("from_address", username))
-    password_env, password_file = _secret_source(email)
+    email = parse_notification_config(raw, base_dir=source.parent)
+    if not email["enabled"]:
+        return EmailConfig(source=source, enabled=False, recipient="")
+    if "password" in email:
+        raise ValueError("runtime email configuration requires password_file or password_env")
+    password_env = email.get("password_env")
+    password_file = (validate_password_file(email["password_file"])
+                     if "password_file" in email else None)
     canonical = {
         "schema_version": SMTP_CONFIG_SCHEMA,
         "email": {
-            "enabled": enabled,
-            "provider": "smtp",
-            "preset": preset,
-            "recipient": recipient,
-            "from_address": from_address,
-            "username": username,
-            "host": host,
-            "port": port,
-            "security": security,
-            "credential": {
-                "env": password_env,
-                "file": str(password_file) if password_file is not None else None,
-            },
+            **{name: email[name] for name in ("enabled", "provider", "preset", "recipient", "from_address",
+                                             "username", "host", "port", "security")},
+            "credential": {"env": password_env, "file": str(password_file) if password_file is not None else None},
         },
     }
     return EmailConfig(
-        source=source,
-        enabled=enabled,
-        recipient=recipient,
-        provider="smtp",
-        digest=sha256_json(canonical),
-        from_address=from_address,
-        smtp_preset=preset,
-        smtp_host=host,
-        smtp_port=port,
-        smtp_security=security,
-        smtp_username=username,
-        smtp_password_env=password_env,
-        smtp_password_file=password_file,
+        source=source, enabled=True, recipient=email["recipient"], provider="smtp",
+        digest=sha256_json(canonical), from_address=email["from_address"],
+        smtp_preset=email["preset"], smtp_host=email["host"], smtp_port=email["port"],
+        smtp_security=email["security"], smtp_username=email["username"],
+        smtp_password_env=password_env, smtp_password_file=password_file,
     )
-
-
-def _validate_config_fields(
-    value: dict[str, Any],
-    allowed: set[str],
-    *,
-    required: set[str] | None = None,
-) -> None:
-    unknown = sorted(set(value) - allowed)
-    missing = sorted((required or allowed) - set(value))
-    if unknown or missing:
-        details = []
-        if unknown:
-            details.append(f"unknown fields: {', '.join(unknown)}")
-        if missing:
-            details.append(f"missing fields: {', '.join(missing)}")
-        raise ValueError(f"invalid notifications.email configuration ({'; '.join(details)})")
-
-
-def _private_install_path(
-    value: Any,
-    label: str,
-    *,
-    must_exist: bool,
-    directory: bool = True,
-) -> Path:
-    raw = bounded_text(value, label, 4096)
-    path = Path(raw).expanduser()
-    if not path.is_absolute() or path.is_symlink():
-        raise ValueError(f"{label} must be an absolute non-symbolic-link path")
-    try:
-        resolved = path.resolve(strict=must_exist)
-    except OSError as exc:
-        raise ValueError(f"{label} is unavailable") from exc
-    if must_exist and directory and not resolved.is_dir():
-        raise ValueError(f"{label} must be a directory")
-    return resolved
-
-
-def _secret_source(email: dict[str, Any]) -> tuple[str | None, Path | None]:
-    password_env = email.get("password_env")
-    password_file_raw = email.get("password_file")
-    if (password_env is None) == (password_file_raw is None):
-        raise ValueError(
-            "notifications.email must set exactly one of password_env or password_file"
-        )
-    if password_env is not None:
-        name = bounded_text(password_env, "notifications.email.password_env", 128)
-        if not ENV_NAME.fullmatch(name):
-            raise ValueError("notifications.email.password_env must be an environment variable name")
-        return name, None
-    path = _private_install_path(
-        password_file_raw,
-        "notifications.email.password_file",
-        must_exist=True,
-        directory=False,
-    )
-    if not path.is_file():
-        raise ValueError("notifications.email.password_file must be a regular file")
-    if path.stat().st_mode & 0o077:
-        raise ValueError("notifications.email.password_file must have mode 0600")
-    return None, path
 
 
 def _configured_path(path: str | Path | None) -> Path:
@@ -837,22 +688,6 @@ def _delivery_result(
         "artifact_refs": [*attachment_refs, receipt_ref],
         "external_side_effects": external_side_effects,
     }
-
-
-def _mapping(value: Any, label: str) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise ValueError(f"{label} must be a TOML table")
-    return value
-
-
-def _email_address(value: Any) -> str:
-    address = bounded_text(value, "notifications.email.recipient", 320)
-    if address.count("@") != 1 or any(character.isspace() for character in address):
-        raise ValueError("notifications.email.recipient must be one email address")
-    local, domain = address.split("@")
-    if not local or "." not in domain or domain.startswith(".") or domain.endswith("."):
-        raise ValueError("notifications.email.recipient must be one email address")
-    return address
 
 
 @contextmanager

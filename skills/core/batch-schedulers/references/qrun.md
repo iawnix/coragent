@@ -30,9 +30,11 @@ and omit ssh_host. The work root must be allowed by that pool. Staged transport
 requires rsync on both hosts; shared mode requires verified path visibility.
 Configure scientific software bindings on the execution host independently.
 
-Use CoRAgent `job_probe` for target/software availability and its `queue` overview
-for pool resources. Pool reachability alone does not establish software readiness.
-The main installer manages default local Qrun pools; SSH enrollment is explicit.
+Use CoRAgent `job_probe` for target reachability and its `queue` overview for pool
+resources; verify software separately with the selected binding's environment check.
+The main installer can provision a local Qrun pool for an explicitly configured
+entry using the default handler. Without execution configuration it creates no
+pool; SSH enrollment is explicit.
 Installation and daemon maintenance are described in [Qrun operations](../../../../docs/QRUN.md).
 
 ## Submit, observe and recover

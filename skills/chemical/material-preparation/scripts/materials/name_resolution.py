@@ -14,10 +14,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from name_resolver_config import parse_name_resolver_config
+
 RESOLVER_CONFIG_ENV = "CORAGENT_NAME_RESOLVER_CONFIG"
 RESOLVER_VERSION = "1"
-DEFAULT_PUBCHEM_ENDPOINT = "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
-DEFAULT_OPSIN_ENDPOINT = "https://opsin.ch.cam.ac.uk/opsin"
 MAX_CANDIDATES = 16
 
 
@@ -27,10 +27,6 @@ class ResolverConfigurationError(ValueError):
 
 def _config_path() -> Path | None:
     configured = os.environ.get(RESOLVER_CONFIG_ENV, "").strip()
-    if not configured:
-        install_root = os.environ.get("CORAGENT_INSTALL_ROOT", "").strip()
-        if install_root:
-            configured = str(Path(install_root) / "etc" / "name-resolver.toml")
     if not configured:
         return None
     path = Path(configured).expanduser()
@@ -50,48 +46,10 @@ def _load_config() -> tuple[Path | None, dict[str, Any]]:
             raw = tomllib.load(handle)
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         raise ResolverConfigurationError(f"cannot read resolver configuration {path}: {exc}") from exc
-    if not isinstance(raw, dict):
-        raise ResolverConfigurationError("resolver configuration must be a TOML table")
-    default = raw.get("default_resolver", "auto")
-    if not isinstance(default, str) or default not in {"auto", "pubchem", "opsin"}:
-        raise ResolverConfigurationError("default_resolver must be auto, pubchem, or opsin")
-    backends = raw.get("backends", {})
-    if not isinstance(backends, dict):
-        raise ResolverConfigurationError("backends must be a TOML table")
-    normalized: dict[str, Any] = {"default_resolver": default, "backends": {}}
-    for name, value in backends.items():
-        if name not in {"pubchem", "opsin"} or not isinstance(value, dict):
-            raise ResolverConfigurationError(f"unsupported resolver backend: {name}")
-        enabled = value.get("enabled", True)
-        if not isinstance(enabled, bool):
-            raise ResolverConfigurationError(f"backends.{name}.enabled must be boolean")
-        endpoint = value.get("endpoint", DEFAULT_PUBCHEM_ENDPOINT if name == "pubchem" else DEFAULT_OPSIN_ENDPOINT)
-        if not isinstance(endpoint, str) or not endpoint.strip():
-            raise ResolverConfigurationError(f"backends.{name}.endpoint must be a URL")
-        parsed = urllib.parse.urlparse(endpoint)
-        if parsed.scheme not in {"https", "http"} or not parsed.netloc:
-            raise ResolverConfigurationError(f"backends.{name}.endpoint must be an absolute HTTP(S) URL")
-        timeout = value.get("timeout_seconds", 10)
-        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 1 <= timeout <= 60:
-            raise ResolverConfigurationError(f"backends.{name}.timeout_seconds must be between 1 and 60")
-        cache = value.get("cache", True)
-        if not isinstance(cache, bool):
-            raise ResolverConfigurationError(f"backends.{name}.cache must be boolean")
-        cache_dir = value.get("cache_dir")
-        if cache_dir is not None and (not isinstance(cache_dir, str) or not Path(cache_dir).is_absolute()):
-            raise ResolverConfigurationError(f"backends.{name}.cache_dir must be an absolute path")
-        user_agent = value.get("user_agent", "CoRAgent-chemical-name-resolver/1")
-        if not isinstance(user_agent, str) or not user_agent.strip() or len(user_agent) > 256:
-            raise ResolverConfigurationError(f"backends.{name}.user_agent must be a non-empty string")
-        normalized["backends"][name] = {
-            "enabled": enabled,
-            "endpoint": endpoint.rstrip("/"),
-            "timeout_seconds": float(timeout),
-            "cache": cache,
-            "cache_dir": cache_dir,
-            "user_agent": user_agent,
-        }
-    return path, normalized
+    try:
+        return path, parse_name_resolver_config(raw)
+    except ValueError as exc:
+        raise ResolverConfigurationError(str(exc)) from exc
 
 
 def _cache_directory(config_path: Path, backend: str, settings: dict[str, Any]) -> Path:

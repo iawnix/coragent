@@ -144,7 +144,7 @@ export function projectDecisionTask(task) {
   const { user_task_id, revision, state, objective, criteria } = task;
   const result = { user_task_id, revision, state, objective, criteria, requirements_revision: task.requirements_revision,
     completion_outcome: task.completion_outcome ?? null, completion: task.completion?.map(({ criterion_id, status, assessment_ref }) => ({ criterion_id, status, assessment_ref })) ?? null,
-    ...(task.execution_target ? { execution_target: task.execution_target } : {}),
+    execution_target: task.execution_target ?? null,
     ...(task.initial_plan ? { initial_plan: task.initial_plan } : {}),
     ...(task.next_action ? { next_action: task.next_action } : {}) };
   if (task.title !== objective) result.title = task.title;

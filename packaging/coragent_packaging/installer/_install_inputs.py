@@ -6,7 +6,6 @@ from research_agent.bootstrap.layout import paths as app_paths
 
 import argparse
 import os
-import shutil
 import stat
 import tomllib
 from pathlib import Path
@@ -19,30 +18,11 @@ def _regular_file(path: Path, label: str, *, private: bool = False) -> Path:
     return path
 
 
-def _copy_private(source: Path, destination: Path) -> None:
-    _regular_file(source, "SMTP password", private=True)
-    if destination.parent.is_symlink():
-        raise ValueError("SMTP secret directory must not be a symbolic link")
-    destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    destination.parent.chmod(0o700)
-    temporary = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")
-    try:
-        with source.open("rb") as src, temporary.open("wb") as dst:
-            os.chmod(temporary, 0o600)
-            shutil.copyfileobj(src, dst)
-            dst.flush()
-            os.fsync(dst.fileno())
-        os.replace(temporary, destination)
-        os.chmod(destination, 0o600)
-    finally:
-        temporary.unlink(missing_ok=True)
-
-
-def email_options(config: Path) -> list[str]:
+def email_options(config: Path) -> list[str] | None:
     """Read explicit email settings without copying or printing credentials."""
     source = config / "email.toml"
     if not source.exists() and not source.is_symlink():
-        return []
+        return None
     _regular_file(source, "email.toml")
     try:
         document = tomllib.loads(source.read_text(encoding="utf-8"))
@@ -63,21 +43,15 @@ def email_options(config: Path) -> list[str]:
     }
     if not isinstance(email, dict) or set(email) - {*fields, "enabled"}:
         raise ValueError("email.toml requires [notifications.email] with supported fields; store passwords separately")
-    enabled = email.get("enabled", True)
-    if not isinstance(enabled, bool):
-        raise ValueError("notifications.email.enabled must be a boolean")
-    if not enabled:
+    from research_agent.integrations.email_config import parse_notification_config
+    email = parse_notification_config(document, base_dir=config)
+    if not email['enabled']:
         return []
     command = []
     for key, (_, flag) in fields.items():
         if key not in email:
             continue
         value = email[key]
-        if (key == "port" and type(value) is not int) or (key != "port" and not isinstance(value, str)):
-            raise ValueError(f"invalid type for notifications.email.{key}")
-        if key == "password_file":
-            password = Path(value).expanduser()
-            value = str(password if password.is_absolute() else config / password)
         command.extend([flag, str(value)])
     return command
 
@@ -138,7 +112,15 @@ def apply_config_directory(args: argparse.Namespace) -> None:
                 _regular_file(source, filename)
         args.agent_config_dir = str(config)
     values = email_options(config)
+    if values is None:
+        return
     if not values:
+        if not any(option.startswith('email_') for option in args._explicit_options):
+            from coragent_packaging.installer.install_wizard import _clear_email_options
+            _clear_email_options(args)
+            args.email_binding = None
+            args._clear_email = True
+            args.__dict__.pop('_email_password', None)
         return
     from coragent_packaging.installer.install_wizard import parse_args, validate_email_options
     configured = parse_args(["--non-interactive", *values], use_environment=False)
@@ -154,12 +136,3 @@ def apply_config_directory(args: argparse.Namespace) -> None:
     if args.email_binding is None:
         raise ValueError("notifications.email.provider is required")
     validate_email_options(args)
-
-
-def provision_config_credentials(args: argparse.Namespace) -> None:
-    """Copy configured SMTP credentials only inside the confirmed install step."""
-    source = getattr(args, "_email_password_source", None)
-    if source and args.email_password_file == source:
-        target = app_paths(Path(args.install_root)).generated / 'secrets/smtp-password'
-        _copy_private(Path(source), target)
-        args.email_password_file = str(target)

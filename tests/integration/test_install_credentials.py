@@ -60,3 +60,32 @@ def test_credential_rejects_symlink(tmp_path: Path) -> None:
     token.symlink_to(target)
     with pytest.raises(ValueError, match="symbolic link"):
         provision_service_credentials(root, with_web=True)
+
+
+def test_web_credential_is_rebuilt_from_canonical_secret(tmp_path: Path) -> None:
+    root = tmp_path / "install"
+    root.mkdir()
+    first = provision_service_credentials(root, with_web=True, web_token_value="canonical-token")
+    token = Path(first["web_http"]["path"])
+    token.write_text("edited-generated-token\n")
+
+    result = provision_service_credentials(root, with_web=True)
+
+    assert result["web_http"]["status"] == "preserved"
+    assert token.read_text() == "canonical-token\n"
+    assert app_paths(root).configuration.credentials()["secrets"]["web_token"] == "canonical-token"
+
+
+def test_generated_web_token_is_not_an_import_source(tmp_path: Path) -> None:
+    root = tmp_path / "install"
+    layout = app_paths(root)
+    token = layout.generated / "web/auth.token"
+    token.parent.mkdir(mode=0o700, parents=True)
+    token.write_text("stale-generated-token\n")
+    token.chmod(0o600)
+
+    result = provision_service_credentials(root, with_web=True)
+
+    assert result["web_http"]["status"] == "created"
+    assert token.read_text().strip() != "stale-generated-token"
+    assert token.read_text().strip() == layout.configuration.credentials()["secrets"]["web_token"]

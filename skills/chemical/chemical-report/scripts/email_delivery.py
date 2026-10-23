@@ -164,12 +164,8 @@ def send_report_email(root: Path, request_file: Path) -> dict[str, Any]:
 
 
 def _journal(root: Path, command: str, result: dict[str, Any], request_file: Path | None) -> dict[str, Any]:
-    journal = root / "research/journal.json"
-    if not journal.is_file():
-        return result
     try:
-        from research_agent.foundation.transactions import TransactionCoordinator
-        from research_agent.application.job_state import persist_event, project_events
+        from research_agent.application.delivery_evidence import record_delivery_evidence
 
         fact = result
         receipt_ref = result.get("receipt_ref")
@@ -184,20 +180,10 @@ def _journal(root: Path, command: str, result: dict[str, Any], request_file: Pat
                 event = source.get("event")
             fact = {**fact, "domain": "chemical.report", "event": event}
         identity = ["chemical-report-email", receipt_ref, fact.get("state")] if receipt_ref else ["chemical-report-email", command, fact]
-        with TransactionCoordinator(root).locked():
-            event_id = persist_event(
-                root,
-                kind="delivery",
-                title="Report email " + command,
-                content=json.dumps(fact, ensure_ascii=False),
-                data=fact,
-                references=[receipt_ref] if receipt_ref else [],
-                identity=identity,
-            )
-            failures = project_events(root)
-        pending = next((item for item in failures if item["event_id"] == event_id), None)
-        if pending:
-            return {**result, "journal_error": pending["error"]}
+        error = record_delivery_evidence(root, fact, title="Report email " + command,
+                                         receipt_ref=receipt_ref, identity=identity)
+        if error:
+            return {**result, "journal_error": error}
     except Exception as error:
         return {**result, "journal_error": str(error)}
     return result

@@ -25,6 +25,16 @@ def test_reproducible_seed_from_supplied_structure(tmp_path, smiles, formula, at
         helper.seeds(smiles, 0, 2, tmp_path/'bad')
 
 
+def test_supplied_structure_does_not_require_online_resolver(tmp_path, monkeypatch):
+    import name_resolution
+
+    monkeypatch.delenv('CORAGENT_NAME_RESOLVER_CONFIG', raising=False)
+    monkeypatch.setenv('CORAGENT_INSTALL_ROOT', str(tmp_path / 'installation'))
+    monkeypatch.setattr(name_resolution, '_http_json', lambda *a, **k: pytest.fail('structure input must remain offline'))
+    assert name_resolution._config_path() is None
+    assert helper.seeds('CCO', 0, 1, tmp_path / 'seed')['formula'] == 'C2H6O'
+
+
 def test_atom_maps_are_prepared_before_embedding_and_survive_explicit_hydrogen_parsing(tmp_path):
     # All atom identities are declared before any coordinates exist.
     source = '[H:31][C:8]([H:32])([H:33])[O:4][H:34]'

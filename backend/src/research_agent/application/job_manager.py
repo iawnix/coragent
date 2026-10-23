@@ -11,7 +11,7 @@ from pathlib import Path
 from importlib.resources import files
 from jsonschema import Draft202012Validator
 from research_agent.foundation.transactions import TransactionCoordinator, workspace_transaction, write_json, read_json
-from .execution import _job_manager, _receipt
+from .execution import _recorded_job_manager, _receipt
 from research_agent.research.operational_ids import allocate_id
 
 _CONTRACTS = json.loads(files(__package__).joinpath('monitor_contracts.json').read_text())
@@ -104,8 +104,9 @@ def _tick(root, base, args):
             row=read_binding(p)
             receipt = None
             try:
-                receipt=_receipt(root,{'job_id':row['job_id']})
-                status=_job_manager(root).job_status(receipt)
+                runtime = _recorded_job_manager(root, row['job_id'])
+                receipt=_receipt(root,{'job_id':row['job_id']}, runtime=runtime)
+                status=runtime.job_status(receipt)
             except FileNotFoundError:
                 status=SimpleNamespace(state=JobState.UNKNOWN,exit_code=None,error='dispatch intent has no receipt; reconcile required')
             status_value={key:getattr(status,key,None) for key in ('exit_code','started_at','finished_at','error','diagnostics')}

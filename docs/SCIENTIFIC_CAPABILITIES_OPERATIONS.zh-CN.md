@@ -43,9 +43,9 @@
 主安装器核验所选绑定，--verify-job-target PLATFORM/ENTRY 还会在指定入口提交有时限的验收 Job。
 报告区分配置、环境与实际执行验证；job_probe 只表示基础设施状态，PubChem／OPSIN 网络可用性单独检查。
 
-应用提交的本地 Job 运行在独立 systemd 用户临时服务中，Host 重启不会连带终止它们。任务只接收最小环境和显式变量，资源请求通过 CPUQuota/MemoryMax 实施。Runtime 在 Job 内或配置的 scratch_root 下创建专属 scratch；显式环境值可引用 `{scratch}`。临时单元移除后，回执仍保留在工作区。
+本机／SSH 连接与调度器独立选择。Qrun 为裸执行主机提供持久 CPU／内存资源池，作业独立于 CoRAgent Host 运行，应用 Host 重启不会连带终止作业。其 systemd 模式使用 cgroup v2 控制资源；portable 模式使用 CPU affinity 和进程树 RSS 采样超限终止，不是内核内存硬限制，见 [Qrun 运维](QRUN.zh-CN.md)。任务只接收最小环境和显式变量。Runtime 在 Job 内或配置的 scratch_root 下创建专属 scratch；显式环境值可引用 `{scratch}`。调度器清理后，执行回执仍保留在工作区。
 
-资源默认值只在准备或提交边界合并一次，顺序为目标、后端、显式请求；已准备入口的资源固定后不能在提交时覆盖。Job 回执和执行指纹记录实际资源。`allowed_queues` 仅是权限范围，不能代替 `submission.queue`。本机直接进程不接受队列字段；本机连接的外部目标可以提交队列任务；Torque 将 cpus/memory_mb 转为 nodes/ppn 和 mem，PBS 使用 select（不能同时声明 select 和 cpus/memory_mb）。walltime 与程序 timeout_seconds 同时存在时取较短值。
+资源默认值只在准备或提交边界合并一次，顺序为目标、后端、显式请求；已准备入口的资源固定后不能在提交时覆盖。Job 回执和执行指纹记录实际资源。`allowed_queues` 仅是权限范围，不能代替 `submission.queue`。Qrun 没有命名队列；其它调度入口按各自声明的队列语义处理，可使用本机或 SSH 连接。Torque 将 cpus/memory_mb 转为 nodes/ppn 和 mem，PBS 使用 select（不能同时声明 select 和 cpus/memory_mb）。walltime 与程序 timeout_seconds 同时存在时取较短值。
 
 外部 Job 使用配置的本机/SSH 连接和队列脚本，与本地共享最小进程环境、线程默认值和 scratch 规则；不继承登录 shell 的科学环境，需要的路径和激活脚本必须由绑定明确提供。每个远端目录带本地 Job 路径的摘要，不同工作区的同名 Job 不共享目录。已接受任务通过保存的请求身份和脚本的只读查询恢复，见[外部任务接入](EXTERNAL_JOBS.zh-CN.md)。
 

@@ -9,6 +9,7 @@ single wheel ships one research_agent namespace.
 from __future__ import annotations
 
 import ast
+import json
 import re
 import sys
 from pathlib import Path
@@ -27,6 +28,37 @@ def _python_files(root: Path):
     return sorted(path for path in root.rglob("*.py") if "__pycache__" not in path.parts)
 
 
+def _imports(path: Path, *, backend: Path | None = None):
+    """Resolve Python imports so relative imports obey the same layer rules."""
+    for node in ast.walk(ast.parse(path.read_text())):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                yield alias.name, node.lineno
+        elif isinstance(node, ast.ImportFrom):
+            package = []
+            if node.level and backend is not None:
+                package = ['research_agent', *path.relative_to(backend).parts[:-1]]
+                package = package[:len(package) - node.level + 1]
+            base = '.'.join([*package, *([node.module] if node.module else [])])
+            for alias in node.names:
+                yield base if alias.name == '*' else '.'.join(filter(None, (base, alias.name))), node.lineno
+
+
+def _execution_resources():
+    """Only catalog-staged science runs remotely; report orchestration stays on the controller."""
+    metadata = json.loads((ROOT / 'package.json').read_text())
+    paths = set()
+    for declaration in metadata['coragent']['execution']:
+        catalog_path = ROOT / declaration
+        catalog = json.loads(catalog_path.read_text())
+        for descriptor in catalog['executors']:
+            paths.update(catalog_path.parent / resource for resource in descriptor['resources'])
+        for descriptor in catalog['validators']:
+            paths.add(catalog_path.parent / descriptor['entry'])
+            paths.update(catalog_path.parent / resource['path'] for resource in descriptor.get('resources', {}).values())
+    return sorted(path for path in paths if path.suffix == '.py')
+
+
 def check_ownership() -> list[str]:
     """Check source dependencies, not runtime payloads or compatibility aliases."""
     errors = []
@@ -36,16 +68,23 @@ def check_ownership() -> list[str]:
         "configuration": {"configuration", "foundation"},
         "artifacts": {"artifacts", "foundation"},
         "research": {"research", "artifacts", "foundation"},
+        "jobs": {"jobs", "foundation"},
+        "integrations": {"integrations", "configuration", "foundation"},
     }
     for path in _python_files(backend):
         owner = path.relative_to(backend).parts[0]
-        for node in ast.walk(ast.parse(path.read_text())):
-            modules = [alias.name for alias in node.names] if isinstance(node, ast.Import) else [node.module or ""] if isinstance(node, ast.ImportFrom) else []
-            for module in modules:
-                if module.split('.')[0] in {"coragent_packaging", "tools", "apps", "scripts"}:
-                    errors.append(f"backend imports delivery/development code: {path.relative_to(ROOT)}:{node.lineno}")
-                if owner in allowed and module.startswith("research_agent.") and module.split('.')[1] not in allowed[owner]:
-                    errors.append(f"{owner} imports an upper layer: {path.relative_to(ROOT)}:{node.lineno}")
+        for module, line in _imports(path, backend=backend):
+            if module.split('.')[0] in {"coragent_packaging", "tools", "apps", "scripts", "skills"}:
+                errors.append(f"backend imports delivery/development code: {path.relative_to(ROOT)}:{line}")
+            if owner in allowed and module.startswith("research_agent.") and module.split('.')[1] not in allowed[owner]:
+                errors.append(f"{owner} imports an upper layer: {path.relative_to(ROOT)}:{line}")
+    # Science payloads and scheduler handlers execute without the controller.
+    # Control-side skills may compose research and delivery through application.
+    independent = [*_execution_resources(), *_python_files(ROOT / 'skills/core/batch-schedulers/scripts')]
+    for path in independent:
+        for module, line in _imports(path):
+            if module.split('.')[0] in {'research_agent', 'coragent_packaging', 'apps', 'tools'}:
+                errors.append(f"execution payload imports the controller: {path.relative_to(ROOT)}:{line}")
     for path in (ROOT / "apps").rglob("*.py"):
         if re.search(r"(?:from|import)\s+(?:coragent_packaging|tools|scripts)\b", path.read_text()):
             errors.append(f"application imports packaging/development code: {path.relative_to(ROOT)}")

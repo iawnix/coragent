@@ -25,7 +25,7 @@ The `research_agent.research` namespace is the sole research implementation. Run
 
 A Node is a persistent local research question. `goal` states the question, `proposal` the current hypothesis or approach, `plan` the investigation, and `progress` the current explanation. Hypotheses are optional. Repeated parameters, geometries and failures stay within the same Node unless an independently tracked question emerges. No model-maintained Attempt entity is required.
 
-Compound studies use independently interpretable questions and existing `part_of`, `requires` and `alternative_to` relations. A root Node is optional; shared questions can have multiple parents. UserTask `/3` stores only `research.entry_node_ids` and `research.focus_node_ids`, set together through `task_update` action `set_research`. These are navigation references, not ownership, a schedule or a second plan. Node and Result schemas remain unchanged.
+Compound studies use independently interpretable questions and existing `part_of`, `requires` and `alternative_to` relations. A root Node is optional; shared questions can have multiple parents. The research scope of `coragent-user-task/5` consists of `research.entry_node_ids` and `research.focus_node_ids`, set together through `task_update` action `set_research`. These are navigation references, not ownership, a schedule or a second plan. Node and Result schemas remain unchanged.
 
 Node status is `open`, `paused` or `closed`. Closing means stopping active work on that question; it does not imply scientific success or cancel a Job. The authored revision changes when Node content changes, independently of background execution observations. Concurrent content changes require a new reading and explicit merge; append-only notes do not replace another author's judgment.
 
@@ -82,6 +82,14 @@ Managed research Jobs explicitly bind node_id and the inspected Node revision at
 ## Persistent user tasks and Monitor
 
 The request-only task facts share the research context budget; the bounded browsing projection still points omitted details to `task_read`. A user task spans Pi runs and compute Jobs. `task_begin`, `task_read` and `task_update` record the authorized objective, cited user submissions, delivery criteria, progress evidence and explicit waits or blockers. Ordinary questions do not create tasks. A session has at most one nonterminal user task. Its control state lives only in Pi durable documents; Host does not store a duplicate task lifecycle or control receipt.
+
+Workspace, Research Memory, Task and context management remain a cohesive research core. An ordinary
+Task starts with null execution target, selection and policy, without resolving a platform. When calculation
+is needed, `task_update action=bind_execution` uses the same resolver as an explicit `task_begin` or the
+first `set_execution_plan`. Preparation and submission require that persisted selection; local bash and
+platform diagnostics do not. The Task remains one protocol and one Pi-owned lifecycle. Research reads
+compose local Job observations and replayable facts in the application layer; they do not poll a queue.
+Existing Jobs retain their original recorded routes independently of changes to the current platform configuration.
 
 The Task Controller runs inside the SessionWorker. Normal tools continue within the native Pi loop. After a completed run, a durable `task_controller` input can continue an active idle task through the same admission transaction used by other inputs. The implementation does not install an `onYield` continuation path. Watch notifications and a 30-second check reconcile outstanding work; Job waits query concrete owned Jobs and invoke no model until ready. Runs without new evidence update an advisory count and a replanning reminder, never an automatic research blocker. Terminal transient provider failures can schedule bounded, delayed successor inputs; nonretryable or exhausted failures retain an execution-recovery attention record while the research state remains active or completing. Final-response recovery retains completion evidence and allows only reads and the response. A normal answer ending is not user-task completion: proposed completion needs evidence for every criterion and a successfully delivered final response.
 

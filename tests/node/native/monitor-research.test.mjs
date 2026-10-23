@@ -6,7 +6,7 @@ import { createTerminalSession } from '../../../apps/agent/terminal/session.mjs'
 import { projectMonitorTask, projectMonitorContinuation } from '../../../apps/agent/tasks/projection.mjs';
 
 const task = {
-  schema_version: 'coragent-user-task/4', user_task_id: 'task_1', title: 'Compare methods',
+  schema_version: 'coragent-user-task/5', user_task_id: 'task_1', title: 'Compare methods',
   objective: 'Explain the comparison and its limits', state: 'active', criteria: [],
   research: { entry_node_ids: ['node_1', 'node_2'], focus_node_ids: ['node_3'] },
   updated_at: '2026-10-10T00:00:00Z', revision: 7,

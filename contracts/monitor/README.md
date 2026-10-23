@@ -54,11 +54,21 @@ sources and is not a cross-database atomic snapshot.
 ```ts
 type Page<T> = { items: T[]; next_cursor: string | null };
 type TaskState = "active" | "waiting" | "paused" | "blocked"
-  | "completing" | "completed" | "cancelled";
+  | "completing" | "completed" | "partial" | "cancelled";
 type Criterion = { id: string; description: string };
 type CompletionEvidence = { criterion_id: string; evidence_refs: string[] };
+type ExecutionTarget = { platform: string; scheduler_entry: string };
+type ExecutionSelection = {
+  target: ExecutionTarget;
+  executor: string;
+  route_digest: string;
+  selection_mode: string;
+  version: number;
+  sources: { submission_id: string; text: string }[];
+  resolved_at: string;
+};
 type UserTask = {
-  schema_version: "coragent-user-task/4";
+  schema_version: "coragent-user-task/5";
   user_task_id: string;
   workspace_id: string;
   session_id: string;
@@ -69,6 +79,14 @@ type UserTask = {
   next_action?: string; // Current next action, included when populated.
   sources: { submission_id: string; entry_id: unknown; text: string }[];
   criteria: Criterion[];
+  execution_target: ExecutionTarget | null;
+  execution_selection: ExecutionSelection | null;
+  execution_policy: {
+    selections: ExecutionSelection[];
+    max_in_flight: number;
+    max_attempts: number;
+    automatic_placement: boolean;
+  } | null;
   research: { entry_node_ids: string[]; focus_node_ids: string[] };
   research_context: {
     brief_id: string | null;
@@ -261,10 +279,19 @@ Job lifecycle. Missing collection or scientific-analysis evidence must not be
 presented as successful analysis merely because execution succeeded.
 
 A session without registered tasks returns no current task. This protocol requires
-`coragent-user-task/4` and `research-snapshot/3`. Run indexes
+`coragent-user-task/5` and `research-snapshot/3`. Run indexes
 cover execution observed by the Task Controller; runs without an index are not
 invented from the active task graph. The diagnostic view presents
 structured execution summaries, not model reasoning or secret tool arguments.
+
+A research Task without calculations has null `execution_target`, `execution_selection` and
+`execution_policy`. Creating, reading and resuming it does not resolve an execution platform. The first
+`task_update action=bind_execution`, or `set_execution_plan`, records its calculation selection before
+preparation/submission; explicit execution fields in `task_begin` may bind it immediately. This is one
+Task lifecycle, not separate research and computation task types. Plans and execution progress retain
+the [existing execution plan contract](../../skills/core/execution-platforms/references/plans.md).
+Job views continue to read existing observations when current platform configuration is absent; remote
+status/cancellation/collection uses each Job's recorded original route.
 
 ## Research in task details
 

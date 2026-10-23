@@ -16,6 +16,7 @@ import { createResearchTools } from "../../../apps/agent/tools/research/tools.mj
 import { wrapToolForHarness } from "../../../apps/agent/tools/envelope.mjs";
 import { createToolExecutionContext } from "../../../apps/agent/tools/context.mjs";
 import { projectUserTask } from "../../../apps/agent/tasks/projection.mjs";
+import { codingExecutionContext } from "../../../apps/agent/tasks/execution-plan.mjs";
 
 const { admitSubmission } = await import(pathToFileURL(join(pinnedPiSource(), "packages/durable/src/harness/submissions.ts")).href);
 async function fixture(t, storage = new MemoryStorage(), controllerOptions = {}, beforeRequest) {
@@ -48,8 +49,8 @@ async function fixture(t, storage = new MemoryStorage(), controllerOptions = {},
       if (!allocatedTasks.has(key)) allocatedTasks.set(key, `task_${allocatedTasks.size + 1}`);
       return { identifier: allocatedTasks.get(key) };
     }
-    if (command === "job_resolve_target") return { target: params.target || { platform: "local", scheduler_entry: "main" }, executor: params.target?.platform === "cluster_a" ? "slurm" : "qrun", route_digest: "sha256:" + "a".repeat(64), selection_mode: params.target ? "explicit" : "default" };
     calls.push({ command, params });
+    if (command === "job_resolve_target") return { target: params.target || { platform: "local", scheduler_entry: "main" }, executor: params.target?.platform === "cluster_a" ? "slurm" : "qrun", route_digest: "sha256:" + "a".repeat(64), selection_mode: params.target ? "explicit" : "default" };
     if (command === "job_list") return { jobs: [...jobStates].map(([job_id, state]) => ({ job_id, state })), next_cursor: null };
     if (command === "job_status") return { job_id: params.job_id, state: jobStates.get(params.job_id) };
     if (command === "job_cancel") { jobStates.set(params.job_id, "cancelled"); return { job_id: params.job_id, state: "cancelled" }; }
@@ -90,7 +91,7 @@ test("idle active tasks continue beyond three evidence-free runs and explicit bl
   const { controller, conversation, faux, begin, admission } = await fixture(t);
   const task = await begin();
   assert.match(task.user_task_id, /^task_/);
-  assert.equal(task.schema_version, "coragent-user-task/4");
+  assert.equal(task.schema_version, "coragent-user-task/5");
   assert.deepEqual(task.research, { entry_node_ids: [], focus_node_ids: [] });
   assert.match(task.sources[0].text, /evidence-backed/);
   assert.equal(task.initial_plan, "Investigate the mechanism and deliver a report supported by evidence.");
@@ -611,7 +612,7 @@ test("read-only task listing never retries a pending cancellation; reconciliatio
 
 for (const mode of ["all", "any"]) test(`completed ${mode} waits release Job binding during the same live run`, async t => {
   const { controller, conversation, faux, begin, jobStates, harness } = await fixture(t);
-  await begin();
+  await begin({ execution_target: { platform: "local", scheduler_entry: "main" } });
   let entered, finish;
   const ready = new Promise(resolve => { entered = resolve; });
   faux.setResponses([() => new Promise(resolve => { entered(); finish = () => resolve(fauxAssistantMessage("Independent work can now continue")); })]);
@@ -720,7 +721,7 @@ test("scope cannot be weakened by reusing the original instruction", async t => 
 
 test("transient wait status failure preserves user access and can recover", async t => {
   const { controller, begin, jobStates, kernel } = await fixture(t);
-  let task = await begin(); jobStates.set("job_1", "running");
+  let task = await begin({ execution_target: { platform: "local", scheduler_entry: "main" } }); jobStates.set("job_1", "running");
   task = await controller.update({ action: "wait", expected_revision: task.revision,
     wait: { job_ids: ["job_1"], mode: "all" } }, "wait-unavailable", context);
   const execute = kernel.execute_command;
@@ -1126,6 +1127,108 @@ for (const control of ["pause", "cancel"]) test(`a ${control} steered into a con
 });
 
 
+test("ordinary research tasks remain unbound through reads, refinement and recovery", async t => {
+  const f = await fixture(t);
+  const execute = f.kernel.execute_command;
+  f.kernel.execute_command = async (command, params) => {
+    assert.notEqual(command, "job_resolve_target", "ordinary research must not require an execution configuration");
+    return execute(command, params);
+  };
+  let task = await f.begin();
+  assert.equal(task.execution_target, null);
+  assert.equal(task.execution_selection, null);
+  assert.equal(task.execution_policy, null);
+  assert.equal(projectUserTask(task).execution_selection, null);
+  assert.deepEqual(codingExecutionContext(task), { unselected: true });
+  await assert.rejects(f.controller.binding(context), { code: "execution_selection_required" });
+  task = await f.controller.update({ action: "refine", expected_revision: task.revision,
+    source_submission_ids: [task.sources[0].submission_id], next_action: "Inspect the literature evidence." }, "refine-research", context);
+  await f.reopen();
+  assert.equal((await f.controller.current(context)).execution_target, null);
+  assert.equal((await f.controller.read({ user_task_id: task.user_task_id }, context)).execution_policy, null);
+});
+
+test("first calculation binding resolves once, survives recovery and cannot replace a pinned destination", async t => {
+  const f = await fixture(t);
+  let task = await f.begin();
+  assert.equal(f.calls.filter(call => call.command === "job_resolve_target").length, 0);
+  const params = { action: "bind_execution", expected_revision: task.revision };
+  task = await f.controller.update(params, "bind-first-calculation", context);
+  assert.equal(task.execution_selection.version, 1);
+  assert.equal(task.execution_target.platform, "local");
+  assert.deepEqual((await f.controller.binding(context)).execution_context.policy, { max_in_flight: 1, max_attempts: 100 });
+  assert.deepEqual(await f.controller.update(params, "bind-first-calculation", context), task);
+  await f.reopen();
+  assert.deepEqual(codingExecutionContext(await f.controller.current(context)), (await f.controller.binding(context)).execution_context);
+  await assert.rejects(f.controller.update({ action: "bind_execution", expected_revision: task.revision,
+    execution_target: { platform: "cluster_a", scheduler_entry: "main" } }, "replace-first-calculation", context),
+  { code: "execution_already_bound" });
+  assert.equal(f.calls.filter(call => call.command === "job_resolve_target").length, 1);
+});
+
+test("an unavailable calculation platform leaves ordinary task state and revision unchanged", async t => {
+  const f = await fixture(t);
+  const task = await f.begin();
+  const execute = f.kernel.execute_command;
+  f.kernel.execute_command = async (command, params) => {
+    if (command === "job_resolve_target") throw Object.assign(new Error("Configure a calculation platform"), { code: "execution_unavailable" });
+    return execute(command, params);
+  };
+  await assert.rejects(f.controller.update({ action: "bind_execution", expected_revision: task.revision }, "bind-unavailable", context),
+    { code: "execution_unavailable" });
+  assert.deepEqual(await f.controller.current(context), task);
+  f.kernel.execute_command = execute;
+  const bound = await f.controller.update({ action: "bind_execution", expected_revision: task.revision }, "bind-unavailable", context);
+  assert.equal(bound.execution_selection.version, 1);
+});
+
+test("pause committed during first calculation resolution prevents a late binding", async t => {
+  const f = await fixture(t);
+  const task = await f.begin();
+  let entered, release;
+  const ready = new Promise(resolve => { entered = resolve; });
+  const execute = f.kernel.execute_command;
+  f.kernel.execute_command = async (command, params) => {
+    if (command === "job_resolve_target") await new Promise(resolve => { release = resolve; entered(); });
+    return execute(command, params);
+  };
+  const binding = f.controller.update({ action: "bind_execution", expected_revision: task.revision }, "bind-race", context);
+  const rejected = assert.rejects(binding, { code: "task_revision_conflict" });
+  await ready;
+  await f.controller.control({ user_task_id: task.user_task_id, expected_revision: task.revision,
+    action: "pause", request_id: "pause-binding" }, context);
+  release();
+  await rejected;
+  const current = await f.controller.current(context);
+  assert.equal(current.state, "paused");
+  assert.equal(current.execution_selection, null);
+});
+
+test("first execution plan atomically binds the requested destination and budget", async t => {
+  const f = await fixture(t);
+  f.faux.setResponses([fauxAssistantMessage("Read the requested destination")]);
+  const source = await f.admission.submitUser({ requestId: "first-placement", content: "Use cluster_a for the calculations" }, context);
+  await f.conversation.waitForIdle(context);
+  let task = await f.begin({ source_submission_ids: [String(source.id)] });
+  const params = { action: "set_execution_plan", expected_revision: task.revision,
+    execution_target: { platform: "cluster_a", scheduler_entry: "main" },
+    execution_intent: { source_submission_id: String(source.id), source_text: "Use cluster_a" },
+    execution_policy: { placements: [{ target: { platform: "cluster_a", scheduler_entry: "main" },
+      intent: { source_submission_id: String(source.id), source_text: "Use cluster_a" } }], max_in_flight: 2, max_attempts: 6 },
+    execution_plan: { items: [{ id: "compute", work_id: "compute", resources: { cpus: 2, memory_mb: 1024 } }] } };
+  await assert.rejects(f.controller.update({ ...params, execution_plan: { items: [{ ...params.execution_plan.items[0], depends_on: ["missing"] }] } },
+    "invalid-first-plan", context), { code: "execution_plan_invalid" });
+  assert.equal((await f.controller.current(context)).execution_selection, null);
+  task = await f.controller.update(params, "first-plan", context);
+  assert.equal(task.execution_target.platform, "cluster_a");
+  assert.equal(task.execution_plan.items[0].selection.target.platform, "cluster_a");
+  assert.deepEqual(codingExecutionContext(task), { unselected: true });
+  task = await f.controller.update({ action: "select_execution_item", expected_revision: task.revision,
+    execution_item_id: "compute" }, "first-item", context);
+  assert.deepEqual((await f.controller.binding(context)).execution_context.policy, { max_in_flight: 2, max_attempts: 6 });
+  assert.equal(codingExecutionContext(task).item.work_id, "compute");
+});
+
 test("compute destination persists and only a new user source can change it", async t => {
   const f = await fixture(t);
   f.faux.setResponses([fauxAssistantMessage("Read placement policy")]);
@@ -1160,7 +1263,7 @@ test("correcting a misread original target is distinct from changing user requir
   const source = await admission.submitUser({ requestId: "original-platform", content: "Use Slurm for the full report" }, context);
   await conversation.waitForIdle(context);
   // Resolver is deliberately mocked here to reproduce a previously misregistered task.
-  let task = await begin({ source_submission_ids: [String(source.id)] });
+  let task = await begin({ source_submission_ids: [String(source.id)], execution_target: { platform: "local", scheduler_entry: "main" } });
   const originalCriteria = task.criteria;
   task = await controller.update({ action: "correct_execution", expected_revision: task.revision,
     execution_target: { platform: "cluster_a", scheduler_entry: "main" }, execution_intent: { source_submission_id: String(source.id), source_text: "Use Slurm", scheduler: "slurm" },

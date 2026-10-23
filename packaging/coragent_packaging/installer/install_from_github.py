@@ -150,9 +150,14 @@ def install_uninstaller(install_root: Path, source_root: Path) -> Path:
         "backend/src/research_agent/_version.py",
         "backend/src/research_agent/bootstrap/__init__.py",
         "backend/src/research_agent/bootstrap/layout.py",
+        "backend/src/research_agent/bootstrap/env.py",
+        "backend/src/research_agent/bootstrap/name_resolver_config.py",
         "backend/src/research_agent/configuration/__init__.py",
         "backend/src/research_agent/configuration/configuration.py",
+        "backend/src/research_agent/integrations/__init__.py",
+        "backend/src/research_agent/integrations/email_config.py",
         "backend/src/research_agent/jobs/qrun.py",
+        "skills/chemical/material-preparation/scripts/materials/name_resolver_config.py",
     )
     copies = [(source_root / "uninstall.sh", uninstaller, 0o755)]
     copies.extend((source_root / relative, private / relative, 0o600) for relative in members)

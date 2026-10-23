@@ -35,6 +35,17 @@ test("paused task binding rejects a new Job before invoking the runtime", async 
   assert.equal(submitted, false);
 });
 
+test("an unbound task blocks submission while platform diagnostics remain available", async () => {
+  const calls = [];
+  const tools = createJobTools({ commandBridge: { execute_command: async (command, params) => {
+    calls.push(command); return { available: true };
+  } }, getTaskBinding: async () => { throw Object.assign(new Error("Use task_update bind_execution"), { code: "execution_selection_required" }); } });
+  await assert.rejects(tools.find(tool => tool.name === "job_start").execute({ command: ["true"] }, api, context),
+    { code: "execution_selection_required" });
+  for (const name of ["job_platforms", "job_resources", "job_probe"]) await tools.find(tool => tool.name === name).execute({}, api, context);
+  assert.deepEqual(calls, ["job_platforms", "job_resources", "job_probe"]);
+});
+
 test("task destination reaches runtime for raw, file and registered requests", async () => {
   const calls = [];
   const [start] = createJobTools({

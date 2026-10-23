@@ -1171,7 +1171,7 @@
             "platform"
           ],
           "additionalProperties": false,
-          "description": "Named platform and optional scheduler entry. Omitted entry resolves the platform default."
+          "description": "Bind a calculation destination only when computation is part of the current request. Omit execution fields for ordinary research tasks; they remain unbound until bind_execution or set_execution_plan."
         },
         "execution_intent": {
           "type": "object",
@@ -1308,6 +1308,7 @@
           "enum": [
             "refine",
             "progress",
+            "bind_execution",
             "wait",
             "block",
             "propose_completion",
@@ -1318,7 +1319,7 @@
             "select_execution_item",
             "complete_execution_item"
           ],
-          "description": "refine requires source_submission_ids; progress requires evidence_refs; wait requires wait; block requires reason, block_kind and resume_when; all kinds except missing_user_input also require evidence_refs; propose_completion requires completion; set_research requires research. Send only the fields for the selected action. apply_user_control applies an explicit user pause/resume/cancel instruction with control and source_submission_ids; cancel also requires jobs. correct_execution fixes an incorrect target interpretation using an original task source, execution_intent and reason; it does not authorize a new destination."
+          "description": "refine requires source_submission_ids; progress requires evidence_refs; wait requires wait; block requires reason, block_kind and resume_when; all kinds except missing_user_input also require evidence_refs; propose_completion requires completion; set_research requires research. Send only the fields for the selected action. apply_user_control applies an explicit user pause/resume/cancel instruction with control and source_submission_ids; cancel also requires jobs. correct_execution fixes an incorrect target interpretation using an original task source, execution_intent and reason; it does not authorize a new destination. bind_execution fixes the first calculation destination using the existing task sources; call it before preparation or direct job_start. With no target it resolves the configured default subject to the original user constraints. set_execution_plan also binds an unbound task. Once bound, destination changes still require refine or correct_execution."
         },
         "reason": {
           "type": "string",
@@ -2231,7 +2232,26 @@
           "then": {
             "required": [
               "execution_plan"
-            ]
+            ],
+            "properties": {
+              "reason": false,
+              "block_kind": false,
+              "resume_when": false,
+              "objective": false,
+              "criteria": false,
+              "source_submission_ids": false,
+              "evidence_refs": false,
+              "next_action": false,
+              "wait": false,
+              "completion": false,
+              "research": false,
+              "control": false,
+              "jobs": false,
+              "completion_outcome": false,
+              "stop_basis": false,
+              "execution_item_id": false,
+              "artifact_ids": false
+            }
           }
         },
         {
@@ -2325,7 +2345,9 @@
               "properties": {
                 "action": {
                   "enum": [
-                    "refine"
+                    "refine",
+                    "bind_execution",
+                    "set_execution_plan"
                   ]
                 }
               }
@@ -2334,6 +2356,40 @@
           "then": {
             "properties": {
               "execution_policy": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "bind_execution"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reason": false,
+              "block_kind": false,
+              "resume_when": false,
+              "objective": false,
+              "criteria": false,
+              "source_submission_ids": false,
+              "evidence_refs": false,
+              "next_action": false,
+              "wait": false,
+              "completion": false,
+              "research": false,
+              "control": false,
+              "jobs": false,
+              "completion_outcome": false,
+              "stop_basis": false,
+              "execution_plan": false,
+              "execution_item_id": false,
+              "artifact_ids": false
             }
           }
         }

@@ -50,6 +50,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--purge-runtime", action="store_true", help="Delete managed Conda/venv runtime state.")
     parser.add_argument("--purge-relay-state", action="store_true", help="Delete Relay state and enrolled credentials owned by this installation.")
     parser.add_argument("--keep-link-relay", action="store_true", help="Keep an installation-owned Link Relay running and preserve its marker.")
+    parser.add_argument("--purge-backups", action="store_true", help="Delete installation backups, which may include saved configuration and credentials.")
     parser.add_argument("--remove-root", action="store_true", help="Remove the installation directory after cleanup.")
     parser.add_argument("--cancel-qrun-jobs", action="store_true", help="Cancel unfinished Jobs in installation-owned local and SSH Qrun pools before removal.")
     parser.add_argument("--purge-qrun-state", action="store_true", help="Delete owned Qrun queue state after stopping its services; never deletes calculation work roots.")
@@ -99,6 +100,7 @@ def choose_options(args: argparse.Namespace, root: Path) -> None:
         args.purge_workspaces = args.purge_config = args.purge_runtime = args.remove_root = True
         args.purge_relay_state = True
         args.purge_qrun_state = True
+        args.purge_backups = True
     if args.remove_root and not (args.purge_workspaces and args.purge_config and args.purge_runtime):
         raise ValueError("--remove-root requires --purge-workspaces, --purge-config, and --purge-runtime")
     if args.non_interactive:
@@ -126,7 +128,13 @@ def choose_options(args: argparse.Namespace, root: Path) -> None:
     if pools:
         args.cancel_qrun_jobs = getattr(args, 'cancel_qrun_jobs', False) or ask_yes_no("Cancel unfinished Jobs in managed Qrun queues", False)
         args.purge_qrun_state = getattr(args, 'purge_qrun_state', False) or ask_yes_no("Delete managed Qrun queue history (calculation files are kept)", False)
-    all_data_selected = args.purge_workspaces and args.purge_config and args.purge_runtime
+    backups = app_paths(root).backups
+    has_backups = backups.is_dir() and any(backups.iterdir())
+    if has_backups:
+        args.purge_backups = getattr(args, 'purge_backups', False) or ask_yes_no("Delete installation backups (including saved credentials)", False)
+    all_data_selected = (args.purge_workspaces and args.purge_config and args.purge_runtime
+                         and (not has_backups or args.purge_backups)
+                         and (not pools or getattr(args, 'purge_qrun_state', False)))
     if not args.remove_root and all_data_selected:
         args.remove_root = ask_yes_no("Remove the installation directory", False)
 
@@ -141,6 +149,8 @@ def choose_options(args: argparse.Namespace, root: Path) -> None:
               tone="danger" if args.purge_qrun_state else "success")
     field("Workspaces", "Delete" if args.purge_workspaces else "Keep",
           tone="danger" if args.purge_workspaces else "success")
+    field("Backups", "Delete" if getattr(args, "purge_backups", False) else "Keep",
+          tone="danger" if getattr(args, "purge_backups", False) else "success")
     field("Config and secrets", "Delete" if args.purge_config else "Keep",
           tone="danger" if args.purge_config else "success")
     field("Python runtime", "Delete" if args.purge_runtime else "Keep",
@@ -354,6 +364,13 @@ def prune_empty_parents(root: Path) -> None:
 def uninstall(args: argparse.Namespace, *, show_progress: bool = False) -> dict[str, object]:
     root = validate_root(Path(args.install_root))
     choose_options(args, root)
+    layout = app_paths(root)
+    # Root deletion must not silently override the individual retention choices.
+    if args.remove_root:
+        if layout.backups.exists() and any(layout.backups.iterdir()) and not getattr(args, 'purge_backups', False):
+            raise ValueError('--remove-root requires --purge-backups when backups exist')
+        if any(Path(pool['state_dir']).is_relative_to(root) for pool in _qrun_install.registry(root)['pools']) and not getattr(args, 'purge_qrun_state', False):
+            raise ValueError('--remove-root requires --purge-qrun-state for queues inside the installation')
     workspace_root = read_workspace_root(root)
     if args.purge_workspaces:
         workspace_root = _validated_workspace_purge_target(root, workspace_root)
@@ -394,9 +411,12 @@ def uninstall(args: argparse.Namespace, *, show_progress: bool = False) -> dict[
             managed.append(app_paths(root).state / 'installation/python')
         if args.purge_config:
             managed.extend([app_paths(root).pi_config, app_paths(root).marker, app_paths(root).locator, app_paths(root).config_file, app_paths(root).credentials, app_paths(root).generated, root / "runtimes/maintenance", root / "uninstall.sh", app_paths(root).state / 'host/link.json', app_paths(root).state / 'host/host.token'])
+        if getattr(args, 'purge_backups', False):
+            managed.append(layout.backups)
         if args.purge_workspaces:
             managed.extend([
                 workspace_root,
+                layout.jobs,
                 app_paths(root).state / 'pi/sessions',
                 app_paths(root).state / 'host',
             ])
@@ -409,7 +429,7 @@ def uninstall(args: argparse.Namespace, *, show_progress: bool = False) -> dict[
         activity.succeed("CoRAgent application files removed")
         return {"ok": True, "install_root": str(root), "workspace_root": str(workspace_root), "stopped_services": stopped, "removed": removed,
                 "preserved_workspaces": not args.purge_workspaces, "preserved_config": not args.purge_config,
-                "preserved_runtime": not args.purge_runtime, "link_relay": relay_result,
+                "preserved_runtime": not args.purge_runtime, "preserved_backups": not getattr(args, "purge_backups", False), "link_relay": relay_result,
                 'retained_job_environments': retained_job_environments, 'qrun': qrun_result}
     except BaseException:
         activity.fail("CoRAgent uninstall failed")

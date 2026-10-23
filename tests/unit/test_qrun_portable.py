@@ -86,7 +86,9 @@ def test_double_fork_and_setsid_descendants_are_removed(pool, cancel):
 if os.fork() == 0:
  os.setsid()
  if os.fork() == 0:
-  pathlib.Path("escaped.pid").write_text(str(os.getpid()))
+  ready = pathlib.Path("escaped.pid.tmp")
+  ready.write_text(str(os.getpid()))
+  ready.replace("escaped.pid")
   while True: time.sleep(1)
  os._exit(0)
 time.sleep(60 if CANCEL else .3)

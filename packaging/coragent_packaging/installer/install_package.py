@@ -335,27 +335,15 @@ def activate_prepared_package(install_root: Path, result: dict, *, guarded=True)
 
 
 def ensure_name_resolver_config(install_root: Path, release_root: Path) -> None:
-    """Install the bundled resolver default on the low-level package path.
-
-    The package installer is a public installation path and does not run the
-    interactive wizard. A fresh installation therefore needs to receive the
-    same deterministic resolver default here. Existing operator configuration
-    is preserved and remains subject to the runtime configuration boundary.
-    """
+    """Derive an explicitly configured resolver without inventing a provider."""
     layout = app_paths(install_root)
-    destination = layout.resolver_config
-    if destination.is_symlink() or (destination.exists() and not destination.is_file()):
-        raise SuiteReleaseError(f'existing name-resolver configuration must be a regular file: {destination}')
-    if destination.is_file():
+    resolver = layout.configuration.read().get('name_resolver')
+    if resolver is None:
+        layout.resolver_config.unlink(missing_ok=True)
         return
-    if 'name_resolver' not in layout.configuration.read():
-        import tomllib
-        source = release_root / 'agent/config/name-resolver.example.toml'
-        layout.configuration.update(name_resolver=tomllib.loads(source.read_text()))
-    # Activation may have a validated job candidate that has not yet been
-    # committed to the main config. Refresh only the resolver here.
+    from research_agent.bootstrap.name_resolver_config import parse_config
     from research_agent.configuration.configuration import atomic_write, toml_text
-    resolver = layout.configuration.read()['name_resolver']
+    parse_config(resolver)
     atomic_write(layout.resolver_config, toml_text(layout.configuration.resolve_credentials(resolver)))
 
 

@@ -1,9 +1,9 @@
-# Copy to ~/.config/coragent/config.toml. Credentials live beside it in credentials.json.
+# Copy to ~/soft/coragent/config/config.toml. Credentials live beside it in credentials.json.
 schema_version = 1
 
 [paths]
 software_root = "/home/iaw/soft/coragent"
-state_root = "/home/iaw/.local/state/coragent"
+state_root = "/home/iaw/soft/coragent/state"
 workspace_root = "/home/iaw/DATA/coragent/workspaces"
 
 [service]
@@ -18,17 +18,9 @@ port = 8766
 # Provider definitions use the Pi models format. For a secret field, use
 # apiKey = "credential:provider_key" and store the value in credentials.json.
 
-[execution]
-schema_version = 2
-default_platform = "local"
-
-[execution.platforms.local]
-default_scheduler = "qrun"
-schedulers.qrun.executor = "qrun"
-transport = "local"
-storage.work_root = "/opt/coragent/jobs"
-# Install Qrun on this host first; use the absolute handler returned by qrun install.
-submission = { resources = { cpus = 1, memory_mb = 1024 } }
+# Execution is optional. Import job.execution.example.toml or job.qrun.example.toml
+# explicitly after choosing your platforms; installation does not create a default queue.
+# Name lookup is also optional: import name-resolver.example.toml explicitly when needed.
 
 [notifications.email]
 enabled = false

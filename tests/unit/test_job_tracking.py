@@ -77,7 +77,6 @@ def test_pending_delivery_does_not_read_research_memory(tmp_path):
 def test_long_queue_emits_one_diagnostic_event_without_poll_wakes(tmp_path, monkeypatch):
     from types import SimpleNamespace
     from research_agent.jobs import JobReceipt, JobState, ExternalJobPlatform
-    from research_agent.application import job_manager
     workspace(tmp_path)
     config = tmp_path/'job.toml'
     config.write_text('[execution]\nschema_version = 2\ndefault_platform="cluster"\n[execution.platforms.cluster]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="ssh"\nssh_host="fixture"\nstorage.work_root="/scratch"\nschedulers.main.handler=["/bin/true"]\n[execution.platforms.cluster.schedulers.main.submission]\nqueue="batch"\nqueue_wait_seconds=60\n')
@@ -94,7 +93,7 @@ def test_long_queue_emits_one_diagnostic_event_without_poll_wakes(tmp_path, monk
     dispatch('start',{'root':str(tmp_path),'request_id':'job_queue','session_id':'s',
         'command':['/bin/true']})
     status = SimpleNamespace(state=JobState.QUEUED,exit_code=None,error=None,diagnostics={'wait_seconds':10})
-    monkeypatch.setattr(job_manager,'_job_manager',lambda root:SimpleNamespace(job_status=lambda receipt:status))
+    monkeypatch.setattr(ExternalJobPlatform, 'status', lambda self, receipt: status)
     command(tmp_path,'tick',{})
     assert command(tmp_path,'pending',{})['deliveries']==[]
     status.diagnostics={'wait_seconds':61,'queue_diagnosis':'feasible procs: 0'}

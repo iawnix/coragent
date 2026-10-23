@@ -34,7 +34,7 @@ Node 的 `closed` 表示结束该问题的活动，不表示科学验证成功�
 
 ## Task 关联研究问题
 
-`coragent-user-task/4` 保存两组引用：
+`coragent-user-task/5` 的 research 字段保存两组引用：
 
 - `research.entry_node_ids`：该委托的研究入口。
 - `research.focus_node_ids`：当前关注的问题。

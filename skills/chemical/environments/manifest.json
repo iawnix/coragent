@@ -18,8 +18,7 @@
           "result": {
             "path": "structure-check.json",
             "fields": {
-              "graph": "passed",
-              "resolver_binding": "passed"
+              "graph": "passed"
             }
           }
         },
@@ -51,7 +50,7 @@
         "glibc": "2.28"
       },
       "resources": {
-        "check_structure.py": "sha256:ed7605165f391a611027c147d6bfb2b1c909f87ccf27686065bf192669e3d936",
+        "check_structure.py": "sha256:4f794fd3a4865ad99b83b6e9871c6c23fce99a6ce04dfe4c34ce1f7ab4ab5de2",
         "structure.lock": "sha256:b2447fff9059d0819049b9d4761e740d6a69a5f3686bf40cc7122edc3307d39b",
         "structure.requirements.txt": "sha256:1c310758c4ee6eab5e8a7971a2b6de85fbaaa90a2fd389710bf35548fea6a556"
       }

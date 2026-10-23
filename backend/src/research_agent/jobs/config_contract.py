@@ -43,7 +43,19 @@ def validate_python(binding, label="python"):
     return binding
 
 
-EXECUTORS = {"qrun", "pbs", "torque", "slurm", "tri", "external"}
+# This module also runs standalone during installation. Keep the built-in
+# scheduler definitions here so normalization, validation and editor schemas
+# share one source without importing a scheduler or its runtime dependencies.
+SCHEDULERS = {
+    "qrun": {"default_handler": ("qrun", "handler"),
+             "unsupported_submission": ("queue",), "unsupported_resources": ("gpus", "select")},
+    "pbs": {},
+    "torque": {},
+    "slurm": {},
+    "tri": {},
+    "external": {},
+}
+EXECUTORS = frozenset(SCHEDULERS)
 CONNECTION_FIELDS = {"transport", "ssh_host", "ssh_config", *TIMEOUT_LIMITS}
 SHARED_FIELDS = {"python", "bindings", "submission", "allowed_queues", "storage"}
 ENTRY_FIELDS = {"executor", "handler", "handler_environment", "cluster_name", "limits", *SHARED_FIELDS}
@@ -86,8 +98,8 @@ def _merge(platform, entry):
 
 def _validate_effective_target(name, target):
     executor = target.get('executor')
-    if not isinstance(executor, str) or executor not in {'qrun', 'pbs', 'torque', 'slurm', 'tri', 'external'}:
-        raise ValueError('executor must be qrun, pbs, torque, slurm, tri or external; process/systemd drivers were removed')
+    if not isinstance(executor, str) or executor not in SCHEDULERS:
+        raise ValueError('executor must be one of: ' + ', '.join(SCHEDULERS))
     _keys(target, {"executor", "transport", "file_mode", "work_root", "handler", "handler_environment",
                    "cluster_name", "ssh_host", "ssh_config", "submission", "bindings", "python",
                    "allowed_queues", "scratch_root", "platform", "scheduler_entry", "limits", *TIMEOUT_LIMITS}, f"execution.platforms.{name}")
@@ -95,8 +107,8 @@ def _validate_effective_target(name, target):
     if transport not in {'local', 'ssh'}:
         raise ValueError('executor requires transport=local or transport=ssh')
     scope = 'remote' if transport == 'ssh' else 'local'
-    if executor == 'qrun':
-        target.setdefault('handler', ['qrun', 'handler'])
+    if 'default_handler' in SCHEDULERS[executor]:
+        target.setdefault('handler', list(SCHEDULERS[executor]['default_handler']))
     for field, limit in TIMEOUT_LIMITS.items():
         if field in target and (type(target[field]) is not int or not 1 <= target[field] <= limit):
             raise ValueError(f"external target {field} must be between 1 and {limit}")
@@ -256,7 +268,7 @@ def bound_target(settings, requested=None, context=None):
     if not context:
         return resolve_target(settings, requested)
     if context.get("unselected"):
-        raise ValueError("execution_item_required: select a task execution item before preparation")
+        raise ValueError("execution_item_required: bind the task with task_update bind_execution or select its execution plan item before preparation")
     selection = context["selection"]
     required = target_key(selection["target"])
     actual = resolve_target(settings, requested) if requested else required
@@ -473,8 +485,12 @@ def validate_submission(result, *, allowed_queues=(), executor=None):
     resources = result.get("resources", {})
     if not isinstance(resources, dict):
         raise ValueError("submission.resources must be a table")
-    if executor == 'qrun' and ('queue' in result or {'gpus', 'select'} & resources.keys()):
-        raise ValueError('Qrun supports CPU, memory and walltime; named queues, GPUs and PBS select are unsupported')
+    if executor is not None:
+        definition = SCHEDULERS[executor]
+        unsupported = (set(definition.get('unsupported_submission', ())) & result.keys()
+                       | set(definition.get('unsupported_resources', ())) & resources.keys())
+        if unsupported:
+            raise ValueError(executor.title() + ' does not support: ' + ', '.join(sorted(unsupported)))
     if set(resources) - {"cpus", "memory_mb", "gpus", "walltime", "select"}:
         raise ValueError("unsupported submission resource")
     if "select" in resources and (not isinstance(resources['select'], str)
@@ -541,12 +557,22 @@ def job_config_schema():
                     'handler': {'type': 'array', 'minItems': 1, 'items': text()},
                     'handler_environment': backend['properties']['environment'],
                     'cluster_name': text('^' + NAME_PATTERN + '$'), 'limits': limits}, ('executor',))
-    qrun_submission = {'not': {'required': ['queue']}, 'properties': {'resources': {
-        'not': {'anyOf': [{'required': [key]} for key in ('gpus', 'select')]}}}}
-    entry['allOf'] = [{'if': {'properties': {'executor': {'const': 'qrun'}}},
-                      'then': {'properties': {'submission': qrun_submission,
-                          'bindings': {'additionalProperties': {'properties': {'submission': qrun_submission}}}}},
-                      'else': {'required': ['handler']}}]
+    entry['allOf'] = []
+    for name, definition in SCHEDULERS.items():
+        scheduler_submission = {}
+        if definition.get('unsupported_submission'):
+            scheduler_submission['not'] = {'anyOf': [
+                {'required': [key]} for key in definition['unsupported_submission']]}
+        if definition.get('unsupported_resources'):
+            scheduler_submission['properties'] = {'resources': {'not': {'anyOf': [
+                {'required': [key]} for key in definition['unsupported_resources']]}}}
+        if scheduler_submission:
+            entry['allOf'].append({'if': {'properties': {'executor': {'const': name}}},
+                'then': {'properties': {'submission': scheduler_submission,
+                    'bindings': {'additionalProperties': {'properties': {'submission': scheduler_submission}}}}}})
+    entry['allOf'].append({'if': {'properties': {'executor': {'enum': [
+        name for name, definition in SCHEDULERS.items() if 'default_handler' in definition]}}},
+        'else': {'required': ['handler']}})
     platform = record({**shared, 'display_name': text(), 'enabled': {'type': 'boolean'},
         'aliases': {'type': 'array', 'uniqueItems': True, 'items': text('^' + NAME_PATTERN + '$')},
         'transport': {'enum': ['local', 'ssh']},

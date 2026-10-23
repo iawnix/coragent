@@ -76,9 +76,33 @@ Keep handler credentials in the installation credential store; discovery does no
   the submitted Job's recorded route even after configuration changes.
 - Ordinary bash continues to execute on the controller. Platform selection does not SSH arbitrary bash.
 
-A Task can contain a durable execution plan with independently placed work items. Use the existing
-`task_begin` placement policy and `task_update` actions `set_execution_plan`, `select_execution_item`
-and `complete_execution_item`. See the [plan contract and examples](../skills/core/execution-platforms/references/plans.md).
+Ordinary research tasks do not require a calculation platform. `task_begin` without execution fields
+persists `execution_target`, `execution_selection` and `execution_policy` as null. Workspace, research
+records, context management and local bash remain available. Platform diagnostics do not bind a Task.
+
+Before preparing or directly submitting the first calculation, read `task_read` and bind an unbound Task:
+
+```json
+{
+  "action": "bind_execution",
+  "expected_revision": 1,
+  "execution_target": {"platform": "Com30", "scheduler_entry": "qrun"}
+}
+```
+
+Send this to `task_update` using the actual current revision. The existing task sources constrain the
+selection; use `execution_intent` to quote an explicit scheduler instruction. Omitting the target resolves
+the configured default under those constraints. Missing configuration fails this calculation operation
+without altering the Task. If calculation is already intended, `task_begin` may instead receive execution
+fields and bind immediately. A bound destination cannot be replaced by another `bind_execution`: changing
+user requirements uses `refine` with a new source, while correcting a misread original instruction uses
+`correct_execution` with that instruction and an audit reason.
+
+A Task can contain a durable execution plan with independently placed work items. `task_update`
+`set_execution_plan` binds an unbound Task atomically with its first plan, optionally accepting the same
+execution fields. An existing binding supplies the plan policy; an existing plan pins that policy.
+Then use `select_execution_item` and `complete_execution_item`.
+See the [plan contract and examples](../skills/core/execution-platforms/references/plans.md).
 Job Manager remains the sole authority for actual execution state; `task_read.execution_progress`
 projects ready/blocked, native Job states, collecting and validating from those records.
 
@@ -127,7 +151,7 @@ uninstall that environment.
 
 Flat target configuration and process/systemd executors are rejected. There is no automatic migration,
 legacy selector alias, or second editable target table. The durable Task and dispatch-intent versions are
-`coragent-user-task/4` and `job_intent/4`; deploy matching runtime/configuration together after settling
+`coragent-user-task/5` and `job_intent/4`; deploy matching runtime/configuration together after settling
 work under the previous version. New-version Jobs preserve original routes; this is not conversion of old receipts.
 
 The [execution-platforms skill](../skills/core/execution-platforms/SKILL.md) owns selection, environments,

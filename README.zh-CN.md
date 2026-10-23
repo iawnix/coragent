@@ -19,6 +19,8 @@ CoRAgent（Computational Research Agent，计算科研智能体）是一个 AI �
 - 在终端中交互，通过 CoRHub 连接同一工作区，或用可选的 CoRAgent Web 浏览研究记录。
 
 按[科学计算指南](docs/SCIENTIFIC_CAPABILITIES_OPERATIONS.zh-CN.md)配置计算所需的科学软件与运行环境。
+没有计算平台、邮件或在线名称解析配置，也可以创建研究任务、整理资料和维护研究记录。
+任务首次需要计算时再选择平台与调度入口；Qrun 队列和 PubChem/OPSIN 服务都需要显式配置。
 
 ## 安装
 
@@ -34,7 +36,7 @@ cd coragent
 需要非交互安装时，参考 `config/` 中的示例准备本机私有配置，然后执行：
 
 ```bash
-./install.sh --source local --config "$HOME/.config/coragent/config.toml" \
+./install.sh --source local --config "$HOME/soft/coragent/config/config.toml" \
   --non-interactive --yes
 ```
 

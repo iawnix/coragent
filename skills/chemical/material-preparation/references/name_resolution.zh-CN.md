@@ -3,16 +3,17 @@
 ## 查询
 
 准备 `chemical.resolve@1`，传 `--name 原文`，可加 `--lookup-name 规范化名称`。
-结果保留原文，所有名称采用相同查询路径。默认依次尝试 PubChem、OPSIN，安装配置
-显式指定的解析器优先。某个后端得到可用候选即可结束查询；结果无法解析时继续尝试
+结果保留原文，所有名称采用相同查询路径。显式启用后，自动查询依次尝试 PubChem、OPSIN，
+安装配置指定的解析器优先；安装器不会默认启用这两个服务。某个后端得到可用候选即可结束查询；结果无法解析时继续尝试
 下一个后端。每次调用至多尝试每个已启用后端一次，保留 404、限流、超时和响应异常诊断。
 必要时使用有针对性的翻译或规范化查询；继续查询难以增加信息时转入候选推断。
 
-配置来自 CORAGENT_NAME_RESOLVER_CONFIG 或
-CORAGENT_INSTALL_ROOT/etc/name-resolver.toml。受管 Job 使用显式绑定：
-安装器在 job.toml 中补齐本地 structure 后端的解析配置路径。保留显式设置，
-远程目标需提供远端可读的路径。修改绑定后重新准备请求。缺少配置时返回
+配置仅来自 `CORAGENT_NAME_RESOLVER_CONFIG`。在主 `config.toml` 中维护 `[name_resolver]`，
+或通过 `--name-resolver-config` 显式导入，安装器生成私有的 `generated/name-resolver.toml`。
+再在 structure 后端的环境中显式绑定该路径；远端平台需要远端可读的文件。
+安装器保留已有绑定，不推断解析器路径。修改绑定后重新准备请求。缺少配置时返回
 `next_step=infer_candidates`，Agent 可根据输入描述继续推断。
+给定 SMILES/XYZ 和候选结构校验不要求在线名称服务，仍使用选定的科学执行环境。
 
 ## 候选输入
 

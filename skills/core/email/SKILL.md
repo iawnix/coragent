@@ -13,6 +13,12 @@ Use this Skill’s operation contracts and command instructions linked below. He
 
 Use this Skill after the requested message has been composed and the user has authorized sending. It checks the configured SMTP transport, pins attachment digests, sends once, and records a receipt that can be reconciled after an interrupted delivery.
 
+Email is optional. An unconfigured or disabled transport does not block the research
+task; report its status before attempting delivery. Maintain settings in
+`config.toml` and `credentials.json`, not the generated file named by
+`CORAGENT_NOTIFICATION_CONFIG`. `check` validates local settings and credential
+sources; it does not contact SMTP or send a test message.
+
 ## Message workflow
 
 1. Write a `ts-email-message/1` request with a stable `message_id`, subject, body, attachment references/digests, and caller metadata.

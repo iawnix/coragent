@@ -20,13 +20,18 @@ _JOB_ID = re.compile(r"^job_[1-9][0-9]*$")
 
 _JOB_MANAGERS: dict[tuple[str, str], JobManager] = {}
 
-def _job_manager(root: Path) -> JobManager:
+def _job_config_path() -> Path:
     configured = os.environ.get("CORAGENT_JOB_CONFIG")
     if not configured:
         raise ValueError("job_config_required: configure the installation job.toml explicitly")
     config = Path(configured).expanduser()
     if not config.is_file():
         raise ValueError(f"explicit job configuration is missing: {config}")
+    return config
+
+
+def _job_manager(root: Path) -> JobManager:
+    config = _job_config_path()
     key = (str(root), hashlib.sha256(config.read_bytes()).hexdigest())
     if key not in _JOB_MANAGERS:
         try:
@@ -199,14 +204,19 @@ def _recorded_platform(intent):
     return platform
 
 
-def _receipt(root: Path, params: dict[str, Any]):
+def _recorded_job_manager(root: Path, job_id: str) -> JobManager:
+    """Existing Jobs use their durable route, independently of new-job settings."""
+    intent = json.loads((root / _intent_path(root, job_id)).read_text())
+    platform = _recorded_platform(intent)
+    return JobManager({intent["platform"]: platform}, default=intent["platform"])
+
+
+def _receipt(root: Path, params: dict[str, Any], *, runtime=None):
     job_id = _job_id(params)
     path = _receipt_path(root, job_id)
     if not path.is_file():
         raise FileNotFoundError(f"job receipt not found: {job_id}")
-    runtime = _job_manager(root)
-    intent = json.loads((root / _intent_path(root, job_id)).read_text())
-    runtime.platforms[intent["platform"]] = _recorded_platform(intent)
+    runtime = runtime or _recorded_job_manager(root, job_id)
     return runtime.receipt_from_disk(str(path))
 
 
@@ -244,19 +254,18 @@ def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
         params = {**request, **controls, **transport}
     if operation == "resolve_target":
         from research_agent.jobs.config_contract import load_job_config, resolve_selection
-        return resolve_selection(load_job_config(os.environ["CORAGENT_JOB_CONFIG"]), params.get("target"),
+        return resolve_selection(load_job_config(_job_config_path()), params.get("target"),
                                  scheduler=params.get("scheduler"),
                                  source_text=params.get("source_text"))
-    runtime = _job_manager(root)
     if operation == "platforms":
         from research_agent.jobs.config_contract import load_job_config, platform_catalog
-        return platform_catalog(load_job_config(os.environ["CORAGENT_JOB_CONFIG"]))
+        return platform_catalog(load_job_config(_job_config_path()))
     if operation == "resources":
         from datetime import datetime, timezone
         from research_agent.jobs.config_contract import load_job_config, resolve_target, target_identity
-        settings = load_job_config(os.environ["CORAGENT_JOB_CONFIG"])
+        settings = load_job_config(_job_config_path())
         name = resolve_target(settings, params.get("execution_target"))
-        probe = runtime.job_probe(JobSpec(command=("true",), cwd=root), platform=name)
+        probe = _job_manager(root).job_probe(JobSpec(command=("true",), cwd=root), platform=name)
         queue = probe.get("queue", {})
         return {"target": target_identity(name), "executor": settings["targets"][name]["executor"],
                 "available": probe["available"], "observed_at": datetime.now(timezone.utc).isoformat(),
@@ -265,33 +274,34 @@ def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
                 "scheduler_observation": queue or None, "error": probe.get("error")}
     if operation == "start":
         from research_agent.jobs.config_contract import bound_target, load_job_config, target_identity
-        settings = load_job_config(os.environ["CORAGENT_JOB_CONFIG"])
+        settings = load_job_config(_job_config_path())
         actual = bound_target(settings, params.get("execution_target"), params.get("execution_context"))
         params["execution_target"] = target_identity(actual)
-        return _start(root, runtime, params, preparation=preparation)
+        return _start(root, _job_manager(root), params, preparation=preparation)
     if operation == "probe":
+        runtime = _job_manager(root)
         # Probe is a capability query and intentionally does not require a
         # command or a workspace job directory.
         if not params.get("command"):
             from research_agent.jobs.config_contract import load_job_config, resolve_target
-            platform = resolve_target(load_job_config(os.environ["CORAGENT_JOB_CONFIG"]), params.get("execution_target"))
+            platform = resolve_target(load_job_config(_job_config_path()), params.get("execution_target"))
             if platform not in runtime.platforms:
                 return {"platform": platform, "available": False, "reason": "platform adapter is not configured"}
             spec = JobSpec(command=("true",), cwd=root)
             return runtime.job_probe(spec, platform=platform)
         return runtime.job_probe(_spec(root, params), platform=_platform_name(params))
     params = _resolve_selector(root, params)
+    intent_path = root / _intent_path(root, _job_id(params))
+    if not intent_path.is_file():
+        raise JobSelectionError("job_not_found", "unknown exact Job ID; query research_search")
+    runtime = _recorded_job_manager(root, params["job_id"])
     try:
-        receipt = _receipt(root, params)
+        receipt = _receipt(root, params, runtime=runtime)
     except FileNotFoundError:
-        if not (root / _intent_path(root, params["job_id"])).is_file():
-            raise JobSelectionError("job_not_found", "unknown exact Job ID; query research_search")
-        intent_path = root / _intent_path(root, _job_id(params))
         recovered = None
-        if operation == "reconcile" and intent_path.is_file():
+        if operation == "reconcile":
             intent = json.loads(intent_path.read_text())
-            platform = _recorded_platform(intent)
-            runtime.platforms[intent["platform"]] = platform
+            platform = runtime.platforms[intent["platform"]]
             recovery = getattr(platform, "recover_receipt", None)
             if recovery and (Path(intent["cwd"]) / "spec.json").is_file():
                 recovered = recovery(intent["job_id"], Path(intent["cwd"]))
@@ -307,8 +317,6 @@ def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
             return value
         else:
             raise
-    intent = json.loads((root / _intent_path(root, receipt.job_id)).read_text())
-    runtime.platforms[receipt.platform] = _recorded_platform(intent)
     value = getattr(runtime, f"job_{operation}")(receipt)
     def json_value(item):
         if hasattr(item, "value"):

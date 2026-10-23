@@ -21,6 +21,9 @@ workspace so you can return to a study and continue where you left off.
 
 Set up the scientific software and execution environments for your calculations
 with the [Scientific operations guide](docs/SCIENTIFIC_CAPABILITIES_OPERATIONS.md).
+You can start research tasks and maintain notes without a compute platform, email,
+or online name resolver. Select a platform when the task first needs calculation.
+Qrun queues and PubChem/OPSIN access require explicit configuration.
 
 ## Install
 
@@ -36,7 +39,7 @@ cd coragent
 For non-interactive installation, prepare private files using the templates in `config/`, then run:
 
 ```bash
-./install.sh --source local --config "$HOME/.config/coragent/config.toml" \
+./install.sh --source local --config "$HOME/soft/coragent/config/config.toml" \
   --non-interactive --yes
 ```
 

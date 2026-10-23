@@ -1,10 +1,10 @@
 """Bind installer options and runtime projections to the single operator config."""
 from __future__ import annotations
 
+import copy
 import json
 import os
 from pathlib import Path
-import tomllib
 from research_agent.bootstrap.layout import paths, Configuration, atomic_write
 
 
@@ -18,8 +18,8 @@ def apply(args, *, validate_credentials=True):
     args.install_root = str(layout.root)
     os.environ['CORAGENT_CONFIG'] = args.config
     document = layout.configuration.read(required=False)
-    if validate_credentials:
-        layout.configuration.resolve_credentials(document)
+    if validate_credentials and "models" in document:
+        layout.configuration.resolve_credentials(document["models"])
     if hasattr(args, 'workspace_root') and not args.workspace_root: args.workspace_root = str(layout.workspace_root)
     service = document.get('service', {})
     for key, option in {'scope':'service_scope', 'user':'service_user'}.items():
@@ -49,66 +49,63 @@ def prepare(args):
     return layout
 
 
-def publish(args):
-    """Commit explicit installer changes to the authoritative config before activation."""
-    layout = paths(args.install_root)
+def commit_sections(root, **sections):
+    """Publish explicit candidate sections, never infer them from generated files."""
+    layout = paths(root)
     configuration = layout.configuration
-    document = configuration.read()
-    for section, path in (('execution', layout.job_config), ('name_resolver', layout.resolver_config)):
-        # Persist validated bindings while keeping the operator's credential references.
-        if path.is_file():
-            value = tomllib.loads(path.read_text())
-            if section == 'execution':
-                value = value['execution']
-            # Preserve operator credential references across normalization.
-            def references(current, original):
-                if isinstance(original, str) and original.startswith('credential:'):
-                    return original if current == configuration.resolve_credentials(original) else current
-                if isinstance(current, dict) and isinstance(original, dict):
-                    return {key: references(item, original.get(key)) for key, item in current.items()}
-                if isinstance(current, list) and isinstance(original, list):
-                    return [references(item, original[index] if index < len(original) else None)
-                            for index, item in enumerate(current)]
-                return current
-            document[section] = references(value, document.get(section))
+    document = configuration.read(required=False)
     credentials = configuration.credentials()
-    auth = layout.pi_config / 'auth.json'
-    if auth.exists():
-        credentials['models'] = {**json.loads(auth.read_text()), **credentials.get('models', {})}
-        auth.unlink()
-    models = layout.pi_config / 'models.json'
-    if 'models' not in document and models.exists(): document['models'] = json.loads(models.read_text())
-    if layout.email_config.exists() and (getattr(args, 'email_binding', None) or 'notifications' not in document):
-        document['notifications'] = tomllib.loads(layout.email_config.read_text())['notifications']
-    if getattr(args, '_clear_email', False): document['notifications'] = {'email': {'enabled': False}}
-    # Imported inline secrets move to credentials.json; references are stable.
+
+    def preserve_references(current, original):
+        if isinstance(original, str) and original.startswith('credential:'):
+            secret = credentials.get('secrets', {}).get(original.removeprefix('credential:'))
+            return original if current == secret else current
+        if isinstance(current, dict) and isinstance(original, dict):
+            return {key: preserve_references(item, original.get(key)) for key, item in current.items()}
+        if isinstance(current, list) and isinstance(original, list):
+            return [preserve_references(item, original[index] if index < len(original) else None)
+                    for index, item in enumerate(current)]
+        return current
+
     def redact(value, prefix):
         if isinstance(value, dict):
             for key, item in list(value.items()):
                 name = prefix + '.' + key
-                if isinstance(item, str) and (key in {'apiKey', 'password', 'TRI_AUTH_TOKEN'}):
+                if isinstance(item, str) and key in {'apiKey', 'password', 'TRI_AUTH_TOKEN'}:
                     if not item.startswith('credential:'):
                         credentials.setdefault('secrets', {})[name] = item
                         value[key] = 'credential:' + name
-                else: redact(item, name)
+                else:
+                    redact(item, name)
         elif isinstance(value, list):
-            for index, item in enumerate(value): redact(item, prefix + '.' + str(index))
-    for name in ('models', 'execution', 'notifications'):
-        if name in document: redact(document[name], name)
-    email = document.get('notifications', {}).get('email', {})
-    generated_password = layout.generated / 'secrets/smtp-password'
-    if email.get('password_file') == str(generated_password) and generated_password.exists():
-        credentials.setdefault('secrets', {})['smtp_password'] = generated_password.read_text().rstrip('\n')
-        email.pop('password_file')
-        email['password'] = 'credential:smtp_password'
-    if layout.remote_config.exists(): document['remote_host'] = json.loads(layout.remote_config.read_text())
-    if getattr(args, 'conda_root', None):
-        document.setdefault('runtime', {})['conda_root'] = str(Path(args.conda_root).expanduser().resolve())
-    document['phone'] = {'access': args.phone_access or 'disabled'}
-    if args.link_url: document['phone']['relay_url'] = args.link_url
-    document['web'] = {'enabled': bool(args.with_web), 'host': args.web_host, 'port': args.web_port or 8766, 'allow_remote': bool(args.allow_remote)}
-    token = layout.generated / 'web/auth.token'
-    if token.is_file(): credentials.setdefault('secrets', {})['web_token'] = token.read_text().strip()
+            for index, item in enumerate(value):
+                redact(item, prefix + '.' + str(index))
+
+    for name, candidate in sections.items():
+        if candidate is None:
+            document.pop(name, None)
+            continue
+        candidate = preserve_references(copy.deepcopy(candidate), document.get(name))
+        redact(candidate, name)
+        document[name] = candidate
+    # InstallationMaintenance snapshots both files and restores them together
+    # on failed publication. Credentials precede references to those credentials.
+    atomic_write(layout.credentials, json.dumps(credentials, indent=2) + '\n')
     configuration.write(document)
-    atomic_write(layout.credentials, json.dumps(credentials, indent=2)+'\n')
-    layout.materialize()
+    return layout
+
+
+def publish(args):
+    """Finalize explicit installation choices, then rebuild derived inputs."""
+    layout = paths(args.install_root)
+    document = layout.configuration.read()
+    sections = {}
+    if getattr(args, 'conda_root', None):
+        sections['runtime'] = {**document.get('runtime', {}),
+                               'conda_root': str(Path(args.conda_root).expanduser().resolve())}
+    sections['phone'] = {'access': args.phone_access or 'disabled'}
+    if args.link_url:
+        sections['phone']['relay_url'] = args.link_url
+    sections['web'] = {'enabled': bool(args.with_web), 'host': args.web_host,
+                       'port': args.web_port or 8766, 'allow_remote': bool(args.allow_remote)}
+    commit_sections(args.install_root, **sections).materialize(strict=True)

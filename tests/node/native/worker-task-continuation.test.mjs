@@ -1,4 +1,3 @@
-import { startQrunFixture } from "./qrun-fixture.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createServer } from "node:http";
@@ -12,13 +11,12 @@ import { TEST_ROOT, TEST_SOCKET_ROOT, managedPython, pinnedPiSource, assertInsta
 const execute = promisify(execFile);
 const packageRoot = resolve(process.env.CORAGENT_TEST_PACKAGE_ROOT || process.cwd());
 
-for (const scenario of ["single", "branches", "block-resume", "execution-recovery", "delivery-recovery", "user-stop"]) test(`real Worker continues ${scenario} research after a partial answer and completes one durable delivery`, { timeout: 60_000 }, async () => {
+for (const scenario of ["single", "branches", "block-resume", "execution-recovery", "delivery-recovery", "user-stop"]) test(`real Worker continues ${scenario} research without a calculation platform and completes one durable delivery`, { timeout: 60_000 }, async () => {
   await assertInstalledRuntime(packageRoot);
   const root = await mkdtemp(join(TEST_ROOT, "task-flow-"));
   const socketRoot = join(TEST_SOCKET_ROOT, "t");
   await mkdir(socketRoot);
   const saved = { ...process.env };
-  let closeQueue;
   let backend, server, requests = 0, fixtureError, failureRequests = 0, recoveryRestarted = false, blockedWrite = false;
   let scope, assessmentPending = false;
   const blockedStopCalls = new Set();
@@ -30,9 +28,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
     Object.assign(process.env, { PI_CODING_AGENT_DIR: agentDir, PI_AGENT_DIR: agentDir,
       CORAGENT_PYTHON: managedPython(), PYTHONDONTWRITEBYTECODE: "1",
       CORAGENT_TASK_RECOVERY_BASE_DELAY_MS: "500", CORAGENT_TASK_RECOVERY_MAX_DELAY_MS: "500" });
-    const jobConfig = join(root, "job.toml");
-    closeQueue = await startQrunFixture(jobConfig, root);
-    process.env.CORAGENT_JOB_CONFIG = jobConfig;
+    delete process.env.CORAGENT_JOB_CONFIG;
     await execute(managedPython(), [join(packageRoot, "apps/cli/workspace_mode.py"),
       "--root", join(workspaceRoot, "task-flow"), "--workspace-id", "task-flow"]);
     server = createServer(async (req, res) => {
@@ -89,6 +85,9 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
         const researchPayload = JSON.parse(researchEnvelope.content.split("\n")[1]);
         const snapshot = researchPayload.research_brief;
         assert.ok(snapshot && snapshot.schema_version === "research-brief/1");
+        if (researchPayload.task) {
+          assert.equal(researchPayload.task.execution_target, null);
+        }
         if (node && task && requests === 2) {
           assert.deepEqual(snapshot.scope.entry_node_ids, [node.id]);
           assert.deepEqual(snapshot.scope.focus_node_ids, [node.id]);
@@ -330,6 +329,10 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
     }
     const count = requests;
     const research = await backend.monitor("monitor/task/read", { ...scope, user_task_id: overview.task.user_task_id });
+    assert.equal(research.task.schema_version, "coragent-user-task/5");
+    assert.equal(research.task.execution_target, null);
+    assert.equal(research.task.execution_selection, null);
+    assert.equal(research.task.execution_policy, null);
     assert.deepEqual(research.research.research.entry_node_ids, research.task.research.entry_node_ids);
     if (scenario === "branches") {
       assert.equal(research.research.research.nodes.find(node => node.title === "Derivation A").status, "closed");
@@ -347,7 +350,6 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
   } finally {
     try { await backend?.close(); }
     finally {
-      await closeQueue?.();
       if (server) { server.closeAllConnections(); await new Promise(done => server.close(done)); }
       for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];
       Object.assign(process.env, saved);

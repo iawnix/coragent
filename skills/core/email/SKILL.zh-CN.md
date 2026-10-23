@@ -13,6 +13,10 @@ description: 通过配置的 SMTP 发送已授权邮件，固定附件并保存�
 
 用户要求的邮件内容准备好并获得发送授权后，使用本 Skill。它检查 SMTP 配置、固定附件 digest、执行一次发送，并在中断后提供可核对的回执。
 
+邮件是可选能力。未配置或已关闭时，先报告邮件状态，研究任务仍可继续。
+设置维护在 `config.toml` 与 `credentials.json`，不要修改 `CORAGENT_NOTIFICATION_CONFIG`
+指向的生成文件。`check` 只验证本地设置与凭据来源，不连接 SMTP，也不发送测试邮件。
+
 ## 消息流程
 
 1. 写入 `ts-email-message/1` 请求，包含稳定的 `message_id`、主题、正文、附件引用/digest 和调用方元数据。

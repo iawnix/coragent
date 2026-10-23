@@ -432,7 +432,8 @@ def test_handler_runs_over_ssh_with_same_lifecycle(queue, tmp_path, monkeypatch)
 
 @pytest.mark.parametrize("lose_response", [False, True])
 @pytest.mark.parametrize("file_mode", ["staged", "shared"])
-def test_application_jobs_reconcile_and_collect_external_tasks(queue, tmp_path, monkeypatch, lose_response, file_mode):
+@pytest.mark.parametrize("current_configuration", ["present", "missing", "invalid", "unset"])
+def test_application_jobs_reconcile_and_collect_external_tasks(queue, tmp_path, monkeypatch, lose_response, file_mode, current_configuration):
     from research_agent.application.execution import dispatch, _JOB_MANAGERS
     from tests.unit.test_job_recovery import workspace
     from coragent_packaging.installer._job_install import toml_bytes
@@ -454,13 +455,51 @@ def test_application_jobs_reconcile_and_collect_external_tasks(queue, tmp_path, 
             dispatch("start", request)
     else:
         assert dispatch("start", request)["job_id"] == "job_1"
+    if current_configuration == "missing":
+        path.unlink()
+    elif current_configuration == "invalid":
+        path.write_text("not valid TOML")
+    elif current_configuration == "unset":
+        monkeypatch.delenv("CORAGENT_JOB_CONFIG")
     _JOB_MANAGERS.clear()
     selector = {"root": str(root), "job_id": "job_1"}
+    if lose_response:
+        assert dispatch("status", selector)["state"] == "unknown"
     assert dispatch("reconcile", selector)["state"] == "queued"
     finish(state)
     result = dispatch("collect", selector)
     assert result["status"]["state"] == "succeeded"
     assert result["output_validation"]["complete"]
+    assert len(tasks(state)) == 1
+
+
+def test_existing_job_monitor_cancel_and_history_do_not_require_current_configuration(queue, tmp_path, monkeypatch):
+    from research_agent.application.execution import dispatch, _JOB_MANAGERS
+    from research_agent.application.job_manager import command
+    root, request, state = application_queue(queue, tmp_path, monkeypatch)
+    receipt = dispatch('start', request)
+    monkeypatch.delenv('CORAGENT_JOB_CONFIG')
+    _JOB_MANAGERS.clear()
+    selector = {'root': str(root), 'job_id': receipt['job_id']}
+    assert dispatch('status', selector)['state'] == 'queued'
+    assert not command(root, 'tick', {})['registration_errors']
+    assert dispatch('cancel', selector)['state'] == 'cancelled'
+    assert not command(root, 'tick', {})['registration_errors']
+    deliveries = command(root, 'pending', {})['deliveries']
+    assert len(deliveries) == 1
+    event = command(root, 'event', {'event_id': deliveries[0]['event_id']})
+    assert event['job_id'] == receipt['job_id'] and event['state'] == 'cancelled'
+    from research_agent.application.memory_context import jobs
+    with monkeypatch.context() as local_reads:
+        local_reads.setattr(ExternalJobPlatform, '__init__',
+                            lambda *args, **kwargs: pytest.fail('local history must not construct a platform'))
+        rows = dispatch('list', {'root': str(root)})['jobs']
+        summaries = jobs(root)
+    assert summaries[0]['job_id'] == receipt['job_id'] and summaries[0]['state'] == 'cancelled'
+    assert len(rows) == 1 and rows[0]['state'] == 'cancelled'
+    assert len(tasks(state)) == 1
+    with pytest.raises(ValueError, match='job_config_required'):
+        dispatch('start', {**request, 'request_id': 'new-job-without-configuration'})
     assert len(tasks(state)) == 1
 
 

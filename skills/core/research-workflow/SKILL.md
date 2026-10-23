@@ -12,13 +12,13 @@ Use this Skill before starting or resuming sustained research, changing its exec
 ## Start and resume
 
 1. Check `runtime_control`; use `task_read` to recover an existing task's complete requirements, state and next action. Do so before acting when `continuation_truncated` is true. Context records can be stale and never constitute new authorization.
-2. Before `task_begin`, read [Execution target selection](references/execution-targets.md). Register a new assignment only when no nonterminal task exists, with actual user submission IDs, objective and criteria covering every deliverable, `initial_plan`, and the first concrete `next_action`. Preserve user requirements separately from hypotheses and optional diagnostics.
+2. Register a new assignment with `task_begin` only when no nonterminal task exists, with actual user submission IDs, objective and criteria covering every deliverable, `initial_plan`, and the first concrete `next_action`. Ordinary research omits execution fields and does not require a compute platform. When calculation is already intended, read [Execution target selection](references/execution-targets.md) and bind the requested destination. Preserve user requirements separately from hypotheses and optional diagnostics.
 3. Continue the current task for follow-ups. New user requirements use `refine`; a misread execution instruction uses the correction procedure in the execution reference. Reading a task or writing progress does not resume paused or blocked work.
 4. Create or select research Nodes and bind entry/focus with `task_update action=set_research`. The first `research_create` supplies an initial binding when none exists. Use the [research-memory Skill](../research-memory/SKILL.md) for records and relations, then select the applicable domain Skill.
 
 ## Execute and record
 
-Use [Job and material workflow](references/jobs-and-artifacts.md) for preparation, submission, collection and file placement. Control helpers use `CORAGENT_PYTHON`; scientific preparation uses `CORAGENT_JOB_CONFIG` and inherits the task target. Do not install scientific dependencies in the control environment.
+Use [Job and material workflow](references/jobs-and-artifacts.md) for preparation, submission, collection and file placement. Before the first calculation on an unbound task, use `task_update action=bind_execution` as described by [Execution target selection](references/execution-targets.md). Control helpers use `CORAGENT_PYTHON`; scientific preparation uses `CORAGENT_JOB_CONFIG` and inherits the task target. Do not install scientific dependencies in the control environment.
 
 Prepare files in the returned Node `work_dir` or `research/work`; place reports in `reports/`. Associate research Jobs with the intended `node_id`. Inspect original outputs and the domain's scientific checks before publishing conclusions. Use research-memory for question decomposition and conclusion records.
 

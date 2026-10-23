@@ -37,8 +37,29 @@ handler 凭据使用安装的凭据存储，平台查询不返回其值。
   已提交 Job 的查询、取消、回收和核对使用记录中的原路由，不随新默认值改变。
 - 普通 bash 始终在控制端执行，平台选择不会把普通 shell 自动改成 SSH。
 
-一个 Task 可以包含多个独立放置的工作项。使用现有 task_begin 的位置策略，以及 task_update 的
-`set_execution_plan`、`select_execution_item`、`complete_execution_item` 操作。
+普通研究任务不要求配置计算平台。task_begin 省略执行字段时，execution_target、execution_selection、
+execution_policy 均保存为 null；工作区、研究记录、上下文管理与本地 bash 仍正常使用。
+平台诊断也不会自动绑定 Task。
+
+首次准备或直接提交计算前，先读取 task_read，再为未绑定 Task 调用 task_update：
+
+```json
+{
+  "action": "bind_execution",
+  "expected_revision": 1,
+  "execution_target": {"platform": "Com30", "scheduler_entry": "qrun"}
+}
+```
+
+修订号替换为当前 Task 的实际版本，选择仍受该任务真实用户来源约束；明确调度器指令通过
+execution_intent 引用原文。省略目标时在这些约束下解析配置默认位置。缺少配置只会让当前绑定操作
+失败，不改变 Task。已明确需要计算时，task_begin 也可直接提供执行字段完成绑定。
+已有绑定不能再次用 bind_execution 替换；新要求用 refine 并引用新用户来源，误读原指令则用
+correct_execution、原始明确指令和纠错原因。
+
+一个 Task 可以包含多个独立放置的工作项。首次 task_update set_execution_plan 可以同时提供
+execution 字段，原子保存未绑定任务的位置与计划；已绑定任务沿用原策略，已有计划固定其策略。
+随后使用 select_execution_item 和 complete_execution_item 操作。
 完整字段与使用步骤见 [执行计划](../skills/core/execution-platforms/references/plans.zh-CN.md)。
 Job Manager 仍是实际作业状态的唯一来源；task_read 的 execution_progress 展示依赖、
 原生执行状态、collecting 与 validating 阶段。
@@ -81,7 +102,7 @@ Qrun 有未结束作业时拒绝移除，除非明确要求取消。多个入口
 删除配置入口本身不会卸载该环境。
 
 旧的平铺 targets、process／systemd 执行器被拒绝；没有自动迁移、旧选择别名或第二份可编辑目标表。
-持久化版本为 `coragent-user-task/4`、`job_intent/4`。部署前应先用旧版本处理完在途工作，
+持久化版本为 `coragent-user-task/5`、`job_intent/4`。部署前应先用旧版本处理完在途工作，
 再同步切换配置和运行时；新版本记录原路由不代表转换旧回执。
 
 新增 [execution-platforms skill](../skills/core/execution-platforms/SKILL.zh-CN.md) 负责选择、环境、

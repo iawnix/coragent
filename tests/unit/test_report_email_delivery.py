@@ -57,3 +57,37 @@ def test_report_adapter_owns_event_and_manifest_policy(tmp_path, monkeypatch):
     }), encoding="utf-8")
     with pytest.raises(ValueError, match="package manifest"):
         adapter.prepare_report_email(tmp_path, request)
+
+
+def test_delivery_evidence_recovers_projection_without_changing_delivery(tmp_path, monkeypatch):
+    from research_agent.research import records
+    from research_agent.research.workspace import initialize_workspace, admit_research_workspace
+
+    initialize_workspace(tmp_path, "ws_mail", "research")
+    admit_research_workspace(tmp_path)
+    adapter = load_adapter()
+    receipt_ref = "artifacts/email/deliveries/fixture.json"
+    receipt = tmp_path / receipt_ref
+    receipt.parent.mkdir(parents=True, exist_ok=True)
+    original = json.dumps({"state": "sent", "message_id": "report-1"})
+    receipt.write_text(original)
+    result = {"state": "sent", "receipt_ref": receipt_ref, "external_side_effects": True}
+    request = tmp_path / "request.json"
+    request.write_text(json.dumps({"metadata": {"event": "report_ready"}}))
+    with monkeypatch.context() as patch:
+        def unavailable(*args, **kwargs):
+            raise OSError("fixture projection unavailable")
+        patch.setattr(records, "record_event", unavailable)
+        pending = adapter._journal(tmp_path, "send", result, request)
+    assert pending["state"] == "sent"
+    assert pending["journal_error"] == "fixture projection unavailable"
+    events = list((tmp_path / "operations/events").glob("*.json"))
+    assert len(events) == 1
+    fact = json.loads(events[0].read_text())
+    assert fact["kind"] == "delivery" and fact["references"] == [receipt_ref]
+    assert fact["data"]["event"] == "report_ready"
+    assert adapter._journal(tmp_path, "send", result, request) == result
+    assert adapter._journal(tmp_path, "send", result, request) == result
+    assert len(list((tmp_path / "operations/events").glob("*.json"))) == 1
+    assert len(list((tmp_path / "operations/event-projections").glob("*.json"))) == 1
+    assert receipt.read_text() == original

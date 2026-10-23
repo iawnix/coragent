@@ -33,6 +33,15 @@ test('task action contracts require their own payloads and reject ignored fields
     assert.equal(Value.Check(tools[key].parameters,args),true);
   };
   const base={expected_revision:1};
+  check('task_update',{...base,action:'bind_execution'});
+  check('task_update',{...base,action:'bind_execution',execution_target:{platform:'Com30',scheduler_entry:'qrun'}});
+  for (const [field,value] of [['source_submission_ids',['12']],['objective','Ignored scope'],['reason','Ignored reason'],['execution_plan',{items:[]}]]) {
+    assert.throws(()=>check('task_update',{...base,action:'bind_execution',[field]:value}));
+  }
+  const firstPlan={...base,action:'set_execution_plan',execution_target:{platform:'Com30',scheduler_entry:'qrun'},
+    execution_plan:{items:[{id:'a',work_id:'a',resources:{cpus:1,memory_mb:512}}]}};
+  check('task_update',firstPlan);
+  assert.throws(()=>check('task_update',{...firstPlan,source_submission_ids:['12']}));
   const actions=[
     ['refine',{source_submission_ids:['12'],objective:'Updated objective'}],
     ['correct_execution',{reason:'Original scheduler misread',execution_intent:{source_submission_id:'12',source_text:'Use TRI',scheduler:'tri'}}],

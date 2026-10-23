@@ -24,7 +24,7 @@ CoRAgent 只使用 Pi 原生 Harness 循环。Workspace 是跨会话存在的研
 
 Node 承载持续推进的局部问题。goal 是问题，proposal 是当前假设或思路，plan 是调查方案，progress 是进展说明。假设可为空；调参数、换构型、同目标重试通常留在原 Node。独立问题才另建 Node，不要求模型创建 Attempt 对象。
 
-复杂研究以可独立解释的问题及现有 `part_of`、`requires`、`alternative_to` 关系组织。根节点可选，共享问题可以有多个父节点。UserTask `/3` 只保存 `research.entry_node_ids` 与 `research.focus_node_ids`，通过 `task_update` 的 `set_research` 动作一起替换。这些是导航引用，不是所有权、执行顺序或第二份计划。Node 与 Result schema 保持不变。
+复杂研究以可独立解释的问题及现有 `part_of`、`requires`、`alternative_to` 关系组织。根节点可选，共享问题可以有多个父节点。`coragent-user-task/5` 的研究范围由 `research.entry_node_ids` 与 `research.focus_node_ids` 组成，通过 `task_update` 的 `set_research` 动作一起替换。这些是导航引用，不是所有权、执行顺序或第二份计划。Node 与 Result schema 保持不变。
 
 Node 状态为 open / paused / closed。关闭表示停止主动推进，不表示科学成功，也不取消 Job。内容修订号独立于后台执行观察；并发修改需要重新读取并明确合并，单纯追加笔记不覆盖其他人的判断。
 
@@ -81,6 +81,13 @@ next_run 是实际调度模式：持久化认证执行事件，会话忙或自�
 ## 持久用户任务与 Monitor
 
 请求阶段的任务事实与研究内容共用预算；有界浏览投影仍将省略详情指向 `task_read`。用户任务跨越多个 Pi run 和计算 Job。`task_begin`、`task_read`、`task_update` 保存已授权目标、用户提交来源、交付条件、进展证据和具体等待/阻塞。普通问答不自动建立任务；每个 session 最多一个非终态用户任务。任务控制状态只存在 Pi durable 文档中，Host 不另存任务状态机或控制回执。
+
+Workspace、Research Memory、Task 与上下文管理保留完整研究核心的内聚。普通 Task 的计算目标、
+选择与策略初始均为 null，不解析平台。实际需要计算时，task_update action=bind_execution 与明确
+提供执行字段的 task_begin、首次 set_execution_plan 共用唯一解析器。准备与提交要求已持久化绑定；
+本地 bash 和平台诊断不要求绑定。Task 始终只有一套协议和一份 Pi 管理的生命周期。
+研究读取在应用组合层读取本地 Job 观察并重放已保存事实，不查询外部队列；已有 Job 使用原记录路由，
+不随当前平台配置变化而改道。
 
 Task Controller 位于 SessionWorker 内。普通工具工作继续使用原生 Pi 循环；run 正常结束后，活跃且空闲的任务通过同一输入接纳事务提交 `task_controller` 内部输入。当前实现不安装 `onYield` 延续路径。watch 和 30 秒核对恢复推进责任；等待只查询实际归属 Job，条件未满足时不请求模型。无新证据轮数仅作为模型重新评估方法的提示，不自动阻塞研究。临时模型服务故障可按配置退避，以新的 Pi 输入进行有限恢复；不可重试或额度耗尽时记录执行待处理，研究任务保留 active 或 completing。最终回复恢复保留完成证据，仅允许读取与回复。回复结束不代表研究完成：完成提议必须覆盖全部交付条件的证据，并且最终回复成功交付。
 

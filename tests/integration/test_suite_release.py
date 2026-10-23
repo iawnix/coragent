@@ -101,10 +101,8 @@ def test_core_package_build_is_deterministic_and_installs_app_server_payload(tmp
     assert (package_root / "agent/apps/agent/main.mjs").is_file()
     assert not (package_root / "phone").exists()
     resolver_config = app_paths(install_root).resolver_config
-    assert resolver_config.is_file()
-    assert stat.S_IMODE(resolver_config.stat().st_mode) == 0o600
-    import tomllib
-    assert tomllib.loads(resolver_config.read_text())["default_resolver"] == "auto"
+    assert not resolver_config.exists()
+    assert 'name_resolver' not in app_paths(install_root).configuration.read()
 
 
 def test_package_install_does_not_mutate_existing_research_workspace(tmp_path: Path) -> None:
@@ -139,6 +137,8 @@ def test_preparing_a_release_does_not_publish_runtime_config_or_current(tmp_path
         built = build_package(output_dir=tmp_path/(marker+'-package'),agent_manifest_path=agent,
                               allow_dirty=True,include_web=False)
         manifests.append(Path(built['manifest']))
+    app_paths(root).configuration.update(name_resolver={
+        'default_resolver': 'opsin', 'backends': {'opsin': {'enabled': False}}})
     original = install_package(manifests[0], None, root, allow_dirty=True)
     current = (root/'current').readlink()
     runtime = (app_paths(root).state / 'installation/python/env.json').read_bytes()

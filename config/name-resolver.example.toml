@@ -1,7 +1,7 @@
-# The installer copies this example to a fresh installation as
-# <installation>/etc/name-resolver.toml. Replace it with
-# --name-resolver-config when a different deterministic backend is required;
-# the installed file is owner-readable (mode 0600).
+# Optional one-time input for --name-resolver-config; no resolver is enabled by default.
+# The installer imports it into config.toml's [name_resolver] section and generates
+# generated/name-resolver.toml (0600). Bind CORAGENT_NAME_RESOLVER_CONFIG explicitly
+# in the structure backend environment to a path readable on its selected platform.
 default_resolver = "auto"
 
 [backends.pubchem]
@@ -13,7 +13,7 @@ cache = true
 user_agent = "CoRAgent-chemical-name-resolver/1"
 
 # OPSIN provides deterministic IUPAC parsing when PubChem does not index a
-# name. Auto lookup tries each enabled backend in manifest order.
+# name. Auto lookup tries PubChem, then OPSIN, with an explicit default_resolver first.
 [backends.opsin]
 enabled = true
 endpoint = "https://opsin.ch.cam.ac.uk/opsin"

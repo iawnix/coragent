@@ -6,6 +6,7 @@ import { TODO_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
 import { createCodingTools } from "../../../apps/agent/runtime/coding-tools.mjs";
 import { loadPi } from "../../../apps/agent/runtime/source.mjs";
 import { TEST_ROOT } from "./test-environment.mjs";
+import { codingExecutionContext } from "../../../apps/agent/tasks/execution-plan.mjs";
 
 async function fixture(t, getSelection) {
   const cwd = await mkdtemp(join(TEST_ROOT, "c-"));
@@ -79,4 +80,13 @@ test("bash inherits the current pinned target without shell interpolation or sta
   selection = null;
   const empty = await invoke("bash", { command: 'printf "context=%s" "${CORAGENT_TASK_EXECUTION-unset}"' });
   assert.match(empty.text, /context=unset/);
+});
+
+test("ordinary bash runs locally for a task with no calculation destination", async t => {
+  const task = { state: "active", execution_target: null, execution_selection: null,
+    execution_policy: null, execution_plan: null, active_execution_item: null };
+  const { cwd, invoke } = await fixture(t, async () => codingExecutionContext(task));
+  const response = await invoke("bash", { command: 'pwd\nprintf "%s" "$CORAGENT_TASK_EXECUTION"' });
+  assert.ok(response.text.includes(cwd));
+  assert.ok(response.text.includes(JSON.stringify({ unselected: true, workspace_root: cwd })));
 });

@@ -4,19 +4,25 @@
 
 Prepare `chemical.resolve@1` with `--name ORIGINAL` and optionally `--lookup-name NORMALIZED`.
 The original name stays in the result. Every name uses the same lookup path.
-The default order is PubChem then OPSIN; an explicit installation preference goes first.
+When those backends are explicitly enabled, the automatic order is PubChem then
+OPSIN; an explicit installation preference goes first. Installation enables neither
+service implicitly.
 A backend yielding usable candidates completes lookup. If its results cannot be parsed,
 continue to the next backend. Each enabled backend is attempted once per invocation;
 404, rate limits, timeout and malformed responses retain their diagnostics.
 Use a purposeful translated/normalized query if helpful, then infer candidates when
 further lookup is unlikely to add information.
 
-Configuration comes from CORAGENT_NAME_RESOLVER_CONFIG or
-CORAGENT_INSTALL_ROOT/etc/name-resolver.toml. Managed Jobs receive explicit
-bindings: the installer sets the local structure backend's resolver path in job.toml.
-Explicit settings are preserved; remote targets require a path readable on that target.
-Prepare a new request after changing a binding. Missing configuration returns
+Configuration comes only from `CORAGENT_NAME_RESOLVER_CONFIG`. Configure
+`[name_resolver]` in the operator's `config.toml`, or explicitly import a resolver
+file with `--name-resolver-config`; the installation produces a private
+`generated/name-resolver.toml`. Bind its path explicitly in the structure backend's
+environment. Remote platforms require a file readable there. The installer preserves
+explicit bindings and does not infer a resolver path. Prepare a new request after
+changing a binding. Missing configuration returns
 `next_step=infer_candidates`, allowing the Agent to continue from the description.
+Supplied SMILES/XYZ and candidate structure validation do not require online name
+services; they still use the selected scientific execution environment.
 
 ## Candidate input
 

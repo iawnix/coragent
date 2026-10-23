@@ -146,16 +146,24 @@ def plan(args, package=ROOT):
     layout = app_paths(root)
     read_input(layout.config_file, inputs)
     document = layout.configuration.read(required=False)
-    installed_job = (toml_bytes({'execution': layout.configuration.resolve_credentials(document['execution'])})
-                     if 'execution' in document else None)
-    raw = read_input(args.job_config, inputs, required=True) if args.job_config else installed_job
-    settings = tomllib.loads(raw.decode()) if raw is not None else {'execution': {
-        'schema_version': 2, 'default_platform': 'local', 'platforms': {'local': {
-            'transport': 'local', 'default_scheduler': 'qrun',
-            'storage': {'work_root': str(layout.state / 'jobs')},
-            'schedulers': {'qrun': {'executor': 'qrun',
-                'submission': {'resources': {'cpus': 1, 'memory_mb': 1024}}}}}}}}
-    settings = contract().validate_job_config(settings)
+    raw = (read_input(args.job_config, inputs, required=True) if args.job_config else
+           toml_bytes({'execution': layout.configuration.resolve_credentials(document['execution'])})
+           if 'execution' in document else None)
+    resolver = (read_input(args.name_resolver_config, inputs, required=True) if args.name_resolver_config
+                else toml_bytes(document['name_resolver']) if 'name_resolver' in document else None)
+    if resolver is not None:
+        from research_agent.bootstrap.name_resolver_config import parse_config
+        parse_config(tomllib.loads(resolver.decode()), package_root=package)
+    if raw is None:
+        if any(getattr(args, option, None) for option in (
+                'job_profile', 'manage_qrun', 'job_conda', 'verify_job_target', 'job_software_root',
+                'qrun_state_dir', 'qrun_cpus', 'qrun_memory_mb', 'qrun_runtime')):
+            raise ValueError('execution configuration required: the requested target is not configured')
+        return {'schema_version': 'coragent-job-install/1', 'settings': None, 'qrun': [],
+                'environments': [], 'targets': [], 'inputs': inputs, 'resolver': resolver.decode() if resolver else None,
+                'resolver_bindings': [], 'remote_resolvers': {}, 'configuration_source': 'not_configured',
+                'profiles': {}, 'install_root': str(root)}
+    settings = contract().validate_job_config(tomllib.loads(raw.decode()))
     settings = copy.deepcopy(settings)
     previous_raw = read_input(app_paths(root).state / RECORD, inputs)
     previous = json.loads(previous_raw) if previous_raw else {'environments': []}
@@ -235,14 +243,10 @@ def plan(args, package=ROOT):
     if selected_targets - settings['targets'].keys():
         raise ValueError('verification target is not configured')
     resolver_path = app_paths(root).resolver_config
-    existing_resolver = toml_bytes(document['name_resolver']) if 'name_resolver' in document else None
-    resolver = (read_input(args.name_resolver_config, inputs, required=True) if args.name_resolver_config else existing_resolver)
-    if resolver is None:
-        resolver = (package / 'config/name-resolver.example.toml').read_bytes()
     resolver_bindings, remote_resolvers = [], {}
     for name, target in settings['targets'].items():
         structure = target.get('backends', {}).get('structure')
-        if structure is None:
+        if structure is None or resolver is None:
             continue
         variables = structure.setdefault('environment', {})
         if {'CORAGENT_NAME_RESOLVER_CONFIG', 'CORAGENT_INSTALL_ROOT'} & variables.keys():
@@ -265,9 +269,14 @@ def plan(args, package=ROOT):
     pools = _qrun_install.plan(args, settings)
     return {'schema_version': 'coragent-job-install/1', 'settings': settings, 'qrun': pools,
             'environments': rows, 'targets': sorted(selected_targets), 'inputs': inputs,
-            'resolver': resolver.decode(), 'resolver_bindings': resolver_bindings, 'remote_resolvers': remote_resolvers,
+            'resolver': resolver.decode() if resolver is not None else None, 'resolver_bindings': resolver_bindings, 'remote_resolvers': remote_resolvers,
             'configuration_source': 'supplied' if args.job_config else 'preserved' if raw else 'generated',
-            'profiles': available, 'install_root': str(root)}
+            'profiles': available, 'install_root': str(root),
+            'previous_execution_sha256': execution_digest(document['execution']) if 'execution' in document else None}
+
+
+def execution_digest(execution):
+    return digest(json.dumps(execution, sort_keys=True, separators=(',', ':')).encode())
 
 
 def preview(value):
@@ -329,6 +338,9 @@ def invoke_target(target, request, package, *, timeout=3600, log_path=None):
 
 
 def prepare(value, args, package, python):
+    if value['settings'] is None:
+        value['readiness'] = {'status': 'not_configured', 'targets': {}}
+        return value
     root = Path(value['install_root'])
     stage_root = app_paths(root).cache / 'job-install'
     stage_root.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -364,7 +376,8 @@ def prepare(value, args, package, python):
             raise RuntimeError(str(error) + '; target preparation log: ' + str(log_path)) from error
     candidate = copy.deepcopy(value['settings'])
     resolver = stage / 'name-resolver.toml'
-    write_private(resolver, value['resolver'].encode())
+    if value['resolver'] is not None:
+        write_private(resolver, value['resolver'].encode())
     # Candidate Jobs read the candidate resolver; publication uses the final
     # installation path and is checked again before any service activation.
     for name in value['resolver_bindings']:
@@ -391,23 +404,35 @@ def prepare(value, args, package, python):
 def publish(value):
     assert_inputs_unchanged(value)
     root = Path(value['install_root'])
-    write_private(app_paths(root).resolver_config, value['resolver'].encode())
-    write_private(app_paths(root).job_config, toml_bytes(contract().configuration_document(value['settings'])))
+    layout = app_paths(root)
+    from coragent_packaging.installer._configuration import commit_sections
+    sections = {}
+    if value['resolver'] is not None:
+        sections['name_resolver'] = tomllib.loads(value['resolver'])
+    if value['settings'] is not None:
+        sections['execution'] = contract().configuration_document(value['settings'])['execution']
+    commit_sections(root, **sections).materialize()
+    if value['settings'] is None:
+        return {'job': {'status': 'not_configured', 'path': str(layout.job_config)},
+                'name_resolver': {'status': 'configured' if value['resolver'] else 'not_configured',
+                                  'path': str(layout.resolver_config)}}
     record = {key: value[key] for key in ('schema_version', 'environments', 'readiness', 'configuration_source')}
-    write_private(app_paths(root).state / RECORD, (json.dumps(record, indent=2) + '\n').encode())
-    current_digest = digest(toml_bytes(contract().configuration_document(value['settings'])))
-    previous_digest = value['inputs'].get(str(app_paths(root).job_config))
-    return {'job': {'status': 'configured', 'path': str(app_paths(root).job_config), 'readiness': value['readiness'],
+    write_private(layout.state / RECORD, (json.dumps(record, indent=2) + '\n').encode())
+    current_digest = execution_digest(layout.configuration.read()['execution'])
+    previous_digest = value['previous_execution_sha256']
+    return {'job': {'status': 'configured', 'path': str(layout.job_config), 'readiness': value['readiness'],
                     'sha256': current_digest, 'previous_sha256': previous_digest,
                     'configuration_changed': previous_digest is not None and previous_digest != current_digest},
-            'name_resolver': {'status': 'configured', 'path': str(app_paths(root).resolver_config)}}
+            'name_resolver': {'status': 'configured' if value['resolver'] else 'not_configured', 'path': str(layout.resolver_config)}}
 
 
 def verify_publication(value, python):
+    if value['settings'] is None:
+        return
     root = Path(value['install_root'])
-    if (app_paths(root).job_config).read_bytes() != toml_bytes(contract().configuration_document(value['settings'])):
+    if tomllib.loads(app_paths(root).job_config.read_text()) != contract().configuration_document(value['settings']):
         raise RuntimeError('published Job configuration changed')
-    if (app_paths(root).resolver_config).read_text() != value['resolver']:
+    if value['resolver'] is not None and tomllib.loads(app_paths(root).resolver_config.read_text()) != tomllib.loads(value['resolver']):
         raise RuntimeError('published resolver configuration changed')
     stage, package = Path(value['stage']), Path(value['package_root'])
     targets = [name for name in value['targets'] if value['settings']['targets'][name]['kind'] == 'local']

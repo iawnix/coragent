@@ -203,7 +203,7 @@ export interface ToolParameters {
   task_read: Record<string, never>;
   task_update: {
     "expected_revision": number;
-    "action": "refine" | "progress" | "wait" | "block" | "propose_completion" | "set_research" | "apply_user_control" | "correct_execution" | "set_execution_plan" | "select_execution_item" | "complete_execution_item";
+    "action": "refine" | "progress" | "bind_execution" | "wait" | "block" | "propose_completion" | "set_research" | "apply_user_control" | "correct_execution" | "set_execution_plan" | "select_execution_item" | "complete_execution_item";
     "reason"?: string;
     "block_kind"?: "missing_user_input" | "resource_unavailable" | "execution_failure" | "budget_exhausted" | "scientific_dead_end";
     "resume_when"?: string;

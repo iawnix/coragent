@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from research_agent.bootstrap.layout import paths as app_paths
 
-import errno
+import json
 import os
 import re
 import secrets
@@ -37,7 +37,7 @@ def provision_service_credentials(
             raise ValueError("CoRAgent Web token path must be an absolute path inside the local state directory")
         if token.is_symlink():
             raise ValueError(f"CoRAgent Web token path cannot be a symbolic link: {token}")
-        if app_paths(root).state not in token.resolve().parents:
+        if not any(parent in token.resolve().parents for parent in (app_paths(root).state, app_paths(root).generated)):
             raise ValueError("CoRAgent Web token path must be an absolute path inside the local state directory")
         specifications.append(("web_http", token.resolve()))
     if not specifications:
@@ -55,35 +55,23 @@ def provision_service_credentials(
         directory.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         _ensure_private_directory(directory)
 
-    existing: dict[str, str] = {}
+    layout = app_paths(root)
+    credentials = layout.configuration.credentials()
+    canonical_token = credentials.get('secrets', {}).get('web_token')
+    if web_token_value is not None:
+        value, status = web_token_value, 'configured'
+    elif canonical_token is not None:
+        _validate_token_value(canonical_token)
+        value, status = canonical_token, 'preserved'
+    else:
+        value, status = secrets.token_urlsafe(TOKEN_BYTES), 'created'
+    credentials.setdefault('secrets', {})['web_token'] = value
+    from research_agent.configuration.configuration import atomic_write
+    atomic_write(layout.credentials, json.dumps(credentials, indent=2) + '\n')
+    result = {}
     for name, path in specifications:
-        if name == "web_http" and web_token_value is not None:
-            continue
-        value = _read_existing_secret(path)
-        if value is not None:
-            existing[name] = value
-    if len(set(existing.values())) != len(existing):
-        raise ValueError("installed service credentials must use distinct values")
-
-    used = set(existing.values())
-    result: dict[str, dict[str, str]] = {}
-    for name, path in specifications:
-        if name in existing:
-            result[name] = {"path": str(path), "status": "preserved", "mode": "0600"}
-            continue
-        value = web_token_value if name == "web_http" and web_token_value is not None else _new_token(used)
-        if web_token_value is not None and name == "web_http":
-            _write_secret(path, value)
-            status = "configured"
-        else:
-            _create_secret(path, value)
-            status = "created"
-        used.add(value)
-        result[name] = {"path": str(path), "status": status, "mode": "0600"}
-
-    final_values = [_read_required_secret(path) for _, path in specifications]
-    if len(set(final_values)) != len(final_values):
-        raise ValueError("installed service credentials must use distinct values")
+        _write_secret(path, value)
+        result[name] = {'path': str(path), 'status': status, 'mode': '0600'}
     return result
 
 
@@ -108,45 +96,6 @@ def _ensure_private_directory(path: Path) -> None:
         raise ValueError(f"credential directory must have mode 0700: {path}")
 
 
-def _read_existing_secret(path: Path) -> str | None:
-    try:
-        return _read_required_secret(path)
-    except FileNotFoundError:
-        return None
-
-
-def _read_required_secret(path: Path) -> str:
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
-    try:
-        descriptor = os.open(path, flags)
-    except OSError as error:
-        if error.errno == errno.ELOOP:
-            raise ValueError(f"credential file cannot be a symbolic link: {path}") from error
-        raise
-    try:
-        info = os.fstat(descriptor)
-        _validate_secret_file(path, info)
-        chunks: list[bytes] = []
-        size = 0
-        while True:
-            chunk = os.read(descriptor, 256)
-            if not chunk:
-                break
-            size += len(chunk)
-            if size > 256:
-                raise ValueError(f"credential file is too large: {path}")
-            chunks.append(chunk)
-    finally:
-        os.close(descriptor)
-    try:
-        value = b"".join(chunks).decode("ascii").strip()
-    except UnicodeDecodeError as error:
-        raise ValueError(f"credential file is not a valid token: {path}") from error
-    if TOKEN_PATTERN.fullmatch(value) is None:
-        raise ValueError(f"credential file is not a valid token: {path}")
-    return value
-
-
 def _validate_secret_file(path: Path, info: os.stat_result) -> None:
     if not stat.S_ISREG(info.st_mode):
         raise ValueError(f"credential must be a regular file: {path}")
@@ -156,13 +105,6 @@ def _validate_secret_file(path: Path, info: os.stat_result) -> None:
         raise ValueError(f"credential must not have hard links: {path}")
     if stat.S_IMODE(info.st_mode) != 0o600:
         raise ValueError(f"credential must have mode 0600: {path}")
-
-
-def _new_token(used: set[str]) -> str:
-    while True:
-        value = secrets.token_urlsafe(TOKEN_BYTES)
-        if value not in used:
-            return value
 
 
 def _validate_token_value(value: str) -> None:
@@ -188,39 +130,3 @@ def _write_secret(path: Path, value: str) -> None:
         if descriptor != -1:
             os.close(descriptor)
         temporary.unlink(missing_ok=True)
-
-
-def _create_secret(path: Path, value: str) -> None:
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
-    descriptor = os.open(path, flags, 0o600)
-    try:
-        os.fchmod(descriptor, 0o600)
-        payload = f"{value}\n".encode("ascii")
-        offset = 0
-        while offset < len(payload):
-            written = os.write(descriptor, payload[offset:])
-            if written == 0:
-                raise OSError("credential write made no progress")
-            offset += written
-        os.fsync(descriptor)
-        _validate_secret_file(path, os.fstat(descriptor))
-    except BaseException:
-        created = os.fstat(descriptor)
-        try:
-            current = os.lstat(path)
-        except FileNotFoundError:
-            pass
-        else:
-            if (current.st_dev, current.st_ino) == (created.st_dev, created.st_ino):
-                path.unlink()
-        raise
-    finally:
-        os.close(descriptor)
-    directory = os.open(
-        path.parent,
-        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0),
-    )
-    try:
-        os.fsync(directory)
-    finally:
-        os.close(directory)

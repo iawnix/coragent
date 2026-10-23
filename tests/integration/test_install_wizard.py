@@ -9,6 +9,7 @@ import io
 import stat
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -267,9 +268,7 @@ def test_review_does_not_reload_email_defaults_after_disable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root = tmp_path / "install"
-    config = app_paths(root).email_config
-    config.parent.mkdir(parents=True)
-    config.write_text("[notifications.email]\nenabled = true\n", encoding="utf-8")
+    app_paths(root).configuration.update(notifications={"email": {"enabled": True}})
     args = wizard.parse_args(["--install-root", str(root)])
     choices = iter(("6", "7", "7"))
     answers = iter((False, True, False, True))
@@ -323,8 +322,7 @@ def test_interactive_menu_can_disable_existing_email_configuration(
 ) -> None:
     root = tmp_path / "install"
     config = app_paths(root).email_config
-    config.parent.mkdir(parents=True)
-    config.write_text("[notifications.email]\nenabled = true\n", encoding="utf-8")
+    app_paths(root).configuration.update(notifications={"email": {"enabled": True}})
     args = wizard.parse_args(["--install-root", str(root)])
     args.email_binding = "smtp"
     args.email_recipient = "receiver@example.org"
@@ -340,7 +338,54 @@ def test_interactive_menu_can_disable_existing_email_configuration(
     assert args.email_binding is None
     assert args.email_recipient is None
     assert wizard.configure_notification_config(args)["status"] == "disabled"
-    assert not config.exists()
+    assert app_paths(root).configuration.read()["notifications"]["email"] == {"enabled": False}
+    assert tomllib.loads(config.read_text())["notifications"]["email"] == {"enabled": False}
+
+
+@pytest.mark.parametrize("fault", ["provider", "missing_credential"])
+@pytest.mark.parametrize("repair", ["disable", "reconfigure"])
+def test_interactive_email_repair_works_without_a_valid_projection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys, fault: str, repair: str,
+) -> None:
+    root = tmp_path / "install"
+    layout = app_paths(root)
+    email = {"provider": "smtp", "preset": "qq", "username": "sender@qq.com",
+             "recipient": "receiver@example.invalid", "password": "credential:missing"}
+    if fault == "provider":
+        email["provider"] = "invalid"
+    layout.configuration.update(notifications={"email": email})
+    args = wizard.parse_args(["--install-root", str(root), "--without-web", "--service-scope", "none"])
+
+    wizard._load_existing_menu_defaults(args)
+    monkeypatch.setattr(wizard, "ask", lambda _prompt, default="": "8")
+    wizard._menu_choice(args)
+    assert "invalid; reconfigure or disable" in capsys.readouterr().out
+    assert not layout.email_config.exists()
+    with pytest.raises(ValueError):
+        wizard.validate_configured_services(args)
+
+    if repair == "disable":
+        answers = iter((False, True))
+        monkeypatch.setattr(wizard, "ask_yes_no", lambda _prompt, _default=False: next(answers))
+    else:
+        values = {"Notification recipient": "new@example.invalid",
+                  "SMTP sender email address": "sender@qq.com",
+                  "Password environment variable": "EXTERNAL_SMTP_PASSWORD"}
+        monkeypatch.setattr(wizard, "ask", lambda prompt, default="": values.get(prompt, default))
+        monkeypatch.setattr(wizard, "ask_yes_no", lambda _prompt, _default=False: True)
+    wizard.configure_email_interactively(args, force=True)
+    wizard.validate_email_options(args)
+    wizard.validate_configured_services(args)
+    wizard.configure_notification_config(args)
+    layout.materialize(strict=True)
+
+    saved = layout.configuration.read()["notifications"]["email"]
+    assert not getattr(args, "_email_configuration_error", False)
+    if repair == "disable":
+        assert saved == {"enabled": False}
+    else:
+        assert saved["recipient"] == "new@example.invalid"
+        assert saved["password_env"] == "EXTERNAL_SMTP_PASSWORD"
 
 
 def test_interactive_job_platform_accepts_one_file_path(
@@ -483,12 +528,15 @@ def test_pi_agent_configuration_is_imported_once_and_kept_private(
     destination = app_paths(Path(args.install_root)).pi_config
     assert imported["status"] == "imported"
     assert imported["files"] == {"models.json": "imported", "auth.json": "imported"}
-    assert destination.joinpath("models.json").read_bytes() == source.joinpath("models.json").read_bytes()
-    assert destination.joinpath("auth.json").read_bytes() == source.joinpath("auth.json").read_bytes()
+    layout = app_paths(Path(args.install_root))
+    assert layout.configuration.read()["models"] == json.loads(source.joinpath("models.json").read_text())
+    assert layout.configuration.credentials()["models"] == json.loads(source.joinpath("auth.json").read_text())
+    assert not destination.joinpath("auth.json").exists()
     assert stat.S_IMODE(destination.joinpath("models.json").stat().st_mode) == 0o600
-    assert stat.S_IMODE(destination.joinpath("auth.json").stat().st_mode) == 0o600
+    assert stat.S_IMODE(layout.credentials.stat().st_mode) == 0o600
 
-    destination.joinpath("models.json").write_text('{"providers":{"installation":{}}}\n', encoding="utf-8")
+    layout.configuration.update(models={"providers": {"installation": {}}})
+    destination.joinpath("models.json").write_text('{"providers":{"stale_projection":{}}}\n', encoding="utf-8")
     source.joinpath("models.json").write_text('{"providers":{"changed":{}}}\n', encoding="utf-8")
     preserved = wizard.provision_pi_agent_configuration(args)
 
@@ -619,13 +667,92 @@ def test_non_interactive_smtp_options_write_only_a_secure_credential_reference(t
     assert result["binding"] == "smtp"
     assert stat.S_IMODE(config.stat().st_mode) == 0o600
     assert stat.S_IMODE(password_file.stat().st_mode) == 0o600
+    layout = app_paths(root)
     content = config.read_text(encoding="utf-8")
-    assert 'provider = "smtp"' in content
-    assert "binding =" not in content
-    assert 'preset = "qq"' in content
-    assert f'password_file = "{password_file}"' in content
-    assert "from_address" not in content
+    projected = tomllib.loads(content)["notifications"]["email"]
+    assert projected["provider"] == "smtp" and "binding" not in projected
+    assert projected["preset"] == "qq"
+    assert projected["password_file"] == str(layout.generated / "secrets/smtp-password")
+    assert projected["from_address"] == "sender@qq.com"
     assert "qq-authorization-code" not in content
+    saved = layout.configuration.read()["notifications"]["email"]
+    assert saved["password"] == "credential:notifications.email.password"
+    assert "password_file" not in saved
+    assert layout.configuration.credentials()["secrets"]["notifications.email.password"] == "qq-authorization-code"
+    assert "qq-authorization-code" not in layout.config_file.read_text()
+    # Derived files can be replaced without becoming a second input source.
+    config.write_text("stale projection")
+    layout.materialize(strict=True)
+    assert tomllib.loads(config.read_text())["notifications"]["email"] == projected
+
+
+@pytest.mark.parametrize("repair", ["smtp", "disable", "unrepaired"])
+def test_invalid_email_can_be_repaired_after_intermediate_install_publications(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, repair: str,
+) -> None:
+    from coragent_packaging.installer import _job_install
+    from coragent_packaging.installer._configuration import publish
+
+    root = tmp_path / "install"
+    layout = app_paths(root)
+    invalid_email = {"enabled": "invalid"}
+    layout.configuration.update(notifications={"email": invalid_email})
+    home = tmp_path / "service-home"
+    source = home / ".pi/agent"
+    source.mkdir(parents=True)
+    models = {"providers": {"fixture": {}}}
+    (source / "models.json").write_text(json.dumps(models), encoding="utf-8")
+    account = SimpleNamespace(pw_name="service-user", pw_dir=str(home))
+    monkeypatch.setattr(wizard.pwd, "getpwuid", lambda _uid: account)
+    monkeypatch.setattr(wizard.pwd, "getpwnam", lambda _name: account)
+    monkeypatch.delenv("CORAGENT_TEST_SMTP_PASSWORD", raising=False)
+    options = [
+        "--install-root", str(root), "--agent-config-dir", str(source),
+        "--without-web", "--service-scope", "none", "--non-interactive",
+    ]
+    if repair == "smtp":
+        options += [
+            "--email-binding", "smtp", "--email-preset", "qq",
+            "--email-address", "sender@qq.com",
+            "--email-recipient", "receiver@example.invalid",
+            "--email-password-env", "CORAGENT_TEST_SMTP_PASSWORD",
+        ]
+    args = wizard.parse_args(options)
+    if repair == "disable":
+        args._clear_email = True
+    if repair != "unrepaired":
+        wizard.validate_options(args)
+
+    # These real installation steps run before the replacement email candidate
+    # is committed. An unrelated old email error must not prevent reaching it.
+    plan = _job_install.plan(args)
+    backends = _job_install.publish(plan)
+    imported = wizard.provision_pi_agent_configuration(args)
+    assert backends["job"]["status"] == "not_configured"
+    assert imported["status"] == "imported"
+    assert json.loads((layout.pi_config / "models.json").read_text()) == models
+    assert layout.configuration.read()["notifications"]["email"] == invalid_email
+    status_path = layout.generated / "configuration-status.json"
+    assert json.loads(status_path.read_text())["email"]["state"] == "invalid"
+    assert not layout.email_config.exists()
+
+    wizard.configure_notification_config(args)
+    if repair == "unrepaired":
+        with pytest.raises(ValueError, match="email configuration is invalid"):
+            publish(args)
+        return
+
+    publish(args)
+    email = tomllib.loads(layout.email_config.read_text())["notifications"]["email"]
+    if repair == "disable":
+        assert email == {"enabled": False}
+    else:
+        assert email["provider"] == "smtp"
+        assert email["recipient"] == "receiver@example.invalid"
+        assert email["password_env"] == "CORAGENT_TEST_SMTP_PASSWORD"
+    assert json.loads(status_path.read_text())["email"]["state"] == (
+        "disabled" if repair == "disable" else "configured"
+    )
 
 
 def test_interactive_smtp_password_is_written_to_the_default_private_file(tmp_path: Path) -> None:
@@ -932,7 +1059,7 @@ def test_component_summary_exposes_app_server_and_phone_connection(tmp_path: Pat
         {"web_http": {"path": "/token", "status": "created", "mode": "0600"}},
     )
     assert components["app_server"]["runtime"] == str(runtime)
-    assert components["app_server"]["server_id"].endswith("/state/coragent/host/server-id")
+    assert components["app_server"]["server_id"] == str(app_paths(Path(args.install_root)).host_state / "server-id")
     assert components["app_server"]["start"] == "systemctl --user start coragent.service"
     assert components["phone"]["tool_access"] == "same_as_terminal"
     assert components["phone"]["protocol"] == "coragent-link.v1"
@@ -1075,9 +1202,34 @@ def test_custom_smtp_provider_writes_explicit_host(tmp_path: Path) -> None:
 
     wizard.configure_notification_config(args)
 
-    content = (app_paths(Path(args.install_root)).email_config).read_text(encoding="utf-8")
-    assert 'preset = "custom"' in content
-    assert 'host = "mail.example.test"' in content
+    content = tomllib.loads(app_paths(Path(args.install_root)).email_config.read_text())["notifications"]["email"]
+    assert content["preset"] == "custom"
+    assert content["host"] == "mail.example.test"
+    assert content["port"] == 587 and content["security"] == "starttls"
+
+
+@pytest.mark.parametrize("option,value,field", [
+    ("email_security", "plaintext", "security"),
+    ("email_recipient", "invalid", "recipient"),
+    ("email_port", True, "port"),
+])
+def test_smtp_install_validation_uses_the_runtime_configuration_contract(tmp_path, option, value, field):
+    from research_agent.integrations.email_config import parse_email_config
+
+    args = wizard.parse_args([
+        "--install-root", str(tmp_path / "install"), "--without-web", "--service-scope", "none",
+        "--email-binding", "smtp", "--email-preset", "qq", "--email-address", "sender@qq.com",
+        "--email-recipient", "recipient@example.invalid", "--email-password-env", "TEST_SMTP_PASSWORD",
+    ])
+    setattr(args, option, value)
+    raw = {"provider": "smtp", "preset": "qq", "username": "sender@qq.com",
+           "recipient": "recipient@example.invalid", "password_env": "TEST_SMTP_PASSWORD", field: value}
+    with pytest.raises(ValueError) as runtime:
+        parse_email_config(raw)
+    with pytest.raises(ValueError) as installation:
+        wizard.validate_email_options(args)
+    assert str(installation.value) == str(runtime.value)
+    assert not (tmp_path / "install").exists()
 
 
 def test_install_log_is_date_named_and_appends_same_day_runs(tmp_path: Path) -> None:
@@ -1142,7 +1294,7 @@ def test_job_toml_is_validated_and_written_private(tmp_path: Path) -> None:
 
     destination = app_paths(root).job_config
     assert configs["job"]["status"] == "configured"
-    assert destination.read_text(encoding="utf-8") == source.read_text(encoding="utf-8")
+    assert tomllib.loads(destination.read_text()) == tomllib.loads(source.read_text())
     assert stat.S_IMODE(destination.stat().st_mode) == 0o600
 
 
@@ -1204,7 +1356,10 @@ def test_configured_email_uses_explicit_file_and_private_password_copy(tmp_path)
     password = app_paths(root).generated / 'secrets/smtp-password'
     assert not root.exists()
     wizard.configure_notification_config(options)
-    assert options.email_password_file == str(password)
+    assert options.email_password_file == str(config / "smtp-password")
+    saved = app_paths(root).configuration.read()["notifications"]["email"]
+    assert saved["password"] == "credential:notifications.email.password"
+    assert "password_file" not in saved
     assert password.read_text() == "synthetic-smtp-authorization-code\n"
     assert stat.S_IMODE(password.stat().st_mode) == 0o600
     installed = (app_paths(root).email_config).read_text()
@@ -1236,6 +1391,86 @@ def test_configured_email_can_reference_service_environment(tmp_path):
     assert options.email_password_env == "EXAMPLE_SMTP_PASSWORD"
     assert options.email_password_file is None
     assert not root.exists()
+
+
+def test_smtp_environment_secret_remains_external_and_unit_uses_canonical_setting(tmp_path, monkeypatch):
+    root = tmp_path / "install"
+    monkeypatch.setenv("EXTERNAL_SMTP_PASSWORD", "synthetic-secret-not-for-storage")
+    args = wizard.parse_args([
+        "--install-root", str(root), "--without-web", "--service-scope", "none",
+        "--email-binding", "smtp", "--email-preset", "qq",
+        "--email-address", "sender@qq.com", "--email-recipient", "receiver@example.invalid",
+        "--email-password-env", "EXTERNAL_SMTP_PASSWORD",
+    ])
+    wizard.validate_email_options(args)
+    result = wizard.configure_notification_config(args)
+    layout = app_paths(root)
+    assert result["credential"] == "EXTERNAL_SMTP_PASSWORD"
+    assert "notifications.email.password" not in layout.configuration.credentials()["secrets"]
+    assert not (layout.generated / "secrets/service.env").exists()
+    assert not (layout.generated / "secrets/smtp-password").exists()
+    for path in (layout.config_file, layout.credentials, layout.email_config):
+        assert "synthetic-secret-not-for-storage" not in path.read_text()
+
+    # Service configuration reads the operator setting even if a disposable
+    # projection has been removed or edited.
+    layout.email_config.write_text('[notifications.email]\nenabled=false\n')
+    unit = wizard.app_server_unit(args)
+    assert "PassEnvironment=EXTERNAL_SMTP_PASSWORD\n" in unit
+    assert "EnvironmentFile=" not in unit
+    assert "synthetic-secret-not-for-storage" not in unit
+    monkeypatch.delenv("EXTERNAL_SMTP_PASSWORD")
+    layout.materialize(strict=True)
+    assert not (layout.generated / "secrets/service.env").exists()
+
+
+def test_smtp_service_environment_name_uses_shared_validation(tmp_path):
+    root = tmp_path / "install"
+    layout = app_paths(root)
+    layout.configuration.update(notifications={"email": {
+        "provider": "smtp", "preset": "qq", "username": "sender@qq.com",
+        "recipient": "receiver@example.invalid", "password_env": "SECRET\nOTHER=value",
+    }})
+    args = wizard.parse_args(["--install-root", str(root)])
+    with pytest.raises(ValueError, match="password_env"):
+        wizard._notification_environment_directive(args)
+
+
+@pytest.mark.parametrize("previous", ["configured", "invalid"])
+@pytest.mark.parametrize("cli_override", [False, True])
+def test_disabled_email_import_replaces_existing_settings_unless_cli_overrides(
+    tmp_path, previous, cli_override,
+):
+    from coragent_packaging.installer import _install_inputs
+    from coragent_packaging.installer._configuration import publish
+
+    config, root, args = _configured_email_fixture(tmp_path)
+    old = {"provider": "smtp", "preset": "qq", "username": "sender@qq.com",
+           "recipient": "old@example.invalid", "password_env": "OLD_SMTP_PASSWORD"}
+    if previous == "invalid":
+        old["provider"] = "invalid"
+    app_paths(root).configuration.update(notifications={"email": old})
+    (config / "email.toml").write_text('[notifications.email]\nenabled=false\n')
+    if cli_override:
+        args = wizard.parse_args([
+            "--import-config", str(config), "--install-root", str(root),
+            "--without-web", "--service-scope", "none", "--non-interactive",
+            "--email-binding", "smtp", "--email-preset", "qq",
+            "--email-address", "sender@qq.com", "--email-recipient", "new@example.invalid",
+            "--email-password-env", "NEW_SMTP_PASSWORD",
+        ])
+    _install_inputs.apply_config_directory(args)
+    wizard.validate_options(args)
+    wizard.configure_notification_config(args)
+    publish(args)
+
+    email = app_paths(root).configuration.read()["notifications"]["email"]
+    if cli_override:
+        assert email["recipient"] == "new@example.invalid"
+        assert email["password_env"] == "NEW_SMTP_PASSWORD"
+        assert not getattr(args, "_clear_email", False)
+    else:
+        assert email == {"enabled": False}
 
 
 @pytest.mark.parametrize("email", [
@@ -1298,40 +1533,54 @@ def test_name_resolver_toml_is_validated_and_written_private(tmp_path: Path) -> 
     assert configs["name_resolver"]["status"] == "configured"
     assert configs["name_resolver"]["enabled_backends"] == "pubchem"
     assert configs["name_resolver"]["automatic_lookup"] == "ready"
-    assert destination.read_text(encoding="utf-8") == source.read_text(encoding="utf-8")
+    assert tomllib.loads(destination.read_text()) == tomllib.loads(source.read_text())
     assert stat.S_IMODE(destination.stat().st_mode) == 0o600
 
 
-def test_name_resolver_config_uses_bundled_pubchem_default(tmp_path: Path) -> None:
-    args = wizard.parse_args([
-        "--install-root", str(tmp_path / "install"), "--without-web", "--service-scope", "none", "--non-interactive",
-    ])
-    wizard.validate_options(args)
-    configs = wizard.configure_backend_configs(args)
-
-    assert configs["name_resolver"]["status"] == "configured"
-    assert configs["name_resolver"]["enabled_backends"] == "opsin,pubchem"
-    assert configs["name_resolver"]["automatic_lookup"] == "ready"
-    assert configs["name_resolver"]["path"].endswith("/generated/name-resolver.toml")
-    assert stat.S_IMODE(app_paths(tmp_path / "install").resolver_config.stat().st_mode) == 0o600
-
-
-def test_invalid_preserved_name_resolver_config_fails_install_configuration(tmp_path: Path) -> None:
+def test_unconfigured_services_do_not_gain_a_default_queue_or_resolver(tmp_path: Path) -> None:
     root = tmp_path / "install"
-    destination = app_paths(root).resolver_config
-    destination.parent.mkdir(parents=True)
-    destination.write_text("default_resolver = \"invalid\"\n", encoding="utf-8")
     args = wizard.parse_args([
         "--install-root", str(root), "--without-web", "--service-scope", "none", "--non-interactive",
     ])
     wizard.validate_options(args)
+    configs = wizard.configure_backend_configs(args)
 
-    with pytest.raises(ValueError, match="invalid existing name-resolver configuration"):
-        wizard.configure_backend_configs(args)
+    assert configs["name_resolver"]["status"] == "not_configured"
+    assert configs["name_resolver"]["enabled_backends"] == ""
+    assert configs["name_resolver"]["automatic_lookup"] == "unavailable"
+    assert configs["job"]["status"] == "not_configured"
+    layout = app_paths(root)
+    assert not layout.resolver_config.exists()
+    assert not layout.job_config.exists()
+    assert "name_resolver" not in layout.configuration.read()
+    assert "execution" not in layout.configuration.read()
+
+
+def test_invalid_configured_name_resolver_fails_before_projection(tmp_path: Path) -> None:
+    root = tmp_path / "install"
+    layout = app_paths(root)
+    layout.configuration.update(name_resolver={"default_resolver": "invalid"})
+    with pytest.raises(ValueError, match="default_resolver"):
+        wizard.configure_backend_configs(SimpleNamespace(install_root=str(root)))
+    assert not layout.resolver_config.exists()
+
+
+def test_generated_backend_files_are_never_implicit_configuration_inputs(tmp_path):
+    root = tmp_path / "install"
+    layout = app_paths(root)
+    layout.generated.mkdir(parents=True)
+    layout.resolver_config.write_text('default_resolver = "invalid"\n')
+    layout.job_config.write_text('not valid TOML')
+    configs = wizard.configure_backend_configs(SimpleNamespace(install_root=str(root)))
+    assert configs['name_resolver']['status'] == 'not_configured'
+    assert configs['job']['status'] == 'not_configured'
+    assert 'execution' not in layout.configuration.read()
+    assert 'name_resolver' not in layout.configuration.read()
+    assert not layout.job_config.exists() and not layout.resolver_config.exists()
 
 
 @pytest.mark.parametrize("imported", [False, True])
-def test_install_binds_local_resolver_and_preserves_explicit_and_remote_settings(tmp_path, imported):
+def test_install_preserves_explicit_environment_bindings_without_inventing_resolvers(tmp_path, imported):
     import copy
     import hashlib
     import tomllib
@@ -1341,17 +1590,17 @@ def test_install_binds_local_resolver_and_preserves_explicit_and_remote_settings
     # Inline tables and dots in target names must survive configuration rewriting.
     python = '{manager="conda", conda_executable="/opt/conda/bin/conda", prefix="/opt/structure", lock_ref="/opt/structure.lock"}'
     raw = ('[execution]\nschema_version = 2\ndefault_platform="local.cpu"\n[execution.platforms."local.cpu"]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="local"\nstorage.work_root="/shared/jobs"\nschedulers.main.handler=["/bin/true"]\npython=' + python + '\n[execution.platforms."local.cpu".bindings]\nstructure={environment={OMP_NUM_THREADS="2"}}\n[execution.platforms.custom]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="local"\nstorage.work_root="/shared/jobs"\nschedulers.main.handler=["/bin/true"]\npython=' + python + '\n[execution.platforms.custom.bindings.structure.environment]\nCORAGENT_NAME_RESOLVER_CONFIG="/custom/resolver.toml"\n[execution.platforms.explicit_root]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="local"\nstorage.work_root="/shared/jobs"\nschedulers.main.handler=["/bin/true"]\npython=' + python + '\n[execution.platforms.explicit_root.bindings.structure.environment]\nCORAGENT_INSTALL_ROOT="/custom/install"\n[execution.platforms.cluster]\ndefault_scheduler = "main"\nschedulers.main.executor = "external"\ntransport="ssh"\nschedulers.main.handler=["/bin/true"]\nssh_host="example.invalid"\nstorage.work_root="/scratch/jobs"\npython=' + python + '\n[execution.platforms.cluster.schedulers.main.submission]\nqueue="batch"\n[execution.platforms.cluster.bindings.structure]\n')
-    source = tmp_path / 'source.toml' if imported else destination
+    source = tmp_path / 'source.toml'
     source.write_text(raw)
-    expected = copy.deepcopy(tomllib.loads(raw))
-    target = expected['execution']['platforms']['local.cpu']
-    target['schedulers']['main']['bindings'] = copy.deepcopy(target['bindings'])
-    target['schedulers']['main']['bindings']['structure']['environment']['CORAGENT_NAME_RESOLVER_CONFIG'] = str(app_paths(root).resolver_config)
+    expected = tomllib.loads(raw)
+    if not imported:
+        app_paths(root).configuration.update(execution=expected['execution'])
     args = SimpleNamespace(install_root=str(root), job_config=str(source) if imported else None)
     configs = wizard.configure_backend_configs(args)
     assert tomllib.loads(destination.read_text()) == expected
     assert configs['job']['sha256'] == hashlib.sha256(destination.read_bytes()).hexdigest()
-    assert configs['job']['resolver_bindings'] == ['local.cpu/main']
+    assert configs['name_resolver']['status'] == 'not_configured'
+    assert 'resolver_bindings' not in configs['job']
     assert stat.S_IMODE(destination.stat().st_mode) == 0o600
     if imported:
         assert source.read_text() == raw

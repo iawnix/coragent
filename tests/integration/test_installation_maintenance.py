@@ -130,7 +130,7 @@ def installation(tmp_path, monkeypatch):
         events.append('configure-units')
         return []
     def activate(*_args):
-        assert events[-1] == 'qrun-commit'
+        assert events[-1] == ('qrun-commit' if state.get('qrun') else 'inspect')
         assert_installation_available(root)
         events.append('activate')
         # A started runtime could accept new input before a later service fails.
@@ -210,7 +210,7 @@ def test_failure_before_activation_restores_configuration_and_old_release(instal
     assert json.loads(app_paths(root).credentials.read_bytes()) == json.loads(auth)
     assert (workspace/'research_map/context.json').read_bytes() == original
     assert 'activate' not in events
-    assert 'qrun-rollback' in events and 'qrun-commit' not in events
+    assert not any(event.startswith('qrun-') for event in events)
     assert_installation_available(root)
 
 
@@ -224,7 +224,7 @@ def test_failure_after_activation_retains_new_release_and_resumes(installation):
     assert context['requirements'] == [{'id':'r1','status':'unmet'}]
     assert context['nodes'] == [{'id':'n1','dependencies':[]}]
     assert events[-1] == 'stop'
-    assert 'qrun-commit' in events and 'qrun-rollback' not in events
+    assert not any(event.startswith('qrun-') for event in events)
     with pytest.raises(RuntimeError, match='maintenance_required'):
         assert_installation_available(root)
     assert (workspace/'runtime-evidence.txt').read_text() == 'new evidence'
@@ -246,6 +246,14 @@ def test_managed_qrun_is_prepared_only_after_old_clients_are_fenced(installation
         assert (root / 'current').resolve().name == 'old'
     else:
         assert events.index('inspect') < events.index('qrun-commit') < events.index('activate')
+    assert_installation_available(root)
+
+
+def test_installation_without_managed_pools_skips_qrun_lifecycle(installation):
+    root, _, options, events, _, _ = installation
+    assert wizard.main(options) == 0
+    assert 'activate' in events
+    assert not any(event.startswith('qrun-') for event in events)
     assert_installation_available(root)
 
 

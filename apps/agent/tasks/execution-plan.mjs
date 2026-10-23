@@ -3,6 +3,19 @@ import { resolveTaskSelection } from "./execution-selection.mjs";
 const key = target => `${target.platform}/${target.scheduler_entry}`;
 const fail = message => { throw Object.assign(new Error(message), { code: "execution_plan_invalid" }); };
 
+export async function resolveTaskExecution(kernel, params, sources, previous = null) {
+  const selection = await resolveTaskSelection(kernel, { ...params,
+    execution_target: params.execution_target || (params.execution_intent && previous?.execution_target
+      ? { platform: previous.execution_target.platform } : previous?.execution_target) },
+  sources, previous?.execution_selection);
+  const policy = await resolveExecutionPolicy(kernel, params.execution_policy, selection, sources);
+  if (!params.execution_policy && previous?.execution_policy) {
+    policy.max_in_flight = previous.execution_policy.max_in_flight;
+    policy.max_attempts = previous.execution_policy.max_attempts;
+  }
+  return { selection, policy };
+}
+
 export async function resolveExecutionPolicy(kernel, policy, selection, sources) {
   const selections = policy ? await Promise.all(policy.placements.map(placement =>
     resolveTaskSelection(kernel, { execution_target: placement.target, execution_intent: placement.intent }, sources))) : [selection];
@@ -89,6 +102,9 @@ export async function resolveExecutionPlan(kernel, draft, policy, previous, jobs
 }
 
 export function executionItemContext(task, id) {
+  if (!task.execution_selection) throw Object.assign(new Error(
+    "Bind the task with task_update action=bind_execution before preparing or submitting a calculation"),
+  { code: "execution_selection_required" });
   const pinned = selection => ({ target: selection.target, route_digest: selection.route_digest });
   const policy = { max_in_flight: task.execution_policy.max_in_flight, max_attempts: task.execution_policy.max_attempts };
   if (!task.execution_plan) return { selection: pinned(task.execution_selection), policy };
@@ -105,6 +121,12 @@ export function executionItemContext(task, id) {
     item: { id: item.id, work_id: item.work_id, plan_revision: task.execution_plan.revision,
       input_artifact_ids: [...new Set(inputs)], resources: item.resources,
       ...(item.backend ? { backend: item.backend } : {}) } };
+}
+
+export function codingExecutionContext(task) {
+  if (!task || !["active", "waiting"].includes(task.state)) return null;
+  if (!task.execution_selection || task.execution_plan && !task.active_execution_item) return { unselected: true };
+  return executionItemContext(task, task.active_execution_item);
 }
 
 export function projectExecutionPlan(task, jobs) {

@@ -8,18 +8,9 @@ from research_agent.research.records import workspace
 
 
 def jobs(root):
-    output = []
-    for path in sorted((Path(root) / 'operations/jobs').glob('*.json')):
-        intent = read_json(path)
-        try:
-            current = read_json(Path(root) / 'operations/executions' / (intent['job_id'] + '.json'))
-        except FileNotFoundError:
-            current = {}
-        output.append({k: current.get(k, intent.get(k)) for k in ('job_id', 'node_id', 'node_revision', 'state', 'collection_state', 'latest_result_receipt_ref', 'error', 'execution_conflict')})
-        output[-1]['state'] = current.get('state', 'unknown')
-        output[-1]['collection_state'] = current.get('collection_state', 'not_collected')
-        output[-1]['read'] = {'tool': 'job_status', 'job_id': intent['job_id']}
-    return output
+    from .job_state import list_execution_summaries
+    return [{**row, 'read': {'tool': 'job_status', 'job_id': row['job_id']}}
+            for row in list_execution_summaries(root)]
 
 
 def _source_bindings(root, submission_ids, session_id=None, *, require=False):
@@ -99,6 +90,7 @@ def read(root, *, ref=None, offset=0, limit=16000, session_id=None, event_ids=()
 
 def reference_details(root, request):
     from research_agent.artifacts.registry import read_manifest
+    from .job_state import execution
     details = {}
     refs = request.get('input_refs', []) + request.get('inputs', []) + request.get('evidence_refs', [])
     refs += list(request.get('subjects', {}).values()) + request.get('check_refs', [])
@@ -121,17 +113,14 @@ def reference_details(root, request):
             if path_has_symlink(path):
                 raise ValueError('reference_symlink')
             receipt = read_json(path)
-            execution = read_json(Path(root) / 'operations/executions' / (receipt['job_id'] + '.json'))
-            details[ref] = {'kind': 'collection_receipt', 'research_binding': execution.get('metadata', {}).get('research_binding'),
+            observation = execution(root, receipt['job_id'])
+            details[ref] = {'kind': 'collection_receipt', 'research_binding': observation.get('metadata', {}).get('research_binding'),
                             'validation': receipt.get('validator_result'),
-                            'input_refs': list(execution.get('metadata', {}).get('input_evidence_basis', {}))}
+                            'input_refs': list(observation.get('metadata', {}).get('input_evidence_basis', {}))}
         elif re.fullmatch(r'job_[1-9][0-9]*', ref):
-            path = Path(root) / 'operations/executions' / (ref + '.json')
-            if path_has_symlink(path):
-                raise ValueError('reference_symlink')
-            execution = read_json(path)
-            details[ref] = {'kind': 'job', 'research_binding': execution.get('metadata', {}).get('research_binding'),
-                            'input_refs': list(execution.get('metadata', {}).get('input_evidence_basis', {}))}
+            observation = execution(root, ref)
+            details[ref] = {'kind': 'job', 'research_binding': observation.get('metadata', {}).get('research_binding'),
+                            'input_refs': list(observation.get('metadata', {}).get('input_evidence_basis', {}))}
         else:
             identity = ref
             material = read_manifest(root, identity)

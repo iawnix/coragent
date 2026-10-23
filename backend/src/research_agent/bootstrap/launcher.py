@@ -49,33 +49,12 @@ SESSION_ID = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,158}[A-Za-z0-9])?$")
 APP_SERVER_ID = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
 )
-NOTIFICATION_SMTP_FIELDS = {
-    "enabled",
-    "provider",
-    "preset",
-    "recipient",
-    "from_address",
-    "username",
-    "password_env",
-    "password_file",
-    "host",
-    "port",
-    "security",
-}
-SMTP_PRESETS = {
-    "163": {"host": "smtp.163.com", "port": 465, "security": "ssl"},
-    "qq": {"host": "smtp.qq.com", "port": 465, "security": "ssl"},
-    "custom": {"host": None, "port": 465, "security": "ssl"},
-}
-SMTP_SECURITY = {"ssl", "starttls"}
 WORKSPACE_ROOT_SCHEMA = "coragent-workspace-root/1"
 SERVICE_CONFIG_SCHEMA = "coragent-service/1"
 REMOTE_HOST_CONFIG_SCHEMA = "coragent-remote-host/1"
 REMOTE_ENVIRONMENT_ENV = "CORAGENT_REMOTE_ENVIRONMENT"
 CORAGENT_THEME_RELATIVE = Path("apps/agent/terminal/themes/coragent.json")
 CORAGENT_THEME_NAME = "coragent"
-EMAIL_ADDRESS = re.compile(r"^[^@\s]+@[^@\s]+$")
-ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 PROXY_VARIABLES = (
     "http_proxy",
     "HTTP_PROXY",
@@ -704,6 +683,14 @@ def _atomic_write_json(path: Path, value: dict) -> None:
 
 def configure_remote(installation: Installation) -> None:
     configured = os.environ.get("CORAGENT_JOB_CONFIG")
+    if not configured and installation.job_config_default:
+        status_path = installation.job_config_default.parent / 'configuration-status.json'
+        if status_path.is_file() and json.loads(status_path.read_text()).get('execution', {}).get('state') == 'invalid':
+            os.environ['CORAGENT_JOB_CONFIG'] = str(installation.job_config_default)
+            os.environ.pop(REMOTE_ENVIRONMENT_ENV, None)
+            os.environ['CORAGENT_REMOTE_DISPLAY_TARGET'] = 'configuration error'
+            print('CoRAgent: execution configuration is invalid; new calculation operations are unavailable.', file=sys.stderr)
+            return
     if not configured:
         if installation.job_config_default and installation.job_config_default.is_file():
             configured = str(installation.job_config_default)
@@ -712,8 +699,10 @@ def configure_remote(installation: Installation) -> None:
         os.environ.pop(REMOTE_ENVIRONMENT_ENV, None)
         os.environ["CORAGENT_REMOTE_DISPLAY_TARGET"] = "not configured"
         return
-    path = _require_config_file(configured, "CORAGENT_JOB_CONFIG")
+    path = Path(configured).expanduser()
+    os.environ["CORAGENT_JOB_CONFIG"] = str(path)
     try:
+        path = _require_config_file(configured, "CORAGENT_JOB_CONFIG")
         with path.open("rb") as handle:
             config = tomllib.load(handle)
         # Load the stdlib configuration contract without importing the runtime.
@@ -736,121 +725,51 @@ def configure_remote(installation: Installation) -> None:
         host = environment["ssh_host"]
         scheduler = environment.get("cluster_name", environment["executor"])
         scheduler = scheduler.title()
-    except (OSError, TypeError, ValueError, tomllib.TOMLDecodeError) as exc:
-        raise CoRAgentHostError(f"invalid remote configuration: {path}: {exc}") from exc
+    except (OSError, TypeError, ValueError, CoRAgentHostError) as exc:
+        os.environ.pop(REMOTE_ENVIRONMENT_ENV, None)
+        os.environ['CORAGENT_REMOTE_DISPLAY_TARGET'] = 'configuration error'
+        print('CoRAgent: execution configuration is invalid; new calculation operations are unavailable.', file=sys.stderr)
+        return
     os.environ["CORAGENT_JOB_CONFIG"] = str(path)
     os.environ[REMOTE_ENVIRONMENT_ENV] = remote_name
     os.environ["CORAGENT_REMOTE_DISPLAY_TARGET"] = f"{host} · {scheduler}"
 
 
 def configure_notifications(installation: Installation) -> None:
+    """Bind optional email without inspecting secrets or contacting its provider."""
+    from research_agent.integrations.email_config import parse_notification_config
+
     configured = os.environ.get("CORAGENT_NOTIFICATION_CONFIG")
-    if not configured and installation.notification_config_default.is_file():
-        configured = str(installation.notification_config_default)
-        os.environ["CORAGENT_NOTIFICATION_CONFIG"] = configured
+    default = installation.notification_config_default
+    if not configured:
+        status_path = default.parent / "configuration-status.json"
+        if status_path.is_file():
+            status = json.loads(status_path.read_text()).get("email", {})
+            if status.get("state") == "invalid":
+                os.environ["CORAGENT_NOTIFICATION_CONFIG"] = str(default)
+                os.environ["CORAGENT_NOTIFICATION_DISPLAY_TARGET"] = "configuration error"
+                print("CoRAgent: email configuration is invalid; email operations are unavailable.", file=sys.stderr)
+                return
+        if default.is_file():
+            configured = str(default)
     if not configured:
         os.environ.pop("CORAGENT_NOTIFICATION_CONFIG", None)
         os.environ["CORAGENT_NOTIFICATION_DISPLAY_TARGET"] = "not configured"
         return
-    path = _require_config_file(configured, "CORAGENT_NOTIFICATION_CONFIG")
-    if stat.S_IMODE(path.stat().st_mode) & 0o077:
-        raise CoRAgentHostError(f"CORAGENT_NOTIFICATION_CONFIG must not be accessible by group or others: {path}")
+    os.environ["CORAGENT_NOTIFICATION_CONFIG"] = configured
     try:
+        path = _require_config_file(configured, "CORAGENT_NOTIFICATION_CONFIG")
+        if stat.S_IMODE(path.stat().st_mode) & 0o077:
+            raise ValueError("email configuration must be private")
         with path.open("rb") as handle:
-            config = tomllib.load(handle)
-        if set(config) != {"notifications"}:
-            raise ValueError("expected only [notifications]")
-        notifications = config["notifications"]
-        if not isinstance(notifications, dict) or set(notifications) != {"email"}:
-            raise ValueError("expected only [notifications.email]")
-        email = notifications["email"]
-        if not isinstance(email, dict):
-            raise ValueError("notifications.email must be a table")
-        if email.get("enabled") is False:
-            os.environ.pop("CORAGENT_NOTIFICATION_CONFIG", None)
-            os.environ["CORAGENT_NOTIFICATION_DISPLAY_TARGET"] = "disabled"
-            return
-        email = _normalize_notification_provider(email)
-        enabled = email["enabled"]
-        recipient = email["recipient"]
-        if not isinstance(enabled, bool):
-            raise ValueError("notifications.email.enabled must be true or false")
-        if not isinstance(recipient, str) or len(recipient) > 320 or not EMAIL_ADDRESS.fullmatch(recipient):
-            raise ValueError("notifications.email.recipient must be one email address")
-        if set(email) - NOTIFICATION_SMTP_FIELDS:
-            unknown = ", ".join(sorted(set(email) - NOTIFICATION_SMTP_FIELDS))
-            raise ValueError(f"unknown notifications.email fields: {unknown}")
-        required = {"enabled", "provider", "preset", "recipient", "username"}
-        missing = required - set(email)
-        if missing:
-            raise ValueError(
-                "notifications.email is missing fields: " + ", ".join(sorted(missing))
-            )
-        if email.get("provider") != "smtp":
-            raise ValueError("invalid notifications.email configuration")
-        preset = email["preset"]
-        if not isinstance(preset, str) or preset.lower() not in SMTP_PRESETS:
-            raise ValueError("notifications.email.preset must be 163, qq, or custom")
-        username = email["username"]
-        if not isinstance(username, str) or not EMAIL_ADDRESS.fullmatch(username):
-            raise ValueError("notifications.email.username must be one email address")
-        from_address = email.get("from_address", username)
-        if not isinstance(from_address, str) or not EMAIL_ADDRESS.fullmatch(from_address):
-            raise ValueError("notifications.email.from_address must be one email address")
-        password_env = email.get("password_env")
-        password_file = email.get("password_file")
-        if (password_env is None) == (password_file is None):
-            raise ValueError(
-                "notifications.email must set exactly one of password_env or password_file"
-            )
-        if password_env is not None and (
-            not isinstance(password_env, str) or not ENV_NAME.fullmatch(password_env)
-        ):
-            raise ValueError("notifications.email.password_env must be an environment variable name")
-        if password_file is not None:
-            if not isinstance(password_file, str) or not password_file.startswith("/"):
-                raise ValueError("notifications.email.password_file must be an absolute path")
-            secret_path = Path(password_file).expanduser()
-            if secret_path.is_symlink() or not secret_path.is_file():
-                raise ValueError("notifications.email.password_file must be a regular file")
-            if stat.S_IMODE(secret_path.stat().st_mode) & 0o077:
-                raise ValueError("notifications.email.password_file must have mode 0600")
-        defaults = SMTP_PRESETS[preset.lower()]
-        host = email.get("host", defaults["host"])
-        if (
-            not isinstance(host, str)
-            or not host
-            or len(host) > 255
-            or any(character.isspace() for character in host)
-            or "/" in host
-            or "@" in host
-        ):
-            raise ValueError("notifications.email.host must be a hostname")
-        if preset.lower() != "custom" and host != defaults["host"]:
-            raise ValueError(
-                f"notifications.email.host must be {defaults['host']} for preset {preset.lower()}"
-            )
-        port = email.get("port", defaults["port"])
-        if not isinstance(port, int) or isinstance(port, bool) or not 1 <= port <= 65535:
-            raise ValueError("notifications.email.port must be an integer from 1 to 65535")
-        security = email.get("security", defaults["security"])
-        if not isinstance(security, str) or security.lower() not in SMTP_SECURITY:
-            raise ValueError("notifications.email.security must be ssl or starttls")
-    except (KeyError, OSError, TypeError, ValueError, tomllib.TOMLDecodeError) as exc:
-        raise CoRAgentHostError(f"invalid notification configuration: {path}: {exc}") from exc
+            email = parse_notification_config(tomllib.load(handle), base_dir=path.parent)
+    except (OSError, ValueError, CoRAgentHostError) as exc:
+        os.environ["CORAGENT_NOTIFICATION_DISPLAY_TARGET"] = "configuration error"
+        print(f"CoRAgent: email configuration is invalid ({type(exc).__name__}); "
+              "email operations are unavailable.", file=sys.stderr)
+        return
     os.environ["CORAGENT_NOTIFICATION_CONFIG"] = str(path)
-    os.environ["CORAGENT_NOTIFICATION_DISPLAY_TARGET"] = recipient if enabled else "disabled"
-
-
-def _normalize_notification_provider(email: dict) -> dict:
-    """Accept the transitional installer key while retaining one canonical schema."""
-    if "binding" not in email:
-        return email
-    if "provider" in email:
-        raise ValueError("notifications.email cannot set both provider and binding")
-    normalized = dict(email)
-    normalized["provider"] = normalized.pop("binding")
-    return normalized
+    os.environ["CORAGENT_NOTIFICATION_DISPLAY_TARGET"] = email["recipient"] if email["enabled"] else "disabled"
 
 
 def _require_config_file(value: str, label: str) -> Path:

@@ -103,7 +103,7 @@ def test_environment_store_cannot_be_a_broad_or_relative_path(layout, monkeypatc
 
 def test_root_overlap_is_rejected(layout):
     document = layout.configuration.read()
-    document['paths']['state_root'] = str(layout.root/'state')
+    document['paths']['state_root'] = str(layout.root/'releases/state')
     layout.configuration.write(document)
     with pytest.raises(ValueError, match='separate'):
         paths(layout.root)
@@ -195,10 +195,11 @@ def test_disabled_notification_needs_no_recipient_or_credentials(layout, monkeyp
 
 
 def test_invalid_notification_configuration_is_rejected_before_install(layout):
-    from coragent_packaging.installer.install_wizard import parse_args
+    from coragent_packaging.installer.install_wizard import parse_args, show_dry_run
     layout.configuration.update(notifications={'email':{'enabled':'true'}})
+    args = parse_args(['--config', str(layout.config_file), '--dry-run'])
     with pytest.raises(ValueError, match='boolean'):
-        parse_args(['--config', str(layout.config_file), '--dry-run'])
+        show_dry_run(args)
     assert not layout.state.exists()
 
 
@@ -247,12 +248,14 @@ def test_installer_reads_email_from_main_config_without_generated_files(layout):
     assert tomllib.loads(layout.email_config.read_text())['notifications']['email']['enabled'] is True
 
 
-def test_execution_import_preserves_unchanged_secret_references_and_accepts_replacements(layout):
+def test_generated_edits_are_not_imported_and_explicit_candidates_preserve_secret_references(layout):
     from coragent_packaging.installer._configuration import publish
     from coragent_packaging.installer.install_wizard import parse_args
     layout.initialize()
     layout.credentials.write_text(json.dumps({'models':{},'secrets':{'tri':'fake-original'}}))
-    execution = execution_config('cluster', {'cluster':{'executor': 'external', 'transport': 'local', 'handler_environment': {'TRI_AUTH_TOKEN': 'credential:tri'}}})
+    execution = execution_config('cluster', {'cluster':{'executor': 'external', 'transport': 'local',
+        'work_root': '/fixture/jobs', 'handler': ['/fixture/handler'],
+        'handler_environment': {'TRI_AUTH_TOKEN': 'credential:tri'}}})
     layout.configuration.update(execution=execution)
     args = parse_args(['--config',str(layout.config_file),'--without-web','--service-scope','none'])
     layout.materialize()
@@ -263,4 +266,138 @@ def test_execution_import_preserves_unchanged_secret_references_and_accepts_repl
     layout.job_config.write_text(toml_text({'execution':execution}))
     publish(args)
     value = layout.configuration.read()['execution']['platforms']['cluster']['schedulers']['main']['handler_environment']
+    assert layout.configuration.resolve_credentials(value)['TRI_AUTH_TOKEN'] == 'fake-original'
+    from coragent_packaging.installer._configuration import commit_sections
+    commit_sections(layout.root, execution=execution).materialize(strict=True)
+    value = layout.configuration.read()['execution']['platforms']['cluster']['schedulers']['main']['handler_environment']
+    assert value['TRI_AUTH_TOKEN'].startswith('credential:')
     assert layout.configuration.resolve_credentials(value)['TRI_AUTH_TOKEN'] == 'fake-replacement'
+
+
+def test_default_layout_keeps_mutable_data_beside_releases(tmp_path, monkeypatch):
+    monkeypatch.delenv('CORAGENT_CONFIG', raising=False)
+    root = tmp_path / 'application'
+    layout = paths(root).initialize()
+    assert layout.config_file == root / 'config/config.toml'
+    assert layout.state == root / 'state'
+    assert layout.generated == root / 'generated'
+    assert layout.jobs == root / 'jobs'
+    assert layout.backups == root / 'backups'
+    assert paths(root).config_file == layout.config_file
+    assert all(p.is_dir() for p in (layout.state, layout.generated, layout.jobs, layout.backups))
+
+
+@pytest.mark.parametrize('name', ['config', 'state', 'generated', 'jobs', 'backups'])
+def test_managed_data_directories_reject_symlinks(tmp_path, monkeypatch, name):
+    monkeypatch.delenv('CORAGENT_CONFIG', raising=False)
+    root = tmp_path / 'application'; root.mkdir()
+    outside = tmp_path / 'outside'; outside.mkdir()
+    (root / name).symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ValueError, match='symlink'):
+        paths(root).initialize()
+    assert not list(outside.iterdir())
+
+
+def test_default_uninstall_preserves_nested_operator_data(tmp_path, monkeypatch):
+    from coragent_packaging.installer.uninstall import parse_args, uninstall
+    monkeypatch.delenv('CORAGENT_CONFIG', raising=False)
+    layout = paths(tmp_path / 'application').initialize()
+    release = layout.releases / 'test'; release.mkdir(parents=True)
+    saved = [layout.credentials, layout.jobs / 'result', layout.backups / 'saved-config', layout.state / 'qrun/queue.sqlite3']
+    for p in saved[1:]:
+        p.parent.mkdir(parents=True, exist_ok=True); p.write_text('preserve')
+    original = {p: p.read_bytes() for p in saved}
+    args = parse_args(['--install-root', str(layout.root), '--service-scope', 'none', '--non-interactive', '--yes'])
+    uninstall(args)
+    assert not release.exists()
+    assert all(p.read_bytes() == data for p, data in original.items())
+    assert layout.config_file.is_file()
+
+
+def test_root_removal_requires_explicit_backup_purge(tmp_path, monkeypatch):
+    from coragent_packaging.installer.uninstall import parse_args, uninstall
+    monkeypatch.delenv('CORAGENT_CONFIG', raising=False)
+    layout = paths(tmp_path / 'application').initialize()
+    backup = layout.backups / 'original'; backup.write_text('keep')
+    args = parse_args(['--install-root', str(layout.root), '--service-scope', 'none', '--non-interactive', '--yes',
+        '--remove-root', '--purge-workspaces', '--purge-runtime', '--purge-config'])
+    with pytest.raises(ValueError, match='purge-backups'):
+        uninstall(args)
+    assert backup.read_text() == 'keep'
+    assert layout.config_file.is_file()
+
+
+def test_invalid_optional_projection_does_not_block_core_or_reuse_old_secret(layout):
+    layout.initialize()
+    layout.configuration.update(notifications={'email': {'provider': 'smtp', 'preset': 'custom',
+        'host': 'smtp.example.test', 'username': 'sender@example.test', 'recipient': 'recipient@example.test',
+        'password': 'credential:missing'}})
+    layout.email_config.write_text('obsolete email configuration')
+    (layout.generated / 'secrets/smtp-password').write_text('obsolete test secret')
+    (layout.generated / 'secrets/service.env').write_text('OLD_SMTP_PASSWORD="obsolete"\n')
+    layout.materialize()
+    assert not layout.email_config.exists()
+    assert not (layout.generated / 'secrets/smtp-password').exists()
+    assert not (layout.generated / 'secrets/service.env').exists()
+    status = json.loads((layout.generated / 'configuration-status.json').read_text())
+    assert status['email']['state'] == 'invalid'
+    assert status['execution']['state'] == 'not_configured'
+    assert paths(layout.root).workspace_root == layout.workspace_root
+    with pytest.raises(ValueError, match='email configuration is invalid'):
+        layout.materialize(strict=True)
+
+
+def test_resolver_projection_uses_domain_validation_and_recovers_after_repair(layout):
+    from research_agent.bootstrap.name_resolver_config import parse_config
+    layout.initialize()
+    invalid = {'default_resolver': 'invalid-resolver'}
+    layout.configuration.update(name_resolver=invalid)
+    layout.resolver_config.write_text('obsolete resolver configuration')
+    with pytest.raises(ValueError) as domain_error:
+        parse_config(invalid)
+
+    layout.materialize()
+
+    assert not layout.resolver_config.exists()
+    status_path = layout.generated / 'configuration-status.json'
+    assert json.loads(status_path.read_text())['name_resolver']['state'] == 'invalid'
+    with pytest.raises(ValueError, match=str(domain_error.value)):
+        layout.materialize(strict=True)
+    repaired = {'default_resolver': 'opsin', 'backends': {'opsin': {'cache': False}}}
+    layout.configuration.update(name_resolver=repaired)
+    layout.materialize(strict=True)
+    import tomllib
+    assert tomllib.loads(layout.resolver_config.read_text()) == repaired
+    assert json.loads(status_path.read_text())['name_resolver']['state'] == 'configured'
+
+
+@pytest.mark.parametrize('email', [None, {'enabled': False}, {
+    'provider': 'smtp', 'preset': 'qq', 'username': 'sender@qq.com',
+    'recipient': 'receiver@example.test', 'password_env': 'EXTERNAL_SMTP_PASSWORD'}])
+def test_email_environment_is_external_and_never_restored_from_generated_capture(layout, email, monkeypatch):
+    layout.initialize()
+    if email is not None:
+        layout.configuration.update(notifications={'email': email})
+    obsolete = layout.generated / 'secrets/service.env'
+    obsolete.write_text('EXTERNAL_SMTP_PASSWORD="obsolete"\n')
+    monkeypatch.setenv('EXTERNAL_SMTP_PASSWORD', 'current-external-value')
+    original = layout.credentials.read_bytes()
+
+    layout.materialize(strict=True)
+
+    assert not obsolete.exists()
+    assert layout.credentials.read_bytes() == original
+    assert not (layout.generated / 'secrets/smtp-password').exists()
+
+
+def test_disposable_component_inputs_rebuild_without_changing_main_config(layout):
+    layout.initialize()
+    layout.configuration.update(execution=execution_config('local', {'local': {
+        'executor': 'qrun', 'transport': 'local', 'work_root': '/fixture/qrun/jobs'}}))
+    original = layout.config_file.read_bytes()
+    layout.materialize(strict=True)
+    expected = layout.job_config.read_bytes()
+    layout.job_config.unlink()
+    layout.materialize(strict=True)
+    assert layout.job_config.read_bytes() == expected
+    assert layout.config_file.read_bytes() == original

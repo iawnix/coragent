@@ -13,6 +13,11 @@ Select the executor in [Operation entrypoints](references/commands.md), then rea
 
 Use this Skill at the start of a calculation or reaction study. It converts names, SMILES, supplied XYZ, and reaction descriptions into material records that downstream geometry and electronic-structure Jobs can consume.
 
+Online name lookup requires an explicitly configured resolver. Supplied structures
+and local candidate checks remain available without one; do not make resolver setup
+a prerequisite for those operations. Bind the task's execution platform before its
+first scientific Job.
+
 ## Preparation workflow
 
 1. Preserve the user's original text or coordinates as the source record.

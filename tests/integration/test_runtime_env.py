@@ -628,7 +628,7 @@ def test_install_env_dry_run_reports_hashed_prefix(tmp_path: Path, monkeypatch: 
     assert payload["dry_run"] is True
     assert payload["env_prefix"].startswith(str(tmp_path / "envs" / "base"))
     assert payload["kernel_env_prefix"].startswith(str(tmp_path / "envs" / "kernels"))
-    assert payload["manifest_path"].endswith("/state/coragent/installation/python/env.json")
+    assert payload["manifest_path"] == str(app_paths(ROOT.parent).runtime_home / "env.json")
     assert payload["environment_lock"] == str(ROOT / "environment.lock.txt")
     assert payload["python_executable"].endswith("/bin/python")
     assert payload["python_distribution"] == "coragent"
