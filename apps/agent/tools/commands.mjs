@@ -113,11 +113,28 @@ export function slashCompletions(name, prefix = "") {
 }
 
 function parseResearchSlash(tokens, usage) {
-  const action = tokens[0] || "read";
-  if (action === "read" && tokens.length <= 2) return validateCommandInvocation("research_read", tokens[1] ? {ref: tokens[1]} : {});
-  if (action === "search") return validateCommandInvocation("research_search", {query: tokens.slice(1).join(" ")});
-
-  throw usageError(usage);
+  if (!tokens.length) return validateCommandInvocation("research_read", {view: "brief"});
+  const [action, ...parts] = tokens;
+  if (!["read", "search"].includes(action)) throw usageError(usage);
+  const params = {}, text = [];
+  while (parts.length) {
+    const part = parts.shift();
+    if (part === "--" && action === "search") { text.push(...parts); break; }
+    if (!part.startsWith("--")) { text.push(part); continue; }
+    if (!["--offset", "--limit"].includes(part)) throw usageError(usage, `Unknown option: ${part}`);
+    const key = part.slice(2), value = parts.shift();
+    if (Object.hasOwn(params, key)) throw usageError(usage, `Duplicate option: ${part}`);
+    if (!value || value.startsWith("--")) throw usageError(usage, `Missing value for ${part}`);
+    if (!/^(0|[1-9]\d*)$/.test(value) || !Number.isSafeInteger(Number(value))
+        || (key === "limit" && (Number(value) < 1 || Number(value) > 100))) {
+      throw usageError(usage, `${part} must be ${key === "limit" ? "an integer from 1 to 100" : "a non-negative integer"}`);
+    }
+    params[key] = Number(value);
+  }
+  if (action === "search") return validateCommandInvocation("research_search", {query: text.join(" "), ...params});
+  if (!text.length) return validateCommandInvocation("research_search", {kind: "node", query: "", ...params});
+  if (text.length === 1 && !Object.keys(params).length) return validateCommandInvocation("research_read", {ref: text[0]});
+  throw usageError(usage, "Read accepts one record ID; pagination options apply to browsing questions and search.");
 }
 
 function parseMonitorSlash(tokens, usage) {

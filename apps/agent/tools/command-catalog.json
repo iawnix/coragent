@@ -710,6 +710,11 @@
               "text": {
                 "type": "string"
               },
+              "content_sha256": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$",
+                "description": "Digest of the complete serialized record. All pages must have the same digest before joining them."
+              },
               "offset": {
                 "type": "integer"
               },
@@ -1233,6 +1238,7 @@
               "schema_version",
               "ref",
               "text",
+              "content_sha256",
               "offset",
               "offset_unit",
               "total_characters",
@@ -5814,8 +5820,8 @@
   "slash_commands": {
     "research": {
       "name": "research",
-      "description": "Read or validate the research workspace.",
-      "usage": "/research [read [ref] | search [text]]",
+      "description": "View current research progress, read evidence, or search saved records.",
+      "usage": "/research [read [ref] | search [text]] [--offset N] [--limit 1–100]",
       "completions": [
         "read",
         "search"

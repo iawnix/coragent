@@ -369,6 +369,7 @@ export interface CommandResults {
     "schema_version": "research-read/2";
     "ref": string;
     "text": string;
+    "content_sha256": string;
     "offset": number;
     "offset_unit": "unicode_characters";
     "total_characters": number;

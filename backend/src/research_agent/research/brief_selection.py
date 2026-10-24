@@ -179,6 +179,7 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         assessments[ref] = (assessment, notices)
         title = excerpt(node['title'], 120)
         card = {'id': ref, 'revision': node['revision'], 'status': node['status'], 'title': title,
+                'updated_at': node['updated_at'],
                 'assessment_ref': assessment_ref, 'selection': reason,
                 'review_notice_count': len(notices), 'other_result_count': len(other_results.get(ref, [])),
                 'omitted_fields': ['goal', 'plan']}
@@ -191,6 +192,7 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         if assessment:
             card['omitted_fields'].append('assessment')
             card['assessment'] = {'ref': assessment_ref,
+                'created_at': assessment['created_at'],
                 'kind': 'result' if assessment_ref.startswith('result_') else assessment['kind'],
                 'conclusion': '', 'limitations': '', 'evidence_refs': [], 'content_omitted': True}
         if notices:
@@ -234,6 +236,7 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
             content = assessment.get('conclusion', '') if is_result else assessment['content']
             limitations = assessment.get('limitations') or ''
             judgment = {'ref': card['assessment_ref'], 'conclusion': content,
+                        'created_at': assessment['created_at'],
                         'kind': 'result' if is_result else assessment['kind'],
                         'limitations': limitations,
                         'evidence_refs': assessment.get('evidence_refs', assessment.get('references', [])),

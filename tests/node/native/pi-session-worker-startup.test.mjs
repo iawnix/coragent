@@ -124,9 +124,11 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
       assert.ok(telemetry.result.contextWindow > 0);
       assert.ok(telemetry.result.contextTokens >= 0);
       assert.equal(telemetry.result.estimated, true);
-      const summary = await queries.research("read", BACKGROUND_CONTEXT);
+      const summary = await queries.research("", BACKGROUND_CONTEXT);
       assert.equal(summary.workspace_id, "startup");
-      assert.equal(summary.result.schema_version, "research-snapshot/3");
+      assert.equal(summary.result.schema_version, "research-brief/1");
+      assert.equal(summary.task, null);
+      assert.equal((await queries.research("read", BACKGROUND_CONTEXT)).result.schema_version, "research-search/2");
       assert.match((await queries.research("storage bootstrap", BACKGROUND_CONTEXT)).error.message, /Usage/);
       const after = await backend.readSession("startup", created.session.session_id);
       assert.deepEqual(after.snapshot.messages, read.snapshot.messages);
@@ -288,8 +290,8 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
         terminal.sendInput('\x1b');
         await waitFor(()=>renderedText().includes('Monitor: Connected · Task: None · Job: 2 running, 0 queued'));
         await new Promise(resolve=>setImmediate(resolve));
-        submit("/research read");
-        await waitFor(() => renderedText().includes("Research state"));
+        submit("/research");
+        await waitFor(() => renderedText().includes("Research progress"));
         terminal.sendInput("\u001b");
         await new Promise((resolve) => setImmediate(resolve));
         submit("/sys-prompt");

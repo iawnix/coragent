@@ -161,6 +161,7 @@ type TaskSummary = TaskListItem & {
   next_action: string | null; // Up to 1024 bytes; null when no next action applies.
   progress: { summary: string | null; at: string } | null; // Summary: 512 bytes.
   reason: string | null; // 512 bytes.
+  block_kind: string | null; // Canonical task blocker kind; distinguishes missing user input.
   resume_when: string | null; // 512 bytes.
   wait: { mode: "all" | "any"; job_count: number } | null;
   execution_recovery: {

@@ -197,6 +197,7 @@ export async function createCoRAgentHarness(databasePath, options) {
         env.provide(CoRAgentSessionAdmission, sessionAdmission);
         env.provide(CoRAgentMonitor, createMonitorService({ controller: taskController, harness, conversation, queryKernel: queryBridge, workspaceId, sessionId, LiveDoc }));
         env.provide(CoRAgentClientQueries, createClientQueries({ workspaceId, sessionId, queryBridge, promptManifest,
+          currentTask: context => taskController.current(context),
           readTelemetry: async (context) => {
             const { estimateContext } = await loadPi("compaction", sourceRoot);
             const [view, agent] = await Promise.all([conversation.context(context), conversation.agent(context)]);

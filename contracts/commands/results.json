@@ -587,6 +587,11 @@
         "text": {
           "type": "string"
         },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "Digest of the complete serialized record. All pages must have the same digest before joining them."
+        },
         "offset": {
           "type": "integer"
         },
@@ -723,6 +728,7 @@
         "schema_version",
         "ref",
         "text",
+        "content_sha256",
         "offset",
         "offset_unit",
         "total_characters",

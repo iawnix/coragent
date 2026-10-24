@@ -49,7 +49,8 @@ test('terminal queries use an independent worker while execution is blocked', as
     let finished = false;
     const slow = execution.execute_command('job_status', { hold: true }).then(result => { finished = true; return result; });
     await until(() => existsSync(join(root, 'started')));
-    const queries = createClientQueries({ workspaceId: 'fixture', sessionId: 'session', queryBridge: query });
+    const queries = createClientQueries({ workspaceId: 'fixture', sessionId: 'session', queryBridge: query,
+      currentTask: async () => null });
     const response = await queries.research('');
     assert.equal(response.result.command, 'research_read');
     assert.equal(finished, false);

@@ -82,6 +82,7 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         summary = node.get("goal", '')
         omitted_fields = [field for field in node['omitted_fields'] if field in {'goal', 'plan'}]
         finding = _source(ref, "node", summary, status=status, assessment_ref=node.get("assessment_ref"),
+                          title=node['title'], updated_at=node['updated_at'],
                           read={'tool': 'research_read', 'ref': ref}, omitted_fields=omitted_fields)
         if node.get("plan"):
             finding['plan'] = node['plan']
@@ -117,6 +118,7 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
                 findings.append(_source(node['assessment_ref'],
                     assessment['kind'] if assessment['kind'] in {'result', 'note'} else 'record',
                     assessment.get('conclusion'), node_id=ref, selected_assessment=True,
+                    created_at=assessment['created_at'],
                     limitations=assessment.get('limitations', ''), references=refs,
                     content_omitted=assessment.get('content_omitted', False),
                     read={'tool': 'research_read', 'ref': node['assessment_ref']}))
@@ -149,6 +151,7 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
             summary = full_result['conclusion']
             findings.append(_source(result["id"], "result", summary,
                                     node_id=result.get("node_id"), supersedes=result.get("supersedes"),
+                                    created_at=result['created_at'],
                                     limitations=full_result.get('limitations') or '',
                                     references=refs, reference_count=len(refs), content_omitted=False,
                                     read={'tool': 'research_read', 'ref': result['id']}))

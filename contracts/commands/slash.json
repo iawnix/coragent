@@ -3,8 +3,8 @@
   "commands": {
     "research": {
       "name": "research",
-      "description": "Read or validate the research workspace.",
-      "usage": "/research [read [ref] | search [text]]",
+      "description": "View current research progress, read evidence, or search saved records.",
+      "usage": "/research [read [ref] | search [text]] [--offset N] [--limit 1–100]",
       "completions": [
         "read",
         "search"

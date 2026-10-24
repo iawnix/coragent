@@ -6,6 +6,14 @@ import { createTerminalSession, runTerminalSessions } from "../../../apps/agent/
 import { parseSlashCommand, slashCompletions, SLASH_COMMAND_NAMES } from "../../../apps/agent/tools/commands.mjs";
 
 const row = (id, workspace = "remote") => ({ session_id: id, workspace_id: workspace });
+const emptyResearchBrief = () => ({ schema_version: 'research-brief/1',
+  scope: { entry_node_ids: [], focus_node_ids: [] }, findings: [], contradictions: [], uncertainties: [],
+  limitations: [], follow_up: [], source_refs: [], coverage: { omitted: {} }, projection_status: 'complete' });
+const researchRecord = (ref, value) => {
+  const text = JSON.stringify(value);
+  return { schema_version: 'research-read/2', ref, content_sha256: 'sha256:fixture-record', text,
+    offset: 0, offset_unit: 'unicode_characters', total_characters: [...text].length, next_offset: null };
+};
 
 test('status sources refresh independently, coalesce bursts, and ignore responses after disposal', async t => {
   t.mock.timers.enable({apis:['setTimeout']});
@@ -87,16 +95,36 @@ test('command validation explains incomplete input without invoking any operatio
   assert.equal(monitor.validate('task pause TaskABC'), undefined);
 });
 
+test('research grammar separates the current overview, saved questions and text search', () => {
+  for (const [input, command, params] of [
+    ['', 'research_read', { view: 'brief' }],
+    ['read', 'research_search', { kind: 'node', query: '' }],
+    ['read --offset 20', 'research_search', { kind: 'node', query: '', offset: 20 }],
+    ['read --limit 5 --offset 20', 'research_search', { kind: 'node', query: '', limit: 5, offset: 20 }],
+    ['read node_7', 'research_read', { ref: 'node_7' }],
+    ['search', 'research_search', { query: '' }],
+    ['search --offset 20', 'research_search', { query: '', offset: 20 }],
+    ['search competing paths', 'research_search', { query: 'competing paths' }],
+    ['search competing paths --offset 20 --limit 5', 'research_search', { query: 'competing paths', offset: 20, limit: 5 }],
+  ]) assert.deepEqual(parseSlashCommand('research', input), { command, params });
+  for (const input of ['detail node_7', 'read node_7 extra', 'read --offset', 'read --offset -1',
+    'read --offset 1.5', 'read --offset 1 --offset 2', 'read --limit 0', 'read --limit 101',
+    'search term --offset', 'search term --unknown value']) {
+    assert.throws(() => parseSlashCommand('research', input), /Usage/);
+  }
+});
+
 test("worker queries bind identity and admit only read-only research arguments", async () => {
   const calls = [];
   const prompt = { effective: "worker prompt", contributors: [] };
+  const record = researchRecord('note_123', { ref: 'note_123', content: 'Saved research record' });
   const queries = createClientQueries({ workspaceId: "remote", sessionId: "one", promptManifest: prompt,
-    queryBridge: { async execute_command(...args) { calls.push(args); return { root: "/remote/workspace" }; } },
+    queryBridge: { async execute_command(...args) { calls.push(args); return record; } },
   });
   assert.deepEqual(await queries.research("read note_123"), {
-    workspace_id: "remote", session_id: "one", result: { root: "/remote/workspace" },
+    workspace_id: "remote", session_id: "one", result: record,
   });
-  assert.deepEqual(calls, [["research_read", { ref: "note_123" }]]);
+  assert.deepEqual(calls, [["research_read", { ref: "note_123", offset: 0, limit: 32000 }]]);
   for (const input of ["change x", "storage bootstrap", "summary --root /local", { root: "/local" }]) {
     assert.ok((await queries.research(input)).error);
   }
@@ -110,7 +138,9 @@ test("command registry, parsing, native selection, and worker reads agree", asyn
   const resumed = [];
   const queries = createClientQueries({ workspaceId: "remote", sessionId: "one",
     promptManifest: { effective: "actual worker prompt", contributors: [{ origin: "native", source: "/remote/prompt" }], sha256: "digest" },
-    queryBridge: { async execute_command() { return { summary: "remote research result" }; } },
+    currentTask: async () => ({ user_task_id: 'task_1', title: 'Remote research', objective: 'remote research result', state: 'active',
+      research: { entry_node_ids: [], focus_node_ids: [] } }),
+    queryBridge: { async execute_command() { return emptyResearchBrief(); } },
   });
   let choice;
   const ui = { showStatus(text) { shown.push(text); }, async select(title) { shown.push(title); return choice; } };
@@ -213,21 +243,88 @@ test('research query errors expose bounded diagnostic facts for F2 details', asy
   assert.doesNotMatch(shown[0][0],/PRIVATE|params|raw_output/);
 });
 
-test('research and health details keep empty values and nested fields on their own rows', async () => {
+test('saved research navigation pages by title and opens the selected canonical record', async () => {
+  const calls = [], choices = [], shown = [];
+  const detail = researchRecord('node_2', {
+    node: { id: 'node_2', title: 'Second research question', goal: 'Check evidence', status: 'open', plan: 'Compare candidates' },
+    assessment: null, review_notices: [], results: [], recent_notes: { records: [] }, related_nodes: [],
+  });
+  const commands = createTerminalCommands({ session: { sessionId: 'one', workspaceId: 'remote' },
+    ui: { showStatus: assert.fail, async select(_title, options) {
+      choices.push(options);
+      return choices.length === 1 ? options.find(option => /next|more/i.test(option.label))?.value : 'node_2';
+    } },
+    queries: { async research(input) {
+      const invocation = parseSlashCommand('research', input);
+      calls.push(invocation);
+      const result = invocation.command === 'research_read' ? detail : {
+        schema_version: 'research-search/2', total: 2, next_offset: invocation.params.offset ? null : 1,
+        records: [{ ref: invocation.params.offset ? 'node_2' : 'node_1', kind: 'node',
+          title: invocation.params.offset ? 'Second research question' : 'First research question' }],
+      };
+      return { session_id: 'one', workspace_id: 'remote', result };
+    } },
+    show: async (title, body) => shown.push({ title, body }),
+  });
+  await commands.find(command => command.name === 'research').run('read', {});
+  assert.equal(choices.length, 2);
+  assert.equal(choices[0].find(option => option.value === 'node_1').label, 'First research question');
+  assert.equal(choices[1].find(option => option.value === 'node_2').label, 'Second research question');
+  assert.equal(calls[0].command, 'research_search');
+  assert.equal(calls[1].params.offset, 1);
+  assert.deepEqual(calls[2], { command: 'research_read', params: { ref: 'node_2' } });
+  assert.equal(shown.length, 1);
+  assert.match(shown[0].body, /Second research question/);
+  assert.match(shown[0].body, /Check evidence/);
+  assert.doesNotMatch(shown[0].body, /"schema_version"|"node"\s*:/);
+});
+
+test('closing the saved research selector never changes focus or starts a detail read', async () => {
+  const calls = [];
+  const commands = createTerminalCommands({ session: { sessionId: 'one', workspaceId: 'remote' },
+    ui: { showStatus: assert.fail, async select() { return undefined; } }, show: assert.fail,
+    queries: { async research(input) {
+      calls.push(input);
+      return { session_id: 'one', workspace_id: 'remote', result: {
+        schema_version: 'research-search/2', total: 1, next_offset: null,
+        records: [{ ref: 'node_1', kind: 'node', title: 'Saved question' }],
+      } };
+    } },
+  });
+  await commands.find(command => command.name === 'research').run('read', {});
+  assert.deepEqual(calls, ['read']);
+});
+
+test('research navigation checks worker identity before displaying each page', async () => {
+  const errors = [];
+  let reads = 0, selections = 0;
+  const commands = createTerminalCommands({ session: { sessionId: 'one', workspaceId: 'remote' },
+    ui: { showStatus(message) { errors.push(message); }, async select(_title, options) {
+      selections++;
+      return options.find(option => /next|more/i.test(option.label))?.value;
+    } }, show: assert.fail,
+    queries: { async research() {
+      reads++;
+      return { session_id: reads === 1 ? 'one' : 'different', workspace_id: 'remote', result: {
+        schema_version: 'research-search/2', total: 2, next_offset: reads === 1 ? 1 : null,
+        records: [{ ref: 'node_1', kind: 'node', title: 'Saved question' }],
+      } };
+    } },
+  });
+  await commands.find(command => command.name === 'research').run('read', {});
+  assert.equal(reads, 2);
+  assert.equal(selections, 1);
+  assert.match(errors[0], /different session/);
+});
+
+test('health details keep empty values and nested fields on their own rows', async () => {
   const result = {nodes:[{id:'node_1',input_refs:[],progress:{},assessment_ref:null,
     content_omitted:false,revision:0,plan:'First line\nSecond line',subjects:['中文','second']}],tasks:[]};
-  let body;
-  const commands = createTerminalCommands({
-    session:{sessionId:'one'},ui:{showStatus(message){assert.fail(message);}},
-    queries:{async research(){return {session_id:'one',result};}},
-    show:async (_title,value)=>{body=value;},
-  });
-  await commands.find(command=>command.name==='research').run('',{});
+  const {formatMonitor} = await import('../../../apps/agent/terminal/commands/monitor.mjs');
+  const body = formatMonitor('monitor/health',result);
   assert.equal(body, 'nodes:\n  • id: node_1\n    input refs: []\n    progress: {}\n    assessment ref: —\n'
     + '    content omitted: false\n    revision: 0\n    plan: First line\n      Second line\n'
     + '    subjects:\n      • 中文\n      • second\ntasks: []');
-  const {formatMonitor} = await import('../../../apps/agent/terminal/commands/monitor.mjs');
-  assert.equal(formatMonitor('monitor/health',result),body);
   assert.match(formatMonitor('monitor/jobs',{items:[]}),/^No entries/);
 });
 
@@ -239,7 +336,7 @@ test("usage and monitor use separate live panels while documents choose reading 
     show:async (title,body,context,command,scope,mode)=>shown.push({title,body,command,scope,mode}),
     usage:()=>usage,monitor:()=>monitor,
     queries:{async systemPrompt(){return {session_id:'one',result:{effective:'prompt'}};},
-      async research(){return {session_id:'one',result:{note:'result'}};}},
+      async research(){return {session_id:'one',result:emptyResearchBrief(),task:null};}},
   });
   for(const name of ['usage','monitor','sys-prompt','research']) await commands.find(c=>c.name===name).run('',{});
   assert.deepEqual(shown.map(item=>item.mode),['panel','panel','page','auto']);

@@ -24,7 +24,8 @@ export function projectMonitorTask(task, { list = false } = {}) {
   if (!list) Object.assign(result, {
     objective: text(task.objective, 1024), next_action: text(task.next_action, 1024),
     progress: task.progress ? { summary: text(task.progress.summary, 512), at: task.progress.at } : null,
-    reason: text(task.reason, 512), resume_when: text(task.block_details?.resume_when, 512),
+    reason: text(task.reason, 512), block_kind: task.block_details?.kind ?? null,
+    resume_when: text(task.block_details?.resume_when, 512),
     wait: task.wait ? { mode: task.wait.mode, job_count: task.wait.job_ids.length } : null,
     execution_plan: task.execution_plan ? { revision: task.execution_plan.revision, item_count: task.execution_plan.items.length,
       completed_count: task.execution_plan.items.filter(item => item.completion).length, active_item_id: task.active_execution_item } : null,

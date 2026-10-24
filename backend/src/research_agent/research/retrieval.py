@@ -80,6 +80,30 @@ def _index(root):
     return db
 
 
+def _search_excerpt(ref, content, query):
+    """Show authored research text around a match, not serialized object headers."""
+    if ref.startswith(('node_', 'result_')):
+        value = json.loads(content)
+        fields = ('goal', 'plan') if ref.startswith('node_') else ('conclusion', 'observation', 'limitations', 'summary')
+        content = '\n\n'.join(key.capitalize() + ': ' + value[key] for key in fields if value[key])
+    position = content.casefold().find(query.casefold()) if query else -1
+    start = 0
+    if position >= 0:
+        # Case folding can expand one character (e.g. ß -> ss), so folded
+        # offsets cannot be used directly to slice the original passage.
+        folded_offset = 0
+        for index, char in enumerate(content):
+            folded_offset += len(char.casefold())
+            if folded_offset > position:
+                start = max(0, index - 120)
+                break
+    start = min(start, max(0, len(content) - 600))
+    prefix = '… ' if start else ''
+    end = min(len(content), start + 600 - len(prefix))
+    suffix = ' …' if end < len(content) else ''
+    return prefix + content[start:end - len(suffix)] + suffix
+
+
 def search(root, *, query='', origin=None, node_id=None, kind=None, after_sequence=0, offset=0, limit=20, session_id=None):
     if not isinstance(query, str) or len(query) > 1000 or origin not in {None, 'user', 'runtime', 'agent'}:
         raise ValueError('search_filter_invalid')
@@ -98,10 +122,15 @@ def search(root, *, query='', origin=None, node_id=None, kind=None, after_sequen
         db = _index(root)
         try:
             total = db.execute('SELECT count(*) FROM objects WHERE ' + condition, args).fetchone()[0]
-            rows = db.execute('SELECT ref,sequence,origin,kind,node_id,title,substr(content,1,600) AS excerpt,created_at FROM objects WHERE ' + condition + ' ORDER BY sequence DESC, ref LIMIT ? OFFSET ?', [*args, limit, offset]).fetchall()
+            rows = db.execute('SELECT ref,sequence,origin,kind,node_id,title,content,created_at FROM objects WHERE ' + condition + ' ORDER BY sequence DESC, ref LIMIT ? OFFSET ?', [*args, limit, offset]).fetchall()
         finally:
             db.close()
-        return {'schema_version': 'research-search/2', 'records': [{**dict(row), 'read': {'ref': row['ref']}} for row in rows],
+        matches = []
+        for row in rows:
+            item = dict(row)
+            item['excerpt'] = _search_excerpt(item['ref'], item.pop('content'), query)
+            matches.append({**item, 'read': {'ref': row['ref']}})
+        return {'schema_version': 'research-search/2', 'records': matches,
                 'total': total, 'next_offset': offset + limit if offset + limit < total else None,
                 'index_sequence': journal(root)['sequence']}
 
@@ -121,9 +150,12 @@ def node_detail(root, node_id, *, jobs=()):
     reviews = [{'used': e['target'], 'superseded_by': replacement['id'], 'relation_id': e['id']}
                for e in links if e['source'] in result_ids | {node_id}
                for replacement in graph['results'].values() if replacement['supersedes'] == e['target']]
-    if assessment and assessment.get('schema_version') == 'research-result/1':
+    if assessment:
         from .context import result_notices
+        from .brief_selection import assessment_notices
         reviews.extend(result_notices(root, assessment, graph))
+        reviews.extend(assessment_notices(root, node['assessment_ref'],
+            [row for row in journal(root)['records'] if row.get('node_id') == node_id]))
     owners = {ref: result['node_id'] for ref, result in graph['results'].items()}
     endpoints = (owners.get(ref, ref) for edge in links for ref in (edge['source'], edge['target']))
     neighbors = {ref for ref in endpoints if ref in graph['nodes'] and ref != node_id}
@@ -154,6 +186,7 @@ def read(root, *, ref, offset=0, limit=16000, session_id=None, jobs=(), field=No
             chunk = chunk[:max(1, len(chunk) * 3 // 4)]
         end = offset + len(chunk)
         response = {'schema_version': 'research-read/2', 'ref': ref, 'text': chunk, 'offset': offset,
+                    'content_sha256': 'sha256:' + digest(full),
                     'offset_unit': 'unicode_characters', 'total_characters': len(full),
                     'next_offset': end if end < len(full) else None}
         if ref.startswith('node_'):

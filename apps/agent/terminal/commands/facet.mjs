@@ -5,7 +5,7 @@ import { createStatusPresentation } from "../status/presentation.mjs";
 import { createDocumentView } from "../renderers/document.mjs";
 import { createCommandPresentation } from "./panel.mjs";
 import { formatMonitor } from "./monitor.mjs";
-import { formatFields } from '../renderers/fields.mjs';
+import { formatResearchOverview, formatResearchDetail, formatResearchSearch, researchChoices } from './research.mjs';
 
 /** Presentation-only commands; all scientific reads execute in the worker. */
 export async function createCoRAgentNativeClientFacet({ sourceRoot, session } = {}) {
@@ -161,23 +161,46 @@ export function createTerminalCommands({ ui, queries, session, show, usage, moni
           else if (id) await session.resume(id);
           return;
         }
-        const response = definition.name === "research"
-          ? await queries.research(args, context)
-          : await queries.systemPrompt(context);
-        if (session.signal?.aborted) return;
-        if (response.session_id !== session.sessionId) throw new Error("Query returned a different session");
-        if (session.workspaceId && response.workspace_id !== session.workspaceId) throw new Error("Query returned a different workspace");
-        if (response.error) {
-          const { message, code, details = {} } = response.error;
-          const fields = [
-            ['Code', code], ['Command', details.command], ['Request', details.request_id],
-            ['Elapsed', Number.isFinite(details.elapsed_ms) ? `${details.elapsed_ms} ms` : undefined],
-          ].filter(([, value]) => value !== undefined);
-          throw new Error([message, ...fields.map(([label, value]) => `${label}: ${value}`)].join('\n'));
+        if (definition.name === "research") {
+          const query = async input => {
+            const response = await queries.research(input, context);
+            checkQueryResponse(response, session);
+            return response;
+          };
+          let response = await query(args);
+          if (session.signal?.aborted) return;
+          let command = `research${args ? ` ${args}` : ''}`;
+          if (invocation.command === 'research_search' && invocation.params.kind === 'node') {
+            while (true) {
+              const choices = researchChoices(response.result);
+              if (!choices.length) { ui.showStatus('No saved research questions on this page. Use /research search to find other records.', context); return; }
+              const next = response.result.next_offset;
+              if (next !== null) choices.push({value:'next-page',label:'More research questions',description:'Show the next page'});
+              const selected = await ui.select('Research questions', choices, undefined, context);
+              if (!selected || session.signal?.aborted) return;
+              if (selected === 'next-page') {
+                response = await query(`read --offset ${next} --limit ${invocation.params.limit || 20}`);
+                if (session.signal?.aborted) return;
+                continue;
+              }
+              response = await query(`read ${selected}`);
+              if (session.signal?.aborted) return;
+              command = `research read ${selected}`;
+              break;
+            }
+          }
+          const overview = !args.trim();
+          const search = invocation.command === 'research_search' && invocation.params.kind !== 'node';
+          const body = overview ? formatResearchOverview(response.result, response.task)
+            : search ? formatResearchSearch(response.result, invocation.params.query) : formatResearchDetail(response.result);
+          await show(overview ? 'Research progress' : search ? 'Research search' : 'Research details',
+            body, context, command, overview ? 'Task' : 'Workspace', 'auto');
+          return;
         }
-        const title = definition.name === "sys-prompt" ? "System prompt" : "Research state";
-        const body = definition.name === "sys-prompt" ? formatPrompt(response.result) : formatResearch(response.result);
-        await show(title, body, context, `${definition.name}${args ? ` ${args}` : ''}`, definition.name === 'research' ? 'Workspace' : 'Session', definition.name === 'sys-prompt' ? 'page' : 'auto');
+        const response = await queries.systemPrompt(context);
+        if (session.signal?.aborted) return;
+        checkQueryResponse(response, session);
+        await show('System prompt', formatPrompt(response.result), context, 'sys-prompt', 'Session', 'page');
       } catch (error) {
         if (!session.signal?.aborted) ui.showStatus(error instanceof Error ? error.message : String(error), context, 'error');
       }
@@ -190,13 +213,15 @@ function formatPrompt(manifest) {
   return `${manifest.effective}\n\nSources\n${sources}\n\nSHA256: ${manifest.sha256}${manifest.limitations?.length ? `\n\nLimitations\n${manifest.limitations.join("\n")}` : ""}`;
 }
 
-function formatResearch(value) {
-  if (value?.schema_version !== 'research-summary/1') return formatFields(value);
-  const sections = [
-    ['Research overview', { workspace: value.workspace_id, revision: value.revision, state: value.lifecycle_state, progress: value.progress }],
-    ['Current focus', value.focus], ['Phases and goals', value.phases], ['Claims', value.claims],
-    ['Research nodes', value.nodes], ['Findings', value.findings], ['Gates', value.gates],
-  ];
-  return sections.map(([title, content]) => `${title}\n${'─'.repeat(title.length)}\n${formatFields(content)}`).join('\n\n')
-    + '\n\nFull item: /research detail <kind> <id>';
+function checkQueryResponse(response, session) {
+  if (response.session_id !== session.sessionId) throw new Error('Query returned a different session');
+  if (session.workspaceId && response.workspace_id !== session.workspaceId) throw new Error('Query returned a different workspace');
+  if (response.error) {
+    const { message, code, details = {} } = response.error;
+    const fields = [
+      ['Code', code], ['Command', details.command], ['Request', details.request_id],
+      ['Elapsed', Number.isFinite(details.elapsed_ms) ? `${details.elapsed_ms} ms` : undefined],
+    ].filter(([, value]) => value !== undefined);
+    throw new Error([message, ...fields.map(([label, value]) => `${label}: ${value}`)].join('\n'));
+  }
 }

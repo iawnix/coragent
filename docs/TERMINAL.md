@@ -117,13 +117,13 @@ symbol cues.
 
 Document views distinguish field labels, numbers, booleans and states. `/sys-prompt`
 colors Markdown headings, inline code and fenced blocks while preserving the source.
-Research and diagnostic fields show empty lists as `[]`, empty objects as `{}`,
+Diagnostic fields show empty lists as `[]`, empty objects as `{}`,
 missing values as `—`, and empty strings as `""`. Empty collections stay beside their
 field labels. Empty Monitor lists show `No entries`; these are not error states.
 
 CoRAgent command names, arguments, and completions share one catalogue:
 
-- `/research`: read-only queries in the attached worker, for Memory context and records, including a remote workspace over SSH. Use the command help for supported selectors. Long results open a separate reading page.
+- `/research`: review the current task's research progress, saved judgments and evidence. Read and search commands open the underlying records, including in a workspace reached over SSH. See Research progress below.
 - `/sys-prompt`: inspect the current worker's CoRAgent system prompt manifest and sources without a model request.
 - `/resume [session-id]`: select or specify a session in the current workspace. Cancelling keeps the current session.
 - `/usage`: inspect session token totals, context and usage by model in a compact panel.
@@ -247,6 +247,41 @@ Session reads and attachments accept only `after_cursor: {epoch, sequence}`;
 a different Host epoch returns a current snapshot without replaying old events.
 Session creation/resumption and `model/select` use `model: {provider, id}`.
 Session lists use `{sessions: [...]}` and contain no legacy backend or format flags.
+
+## Research progress
+
+| Command | Behavior |
+| --- | --- |
+| `/research` | Research progress for the current task, with links to other research problems |
+| `/research read [ref]` | Select a problem by title, or read a referenced problem, judgment or Result |
+| `/research search [text]` | Find saved research and evidence by text; omit the text to browse recent records |
+
+The title browser and search results provide commands for the next page and accept
+`--offset` and `--limit` in records. `/research read --offset <n>` browses another
+page of problem titles. Reading an explicit reference loads the complete detail
+automatically and does not accept pagination flags. Search uses a case-insensitive
+literal substring and previews the relevant research text. Put text that starts
+with an option name after `--`.
+
+The overview leads with the research objective and current saved judgment, including
+its limitations. It then shows the evidence already obtained, the next action,
+blockers and any recorded request for user input. Problem titles provide navigation;
+record IDs identify the exact evidence to open. Update times show when the displayed
+information was saved.
+
+The current task determines the overview's focus. Other problems remain available
+through their titles and read commands. A missing judgment is shown explicitly;
+the view does not invent a conclusion from a Job's exit status. New evidence or a
+superseded Result cited by the judgment is marked as requiring review, so an older
+judgment is not presented as an updated assessment.
+
+These commands read persisted records through the attached worker. They do not call
+the model, update research, change task focus or resume a stopped task. Task state,
+scientific conclusions and compute Job state are separate facts: a stopped task
+does not establish that the research is complete, and a successful Job does not
+establish a valid conclusion. Use `/monitor` for task controls and `/monitor jobs`
+for execution status. Text search finds stored records; it does not generate a new
+answer or replace reading their evidence.
 
 ## Monitor
 
