@@ -59,7 +59,7 @@ async function fixture(t, storage = new MemoryStorage(), controllerOptions = {},
       ...(typeof artifacts.get(params.artifact_id) === "object" ? artifacts.get(params.artifact_id) : { sha256: artifacts.get(params.artifact_id) }) };
     throw new Error(`Unexpected test command ${command}`);
   } };
-  const openController = () => createTaskController({ harness, conversation, admission, LiveDoc, InboxDoc, kernel, workspaceId: "workspace", sessionId: "session", context, ...controllerOptions });
+  const openController = () => createTaskController({ harness, conversation, admission, LiveDoc, InboxDoc, kernel, queryKernel: kernel, workspaceId: "workspace", sessionId: "session", context, ...controllerOptions });
   controller = openController();
   const session = createSessionAdmission({ harness, conversation, LiveDoc, taskController: controller });
   const native = bindUserInputConversation(conversation, admission, harness, session);
@@ -292,7 +292,7 @@ test("fixed evidence is counted once across tools, reference combinations, conte
   const task = await controller.current(context);
   assert.equal(task.progress_identities.length, 140);
   await controller.close();
-  const reopened = createTaskController({ harness, conversation, admission, LiveDoc, InboxDoc, kernel, workspaceId: "workspace", sessionId: "session", context });
+  const reopened = createTaskController({ harness, conversation, admission, LiveDoc, InboxDoc, kernel, queryKernel: kernel, workspaceId: "workspace", sessionId: "session", context });
   t.after(() => reopened.close());
   await reopened.update({ action: "progress", expected_revision: task.revision, evidence_refs: ["result_1", "result_2", "art_2"] }, "after-restart", context);
   await reopened.observeToolResults(observed("research_result", { result: { id: "result_1" } }), context);
@@ -483,6 +483,64 @@ test("concrete Job waits do not generate inputs and reconcile already finished J
   assert.equal((await controller.current(context)).continuation.sequence, 1);
 });
 
+test("Task and Monitor reads preserve waiting state and use isolated persisted Job queries", async t => {
+  let jobs = [{ job_id: "job_1", state: "running" }];
+  const queries = [];
+  const queryKernel = { async execute_command(command, params) {
+    assert.equal(command, "job_list");
+    queries.push(params);
+    return { jobs, next_cursor: null };
+  } };
+  const { controller, begin, kernel, harness, conversation } = await fixture(t, new MemoryStorage(), { queryKernel, enabled: false });
+  let task = await begin();
+  task = await controller.update({ expected_revision: task.revision, action: "wait",
+    wait: { job_ids: ["job_1"], mode: "all" } }, "wait-isolated", context);
+  // A slow execution worker must not be needed to read Task or Monitor state.
+  kernel.execute_command = async command => { throw new Error(`Execution worker unavailable: ${command}`); };
+  jobs = [{ job_id: "job_1", state: "succeeded" }];
+  queries.length = 0;
+  for (const read of [() => controller.current(context), () => controller.read({ user_task_id: task.user_task_id }, context),
+    async () => (await controller.snapshot(context)).task]) {
+    const observed = await read();
+    assert.equal(observed.state, "waiting");
+    assert.equal(observed.revision, task.revision);
+    assert.deepEqual(observed.audit, task.audit);
+  }
+  assert.equal(queries.length, 0, "reading Task lifecycle does not settle its wait");
+  const monitor = createMonitorService({ controller, harness, conversation, queryKernel,
+    workspaceId: "workspace", sessionId: "session", LiveDoc });
+  const overview = await monitor.handle({ method: "monitor/overview" }, context);
+  assert.equal(overview.error, null);
+  assert.equal(overview.result.task.state, "waiting");
+  assert.deepEqual(overview.result.jobs.counts, { running: 0, queued: 0, total: 1 });
+  assert.equal(queries.length, 1);
+  await controller.reconcile();
+  const reconciled = await controller.current(context);
+  assert.equal(reconciled.state, "active", "background reconciliation advances the completed wait");
+  assert.equal(reconciled.continuation.sequence, 0, "disabled continuation does not submit a model run");
+});
+
+test("waiting for all Jobs requires every persisted Job and honors all result pages", async t => {
+  let includeSecond = false;
+  const queryKernel = { async execute_command(command, params) {
+    assert.equal(command, "job_list");
+    return params.cursor
+      ? { jobs: includeSecond ? [{ job_id: "job_2", state: "succeeded" }] : [], next_cursor: null }
+      : { jobs: [{ job_id: "job_1", state: "succeeded" }], next_cursor: "job_1" };
+  } };
+  const { controller, begin } = await fixture(t, new MemoryStorage(), { queryKernel, enabled: false });
+  let task = await begin();
+  includeSecond = true;
+  task = await controller.update({ expected_revision: task.revision, action: "wait",
+    wait: { job_ids: ["job_1", "job_2"], mode: "all" } }, "wait-pages", context);
+  includeSecond = false;
+  await controller.reconcile();
+  assert.equal((await controller.current(context)).state, "waiting", "missing observations cannot satisfy all-Jobs waits");
+  includeSecond = true;
+  await controller.reconcile();
+  assert.equal((await controller.current(context)).state, "active");
+});
+
 test("native abort persists pause and control retries are idempotent", async t => {
   const { controller, conversation, native, faux, begin } = await fixture(t);
   await begin();
@@ -528,7 +586,7 @@ test("task sources reject internal continuations and Monitor queries never resum
   await controller.reconcile(); await conversation.waitForIdle(context);
   const automatic = await admission.status(`task:${task.user_task_id}:continue:1`, context);
   await assert.rejects(controller.begin({ title: "fake", objective: "fake", source_submission_ids: [String(automatic.id)], criteria: [] }, "fake", context), { code: "task_source_invalid" });
-  const service = createMonitorService({ controller, harness, conversation, kernel, workspaceId: "workspace", sessionId: "session", LiveDoc });
+  const service = createMonitorService({ controller, harness, conversation, queryKernel: kernel, workspaceId: "workspace", sessionId: "session", LiveDoc });
   for (const method of ["monitor/overview", "monitor/tasks", "monitor/health", "monitor/jobs", "monitor/runs"]) {
     assert.equal((await service.handle({ method, params: {} }, context)).error, null);
   }
@@ -647,8 +705,8 @@ test("pause wins while completed waits are being observed", async t => {
   let entered, finish;
   const ready = new Promise(resolve => { entered = resolve; });
   const execute = kernel.execute_command;
-  kernel.execute_command = async (command, params) => command === "job_status"
-    ? new Promise(resolve => { entered(); finish = () => resolve({ job_id: "job_1", state: "succeeded" }); })
+  kernel.execute_command = async (command, params) => command === "job_list"
+    ? new Promise(resolve => { entered(); finish = () => resolve({ jobs: [{ job_id: "job_1", state: "succeeded" }], next_cursor: null }); })
     : execute(command, params);
   const binding = controller.binding(context);
   const rejected = assert.rejects(binding, { code: "task_not_active" });
@@ -727,12 +785,13 @@ test("transient wait status failure preserves user access and can recover", asyn
     wait: { job_ids: ["job_1"], mode: "all" } }, "wait-unavailable", context);
   const execute = kernel.execute_command;
   kernel.execute_command = async (command, params) => {
-    if (command === "job_status") throw new Error("Fixture status service unavailable");
+    if (command === "job_list") throw new Error("Fixture persisted Job state unavailable");
     return execute(command, params);
   };
   assert.equal((await controller.current(context)).state, "waiting");
-  assert.equal(controller.health().error.code, "task_wait_observation_failed");
+  assert.equal(controller.health().error, null, "reading Task state does not observe waiting Jobs");
   await assert.rejects(controller.binding(context), { code: "task_not_active" });
+  assert.equal(controller.health().error.code, "task_wait_observation_failed");
   kernel.execute_command = execute; jobStates.set("job_1", "succeeded");
   assert.deepEqual(await controller.binding(context), { user_task_id: task.user_task_id, execution_context: { selection: { target: { platform: "local", scheduler_entry: "main" }, route_digest: "sha256:" + "a".repeat(64) }, policy: { max_in_flight: 1, max_attempts: 100 } } });
 });
@@ -1035,6 +1094,37 @@ test("task cancellation commits before unavailable Job discovery, and retries cl
   assert.deepEqual(task.cancel_jobs.pending, []);
   assert.equal(task.cancel_jobs.receipts.job_55.state, "cancelled");
   assert.equal(task.continuation.sequence, 0);
+});
+
+test("task cancellation discovers Jobs after pending execution commits instead of an early query snapshot", async t => {
+  const queryKernel = { async execute_command(command) {
+    assert.equal(command, "job_list");
+    return { jobs: [], next_cursor: null };
+  } };
+  const env = await fixture(t, new MemoryStorage(), { queryKernel });
+  const task = await env.begin();
+  let entered, release;
+  const discovering = new Promise(resolve => { entered = resolve; });
+  const pendingDispatch = new Promise(resolve => { release = resolve; });
+  const execute = env.kernel.execute_command;
+  env.kernel.execute_command = async (command, params) => {
+    if (command === "job_list") {
+      entered();
+      await pendingDispatch;
+    }
+    return execute(command, params);
+  };
+  const cancellation = env.controller.control({ user_task_id: task.user_task_id, expected_revision: task.revision,
+    action: "cancel", jobs: "cancel", request_id: "cancel-during-dispatch" }, context);
+  try {
+    await discovering;
+    assert.equal((await env.controller.current(context)).state, "cancelled", "Task stops before cancellation waits for dispatch");
+    env.jobStates.set("job_1", "running");
+  } finally { release(); }
+  const result = await cancellation;
+  assert.equal(result.task.cancel_jobs.discovery_pending, false);
+  assert.equal(result.task.cancel_jobs.receipts.job_1.state, "cancelled");
+  assert.equal(env.jobStates.get("job_1"), "cancelled");
 });
 
 for (const source of ["automatic", "historical"]) test(`internal runs cannot control a task using ${source} authorization`, async t => {

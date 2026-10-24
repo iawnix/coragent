@@ -102,7 +102,10 @@ Incomplete commands report the missing argument without executing an operation.
 
 Failed commands return to an untouched editor for correction; late failures never
 overwrite a newer draft. Press F2 on an error to read its complete message and
-usage, then Esc to return. Paths and multiline text starting with a slash remain
+usage; runtime query errors also include their available command, error code,
+request ID and elapsed time. Esc returns to the editor. Standard Windows Terminal
+F2 sequences are supported, including sequences split across SSH packets within
+the input timeout. Paths and multiline text starting with a slash remain
 ordinary messages. Pasting alone never executes a command.
 
 Command surfaces follow the active Pi theme. `›` marks keyboard focus and
@@ -132,8 +135,16 @@ The nonfunctional `/debug` placeholder has been removed.
 Successful command feedback expires after three seconds and informational feedback
 after five; errors remain until dismissed or another input is submitted. Submitting
 a message clears completed command feedback. With a selector or document open, Esc
-returns to chat. In ordinary chat, Esc interrupts the running turn even when command
-feedback is visible.
+returns to chat. In ordinary chat, Esc pauses the current user task, including
+while it waits for compute with no active model reply, and interrupts any running
+turn. Command feedback does not intercept this action. Compute Jobs keep running.
+
+The Context footer refreshes independently of Monitor and research queries.
+When the transcript changes, usage displays `Updating` until a matching estimate
+arrives; the known capacity remains visible for the same model.
+A failed request displays `Unavailable`, with its reason in `/usage`. Switching
+models never reuses the old model's capacity. `Total tokens` is cumulative session
+usage, not the current context size.
 
 Usage and monitor panels, model/thinking/resume selectors, and slash completions
 open above the Monitor row. The system prompt and long research results replace the
@@ -144,37 +155,52 @@ Arrow keys scroll content without changing the panel height; short documents onl
 show Back. Closing restores editing and the transcript reading position. Background
 task cancellation hints are hidden while a command surface owns Esc.
 
-A permanent row immediately above the input shows a compact activity label and
-Job count, for example `Monitor … · Working · 2 jobs running`. It uses only five
-labels; operational explanations belong in `/monitor`, not in the status name.
+A permanent row immediately above the input separates the Monitor connection,
+the user task state, and compute Job counts:
+
+`Monitor: Connected · Task: Waiting for compute · Job: 1 running, 0 queued`
+
+`Monitor` describes the availability of the current session's Monitor snapshot:
 
 | Display | Meaning |
 | --- | --- |
-| Working | Research, continuation scheduling, final delivery, or an executing recovery |
-| Waiting | Waiting for compute or an automatic recovery retry |
-| Stopped | Paused, cancelled, blocked, unable to recover, or automatic continuation disabled while idle |
-| Completed | The user task finished its delivery |
-| Idle | No current task and no model response executing |
+| Connected | A current snapshot was received successfully |
+| Connecting | Waiting for the first snapshot, including after switching sessions |
+| Disconnected | The Monitor overview request failed |
+| Unknown | The snapshot is missing a valid timestamp or is older than 30 seconds |
 
-Missing observations, overdue controller checks, and connection or stale-snapshot
-failures display `—` instead of claiming work is progressing. A running response
-can still show Working before the first controller check or with automatic
-continuation disabled. Replies explaining a paused, blocked, cancelled, or
-attention-required task do not replace Stopped with a combined status name.
-Connection failure, missing session data, and snapshots older than 30 seconds also
-hide cached job counts. Open `/monitor` for the explanation and recovery guidance.
+Until a current snapshot is available, `Task` and `Job` display `Unknown`; cached
+data from another session or an expired snapshot is not presented as current.
+These connection and freshness states do not imply that research or compute Jobs
+have paused or stopped.
 
-A completed model reply does not imply a completed user task. `jobs running`
-counts running compute jobs for the current task, or the session if no task exists;
-it excludes queued jobs and does not indicate whether a model turn is running.
-No progress percentage or completion time is inferred. The row remains visible
-while idle and while command panels are open. Background refreshes preserve
-focus, selection, reading position, and the input draft.
+`Task` directly reflects the persisted `task.state`, using the same labels as task
+details and lists:
 
-The five labels are a presentation mapping, not a new stored lifecycle. Task
-details and task lists retain the precise paused, blocked, cancelled, and delivery
-states. Reasons, automatic-continuation policy, and recovery records remain
-available in overview, task details, execution records, and health.
+| Task state | Display |
+| --- | --- |
+| `active` | Researching |
+| `waiting` | Waiting for compute |
+| `paused` | Paused |
+| `blocked` | Needs attention |
+| `completing` | Preparing delivery |
+| `completed` | Completed |
+| `partial` | Partially completed |
+| `cancelled` | Cancelled |
+| `recovering` | Checking recovery |
+
+A current snapshot with no task displays `Task: None`. Controller query failures,
+disabled automatic continuation, and execution recovery do not replace the task's
+state with a different activity label. Their explanations remain available in
+`/monitor`, task details, execution records, and `/monitor health`. A completed
+model reply does not imply a completed user task.
+
+`Job` reports running and queued compute Jobs separately, scoped to the current
+task or to the session when there is no task. Counts cover all pages and do not
+indicate whether a model turn is running. No progress percentage or completion
+time is inferred. The row remains visible while idle and while command panels
+are open. Background refreshes preserve focus, selection, reading position, and
+the input draft.
 
 `/monitor` is a compact live current-session overview. It displays the task state,
 objective, latest progress, next action, wait conditions, recovery reason, resume
@@ -199,8 +225,9 @@ switching. On reopening, inputs outside the active transcript after compaction a
 not restored.
 
 Disconnect, interrupt, and quit are different states. A detached terminal is
-only a disconnected client. `Esc` or Host `turn/interrupt` requests an active
-turn interruption. `/quit` closes only this terminal connection. If an input response is lost after dispatch, query `input/status` with the
+only a disconnected client. Chat `Esc` pauses the current task even while waiting
+for compute; Host `turn/interrupt` targets a specific active turn. Both suppress
+automatic continuation. `/quit` closes only this terminal connection. If an input response is lost after dispatch, query `input/status` with the
 same `client_message_id`. Pi's durable submission owns acceptance and completion;
 retrying the same business ID does not create another input.
 
@@ -276,8 +303,8 @@ not silently retried. Monitor's previous status/list/enable/disable methods and
 per-Job automatic-follow-up switches are removed.
 
 Pausing a user task prevents new automatic progress without cancelling its running
-Jobs. Chat Esc/`turn/interrupt` stops the current reply and suppresses automatic
-restart. Esc inside a Monitor panel only closes that panel. Cancelling a Job and
+Jobs. Chat Esc pauses the task and stops any current reply; `turn/interrupt`
+targets a specific active turn. Both suppress automatic restart. Esc inside a Monitor panel only closes that panel. Cancelling a Job and
 closing a terminal are separate actions. `/resume` switches the chat session;
 `/monitor task resume` resumes work inside the current session.
 

@@ -103,8 +103,10 @@ Task Controller 位于 SessionWorker 内。普通工具工作继续使用原生 
 
 暂停只抑制后续自动执行，当前回复和已有 Job 可以收尾；用户打断回复会同时暂停任务。恢复是用户控制操作。取消任务须显式选择保留还是请求取消已有 Job。Monitor 查询不发送模型输入或恢复任务。`CORAGENT_AUTOMATIC_CONTINUATION=0` 关闭自动输入，保留用户输入与状态读取。
 
-研究执行失败后，新的用户请求运行期间，Monitor 详情保留失败原因。底部状态行使用
-[终端文档](TERMINAL.zh-CN.md)中的五个简短标签，恢复细节在面板内查看。仅接收消息不会恢复自动研究；当前用户 run 记录了新的任务证据或归属 Job 里程碑，并由 Pi 确认提交成功结束后，控制器清除旧的研究恢复警告，允许后续续接（或遵守当前 Job 等待）。重复证据、状态询问、被新输入替代的请求和失败 run 都不能清除警告；暂停与取消仍优先。恢复关联可跨重启保留，历史失败提交不被改写。
+研究执行失败后，新的用户请求运行期间，Monitor 详情保留失败原因。底部状态行分别显示
+Monitor 连接、持久化的 Task 状态和运行中／排队中的 Job 数量，具体见[终端文档](TERMINAL.zh-CN.md)。
+自动推进错误和恢复详情不覆盖 Task 状态；快照不可用或过期时，Task 和 Job 显示未知。
+仅接收消息不会恢复自动研究；当前用户 run 记录了新的任务证据或归属 Job 里程碑，并由 Pi 确认提交成功结束后，控制器清除旧的研究恢复警告，允许后续续接（或遵守当前 Job 等待）。重复证据、状态询问、被新输入替代的请求和失败 run 都不能清除警告；暂停与取消仍优先。恢复关联可跨重启保留，历史失败提交不被改写。
 
 自然语言任务控制使用 `task_update action=apply_user_control`，引用当前 run 已消费的最新真实用户提交。运行时校验来源、当前输入归属及修订号；自动输入不构成控制授权。处理停止指令的 run 可以完成只读核实、用户要求的 Job 取消与最终确认，但不能继续发起工作或创建替代任务。Task 取消先于 Job 查询与取消落盘；后端故障保留为持久化清理工作，不唤醒模型。取消 Job 或修改 Node 状态都不会停止顶层 Task。
 
@@ -113,6 +115,17 @@ Task Controller 位于 SessionWorker 内。普通工具工作继续使用原生 
 Host 重启从 Pi 现有 session catalog 发现会话，最多并行恢复四个 Worker；每个 Worker 核对自身 durable 任务。恢复失败通过 `monitor/health` 展示。只有 SessionWorker 写会话 SQLite；聚合视图来自 Task、Pi、Job 各自事实源，不声称跨系统原子快照。
 
 `/monitor` 统一展示任务、作业和执行详情。Host 与浏览器共用 `apps/agent/contracts/monitor.mjs` 的唯一方法目录，请求与返回见 [Monitor 合同](../contracts/monitor/README.md)。Pi generation/tool Task 位于 run 的诊断详情中，不列入用户任务。任务/作业变化与重连沿用现有通知读取最新快照。
+
+每个 SessionWorker 拥有执行通道和有界本地查询通道，两者复用同一 Python JSONL 协议、
+命令实现和工作区事务。查询通道只允许 `research_read`、`research_search`、`job_list`
+与 `job_manager_assess`，合并相同的在途请求，同时最多接收 16 个不同请求。
+调用超时不会取消 Python 操作，实际响应或进程退出后才释放容量；Worker 关闭时清理两个进程。
+已发送请求超时的工具结果标记为结果未知、不可自动重试；发送前因容量不足拒绝则标记为未执行。
+查询可能恢复事务、投影事件，仍遵守既有工作区锁。
+
+Monitor 读取持久 Task 状态及 Job Manager 观测，不在界面刷新时改变 Task 生命周期或查询远端调度器。
+控制器根据持久 Job 观测解除等待。取消任务时的作业发现仍排在此前执行请求之后，避免漏掉在途提交。
+Context 用量只依赖 Pi 历史和模型配置，与两个 Python 通道独立。
 
 ## Skill 与交付
 

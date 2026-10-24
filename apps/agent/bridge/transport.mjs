@@ -23,12 +23,15 @@ export function create_jsonl_subprocess_transport({
   cwd = REPOSITORY_ROOT,
   env = process.env,
   timeout_ms = DEFAULT_TIMEOUT_MS,
+  max_pending = 256,
+  coalesce = false,
 } = {}) {
   if (typeof command !== "string" || command.length === 0) throw new TypeError("subprocess command is required");
   if (!Array.isArray(args) || args.some((item) => typeof item !== "string")) {
     throw new TypeError("subprocess args must be an array of strings");
   }
   if (!Number.isInteger(timeout_ms) || timeout_ms <= 0) throw new TypeError("timeout_ms must be positive");
+  if (!Number.isInteger(max_pending) || max_pending <= 0) throw new TypeError("max_pending must be positive");
 
   const child = spawn(command, [...args, "-u", "-m", "research_agent.application.bridge_worker"], {
     cwd: resolve(cwd),
@@ -41,6 +44,7 @@ export function create_jsonl_subprocess_transport({
   let closed = false;
   let sequence = 0;
   const pending = new Map();
+  const requests = new Map();
   ACTIVE_KERNEL_CHILDREN.add(child);
   const exited = new Promise(done => child.once("close", done));
   let closePromise;
@@ -53,6 +57,7 @@ export function create_jsonl_subprocess_transport({
       entry.reject(error);
     }
     pending.clear();
+    requests.clear();
   }
 
   child.stdout.setEncoding("utf8");
@@ -74,6 +79,7 @@ export function create_jsonl_subprocess_transport({
       const entry = pending.get(response?.id);
       if (!entry) continue;
       pending.delete(response.id);
+      requests.delete(entry.key);
       clearTimeout(entry.timer);
       if (response.ok === true) entry.resolve(response.result);
       else entry.reject(new KernelBridgeError(response?.error?.message || "Python runtime request failed", {
@@ -97,21 +103,37 @@ export function create_jsonl_subprocess_transport({
   async function request(method, payload = {}) {
     if (!["workspace_files", "workspace_catalog", "workspace_initialize", "workspace_attach", "workspace_admit"].includes(method)) require_method(method);
     if (closed) throw new KernelBridgeError("Python runtime transport is closed", { code: "transport_closed" });
+    const key = coalesce ? JSON.stringify([method, payload]) : null;
+    if (key !== null && requests.has(key)) return requests.get(key);
+    if (pending.size >= max_pending) throw new KernelBridgeError("Python runtime request capacity reached", {
+      code: "kernel_request_busy", details: { command: payload.command, pending_requests: pending.size },
+    });
     const id = `bridge_${++sequence}`;
     const message = `${JSON.stringify({ id, method, payload })}\n`;
-    return new Promise((resolve_result, reject) => {
+    const started = Date.now();
+    const promise = new Promise((resolve_result, reject) => {
       const timer = setTimeout(() => {
-        pending.delete(id);
-        reject(new KernelBridgeError(`Python runtime request timed out: ${method}`, { code: "kernel_request_timeout" }));
+        // A timeout ends the caller's wait, not the Python operation. Keep its
+        // capacity and coalescing entry until the actual reply or process exit.
+        // Repeated refreshes cannot keep adding work behind a blocked request.
+        reject(new KernelBridgeError(`Python runtime request timed out: ${payload.command || method}`, {
+          code: "kernel_request_timeout", details: { request_id: id, command: payload.command || method,
+            elapsed_ms: Date.now() - started, pending_requests: pending.size,
+            outstanding: [...pending].map(([request_id, entry]) => ({ request_id, command: entry.command,
+              elapsed_ms: Date.now() - entry.started })) },
+        }));
       }, timeout_ms);
-      pending.set(id, { resolve: resolve_result, reject, timer });
+      pending.set(id, { resolve: resolve_result, reject, timer, key, started, command: payload.command || method });
       child.stdin.write(message, (error) => {
         if (!error) return;
         clearTimeout(timer);
         pending.delete(id);
+        requests.delete(key);
         reject(new KernelBridgeError(`cannot write Python runtime request: ${error.message}`, { code: "kernel_request_write_error", cause: error }));
       });
     });
+    if (key !== null) requests.set(key, promise);
+    return promise;
   }
 
   function close() {

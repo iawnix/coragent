@@ -560,12 +560,38 @@
 +		if (this.#commandFeedbackKind !== "running") this.#dismissCommand();
  		const controller = this.#selectedController();
  		if (controller === undefined) return;
-@@ -596,4 +885,5 @@
+@@ -596,14 +885,14 @@
  
  	#interrupt(): void {
 +		if (this.#commandFeedback) this.#dismissCommand();
- 		const view = this.#conversationView();
+-		const view = this.#conversationView();
  		const controller = this.#selectedController();
+-		if (view === undefined || liveOf(view).run === undefined || controller === undefined) return;
+-		this.#status = "Aborting…";
++		if (controller === undefined) return;
++		this.#status = "Pausing…";
+ 		this.#rebuild();
+ 		void controller.abort(BACKGROUND_CONTEXT).then(
+ 			() => {
+-				if (this.#status !== "Aborting…") return;
++				if (this.#status !== "Pausing…") return;
+ 				this.#status = "";
+ 				this.#rebuild();
+ 			},
+ 			(error: unknown) => {
+--- a/packages/tui/src/stdin-buffer.ts
++++ b/packages/tui/src/stdin-buffer.ts
+@@ -289,7 +289,9 @@
+ 
+ 	constructor(options: StdinBufferOptions = {}) {
+ 		super();
+-		this.timeoutMs = options.timeout ?? DEFAULT_SEQUENCE_TIMEOUT_MS;
+ 		this.escapeTimeoutMs = options.escapeTimeout ?? DEFAULT_ESCAPE_TIMEOUT_MS;
++		// SSH fragments can arrive after the local 50ms sequence timeout.
++		// An escape prefix must retain the same window as its initial ESC.
++		this.timeoutMs = options.timeout ?? Math.max(DEFAULT_SEQUENCE_TIMEOUT_MS, this.escapeTimeoutMs);
+ 	}
+ 
 --- a/packages/coding-agent/src/experimental/services/presentation-ui.ts
 +++ b/packages/coding-agent/src/experimental/services/presentation-ui.ts
 @@ -1,2 +1,3 @@

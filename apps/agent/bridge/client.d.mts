@@ -20,7 +20,7 @@ export function create_runtime_bridge(request: {
   readonly transport: KernelBridgeTransport;
 }): RuntimeBridge;
 
-export function create_python_runtime_bridge(request: {
+export interface PythonRuntimeBridgeOptions {
   readonly workspace_root: string;
   readonly workspace_id?: string;
   readonly command?: string;
@@ -28,4 +28,13 @@ export function create_python_runtime_bridge(request: {
   readonly cwd?: string;
   readonly env?: NodeJS.ProcessEnv;
   readonly timeout_ms?: number;
-}): RuntimeBridge;
+  readonly max_pending?: number;
+  readonly coalesce?: boolean;
+}
+export function create_python_runtime_bridge(request: PythonRuntimeBridgeOptions): RuntimeBridge;
+
+export interface QueryRuntimeBridge {
+  execute_command<C extends 'research_read' | 'research_search' | 'job_list' | 'job_manager_assess'>(command: C, params?: Record<string, unknown>): Promise<CommandResults[C]>;
+  close(): Promise<void>;
+}
+export function create_query_runtime_bridge(request: PythonRuntimeBridgeOptions): QueryRuntimeBridge;

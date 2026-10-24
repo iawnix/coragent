@@ -14,6 +14,31 @@ const execute = promisify(execFile);
 const sourceRoot = pinnedPiSource();
 const packageRoot = resolve(process.env.CORAGENT_TEST_PACKAGE_ROOT || process.cwd());
 
+test("SSH input reassembles standard F2 fragments throughout the Escape timeout", async t => {
+  const [{ StdinBuffer }, { resolveEscapeTimeoutMs }] = await Promise.all([
+    import(pathToFileURL(join(sourceRoot, "packages/tui/src/stdin-buffer.ts"))),
+    import(pathToFileURL(join(sourceRoot, "packages/tui/src/terminal.ts"))),
+  ]);
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const escapeTimeout = resolveEscapeTimeoutMs({ SSH_TTY: "/dev/pts/fixture" });
+  assert.equal(escapeTimeout, 100);
+  for (const sequence of ["\x1bOQ", "\x1b[12~"]) {
+    const buffer = new StdinBuffer({ escapeTimeout });
+    const received = [];
+    buffer.on("data", data => received.push(data));
+    try {
+      buffer.process(sequence.slice(0, -1));
+      t.mock.timers.tick(75);
+      assert.deepEqual(received, [], "an incomplete F2 must not be flushed before the SSH Escape timeout");
+      buffer.process(sequence.slice(-1));
+      assert.deepEqual(received, [sequence]);
+      buffer.process("\x1b");
+      t.mock.timers.tick(escapeTimeout);
+      assert.deepEqual(received, [sequence, "\x1b"], "a standalone Escape still pauses promptly");
+    } finally { buffer.destroy(); }
+  }
+});
+
 test("real worker terminal isolates monitor refresh, command feedback and task cancellation", {
   timeout: 90_000,
 }, async () => {
@@ -173,14 +198,14 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
       };
       const submit = (text) => { terminal.sendInput('\x05'); terminal.sendInput('\x15'); terminal.sendInput(text); terminal.sendInput("\r"); };
       const frameAt = (width=100,height=24) => renderLayoutFrame(component.layoutRoot,width,height,()=>{});
-      const monitorRow = frame => frame.lines.findIndex(line=>stripVTControlCharacters(line).trim().startsWith('Monitor '));
+      const monitorRow = frame => frame.lines.findIndex(line=>/^Monitor[: ]/.test(stripVTControlCharacters(line).trim()));
       const assertDock = (frame,height=24,inputRows=1) => {
         const index=monitorRow(frame);
         assert.equal(index,height-5-inputRows,frame.lines.map(stripVTControlCharacters).join('\n'));
         assert.match(stripVTControlCharacters(frame.lines[index+1]),/^─/);
         assert.match(stripVTControlCharacters(frame.lines[index+2+inputRows]),/^─/);
       };
-      const withoutMonitor = text => text.split('\n').filter(line=>!stripVTControlCharacters(line).trim().startsWith('Monitor ')).join('\n');
+      const withoutMonitor = text => text.split('\n').filter(line=>!/^Monitor[: ]/.test(stripVTControlCharacters(line).trim())).join('\n');
       try {
         ui.addChild(component); ui.setLayoutRoot(component.layoutRoot); ui.setFocus(component); ui.start();
         const clickEditor = async () => {
@@ -197,6 +222,10 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
         await waitFor(() => !renderedText().includes("Context: Unknown"));
         assert.doesNotMatch(renderedText(), /Server:| entries|\/model ·/);
         assertDock(frameAt());
+        assert.equal((await backend.readSession("startup", created.session.session_id)).session.is_streaming, false);
+        terminal.sendInput('\x1b');
+        assert.match(renderedText(), /Pausing…/, "Esc must reach session admission while no model run is active");
+        await waitFor(() => !renderedText().includes('Pausing…'));
         terminal.sendInput('/mo');
         await waitFor(()=>component.render(100).some(line=>line.includes("Inspect and control")));
         for(const [width,height] of [[100,24],[32,12],[20,10]]) {
@@ -248,16 +277,16 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
         await waitFor(()=>renderedText().includes('Monitor ✓ · ↑2'));
         await new Promise(resolve => setImmediate(resolve));
         submit('/monitor');
-        await waitFor(()=>renderedText().includes('1 jobs running'));
+        await waitFor(()=>renderedText().includes('Job: 1 running, 0 queued'));
         const monitorFocus=ui.getFocusedComponent();
         monitorRunning=2;refreshMonitor();
-        await waitFor(()=>renderedText().includes('2 jobs running'));
+        await waitFor(()=>renderedText().includes('Job: 2 running, 0 queued'));
         assert.equal(ui.getFocusedComponent(),monitorFocus);
         assert.match(renderedText(),/job_1 · running/);
         assertDock(frameAt());
-        assert.match(renderedText(),/Monitor ✓ · Idle · 2 jobs running/);
+        assert.match(renderedText(),/Monitor: Connected · Task: None · Job: 2 running, 0 queued/);
         terminal.sendInput('\x1b');
-        await waitFor(()=>renderedText().includes('Monitor ✓ · Idle · 2 jobs running'));
+        await waitFor(()=>renderedText().includes('Monitor: Connected · Task: None · Job: 2 running, 0 queued'));
         await new Promise(resolve=>setImmediate(resolve));
         submit("/research read");
         await waitFor(() => renderedText().includes("Research state"));
@@ -331,12 +360,25 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
         submit('/monitor task pause');
         await waitFor(()=>renderedText().includes('Missing task ID'));
         assert.match(stripVTControlCharacters(frameAt().lines[20]),/\/monitor task pause/);
-        terminal.sendInput('\x1bOQ'); // F2 opens the complete error without losing the command.
-        await waitFor(()=>renderedText().includes('Command error'));
-        assert.match(renderedText(),/Usage:/);
-        terminal.sendInput('\x1b');
-        await new Promise(resolve=>setImmediate(resolve));
-        assert.match(stripVTControlCharacters(frameAt().lines[20]),/\/monitor task pause/);
+        const { StdinBuffer } = await fromSource('packages/tui/src/stdin-buffer.ts');
+        const keyboard = new StdinBuffer({ escapeTimeout: 100 });
+        keyboard.on('data', data => terminal.sendInput(data));
+        try {
+          // Windows Terminal's standard SS3 F2 and the common CSI form must
+          // open error details after mouse focus and across SSH input chunks.
+          for (const sequence of ['\x1bOQ', '\x1b[12~']) {
+            await clickEditor();
+            keyboard.process(sequence.slice(0, -1));
+            await new Promise(resolve => setImmediate(resolve));
+            keyboard.process(sequence.slice(-1));
+            await waitFor(()=>renderedText().includes('Command error'));
+            assert.match(renderedText(),/Usage:/);
+            terminal.sendInput('\x1b');
+            assert.doesNotMatch(renderedText(), /Pausing…/, 'Esc in details must only close the panel');
+            await new Promise(resolve=>setImmediate(resolve));
+            assert.match(stripVTControlCharacters(frameAt().lines[20]),/\/monitor task pause/);
+          }
+        } finally { keyboard.destroy(); }
         submit('/delayed-error');
         await waitFor(()=>typeof finishError==='function');
         terminal.sendInput('new draft');finishError();
@@ -374,7 +416,7 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
         await waitFor(()=>renderedText().includes('Selected fixture/fixture'));
         assert.match(renderedText(),/\/model · ✓ Done/);
         const commandLines=component.render(100).map(stripVTControlCharacters);
-        const monitorIndex=commandLines.findIndex(line=>line.includes('Monitor ✓'));
+        const monitorIndex=commandLines.findIndex(line=>/^Monitor[: ]/.test(line.trim()));
         assert.ok(monitorIndex > commandLines.findIndex(line=>line.includes('/model ·')));
         assert.match(commandLines[monitorIndex+1],/─/);
         terminal.sendInput('timer draft');

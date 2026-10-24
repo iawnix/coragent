@@ -9,6 +9,8 @@ export interface JsonlSubprocessTransportOptions {
   readonly cwd?: string;
   readonly env?: NodeJS.ProcessEnv;
   readonly timeout_ms?: number;
+  readonly max_pending?: number;
+  readonly coalesce?: boolean;
 }
 
 export function create_jsonl_subprocess_transport(

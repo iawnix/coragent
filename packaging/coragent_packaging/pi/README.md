@@ -12,7 +12,7 @@ All patches target the commit in `source.json`. For an upgrade, evaluate every r
 | 004-client-lifecycle | Attach/detach and client shutdown | `pi-session-worker-startup`, `pi-server-lifecycle` | Upstream preserves Worker execution across client detach |
 | 005-client-history | Restore session-specific input history | `pi-session-worker-startup` | Upstream restores and isolates native client history |
 | 006-tool-presentation | Product tool rendering hooks | `tool-presentation`, `runtime-presentation` | Upstream exposes equivalent renderer registration |
-| 007-client-status | Client status, commands and panels | `status-presentation`, `terminal-completion`, `coragent-native-commands` | Public UI APIs cover the product panels and status lifecycle |
+| 007-client-status | Client status, commands and panels; Esc sends session pause even without an active model run; incomplete SSH key sequences retain the configured Escape window | `status-presentation`, `terminal-completion`, `coragent-native-commands`, `pi-session-worker-startup`, `session-admission` | Public UI APIs cover panels, status lifecycle, idle session interruption and SSH key reassembly |
 | 008-request-admission | Validate the full model request before dispatch | `context-manager`, `tool-execution-boundary` | Upstream exposes equivalent request admission and failure semantics |
 | 009-input-identity | Preserve submission identity through client and server | `input-admission`, `user-sources` | Public APIs preserve the same input identity end to end |
 | 010-context-lifecycle | Context preparation and fixed-history compaction supplements | `context-manager`, `compaction-outcome` | Public hooks provide the same persistence and compaction boundaries |

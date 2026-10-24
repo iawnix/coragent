@@ -39,27 +39,6 @@ function jobRow(job) {
   return `${job.job_id} · ${text(job.state)} · Collection: ${text(job.collection_state)}`;
 }
 
-// Five user-facing activity labels. A dash means the observation is not ready.
-// Detailed lifecycle and controller facts remain in task details and health.
-export function continuationLabel(response) {
-  const task = response.task, running = response.execution?.state === 'running';
-  switch (response.continuation?.state) {
-    case 'idle': return task?.state === 'partial' ? 'Partially completed' : task?.state === 'completed' ? 'Completed'
-      : task?.state === 'cancelled' ? 'Stopped' : running ? 'Working' : 'Idle';
-    case 'paused':
-    case 'blocked':
-    case 'error':
-    case 'attention_required': return 'Stopped';
-    case 'disabled': return running ? 'Working' : 'Stopped';
-    case 'checking': return running ? 'Working' : '—';
-    case 'retrying': return running ? 'Working' : 'Waiting';
-    case 'waiting': return 'Waiting';
-    case 'pending':
-    case 'ready': return 'Working';
-    default: return '—';
-  }
-}
-
 export function continuationDetail(response) {
   switch (response.continuation?.state) {
     case 'idle': return response.task?.state === 'cancelled' ? 'The task was cancelled.' : null;
@@ -68,7 +47,7 @@ export function continuationDetail(response) {
     case 'disabled': return 'Automatic continuation is off. Inspect /monitor health before resuming.';
     case 'checking': return 'Waiting for the first continuation check.';
     case 'overdue': return 'Continuation checks are overdue. Inspect /monitor health.';
-    case 'error': return 'Automatic continuation failed. Inspect /monitor health and the task execution records.';
+    case 'error': return 'Automatic continuation check failed. Inspect /monitor health and the task execution records.';
     case 'attention_required': return 'Execution recovery needs attention. Inspect the task execution records before resuming.';
     case 'retrying': return response.execution?.state === 'running'
       ? 'Execution recovery is running.' : 'Execution will retry automatically.';
@@ -80,14 +59,13 @@ export function continuationDetail(response) {
 function formatOverview(response) {
   const { task, jobs } = response;
   const counts = jobs?.counts || {};
-  const jobSummary = `${counts.running ?? 0} running · ${counts.queued ?? 0} queued · ${counts.total ?? 0} total`;
+  const jobSummary = `${text(counts.running)} running · ${text(counts.queued)} queued · ${text(counts.total)} total`;
   const scopeLabel = jobs?.scope === 'task' ? 'Task jobs' : 'Session jobs';
   const command = jobs?.scope === 'task' && task ? `/monitor jobs --task ${task.user_task_id}` : '/monitor jobs';
-  const continuation = continuationLabel(response);
   const detail = continuationDetail(response);
   return [
     task ? `Task: ${task.title}` : 'No current task',
-    `Status: ${continuation}`,
+    `Task status: ${task ? taskStateLabel(task.state) : 'None'}`,
     ...(detail ? [`Details: ${detail}`] : []),
     ...(task ? [`Goal: ${task.objective}`] : []),
     ...(task?.progress?.summary ? [`Progress: ${task.progress.summary}`] : []),

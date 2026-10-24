@@ -41,7 +41,7 @@ test('Monitor task research uses the canonical read without mutating focus or ad
   const original = structuredClone(task), calls = [], reads = [];
   const service = createMonitorService({ workspaceId: 'w', sessionId: 's',
     controller: { async read(params) { reads.push(params); return task; } },
-    kernel: { async execute_command(command, params) {
+    queryKernel: { async execute_command(command, params) {
       calls.push([command, params]);
       return command === 'research_read' ? snapshot : { jobs: [{ job_id: 'job_a' }], next_cursor: null };
     } },
@@ -102,7 +102,7 @@ test('research snapshot errors surface through the existing Monitor error envelo
   let calls = 0;
   const service = createMonitorService({ workspaceId: 'w', sessionId: 's',
     controller: { async read() { return task; } },
-    kernel: { async execute_command() {
+    queryKernel: { async execute_command() {
       calls++;
       throw Object.assign(new Error('Research unavailable'), { code: 'research_read_failed' });
     } },
@@ -115,7 +115,7 @@ test('research snapshot errors surface through the existing Monitor error envelo
 test('Monitor overview omits internal records and duplicate review and policy fields', async () => {
   const service = createMonitorService({ workspaceId: 'w', sessionId: 's',
     controller: { async current() { return task; }, health() { return { automatic_continuation_enabled: false }; } },
-    kernel: { async execute_command(command) { return command === 'job_list' ? { jobs: [], next_cursor: null } : {}; } },
+    queryKernel: { async execute_command(command) { return command === 'job_list' ? { jobs: [], next_cursor: null } : {}; } },
     harness: { async snapshot() { return null; } }, conversation: { id: 'c' }, LiveDoc: {} });
   const response = await service.handle({ method: 'monitor/overview', params: {} });
   assert.equal(response.error, null);
@@ -158,7 +158,7 @@ test('shared research keeps external Jobs visible without offering unusable sess
   const calls = [];
   const service = createMonitorService({ workspaceId: 'w', sessionId: 's',
     controller: { async read() { return task; } },
-    kernel: { async execute_command(command, params) {
+    queryKernel: { async execute_command(command, params) {
       calls.push([command, params]);
       if (command === 'research_read') return shared;
       assert.equal(command, 'job_list');
@@ -199,7 +199,7 @@ test('Monitor summaries are bounded and task pages preserve control revisions wi
   const service = createMonitorService({ workspaceId: 'w', sessionId: 's',
     controller: { async list(_ctx, params) { assert.equal(params.cursor, 'page2'); return { items: [full], next_cursor: 'page3' }; },
       async read() { return full; } },
-    kernel: { async execute_command(command) { return command === 'research_read' ? snapshot : { jobs: [], next_cursor: null }; } },
+    queryKernel: { async execute_command(command) { return command === 'research_read' ? snapshot : { jobs: [], next_cursor: null }; } },
   });
   const page = await service.handle({ method: 'monitor/tasks', params: { cursor: 'page2' } });
   assert.equal(page.error, null);
@@ -221,7 +221,7 @@ test('Monitor overview counts every scoped job page and previews only active wor
     const service = createMonitorService({ workspaceId: 'w', sessionId: 's',
       controller: { async current() { return current; }, health() { return {}; } },
       harness: { async snapshot() { return null; } }, conversation: { id: 'c' }, LiveDoc: {},
-      kernel: { async execute_command(command, params) {
+      queryKernel: { async execute_command(command, params) {
         assert.equal(command, 'job_list');
         calls.push(params);
         return { jobs: pages[params.cursor ? 1 : 0], next_cursor: params.cursor ? null : 'page2' };
@@ -273,25 +273,27 @@ test('overview explains next action and blocker recovery without review internal
     execution: { state: 'idle' }, jobs: { scope: 'task', counts: {}, active: [], active_omitted: 0 } });
   assert.match(view, /Next: Compare the two verified datasets/);
   assert.match(view, /To resume: Provide the reference dataset/);
-  assert.match(view, /Status: Stopped/);
+  assert.match(view, /Task status: Needs attention/);
   assert.doesNotMatch(view, /sha256|brief_state|Continues when ready|Automatic continuation: On/);
   const detail = formatMonitor('monitor/task/read', { task: blocked, research: snapshot, session_job_ids: [] });
   assert.match(detail, /To resume: Provide the reference dataset/);
 });
 
-test('the same Stopped label retains distinct causes and resume guidance in overview', () => {
+test('overview shows the Task lifecycle separately from continuation diagnostics', () => {
   const cases = [
-    ['paused', 'paused', /The task is paused/],
-    ['cancelled', 'idle', /The task was cancelled/],
-    ['blocked', 'blocked', /Research is blocked/],
-    ['active', 'disabled', /Automatic continuation is off.*\/monitor health/],
-    ['active', 'error', /Automatic continuation failed.*\/monitor health/],
-    ['active', 'attention_required', /Execution recovery needs attention.*execution records/],
+    ['paused', 'paused', 'Paused', /The task is paused/],
+    ['cancelled', 'idle', 'Cancelled', /The task was cancelled/],
+    ['blocked', 'blocked', 'Needs attention', /Research is blocked/],
+    ['active', 'disabled', 'Researching', /Automatic continuation is off.*\/monitor health/],
+    ['active', 'error', 'Researching', /Automatic continuation check failed.*\/monitor health/],
+    ['waiting', 'error', 'Waiting for compute', /Automatic continuation check failed.*\/monitor health/],
+    ['active', 'attention_required', 'Researching', /Execution recovery needs attention.*execution records/],
   ];
-  for (const [state, continuation, explanation] of cases) {
+  for (const [state, continuation, label, explanation] of cases) {
     const view = formatMonitor('monitor/overview', { task: projectMonitorTask({ ...task, state }),
       execution: { state: 'idle' }, continuation: { state: continuation } });
-    assert.match(view, /Status: Stopped/);
+    assert.ok(view.includes(`Task status: ${label}`));
+    assert.doesNotMatch(view, /Stopped/);
     assert.match(view, explanation);
   }
 });

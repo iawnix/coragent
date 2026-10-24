@@ -98,3 +98,19 @@ export function create_python_runtime_bridge({ workspace_root, workspace_id, ...
   const bridge = create_runtime_bridge({ workspace_root, workspace_id, transport });
   return Object.freeze({ ...bridge });
 }
+
+// These commands read local durable state. In particular, job_status is not a
+// local query: it may contact a scheduler and must stay on the execution bridge.
+const LOCAL_QUERIES = new Set(["research_read", "research_search", "job_list", "job_manager_assess"]);
+
+/** A bounded query process using the same protocol, commands and workspace locks. */
+export function create_query_runtime_bridge(options = {}) {
+  const bridge = create_python_runtime_bridge({ ...options, max_pending: 16, coalesce: true });
+  return Object.freeze({
+    execute_command(command, params = {}) {
+      if (!LOCAL_QUERIES.has(command)) throw new TypeError(`Not a local runtime query: ${command}`);
+      return bridge.execute_command(command, params);
+    },
+    close: () => bridge.close(),
+  });
+}

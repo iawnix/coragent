@@ -43,7 +43,7 @@ async function setup(t, { validate = false } = {}) {
       validateConsumption: (record, _origin, ctx, basis) => admission.recordConsumption(record,basis,ctx),
       assertExecutionAllowed: async () => {}, completeJobEventConsumption: async () => {},
     },
-    kernel: {
+    queryKernel: {
       async execute_command(command, params) {
         assert.equal(command, "job_manager_assess");
         assert.equal(params.session_id, "s");
@@ -104,6 +104,28 @@ test("the shared event limit is checked before assessment or Pi admission", asyn
   assert.deepEqual(await f.monitor.admit({ ...request(), eventIds: eventIds.slice(0, JOB_EVENT_IDS_LIMIT) }, context),
     { accepted: true, skipped: true });
   assert.equal(f.state.assessments, JOB_EVENT_IDS_LIMIT);
+});
+
+test("a valid event batch larger than the query limit is admitted and consumed without overflowing it", async t => {
+  const f = await setup(t, { validate: true });
+  let active = 0, maximum = 0;
+  f.state.wait = async () => {
+    active++;
+    maximum = Math.max(maximum, active);
+    assert.ok(active <= 16, "query worker pending-request limit must not be exceeded");
+    await new Promise(resolve => setImmediate(resolve));
+    active--;
+  };
+  const eventIds = Array.from({ length: 32 }, (_, index) => `event_${index + 1}`);
+  f.faux.setResponses([fauxAssistantMessage("Inspect the completed calculations")]);
+  const admitted = await f.monitor.admit({ ...request("large-batch"), eventIds }, context);
+  assert.equal(admitted.accepted, true);
+  await f.conversation.waitForIdle(context);
+  const record = await f.admission.status("large-batch", context);
+  assert.equal(record.status, "done");
+  assert.equal((await f.monitor.admit({ ...request("large-batch"), eventIds }, context)).consumed, true);
+  assert.equal(f.state.assessments, 64);
+  assert.ok(maximum <= 16);
 });
 
 test("slow Python assessment never holds Pi transaction or blocks native input", async t => {

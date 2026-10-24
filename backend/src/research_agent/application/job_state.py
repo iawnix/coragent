@@ -1,6 +1,6 @@
 """Runtime-owned Job observations and automatic research journal entries."""
 from pathlib import Path
-from research_agent.foundation.transactions import read_json, write_json, workspace_transaction
+from research_agent.foundation.transactions import TransactionCoordinator, read_json, write_json, workspace_transaction
 from research_agent.foundation.path_safety import path_has_symlink
 from datetime import datetime, timezone
 from research_agent.research.operational_ids import allocate_id
@@ -37,22 +37,23 @@ def list_executions(root, *, session_id=None, user_task_id=None, limit=50, curso
     """Read persisted Job observations and ownership without polling a platform."""
     from .job_manager import read_binding
     root = Path(root)
-    bindings = {row['job_id']: row for path in (root / 'operations/monitors').glob('*/binding.json')
-                for row in [read_binding(path)]}
-    rows = []
-    for path in sorted((root / 'operations/executions').glob('*.json'), key=lambda p: int(p.stem.split('_')[1])):
-        if cursor is not None and int(path.stem.split('_')[1]) <= int(cursor.split('_')[1]):
-            continue
-        binding = bindings.get(path.stem, {})
-        if session_id is not None and binding.get('session_id') != session_id:
-            continue
-        if user_task_id is not None and binding.get('user_task_id') != user_task_id:
-            continue
-        rows.append({**execution(root, path.stem), 'session_id': binding.get('session_id'),
-                     'user_task_id': binding.get('user_task_id')})
-        if len(rows) > limit:
-            break
-    return {'jobs': rows[:limit], 'next_cursor': rows[limit - 1]['job_id'] if len(rows) > limit else None}
+    with TransactionCoordinator(root).locked():
+        bindings = {row['job_id']: row for path in (root / 'operations/monitors').glob('*/binding.json')
+                    for row in [read_binding(path)]}
+        rows = []
+        for path in sorted((root / 'operations/executions').glob('*.json'), key=lambda p: int(p.stem.split('_')[1])):
+            if cursor is not None and int(path.stem.split('_')[1]) <= int(cursor.split('_')[1]):
+                continue
+            binding = bindings.get(path.stem, {})
+            if session_id is not None and binding.get('session_id') != session_id:
+                continue
+            if user_task_id is not None and binding.get('user_task_id') != user_task_id:
+                continue
+            rows.append({**execution(root, path.stem), 'session_id': binding.get('session_id'),
+                         'user_task_id': binding.get('user_task_id')})
+            if len(rows) > limit:
+                break
+        return {'jobs': rows[:limit], 'next_cursor': rows[limit - 1]['job_id'] if len(rows) > limit else None}
 
 
 def register_execution(root, spec, platform):

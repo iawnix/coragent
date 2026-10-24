@@ -12,6 +12,8 @@ function classifyToolFailure(error) {
   const source = error && typeof error === "object" ? error : {};
   const explicit = typeof source.failure_class === "string" ? source.failure_class : "";
   if (FAILURE_CLASSES.includes(explicit)) return explicit;
+  // The Python request was sent and may still commit after its caller times out.
+  if (source.code === "kernel_request_timeout") return "ambiguous";
   const text = `${source.code || ""} ${source.name || ""} ${source.message || error || ""}`.toLowerCase();
   if (/contract|metadata|envelope|schema/.test(text)) return "contract";
   if (/authoriz|permission|forbidden|policy/.test(text)) return "authorization";

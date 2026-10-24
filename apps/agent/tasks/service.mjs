@@ -23,9 +23,9 @@ export async function recordRun({ conversation, api, inputIds, userTaskId, conte
   }, context);
 }
 
-export function createMonitorService({ controller, harness, conversation, kernel, workspaceId, sessionId, LiveDoc }) {
+export function createMonitorService({ controller, harness, conversation, queryKernel, workspaceId, sessionId, LiveDoc }) {
   const scopedJobs = async params => {
-    const page = await kernel.execute_command("job_list", { session_id: sessionId,
+    const page = await queryKernel.execute_command("job_list", { session_id: sessionId,
       ...(params.user_task_id ? { user_task_id: params.user_task_id } : {}),
       ...(params.limit ? { limit: params.limit } : {}), ...(params.cursor ? { cursor: params.cursor } : {}) });
     return { items: page.jobs, next_cursor: page.next_cursor };
@@ -80,7 +80,7 @@ export function createMonitorService({ controller, harness, conversation, kernel
     },
     "monitor/task/read": async (params, context) => {
       const task = await controller.read(params, context);
-      const research = await kernel.execute_command("research_read", {
+      const research = await queryKernel.execute_command("research_read", {
         session_id: sessionId, ...task.research, limit: 16000,
       });
       const visibleJobs = new Set([...research.running_jobs, ...research.uncollected_jobs].map(job => job.job_id));

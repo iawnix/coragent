@@ -1,11 +1,65 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createTerminalCommands } from "../../../apps/agent/terminal/commands/facet.mjs";
+import { createRefreshLoop, createTerminalCommands } from "../../../apps/agent/terminal/commands/facet.mjs";
 import { createClientQueries } from "../../../apps/agent/runtime/services/queries.mjs";
 import { createTerminalSession, runTerminalSessions } from "../../../apps/agent/terminal/session.mjs";
 import { parseSlashCommand, slashCompletions, SLASH_COMMAND_NAMES } from "../../../apps/agent/tools/commands.mjs";
 
 const row = (id, workspace = "remote") => ({ session_id: id, workspace_id: workspace });
+
+test('status sources refresh independently, coalesce bursts, and ignore responses after disposal', async t => {
+  t.mock.timers.enable({apis:['setTimeout']});
+  const applied = [], telemetryReads = [];
+  let monitorReads = 0;
+  const telemetry = createRefreshLoop({
+    read: () => new Promise(resolve => telemetryReads.push(resolve)),
+    apply: value => applied.push(['telemetry',value]), onError: assert.fail,
+  });
+  const monitor = createRefreshLoop({read:async()=>++monitorReads,
+    apply:value=>applied.push(['monitor',value]),onError:assert.fail});
+  const flush = () => new Promise(resolve => setImmediate(resolve));
+  try {
+    const pending = telemetry.refresh();
+    await monitor.refresh();
+    assert.deepEqual(applied,[['monitor',1]]);
+    for (let index=0;index<100;index++) telemetry.schedule();
+    t.mock.timers.tick(5000); await flush();
+    assert.deepEqual(applied,[['monitor',1],['monitor',2]]);
+    assert.equal(telemetryReads.length,1);
+    telemetryReads[0]('first'); await pending;
+    assert.deepEqual(applied.at(-1),['telemetry','first']);
+    t.mock.timers.tick(249); await flush();
+    assert.equal(telemetryReads.length,1);
+    t.mock.timers.tick(1); await flush();
+    assert.equal(telemetryReads.length,2);
+    telemetry.stop(); monitor.stop();
+    const before = [...applied];
+    telemetryReads[1]('disposed'); await flush();
+    t.mock.timers.tick(20000); await flush();
+    await telemetry.refresh(); monitor.schedule();
+    assert.deepEqual(applied,before);
+    assert.equal(telemetryReads.length,2);
+    assert.equal(monitorReads,2);
+  } finally { telemetry.stop(); monitor.stop(); }
+});
+
+test('refresh failures remain local and scheduled updates do not starve under repeated notifications', async t => {
+  t.mock.timers.enable({apis:['setTimeout']});
+  let reads=0;
+  const applied=[],errors=[];
+  const refresh=createRefreshLoop({read:async()=>{
+    if (++reads===1) throw new Error('connection unavailable');
+    return reads;
+  },apply:value=>applied.push(value),onError:error=>errors.push(error.message)});
+  try {
+    await refresh.refresh();
+    assert.deepEqual(errors,['connection unavailable']);
+    for(let index=0;index<5;index++) { refresh.schedule(); t.mock.timers.tick(50); }
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.deepEqual(applied,[2]);
+    assert.equal(reads,2);
+  } finally { refresh.stop(); }
+});
 
 test('slash completion follows argument positions and preserves case-sensitive IDs', () => {
   const values = prefix => (slashCompletions('monitor', prefix) || []).map(item => item.value);
@@ -37,7 +91,7 @@ test("worker queries bind identity and admit only read-only research arguments",
   const calls = [];
   const prompt = { effective: "worker prompt", contributors: [] };
   const queries = createClientQueries({ workspaceId: "remote", sessionId: "one", promptManifest: prompt,
-    commandBridge: { async execute_command(...args) { calls.push(args); return { root: "/remote/workspace" }; } },
+    queryBridge: { async execute_command(...args) { calls.push(args); return { root: "/remote/workspace" }; } },
   });
   assert.deepEqual(await queries.research("read note_123"), {
     workspace_id: "remote", session_id: "one", result: { root: "/remote/workspace" },
@@ -56,7 +110,7 @@ test("command registry, parsing, native selection, and worker reads agree", asyn
   const resumed = [];
   const queries = createClientQueries({ workspaceId: "remote", sessionId: "one",
     promptManifest: { effective: "actual worker prompt", contributors: [{ origin: "native", source: "/remote/prompt" }], sha256: "digest" },
-    commandBridge: { async execute_command() { return { summary: "remote research result" }; } },
+    queryBridge: { async execute_command() { return { summary: "remote research result" }; } },
   });
   let choice;
   const ui = { showStatus(text) { shown.push(text); }, async select(title) { shown.push(title); return choice; } };
@@ -141,6 +195,22 @@ test("document commands pass complete text to the document surface", async () =>
   assert.equal(shown[0].title,"System prompt");
   assert.match(shown[0].body,/line 0\n/);
   assert.match(shown[0].body,/line 39/);
+});
+
+test('research query errors expose bounded diagnostic facts for F2 details', async () => {
+  const shown=[];
+  const commands=createTerminalCommands({session:{sessionId:'one',workspaceId:'remote'},
+    ui:{showStatus:(...args)=>shown.push(args)},
+    queries:{async research(){return {session_id:'one',workspace_id:'remote',error:{
+      message:'Python runtime request timed out: execute_command',code:'kernel_request_timeout',
+      details:{command:'research_read',request_id:'q17',elapsed_ms:30000,params:{secret:'PRIVATE'},raw_output:'PRIVATE'},
+    }};}},
+  });
+  await commands.find(command=>command.name==='research').run('',{});
+  assert.equal(shown[0][0], 'Python runtime request timed out: execute_command\nCode: kernel_request_timeout\n'
+    + 'Command: research_read\nRequest: q17\nElapsed: 30000 ms');
+  assert.equal(shown[0][2],'error');
+  assert.doesNotMatch(shown[0][0],/PRIVATE|params|raw_output/);
 });
 
 test('research and health details keep empty values and nested fields on their own rows', async () => {
@@ -270,7 +340,7 @@ test('Monitor overview stays compact and links to detailed views', async () => {
   assert.match(overview, /Task: Research/);
   assert.match(overview, /Task jobs: 1 running · 0 queued · 1 total/);
   assert.match(overview, /Next: Inspect the computed result/);
-  assert.match(overview, /Status: Waiting/);
+  assert.match(overview, /Task status: Waiting for compute/);
   assert.match(overview, /Details: Waiting for compute. Continues when ready./);
   assert.doesNotMatch(overview, /Research review|Automatic continuation: On/);
   assert.match(overview, /\/monitor task t1 · \/monitor jobs --task t1/);

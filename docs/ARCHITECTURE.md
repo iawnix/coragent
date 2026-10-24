@@ -112,8 +112,11 @@ The Task Controller runs inside the SessionWorker. Normal tools continue within 
 Pause suppresses new automatic work while the current response and Jobs can finish. Interrupting a response also pauses the user task. Resume is a user control operation. Cancellation requires an explicit keep/cancel policy for owned Jobs. Querying Monitor does not send a prompt or resume a task. `CORAGENT_AUTOMATIC_CONTINUATION=0` disables automatic input while preserving user input and read access.
 
 When a new user request runs after a research execution failure, Monitor retains
-the failure in its task details. The compact status row uses the five labels
-documented in [Terminal](TERMINAL.md); it does not encode recovery details in a combined label. Admission alone does not resume automatic work. If that current user run records new task evidence or an owned Job milestone and Pi completes its submission successfully, the controller clears the old research recovery warning and allows continuation (or honors the current Job wait). Duplicate evidence, status questions, superseded inputs and failed runs cannot clear it; pause/cancel still take precedence. The recovery link survives restart, and historical failed submissions remain unchanged.
+the failure in its task details. The compact status row separates the Monitor
+connection, the persisted Task state, and running/queued Job counts, as documented
+in [Terminal](TERMINAL.md). Continuation errors and recovery details do not override
+the Task state; unavailable or stale snapshots display unknown Task and Job values.
+Admission alone does not resume automatic work. If that current user run records new task evidence or an owned Job milestone and Pi completes its submission successfully, the controller clears the old research recovery warning and allows continuation (or honors the current Job wait). Duplicate evidence, status questions, superseded inputs and failed runs cannot clear it; pause/cancel still take precedence. The recovery link survives restart, and historical failed submissions remain unchanged.
 
 Natural-language task control uses `task_update action=apply_user_control` with the latest actual user submission consumed by the current run. The runtime checks provenance, live input membership and the current revision; automatic inputs cannot authorize controls. The stopping run can finish read-only checks, requested Job cancellations and its final acknowledgement, but cannot start more work or a replacement task. Task cancellation is committed before Job discovery/cancellation; backend failures remain durable cleanup work and do not wake the model. Job cancellation and Node status changes do not stop the top-level Task.
 
@@ -122,6 +125,23 @@ Progress observations and explicit progress updates share persistent identities:
 Host restart discovers sessions from Pi's existing catalog and reopens at most four Workers concurrently; each Worker reconciles its durable task. Recovery failures appear in `monitor/health`. No process besides the SessionWorker writes its SQLite store. The aggregate is a projection of independent Task, Pi and Job owners, not a cross-system atomic snapshot.
 
 `/monitor` is the unified product entry point for tasks, Jobs and execution details. Host and browser transports share one canonical method list in `apps/agent/contracts/monitor.mjs`; the [Monitor contract](../contracts/monitor/README.md) describes requests and results. Pi generation/tool Tasks appear under a run's diagnostic details, never as user tasks. Existing session and Job notifications request a fresh snapshot after changes or reconnects.
+
+Each SessionWorker owns an execution bridge and a bounded local-query bridge,
+using the same Python JSONL protocol, command implementations and workspace
+transactions. The query bridge admits only `research_read`, `research_search`,
+`job_list` and `job_manager_assess`; it coalesces identical outstanding requests
+and accepts at most 16 distinct requests. A timeout does not cancel Python work:
+capacity is released when its actual response arrives or the process exits.
+Tool envelopes classify a sent request timeout as an unknown outcome, with no
+automatic retry; a capacity rejection before sending remains not executed.
+Both processes are closed with the Worker. Query commands may recover transactions
+or project events and retain the existing workspace locks.
+
+Monitor reads persisted Task state and Job Manager observations without changing
+Task lifecycle or polling schedulers. The controller resolves waits from persisted
+Job observations. Cancellation discovery stays ordered behind earlier execution
+requests so an in-flight submission cannot escape discovery. Context telemetry
+uses Pi history and model metadata, independently of both Python bridges.
 
 ## Skills and delivery
 

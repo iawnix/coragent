@@ -5,7 +5,7 @@ export function createSessionAdmission({ harness, conversation, LiveDoc, taskCon
   return {
     async abort(context) {
       await conversation.commit(async tx => {
-        await taskController?.pauseInTransaction(tx, "User stopped the current reply");
+        await taskController?.pauseInTransaction(tx, "User paused the current task");
         const live = await tx.doc(LiveDoc, conversation.id);
         if (live.run) {
           const task = await tx.task(live.run.taskId);

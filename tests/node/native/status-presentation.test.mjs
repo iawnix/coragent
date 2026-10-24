@@ -27,8 +27,30 @@ test('usage ledger survives compacted entries and model switch invalidates conte
  const compacted={...view,entries:[{id:10,kind:'pi.compaction'},{id:1}]};
  assert.equal(contextMatches(compacted,telemetry),false);
  status.update({view:compacted});
- assert.match(status.footer.render(150).join('\n'),/Context: Unknown.*Total tokens: 60/);
- assert.equal(contextMatches({...view,docs:{...view.docs,'pi.agent':{model:{provider:'fixture',modelId:'b'}}}},telemetry),false);
+ assert.match(status.footer.render(150).join('\n'),/Context: Updating\/200.0k.*Total tokens: 60/);
+ assert.match(status.usageDetails(),/Context: Updating \/ 200,000/);
+ const switched={...view,docs:{...view.docs,'pi.agent':{model:{provider:'fixture',modelId:'b'}}}};
+ assert.equal(contextMatches(switched,telemetry),false);
+ status.update({view:switched});
+ assert.match(status.footer.render(150).join('\n'),/Context: Updating\/Unknown/);
+ assert.doesNotMatch(status.footer.render(150).join('\n'),/200.0k|Budget/);
+ assert.match(status.usageDetails(),/Context: Updating \/ —/);
+});
+
+test('context refresh errors retain only matching model capacity and recover independently of Monitor',()=>{
+ const status=createStatusPresentation({session:{workspaceId:'w',sessionId:'s'},theme,...tui});
+ status.update({view,telemetry,telemetryError:'Context request timed out'});
+ assert.match(status.footer.render(150).join('\n'),/Context: Unavailable\/200.0k.*Total tokens: 60/);
+ assert.doesNotMatch(status.footer.render(150).join('\n'),/48.0k|24%|Budget/);
+ assert.match(status.usageDetails(),/Context: Unavailable \/ 200,000/);
+ assert.match(status.usageDetails(),/Context refresh: Context request timed out/);
+ status.update({telemetry,telemetryError:null,monitorError:'Monitor request timed out'});
+ assert.match(status.footer.render(150).join('\n'),/Context: 48.0k\/200.0k \(24%\)/);
+ assert.doesNotMatch(status.usageDetails(),/Context refresh:/);
+ status.update({view:{...view,entries:[{id:2}]}});
+ assert.match(status.footer.render(150).join('\n'),/Context: Updating\/200.0k/);
+ status.update({telemetry:{...telemetry,entryId:2,firstEntryId:2,contextTokens:50000}});
+ assert.match(status.footer.render(150).join('\n'),/Context: 50.0k\/200.0k \(25%\)/);
 });
 
 const task = {user_task_id:'t1',title:'Research',objective:'Compare paths',state:'active',reason:null,criteria:[{id:'c1',description:'Final report'}],wait:null,progress:null,continuation:{reservation:null},updated_at:new Date().toISOString()};
@@ -38,43 +60,45 @@ const snapshot = (changes={}) => {
  return {...wire,continuation:projectMonitorContinuation(data.task,{...task_controller,automatic_continuation_enabled})};
 };
 
-test('Monitor uses only five activity labels and a placeholder for unavailable observations',()=>{
+test('Monitor connection, Task lifecycle and Job counts remain independent',()=>{
  const cases = [
-  [{}, 'Working'],
-  [{task:{...task,state:'completing'}}, 'Working'],
-  [{task:{...task,state:'waiting',wait:{job_ids:['j1'],mode:'all'}}}, 'Waiting'],
-  [{task:{...task,state:'paused'}}, 'Stopped'],
-  [{task:{...task,state:'blocked',reason:'Missing reference data'}}, 'Stopped'],
-  [{task:{...task,state:'cancelled'}}, 'Stopped'],
+  [{}, 'Researching'],
+  [{task:{...task,state:'completing'}}, 'Preparing delivery'],
+  [{task:{...task,state:'waiting',wait:{job_ids:['j1'],mode:'all'}}}, 'Waiting for compute'],
+  [{task:{...task,state:'paused'}}, 'Paused'],
+  [{task:{...task,state:'blocked',reason:'Missing reference data'}}, 'Needs attention'],
+  [{task:{...task,state:'cancelled'}}, 'Cancelled'],
   [{task:{...task,state:'completed'}}, 'Completed'],
-  [{execution:{state:'idle'}}, 'Working'],
-  [{execution:{state:'idle'},task:{...task,continuation:{reservation:'r1'}}}, 'Working'],
-  [{execution:{state:'idle'},automatic_continuation_enabled:false}, 'Stopped'],
-  [{automatic_continuation_enabled:false}, 'Working'],
-  [{task:null,execution:{state:'idle'}}, 'Idle'],
-  [{task:null}, 'Working'],
-  [{task_controller:{error:{code:'task_reconcile_failed'}}}, 'Stopped'],
-  [{task_controller:{last_checked_at:null}}, 'Working'],
-  [{execution:{state:'idle'},task_controller:{last_checked_at:null}}, '—'],
-  [{task_controller:{last_checked_at:new Date(Date.now()-31000).toISOString(),check_interval_ms:1000}}, '—'],
+  [{task:{...task,state:'partial'}}, 'Partially completed'],
+  [{execution:{state:'idle'}}, 'Researching'],
+  [{execution:{state:'idle'},task:{...task,continuation:{reservation:'r1'}}}, 'Researching'],
+  [{execution:{state:'idle'},automatic_continuation_enabled:false}, 'Researching'],
+  [{automatic_continuation_enabled:false}, 'Researching'],
+  [{task:null,execution:{state:'idle'}}, 'None'],
+  [{task:null}, 'None'],
+  [{task_controller:{error:{code:'task_reconcile_failed'}}}, 'Researching'],
+  [{task:{...task,state:'waiting'},task_controller:{error:{code:'kernel_request_timeout'}}}, 'Waiting for compute'],
+  [{task_controller:{last_checked_at:null}}, 'Researching'],
+  [{execution:{state:'idle'},task_controller:{last_checked_at:null}}, 'Researching'],
+  [{task_controller:{last_checked_at:new Date(Date.now()-31000).toISOString(),check_interval_ms:1000}}, 'Researching'],
  ];
- const labels = new Set();
  for (const [changes, expected] of cases) {
   const result = activityStatus({monitor:snapshot(changes),sessionId:'s'});
-  assert.equal(result.reason, expected);
-  assert.equal(result.text, `Monitor ${result.symbol} · ${expected} · 1 jobs running`);
-  labels.add(result.reason);
+  assert.equal(result.connection, 'Connected');
+  assert.equal(result.taskState, expected);
+  assert.equal(result.text, `Monitor: Connected · Task: ${expected} · Job: 1 running, 0 queued`);
  }
- assert.deepEqual([...labels].sort(), ['Completed','Idle','Stopped','Waiting','Working','—']);
  const monitor=snapshot();
- for (const changes of [{monitorError:'offline'},{now:Date.now()+31000},{sessionId:'other'}]) {
+ for (const [changes, connection] of [[{monitorError:'offline'},'Disconnected'],[{now:Date.now()+31000},'Unknown'],[{sessionId:'other'},'Connecting']]) {
   const result=activityStatus({monitor,sessionId:'s',...changes});
-  assert.equal(result.reason,'—');
+  assert.equal(result.connection,connection);
+  assert.equal(result.taskState,'Unknown');
+  assert.equal(result.jobSummary,'Unknown');
   assert.equal(result.running,null);
   assert.equal(result.queued,null);
   assert.ok(result.detail);
  }
- assert.match(activityStatus({sessionId:'s',monitor:snapshot({jobs:{active:[]}})}).text,/— jobs running/);
+ assert.match(activityStatus({sessionId:'s',monitor:snapshot({jobs:{active:[]}})}).text,/Job: Unknown/);
 });
 
 test('blocked task details stay in Monitor while the activity line remains short and tracks recovery',()=>{
@@ -82,29 +106,29 @@ test('blocked task details stay in Monitor while the activity line remains short
  const reason='输入构造失败，需要修正结构。'.repeat(40)+'\n等待进一步指令。';
  status.update({monitor:snapshot({execution:{state:'idle'},task:{...task,state:'blocked',reason}})});
  const line=status.activity.render(80).join('');
- assert.match(line,/Stopped · 1 jobs running/);
+ assert.match(line,/Task: Needs attention · Job: 1 running, 0 queued/);
  assert.doesNotMatch(line,/输入构造|等待进一步/);
  assert.ok(tui.visibleWidth(line)<=80);
  assert.ok(status.monitorDetails().includes(reason));
  status.update({monitor:snapshot({task:{...task,state:'blocked',reason}})});
- assert.match(status.activity.render(80).join(''),/Stopped · 1 jobs running/);
+ assert.match(status.activity.render(80).join(''),/Task: Needs attention · Job: 1 running, 0 queued/);
  status.update({monitor:snapshot()});
- assert.match(status.activity.render(80).join(''),/Working · 1 jobs running/);
+ assert.match(status.activity.render(80).join(''),/Task: Researching · Job: 1 running, 0 queued/);
  assert.doesNotMatch(status.monitorDetails(),/输入构造|Task blocked|Needs attention/);
 });
 
-test('monitor symbol colors and narrow width do not hide state in the normal layout',()=>{
+test('Monitor connection color is independent of a paused Task and fits the normal layout',()=>{
  const colors=[];
  const status=createStatusPresentation({session:{workspaceId:'w',sessionId:'s'},monochrome:false,theme:{fg:(color,text)=>{colors.push([color,text]);return text;}},...tui});
  status.update({monitor:snapshot({task:{...task,state:'paused'}})});
- assert.match(status.activity.render(80).join(''),/Monitor ! · Stopped · 1 jobs running/);
- assert.deepEqual(colors.map(([color])=>color),['muted','warning','muted']);
+ assert.match(status.activity.render(80).join(''),/Monitor: Connected · Task: Paused · Job: 1 running, 0 queued/);
+ assert.deepEqual(colors.map(([color])=>color),['muted','muted','muted']);
  for(const width of [0,1,2,8,12,20,80]) for(const line of status.activity.render(width)) assert.ok(tui.visibleWidth(line)<=width);
  assert.match(status.monitorDetails(),/The task is paused/);
  assert.match(status.monitorDetails(),/Goal: Compare paths/);
  assert.doesNotMatch(status.monitorDetails(),/control_epoch|producer|generation/);
  const plain=createStatusPresentation({session:{sessionId:'s'},monochrome:true,theme:{fg(){throw new Error('monochrome must not color activity');}},...tui});
- assert.match(plain.activity.render(80).join(''),/— · — jobs running/);
+ assert.match(plain.activity.render(80).join(''),/Monitor: Connecting · Task: Unknown · Job: Unknown/);
 });
 
 test('document pages resize without overflowing or losing their logical anchor',()=>{
@@ -207,7 +231,7 @@ test('usage and monitor details stay separate while disconnection overrides cach
  assert.doesNotMatch(status.usageDetails(),/Monitor|Task:/);
  assert.doesNotMatch(status.monitorDetails(),/tokens|Context/);
  status.update({monitorError:'offline'});
- assert.match(status.activity.render(80).join(''),/Monitor × · — · — jobs running/);
+ assert.match(status.activity.render(80).join(''),/Monitor: Disconnected · Task: Unknown · Job: Unknown/);
  assert.match(status.monitorDetails(),/Monitor is unavailable/);
  assert.doesNotMatch(status.monitorDetails(),/Working|Task: Research/);
  assert.match(status.monitorDetails(),/Connection: offline/);
@@ -307,33 +331,34 @@ test('long errors expose complete details while the feedback remains bounded',()
 });
 
 
-test('execution recovery is visible without claiming research is blocked', () => {
+test('execution recovery does not change Monitor connection or Task lifecycle labels', () => {
  const base = { session_id: 'recovery', updated_at: new Date().toISOString(), jobs: { counts: { running: 1, queued: 0 } },
    execution: { state: 'idle' }, automatic_continuation_enabled: true,
    task_controller: { error: null, last_checked_at: new Date().toISOString(), check_interval_ms: 30000 } };
- for (const [state,phase,label] of [['retrying','research','Waiting'], ['running','delivery','Waiting'],
-   ['attention_required','research','Stopped']]) {
+ for (const [state,phase,label] of [['retrying','research','Researching'], ['running','delivery','Preparing delivery'],
+   ['attention_required','research','Researching']]) {
    const task = { state: phase === 'delivery' ? 'completing' : 'active', execution_recovery: { state, phase } };
    const monitor = { ...base, task, continuation:projectMonitorContinuation(task,{...base.task_controller,automatic_continuation_enabled:true}) };
    const status = activityStatus({ monitor, sessionId: 'recovery' });
-   assert.equal(status.reason, label); assert.doesNotMatch(status.text, /Task blocked/);
-   assert.equal(activityStatus({ monitor: { ...monitor, execution: { state: 'running' } }, sessionId: 'recovery' }).reason,
-     state === 'attention_required' ? 'Stopped' : 'Working');
+   assert.equal(status.connection, 'Connected');
+   assert.equal(status.taskState, label); assert.doesNotMatch(status.text, /Stopped/);
+   assert.equal(activityStatus({ monitor: { ...monitor, execution: { state: 'running' } }, sessionId: 'recovery' }).taskState, label);
  }
 });
 
-test('recovery requiring attention stays stopped while its explanation is delivered', () => {
+test('recovery requiring attention remains in details while the three status sections stay distinct', () => {
  const recovery = { state: 'attention_required', phase: 'research', reason: 'request_blocked', detail: 'Previous request exceeded context' };
  const taskWithRecovery = { ...task, execution_recovery: recovery };
  const status = createStatusPresentation({session:{workspaceId:'w',sessionId:'s'},theme,...tui});
  const running = snapshot({task:taskWithRecovery});
  status.update({monitor:running});
- assert.equal(activityStatus({monitor:running,sessionId:'s'}).symbol,'!');
- assert.match(status.activity.render(120).join(''),/Stopped/);
+ assert.equal(activityStatus({monitor:running,sessionId:'s'}).connection,'Connected');
+ assert.match(status.activity.render(120).join(''),/Monitor: Connected · Task: Researching · Job: 1 running, 0 queued/);
+ assert.match(status.monitorDetails(),/Execution recovery needs attention/);
  assert.match(status.monitorDetails(),/Previous request exceeded context/);
  status.update({monitor:snapshot({task:taskWithRecovery,execution:{state:'idle'}})});
- assert.match(status.activity.render(120).join(''),/Monitor ! · Stopped/);
+ assert.match(status.activity.render(120).join(''),/Monitor: Connected · Task: Researching/);
  status.update({monitor:snapshot({task})});
- assert.match(status.activity.render(120).join(''),/Working/);
+ assert.match(status.activity.render(120).join(''),/Task: Researching/);
  assert.doesNotMatch(status.monitorDetails(),/Previous request exceeded context/);
 });

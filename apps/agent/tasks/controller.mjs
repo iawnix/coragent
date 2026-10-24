@@ -77,7 +77,7 @@ const jobIdentities = (job, observed) => {
 
 /** Policy only: Pi owns all execution, submissions, transactions and recovery. */
 export function createTaskController({ harness, conversation, admission, LiveDoc, InboxDoc,
-  kernel, workspaceId, sessionId, context, intervalMs = 30000, enabled = true, recoveryPolicy = taskRecoveryPolicy(), now = Date.now }) {
+  kernel, queryKernel, workspaceId, sessionId, context, intervalMs = 30000, enabled = true, recoveryPolicy = taskRecoveryPolicy(), now = Date.now }) {
   let stopped = false, started = false, timer, recoveryTimer, unsubscribe, scheduled = false, running = false, lastError = null, lastCheckedAt = null;
   const currentTx = async tx => {
     const index = await tx.doc(UserTasks, conversation.id);
@@ -157,10 +157,10 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     task.progress_version += 1; task.continuation.no_progress = 0;
     return true;
   };
-  async function ownedJobs(userTaskId) {
+  async function ownedJobs(userTaskId, reader = queryKernel) {
     const jobs = []; let cursor;
     do {
-      const page = await kernel.execute_command("job_list", { session_id: sessionId, user_task_id: userTaskId, limit: 100, ...(cursor ? { cursor } : {}) });
+      const page = await reader.execute_command("job_list", { session_id: sessionId, user_task_id: userTaskId, limit: 100, ...(cursor ? { cursor } : {}) });
       jobs.push(...page.jobs); cursor = page.next_cursor;
     } while (cursor);
     return jobs;
@@ -168,7 +168,9 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
   async function settleCancellations(task, ctx) {
     if (task.cancel_jobs.discovery_pending) {
       let jobs, error;
-      try { jobs = await ownedJobs(task.user_task_id); }
+      // Discover only after already-sent submissions settle on the execution
+      // channel; an independent query could miss a Job still being committed.
+      try { jobs = await ownedJobs(task.user_task_id, kernel); }
       catch (failure) { error = { code: failure.code || "job_cancellation_discovery_failed", message: failure.message }; }
       await conversation.commit(async tx => {
         const current = await tx.doc(UserTask, conversation.id, task.user_task_id, null);
@@ -359,19 +361,26 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     }, ctx);
   }
 
+  async function waitReady(task) {
+    // Job Manager owns remote observation. Waiting and event admission consume
+    // the same durable Job records as Monitor, without another scheduler poll.
+    const jobs = new Map((await ownedJobs(task.user_task_id)).map(job => [job.job_id, job]));
+    const finished = jobId => jobFinished.has(jobs.get(jobId)?.state);
+    return task.wait.mode === "any" ? task.wait.job_ids.some(finished) : task.wait.job_ids.every(finished);
+  }
+
   async function settleWait(ctx) {
     const basis = await getCurrent(ctx);
     if (basis?.state !== "waiting") return basis;
-    let statuses;
+    let ready;
     try {
-      statuses = await Promise.all(basis.wait.job_ids.map(job_id => kernel.execute_command("job_status", { job_id })));
+      ready = await waitReady(basis);
     } catch (error) {
       ctx?.abortSignal?.throwIfAborted();
-      // Status refresh must not prevent a user from reading or correcting a waiting task.
+      // A failed local observation must not advance the wait or block user controls.
       lastError = { code: error.code || "task_wait_observation_failed", message: error.message };
       return getCurrent(ctx);
     }
-    const ready = basis.wait.mode === "any" ? statuses.some(job => jobFinished.has(job.state)) : statuses.every(job => jobFinished.has(job.state));
     if (!ready) return basis;
     await conversation.commit(async tx => {
       const { task } = await currentTx(tx);
@@ -457,8 +466,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       const deferred = pendingJobEvents(task, eligible.map(event => event.event_id));
       if (deferred) return { events: [], basis: {}, deferred };
       if (task?.state === "waiting") {
-        const statuses = await Promise.all(task.wait.job_ids.map(job_id => kernel.execute_command("job_status", { job_id })));
-        const ready = task.wait.mode === "any" ? statuses.some(job => jobFinished.has(job.state)) : statuses.every(job => jobFinished.has(job.state));
+        const ready = await waitReady(task);
         if (!ready) return { events: [], basis: {}, deferred: {
           code: "task_waiting",
           message: "The task's explicit Job wait has not completed; events remain pending",
@@ -469,7 +477,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       return { events: eligible, basis: task ? { task_revision: task.revision, control_epoch: task.control_epoch } : {} };
     },
     async current(ctx) {
-      const task = await settleWait(ctx);
+      const task = await getCurrent(ctx);
       return task?.execution_plan
         ? { ...task, execution_progress: projectExecutionPlan(task, await ownedJobs(task.user_task_id)) } : task;
     },
@@ -840,8 +848,10 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     },
     async validateConsumption(record, origin, ctx, consumptionBasis = origin.admission_basis) {
       const inherited = origin.producer === "task_controller" ? origin.admission_basis.event_inputs : [];
-      const inheritedEvents = inherited?.length ? await Promise.all(inherited.flatMap(input => input.event_ids).map(event_id =>
-        kernel.execute_command("job_manager_assess", { event_id, session_id: sessionId }))) : [];
+      const inheritedEvents = [];
+      for (const input of inherited || []) for (const event_id of input.event_ids) {
+        inheritedEvents.push(await queryKernel.execute_command("job_manager_assess", { event_id, session_id: sessionId }));
+      }
       requireValue(inheritedEvents.every(event => event.obsolete || event.admitted), "job_events_paused", "Deferred event delivery is paused");
       const consumedIds = new Set([record.id, ...(inherited || []).map(input => input.submission_id)]);
       await admission.recordConsumption(record, consumptionBasis, ctx, async tx => {
@@ -961,7 +971,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         if (!["busy", "task_superseded", "task_paused", "task_execution_recovery"].includes(error.code)) throw error;
       }
     },
-    async snapshot(ctx) { return { task: await settleWait(ctx), automatic_continuation_enabled: enabled }; },
+    async snapshot(ctx) { return { task: await getCurrent(ctx), automatic_continuation_enabled: enabled }; },
     health: () => ({ automatic_continuation_enabled: enabled, error: lastError, checking: running, last_checked_at: lastCheckedAt, check_interval_ms: intervalMs, recovery_policy: { ...recoveryPolicy } }),
     start() {
       started = true;

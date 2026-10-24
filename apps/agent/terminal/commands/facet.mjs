@@ -38,39 +38,39 @@ export async function createCoRAgentNativeClientFacet({ sourceRoot, session } = 
         const status = createStatusPresentation({ session, theme, ...components, ring: process.env.TERM !== "dumb" && process.env.CORAGENT_TUI_RING !== "0" });
         const lifetime = new AbortController();
         const queryContext = withAbortSignal(lifetime.signal, BACKGROUND_CONTEXT);
-        let stopped = false, refreshing = false, dirty = false, timer;
+        let stopped = false;
         const redraw = () => { if (!stopped) { ui.setFooter(status.footer); ui.setActivity(status.activity); } };
-        const refresh = async () => {
-          if (stopped || session.signal?.aborted) return;
-          if (refreshing) { dirty = true; return; }
-          refreshing = true; dirty = false;
-          const results = await Promise.allSettled([queries.telemetry(queryContext), session.monitor()]);
-          if (!stopped && !session.signal?.aborted) {
-            const [usage, monitor] = results;
-            if (usage.status === "fulfilled" && usage.value.session_id === session.sessionId && usage.value.workspace_id === session.workspaceId) status.update({telemetry:usage.value.result});
-            else status.update({telemetry:null});
-            if (monitor.status === "fulfilled" && monitor.value?.workspace_id === session.workspaceId) status.update({monitor:monitor.value, monitorError:null});
-            else status.update({monitorError:"Monitor unavailable"});
-            redraw();
-          }
-          refreshing = false;
-          if (!stopped && !session.signal?.aborted) { clearTimeout(timer); timer = setTimeout(refresh, dirty ? 250 : 5000); timer.unref?.(); }
-        };
+        const telemetryRefresh = createRefreshLoop({ signal: session.signal,
+          read: () => queries.telemetry(queryContext),
+          apply(value) {
+            if (value.session_id !== session.sessionId || value.workspace_id !== session.workspaceId) throw new Error('Context query returned a different session or workspace');
+            status.update({telemetry:value.result, telemetryError:null}); redraw();
+          },
+          onError(error) { status.update({telemetryError:error.message || String(error)}); redraw(); },
+        });
+        const monitorRefresh = createRefreshLoop({ signal: session.signal,
+          read: () => session.monitor(),
+          apply(value) {
+            if (value.session_id !== session.sessionId || value.workspace_id !== session.workspaceId) throw new Error('Monitor query returned a different session or workspace');
+            status.update({monitor:value, monitorError:null}); redraw();
+          },
+          onError(error) { status.update({monitorError:error.message || String(error)}); redraw(); },
+        });
         let signature;
         env.own(transcript.state.subscribe(view => {
           status.update({view});
           const next = JSON.stringify([view.entries.at(-1)?.id, view.docs["pi.agent"], view.entries[0]?.id]);
-          if (next !== signature) { signature = next; clearTimeout(timer); timer = setTimeout(refresh,250); }
+          if (next !== signature) { signature = next; telemetryRefresh.schedule(); monitorRefresh.schedule(); }
           // Pi already repaints transcript changes; the components read current state at render time.
         }));
-        redraw(); void refresh();
-        if (session.subscribeMonitor) env.own(session.subscribeMonitor(() => { void refresh(); }, () => {
+        redraw(); void telemetryRefresh.refresh(); void monitorRefresh.refresh();
+        if (session.subscribeMonitor) env.own(session.subscribeMonitor(() => { monitorRefresh.schedule(); }, () => {
           // A notification connection can drop while the request connection is
           // still healthy. Re-read the authoritative snapshot before showing an
           // unavailable state; a transport blip must not overwrite a fresh view.
-          void refresh();
+          monitorRefresh.schedule();
         }));
-        env.own(() => { stopped = true; lifetime.abort(); clearTimeout(timer); ui.setFooter(undefined); ui.setActivity(undefined); ui.setCommandPresentation(undefined); });
+        env.own(() => { stopped = true; lifetime.abort(); telemetryRefresh.stop(); monitorRefresh.stop(); ui.setFooter(undefined); ui.setActivity(undefined); ui.setCommandPresentation(undefined); });
         const show = (title, body, context, command, scope, mode) => ui.showDocument(document({ title, body, command, scope, mode }), context);
         for (const command of createTerminalCommands({ ui, queries, session, show, usage: () => status.usageDetails(), monitor: (value) => {
           if (value) status.update({monitor:value, monitorError:null});
@@ -81,6 +81,42 @@ export async function createCoRAgentNativeClientFacet({ sourceRoot, session } = 
       });
     },
   });
+}
+
+/** One in-flight read per source; bursts request only one follow-up refresh. */
+export function createRefreshLoop({ read, apply, onError, signal, intervalMs = 5000, coalesceMs = 250 }) {
+  let stopped = false, running = false, dirty = false, timer, scheduledUpdate = false;
+  const active = () => !stopped && !signal?.aborted;
+  const scheduleAfter = (delay, update) => {
+    clearTimeout(timer);
+    scheduledUpdate = update;
+    timer = setTimeout(() => { timer = undefined; scheduledUpdate = false; void refresh(); }, delay);
+    timer.unref?.();
+  };
+  async function refresh() {
+    if (!active()) return;
+    if (running) { dirty = true; return; }
+    clearTimeout(timer); timer = undefined; scheduledUpdate = false;
+    running = true; dirty = false;
+    try {
+      const value = await read();
+      if (active()) apply(value);
+    } catch (error) {
+      if (active()) onError(error);
+    } finally {
+      running = false;
+      if (active()) scheduleAfter(dirty ? coalesceMs : intervalMs, dirty);
+    }
+  }
+  return {
+    refresh,
+    schedule() {
+      if (!active()) return;
+      if (running) { dirty = true; return; }
+      if (!scheduledUpdate) scheduleAfter(coalesceMs, true);
+    },
+    stop() { stopped = true; clearTimeout(timer); },
+  };
 }
 
 export function createTerminalCommands({ ui, queries, session, show, usage, monitor }) {
@@ -131,7 +167,14 @@ export function createTerminalCommands({ ui, queries, session, show, usage, moni
         if (session.signal?.aborted) return;
         if (response.session_id !== session.sessionId) throw new Error("Query returned a different session");
         if (session.workspaceId && response.workspace_id !== session.workspaceId) throw new Error("Query returned a different workspace");
-        if (response.error) throw new Error(response.error.message);
+        if (response.error) {
+          const { message, code, details = {} } = response.error;
+          const fields = [
+            ['Code', code], ['Command', details.command], ['Request', details.request_id],
+            ['Elapsed', Number.isFinite(details.elapsed_ms) ? `${details.elapsed_ms} ms` : undefined],
+          ].filter(([, value]) => value !== undefined);
+          throw new Error([message, ...fields.map(([label, value]) => `${label}: ${value}`)].join('\n'));
+        }
         const title = definition.name === "sys-prompt" ? "System prompt" : "Research state";
         const body = definition.name === "sys-prompt" ? formatPrompt(response.result) : formatResearch(response.result);
         await show(title, body, context, `${definition.name}${args ? ` ${args}` : ''}`, definition.name === 'research' ? 'Workspace' : 'Session', definition.name === 'sys-prompt' ? 'page' : 'auto');

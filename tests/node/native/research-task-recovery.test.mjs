@@ -60,7 +60,7 @@ test("Memory and Task recover their original identities without a calculation pl
     conversation = await harness.root(context, { agent: { model: { provider: "faux", modelId: "faux-1" } } });
     admission = createInputAdmission({ harness, conversation, LiveDoc, InboxDoc, admitSubmission });
     controller = createTaskController({ harness, conversation, admission, LiveDoc, InboxDoc,
-      kernel: bridge, workspaceId, sessionId, context });
+      kernel: bridge, queryKernel: bridge, workspaceId, sessionId, context });
     await admission.checkRecovery(context);
   }
   const replay = invocation => tools.find(tool => tool.name === invocation.name).execute(invocation.params, invocation.api, context);

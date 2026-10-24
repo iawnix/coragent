@@ -5,7 +5,7 @@ export const JOB_ADMISSION_SERVICE_ID = "coragent.job-admission";
 const fail = (code, message) => Object.assign(new Error(`${code}: ${message}`), { code });
 
 /** Assess durable delivery identity outside Pi commits. Only authenticated producers reach admission. */
-export function createJobAdmission({ admission, kernel, sessionId, producerToken, taskController }) {
+export function createJobAdmission({ admission, queryKernel, sessionId, producerToken, taskController }) {
   if (!taskController || !["prepareJobEvents", "validateConsumption", "assertExecutionAllowed", "completeJobEventConsumption"]
     .every(name => typeof taskController[name] === "function")) {
     throw new TypeError("Job event admission requires Task Controller policy");
@@ -18,12 +18,19 @@ export function createJobAdmission({ admission, kernel, sessionId, producerToken
     }
   }
   const assess = async id => {
-    const result = await kernel.execute_command("job_manager_assess", { event_id: id, session_id: sessionId });
+    const result = await queryKernel.execute_command("job_manager_assess", { event_id: id, session_id: sessionId });
     if (typeof result?.admitted !== "boolean" || !result.delivery_token) {
       throw fail("invalid_job_event_assessment", "Invalid Job Manager assessment");
     }
     return result;
   };
+  async function assessEvents(ids) {
+    // The local query worker is serial and bounded. A valid event batch can
+    // exceed its pending-request limit without needing concurrent requests.
+    const events = [];
+    for (const id of ids) events.push(await assess(id));
+    return events;
+  }
   function eventIdentity(ids) {
     if (!Array.isArray(ids) || !ids.length || ids.length > JOB_EVENT_IDS_LIMIT || ids.some(id => typeof id !== "string" || !/^event_[1-9][0-9]*$/u.test(id))) {
       throw fail("invalid_job_events", "Job Manager input requires structured eventIds");
@@ -47,7 +54,7 @@ export function createJobAdmission({ admission, kernel, sessionId, producerToken
       return { ...accepted(record), consumed: true };
     }
     if (record.status === "unanswered") {
-      const prepared = await taskController.prepareJobEvents(await Promise.all(identity.event_ids.map(assess)), context);
+      const prepared = await taskController.prepareJobEvents(await assessEvents(identity.event_ids), context);
       if (prepared.deferred) return { ...accepted(record), pending: true, deferred: prepared.deferred };
       if (!prepared.events.length) return { accepted: true, skipped: true };
       return { ...accepted(record), pending: true };
@@ -61,7 +68,7 @@ export function createJobAdmission({ admission, kernel, sessionId, producerToken
       const identity = eventIdentity(eventIds);
       const existing = await admission.recoverInternal(requestId, "job_manager", identity, context);
       if (existing) return jobEventResult(existing, identity, context);
-      const events = await Promise.all(identity.event_ids.map(assess));
+      const events = await assessEvents(identity.event_ids);
       if (events.some(event => !event.obsolete && !event.admitted)) {
         return { accepted: false, pending: true, assessments: events,
           error: { code: "job_events_paused", message: "Automatic delivery is paused; events remain pending" } };
@@ -86,7 +93,7 @@ export function createJobAdmission({ admission, kernel, sessionId, producerToken
       }
       let basis;
       if (origin.producer === "job_manager") {
-        const events = await Promise.all(origin.identity.event_ids.map(assess));
+        const events = await assessEvents(origin.identity.event_ids);
         const active = events.filter(event => !event.obsolete);
         if (active.some(event => !event.admitted)) throw fail("job_events_paused", "Automatic event delivery was paused");
         if (!active.length) {

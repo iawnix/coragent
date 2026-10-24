@@ -66,8 +66,8 @@ async function fixture(t) {
     throw new Error(`Unexpected fixture command ${method}`);
   } };
   function openController() {
-    controller = createTaskController({ harness, conversation, admission, LiveDoc, InboxDoc, kernel, workspaceId: "workspace", sessionId: "session", context });
-    monitor = createJobAdmission({ admission, kernel, sessionId: "session", producerToken: "fixture-token", taskController: controller });
+    controller = createTaskController({ harness, conversation, admission, LiveDoc, InboxDoc, kernel, queryKernel: kernel, workspaceId: "workspace", sessionId: "session", context });
+    monitor = createJobAdmission({ admission, queryKernel: kernel, sessionId: "session", producerToken: "fixture-token", taskController: controller });
   }
   openController();
   t.after(async () => { await controller.close(); await harness.close(context); });
@@ -107,6 +107,35 @@ test("an early Job event cannot consume an all-Jobs wait", async t => {
   });
   assert.equal((await env.controller.current(context)).state, "waiting");
   assert.equal(env.requests, before, "no model request until the complete wait predicate is satisfied");
+});
+
+for (const pause of [false, true]) test(`persisted Job completion ${pause ? "respects pause" : "wakes the waiting Task"} without scheduler polling`, async t => {
+  const env = await fixture(t);
+  env.jobs.set("job_a", "running");
+  let task = await env.controller.current(context);
+  task = await env.controller.update({ expected_revision: task.revision, action: "wait",
+    wait: { job_ids: ["job_a"], mode: "all" } }, "wait-persisted", context);
+  if (pause) await env.controller.control({ user_task_id: task.user_task_id, expected_revision: task.revision,
+    action: "pause", request_id: "pause-before-completion" }, context);
+  // Job Manager commits the Job observation before publishing its event.
+  env.jobs.set("job_a", "succeeded");
+  const execute = env.kernel.execute_command;
+  env.kernel.execute_command = async (command, params) => {
+    assert.notEqual(command, "job_status", "event admission must not repeat the remote observation");
+    return execute(command, params);
+  };
+  assert.equal((await env.controller.current(context)).state, pause ? "paused" : "waiting");
+  env.faux.setResponses([fauxAssistantMessage("Inspect the completed calculation")]);
+  const before = env.requests;
+  const response = await env.monitor.admit({ requestId: "persisted-completion", eventIds: ["event_1"],
+    token: "fixture-token", mode: "next_run" }, context);
+  await env.conversation.waitForIdle(context);
+  assert.equal(response.accepted, !pause);
+  if (pause) assert.equal(response.error.code, "task_paused");
+  assert.equal(env.requests, before + (pause ? 0 : 1));
+  task = await env.controller.current(context);
+  assert.equal(task.state, pause ? "paused" : "active");
+  assert.equal(task.continuation.sequence, pause ? 0 : 1);
 });
 
 test("a partially failed cancel request retains responsibility across controller recovery", async t => {
@@ -429,7 +458,7 @@ test("single-Job cancellation identity cannot be reused for another target", asy
   const env = await fixture(t);
   env.jobs.set("job_a", "running"); env.jobs.set("job_b", "running");
   const service = createMonitorService({ controller: env.controller, harness: env.harness, conversation: env.conversation,
-    kernel: env.kernel, workspaceId: "workspace", sessionId: "session", LiveDoc });
+    queryKernel: env.kernel, workspaceId: "workspace", sessionId: "session", LiveDoc });
   const request = { method: "monitor/job/cancel", params: { job_id: "job_a", request_id: "cancel-one" } };
   const first = await service.handle(request, context);
   assert.equal(first.error, null);

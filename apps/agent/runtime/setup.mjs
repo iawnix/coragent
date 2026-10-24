@@ -26,7 +26,7 @@ import { createSystemPromptManifest } from "./prompt.mjs";
 import { createPackageSourceReadGuard } from "./policy.mjs";
 import { wrapToolForHarness } from "../tools/envelope.mjs";
 import { createToolExecutionContext } from "../tools/context.mjs";
-import { create_python_runtime_bridge } from "../bridge/client.mjs";
+import { create_python_runtime_bridge, create_query_runtime_bridge } from "../bridge/client.mjs";
 import { RESEARCH_MEMORY_WRITE_PRINCIPAL } from "../bridge/ports.mjs";
 import { createTransactionCoordinator } from "../bridge/transactions.mjs";
 
@@ -54,7 +54,7 @@ export async function createCoRAgentHarness(databasePath, options) {
   const settingsManager = SettingsManager.create(cwd);
   configureHarnessHttp(settingsManager);
   const executionEnvs = new ExecutionEnvs(cwd);
-  let commandBridge, harness, taskController;
+  let commandBridge, queryBridge, harness, taskController;
   try {
     const resolved = await findInitialAgentModel(
       settingsManager,
@@ -63,6 +63,7 @@ export async function createCoRAgentHarness(databasePath, options) {
     );
     const loadedSkills = await loadProductSkills();
     commandBridge = create_python_runtime_bridge({ workspace_root: cwd, workspace_id: workspaceId });
+    queryBridge = create_query_runtime_bridge({ workspace_root: cwd, workspace_id: workspaceId });
     const transactionCoordinator = createTransactionCoordinator({ bridge: commandBridge, workspaceRoot: cwd });
     const businessTools = createCoreTools({ commandBridge,
       getTaskBinding: context => taskController.binding(context),
@@ -186,10 +187,10 @@ export async function createCoRAgentHarness(databasePath, options) {
     const conversation = await harness.root(PI_TODO_CONTEXT, { agent: { cwd, ...(created && resolved.model ? { model: resolved.model } : {}), ...(created && resolved.thinkingLevel ? { thinkingLevel: resolved.thinkingLevel } : {}) } });
     inputAdmission = createInputAdmission({ harness, conversation, LiveDoc, InboxDoc, admitSubmission });
     taskController = createTaskController({ harness, conversation, admission: inputAdmission, LiveDoc, InboxDoc,
-      kernel: commandBridge, workspaceId, sessionId, context: PI_TODO_CONTEXT,
+      kernel: commandBridge, queryKernel: queryBridge, workspaceId, sessionId, context: PI_TODO_CONTEXT,
       enabled: process.env.CORAGENT_AUTOMATIC_CONTINUATION !== "0" });
     await inputAdmission.checkRecovery(PI_TODO_CONTEXT);
-  jobAdmission = createJobAdmission({ admission: inputAdmission, kernel: commandBridge, sessionId,
+    jobAdmission = createJobAdmission({ admission: inputAdmission, queryKernel: queryBridge, sessionId,
       producerToken, taskController });
     const sessionAdmission = createSessionAdmission({ harness, conversation, LiveDoc, taskController });
     taskController.start();
@@ -200,11 +201,11 @@ export async function createCoRAgentHarness(databasePath, options) {
         env.provide(CoRAgentJobAdmission, jobEventService);
         env.provide(CoRAgentInputAdmission, createInputService(inputAdmission));
         env.provide(CoRAgentSessionAdmission, sessionAdmission);
-        env.provide(CoRAgentMonitor, createMonitorService({ controller: taskController, harness, conversation, kernel: commandBridge, workspaceId, sessionId, LiveDoc }));
-        env.provide(CoRAgentClientQueries, createClientQueries({ workspaceId, sessionId, commandBridge, promptManifest,
+        env.provide(CoRAgentMonitor, createMonitorService({ controller: taskController, harness, conversation, queryKernel: queryBridge, workspaceId, sessionId, LiveDoc }));
+        env.provide(CoRAgentClientQueries, createClientQueries({ workspaceId, sessionId, queryBridge, promptManifest,
           readTelemetry: async (context) => {
             const { estimateContext } = await loadPi("compaction", sourceRoot);
-            const [view, agent, research] = await Promise.all([conversation.context(context), conversation.agent(context), commandBridge.execute_command("research_read", {})]);
+            const [view, agent] = await Promise.all([conversation.context(context), conversation.agent(context)]);
             const model = agent.model && modelRuntime.getModel(agent.model.provider, agent.model.modelId);
             // Reuse Pi's compaction-aware request estimate. It is not an exact tokenizer count.
             const contextWindow = model?.contextWindow || null;
@@ -213,15 +214,16 @@ export async function createCoRAgentHarness(databasePath, options) {
               contextTokens: estimateContext(view, []), inputBudgetTokens,
               reserveTokens: harnessSettings.compaction.reserveTokens ?? null,
               estimated: true,
-              entryId: view.entries.at(-1)?.id ?? null, firstEntryId: view.entries[0]?.id ?? null, headId: view.head?.id ?? null, research };
+              entryId: view.entries.at(-1)?.id ?? null, firstEntryId: view.entries[0]?.id ?? null, headId: view.head?.id ?? null };
           },
         }));
       } })]),
-      cleanup: async (context) => { await taskController.close(); try { await executionEnvs.cleanup(context); } finally { await commandBridge.close(); } },
+      cleanup: async (context) => { await taskController.close(); try { await executionEnvs.cleanup(context); } finally { await Promise.all([commandBridge.close(), queryBridge.close()]); } },
     };
   } catch (error) {
     await taskController?.close();
     await commandBridge?.close().catch(() => {});
+    await queryBridge?.close().catch(() => {});
     await harness?.close(PI_TODO_CONTEXT).catch(() => {});
     await executionEnvs.cleanup(PI_TODO_CONTEXT).catch(() => {});
     throw error;
