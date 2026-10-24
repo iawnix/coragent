@@ -1,10 +1,13 @@
-"""Pure allocation contract; no science imports, probes, writes or ambient inference.
+"""Pure allocation and input contract; no science imports, probes or writes.
 
 Current scan, NEB image and MECP surface evaluations are sequential: concurrency
 is one. A parallel implementation must update this contract along with its runner.
 Gaussian/PySCF memory reserves at least 256 MiB and 10% of the job total for overhead.
 This is a conservative default budget, not a prediction of actual peak RSS.
 """
+import contextlib
+import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -106,6 +109,30 @@ def requirements(descriptor, arguments, inputs):
             **({'memory_mb': job_memory(memory)} if memory is not None else {})}
 
 
+def _load(path):
+    # These files are pinned by the execution descriptor. Do not alter sys.path
+    # or reuse a same-named module from another installed Skill.
+    spec = importlib.util.spec_from_file_location('gaussian_input_contract', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _inspect_gaussian(descriptor, arguments, source):
+    root = Path(__file__).resolve().parent.parent
+    cli = _load(root / descriptor['cli'])
+    diagnostic = io.StringIO()
+    try:
+        with contextlib.redirect_stderr(diagnostic):
+            args = cli.parse_arguments(['--input-gjf', str(source), '--output-dir', 'results',
+                                        *arguments, '--executable', 'configured-gaussian'])
+    except SystemExit as error:
+        raise ValueError('runner_arguments_invalid: ' + diagnostic.getvalue().strip()) from error
+    checked = _load(Path(__file__).with_name('gaussian_input.py'))
+    return checked.inspect_input(source, args.method, args.basis, args.charge,
+                                 args.multiplicity, args.threads, args.memory_mb)
+
+
 def prepare(descriptor, arguments, inputs, resources):
     cpus, memory = _declared(descriptor, arguments, inputs)
     total_cpus = resources.get('cpus')
@@ -126,6 +153,10 @@ def prepare(descriptor, arguments, inputs, resources):
             arguments += ['--threads', str(total_cpus)]
         if has_memory and _option(arguments, '--memory-mb') is None:
             arguments += ['--memory-mb', str(memory)]
-    return arguments, {'status': 'checked', 'scope': 'declared program settings, not measured peak usage',
-                       'threads': total_cpus, 'concurrent_processes': 1,
-                       **({'program_memory_mb': memory} if has_memory else {})}
+    report = {'status': 'checked', 'scope': 'declared program settings, not measured peak usage',
+              'threads': total_cpus, 'concurrent_processes': 1,
+              **({'program_memory_mb': memory} if has_memory else {})}
+    if descriptor['id'] == 'chemical.gaussian-input':
+        report['input_validation'] = _inspect_gaussian(descriptor, arguments, inputs['input'])
+        report['scope'] = 'declared program settings and Gaussian input safety, not measured peak usage or scientific validity'
+    return arguments, report

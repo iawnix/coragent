@@ -149,10 +149,11 @@ def test_shortcut_program_threads_follow_job_allocation(tmp_path, mock_environme
 def test_explicit_gaussian_input_drives_allocation_and_is_not_rewritten(tmp_path, mock_environment_probe):
     config = configured(tmp_path)
     source = tmp_path / 'input.gjf'
-    source.write_text('%nprocshared=12\n%mem=8GB\n#p HF/sto-3g SP\n\nwater\n\n0 1\n\n')
+    source.write_text('%nprocshared=12\n%mem=8GB\n#p HF/sto-3g SP\n\nwater\n\n0 1\nO 0.0 0.0 0.0\nH 0.0 0.0 1.0\nH 0.0 1.0 0.0\n\n')
     before = source.read_bytes()
     def build(**kw):
-        return prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, 'chemical.gaussian-input', '1', {'input': source}, **kw)
+        return prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, 'chemical.gaussian-input', '1', {'input': source},
+                       ['--method', 'HF', '--basis', 'sto-3g'], **kw)
     request = build()
     assert request['metadata']['resources'] == {'cpus': 12, 'memory_mb': 9103}
     assert request['metadata']['program_resources']['program_memory_mb'] == 8192
@@ -162,6 +163,73 @@ def test_explicit_gaussian_input_drives_allocation_and_is_not_rewritten(tmp_path
     with pytest.raises(ValueError, match='including overhead'):
         build(submission={'resources': {'memory_mb': 8192}})
     assert source.read_bytes() == before
+
+
+def explicit_gaussian_input(path, *, route='SP', body=None):
+    body = body or 'water\n\n0 1\nO 0.0 0.0 0.0\nH 0.0 0.0 1.0\nH 0.0 1.0 0.0\n\n'
+    path.write_text('%nprocshared=12\n%mem=4000MB\n#p M062X/6-31G** ' + route + '\n\n' + body)
+    return path
+
+
+@pytest.mark.parametrize('route,body,expected', [
+    ('Opt=QST2', 'reactant\n\n0 1\nH 0.0 0.0 0.0\nH 0.0 0.0 0.74\n\n'
+                 '0 1\nH 0.0 0.0 0.0\nH 0.0 0.0 0.74\n\n', 'QST2 requires'),
+    ('Opt=TS', 'collision\n\n0 1\nH 0.0 0.0 0.0\nH 0.112 0.0 0.0\n\n', 'geometry safety failed'),
+    ('IRC=(Forward,StepSize=0.5)', None, 'StepSize must be a nonzero integer'),
+])
+def test_explicit_gaussian_bad_input_fails_before_environment_probe(tmp_path, monkeypatch, route, body, expected):
+    config = configured(tmp_path)
+    source = explicit_gaussian_input(tmp_path / 'input.gjf', route=route, body=body)
+    monkeypatch.setattr('research_agent.application.executors.probe_binding',
+                        lambda *args: pytest.fail('invalid input must fail before environment probing'))
+    with pytest.raises(ValueError, match=expected):
+        prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, 'chemical.gaussian-input', '1', {'input': source})
+
+
+def test_explicit_gaussian_preparation_is_stdlib_only_and_matches_runner_check(tmp_path):
+    root = Path(__file__).resolve().parents[2]
+    source = explicit_gaussian_input(tmp_path / 'input.gjf')
+    contract = root / 'skills/chemical/_shared/job_resources.py'
+    program = '''import importlib.util, json, sys
+from pathlib import Path
+def load(path):
+    spec = importlib.util.spec_from_file_location('isolated_contract', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+search_path = list(sys.path)
+contract = load(Path(sys.argv[1]))
+descriptor = {'id': 'chemical.gaussian-input', 'backend': 'gaussian', 'cli': 'gaussian/scripts/cli.py'}
+arguments, report = contract.prepare(descriptor, [], {'input': Path(sys.argv[2])}, {'cpus': 12, 'memory_mb': 4445})
+checked = load(Path(sys.argv[1]).with_name('gaussian_input.py'))
+assert report['input_validation'] == checked.inspect_input(sys.argv[2], 'M062X', '6-31G**', 0, 1, 12, 4000)
+assert sys.path == search_path
+assert not {'numpy', 'cclib', 'science', 'input_job', 'gaussian_input', 'geometry_safety', 'gaussian_input_contract', 'gaussian_geometry_safety', 'isolated_contract'} & sys.modules.keys()
+print(json.dumps(report))
+'''
+    completed = subprocess.run([sys.executable, '-I', '-S', '-B', '-c', program, str(contract), str(source)],
+                               capture_output=True, text=True)
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout)['input_validation']['geometry_safety']['status'] == 'passed'
+
+
+def test_explicit_gaussian_preparation_and_submission_recheck_current_bytes(tmp_path, mock_environment_probe):
+    config = configured(tmp_path)
+    source = explicit_gaussian_input(tmp_path / 'input.gjf')
+    def request():
+        return prepare(config, {'platform': 'local', 'scheduler_entry': 'main'}, 'chemical.gaussian-input', '1', {'input': source})
+    prepared = request()
+    check_binding(prepared, probe=False)
+    assert prepared['metadata']['program_resources']['input_validation']['geometry_safety']['status'] == 'passed'
+    source.write_text(source.read_text().replace('H 0.0 0.0 1.0', 'H 0.0 0.0 0.1'))
+    with pytest.raises(ValueError, match='prepared_input_changed'):
+        check_binding(prepared, probe=False)
+    with pytest.raises(ValueError, match='geometry safety failed'):
+        request()
+    explicit_gaussian_input(source)
+    prepared['metadata']['program_resources']['input_validation']['geometry_safety']['status'] = 'not_assessed'
+    with pytest.raises(ValueError, match='execution_program_resources_mismatch'):
+        check_binding(prepared, probe=False)
 
 
 @pytest.mark.parametrize('arguments,submission', [

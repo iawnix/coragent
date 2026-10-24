@@ -27,6 +27,8 @@ Before selecting a costly search, read [method selection](../method-selection/SK
 
 Keep multiple site, face, conformer, and mechanism hypotheses until validation or energetics gives a reason to reduce them. A scan maximum, NEB image, or QST interpolation is a candidate record and a useful restart frame; it becomes a TS claim only after `validation`.
 
+Do not average the Cartesian coordinates of unaligned endpoints to make a TS guess. Establish atom mapping and a common frame first; even an aligned midpoint can collapse bonds or rotate fragments through one another. Use the mapped QST preparer or a justified reactive pose/path method, then inspect contacts and fragment geometry before Gaussian refinement.
+
 ## Recommended loop
 
 1. State the atom mapping, forming/breaking bonds, transfer coordinates, and electronic state.
@@ -52,7 +54,7 @@ distinct, geometry-checked candidates to an expensive Gaussian refinement.
 - `chemical.neb-xtb@2`, `chemical.neb-gaussian@2`: ASE NEB v2 searches.
 - `chemical.search-recovery@1`: evidence-directed next-route decisions after a failed search.
 
-Both QST preparers use the shared Cartesian serializer in `skills/chemical/_shared/gaussian_input.py`. It reads generated blocks back and checks their state, ordered elements and coordinates against the mapped request before producing the input. Supply the explicit atom mapping to the preparer; coordinate serialization preserves that ordering.
+Both QST preparers use the shared Cartesian serializer in `skills/chemical/_shared/gaussian_input.py`. It reads generated blocks back and checks their state, ordered elements and coordinates against the mapped request before producing the input. Supply the explicit atom mapping to the preparer; coordinate serialization preserves that ordering. Pass the generated `.gjf` to `chemical.gaussian-input@1` for checked preparation and submit its prepared request with `job_start`.
 
 Read [candidate-generation criteria](references/candidate_generation.md), [path operations](references/path_search.md), [QST preparation](references/path_preparation.md), and [NEB executor details](references/ase_neb_executor.md). Use [reactive geometry](../reactive-geometry/SKILL.md) for pose construction and [validation](../validation/SKILL.md) for saddle/IRC evidence.
 

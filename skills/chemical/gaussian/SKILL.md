@@ -23,6 +23,8 @@ Use this Skill when Gaussian is the chosen backend for optimization, single poin
 
 The path-specific gradient and NEB adapters live in `candidate-generation`; Gaussian saddle and IRC checks live in `validation`.
 
+For the calculations above, prepare the registered adapter request and submit that request with `job_start`. `chemical.gaussian-input@1` checks its explicit input during preparation and again before Gaussian starts; the XYZ shortcut checks geometry when it runs. A software/environment check only establishes that Gaussian can run; it does not validate a new input. Keep the checked adapter in custom multi-step workflows instead of replacing it with an unchecked `g16 < input.gjf` shell command. General shell tools remain available for staging, analysis, and operations outside these adapters.
+
 ## XYZ shortcut
 
 ```bash
@@ -41,7 +43,9 @@ Stage a complete input and relative checkpoint/dependency names inside the Job:
 "$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.gaussian-input --version 1 --input input=ts.gjf --collect results/ts.chk --output prepared/ts.json -- --method M062X --basis '6-31G**' --charge 0 --multiplicity 1 --validation none
 ```
 
-Use `--validation opt|sp|frequency|minimum|saddle|irc` when the input is intended for a parser check. Keep the final blank section terminator and complete Link1 metadata. Submit prepared requests with `job_start`, then inspect `gaussian.out`, `parsed.json`, checkpoint, geometry, and validation fields.
+Use `--validation opt|sp|frequency|minimum|saddle|irc` to select checks on the calculated output. `--validation none` leaves those task-specific output checks unselected; it does not disable input validation. Keep the final blank section terminator and complete Link1 metadata. For QST2/QST3, use `chemical.qst-prepare@1` from [candidate-generation](../candidate-generation/SKILL.md) to serialize mapped structures with a separate title, electronic state, and coordinate block for each structure. Prepare the resulting input with `chemical.gaussian-input@1`, submit the prepared request with `job_start`, then inspect `gaussian.out`, `parsed.json`, checkpoint, geometry, and validation fields.
+
+Preparation checks section structure, QST blocks, declared state and resources, and explicit Cartesian geometry. Correct a rejected input and prepare it again; do not bypass a rejection with a direct shell submission. Passing these checks does not establish a chemically sound TS guess. Reuse optimized fragments, preserve their internal geometry during placement, and inspect reaction-center angles and contacts after edits; see [reactive geometry](../reactive-geometry/SKILL.md).
 
 Read [L101 input guide](references/l101_input_guide.md), [electronic states](references/electronic_states.md), [relaxed scans](references/relaxed_scans.md), and [Gaussian validation](references/gaussian_validation.md) for route and parser details.
 

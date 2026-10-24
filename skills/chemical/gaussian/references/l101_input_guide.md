@@ -86,21 +86,24 @@ additional data and produce an L101 error.
 Write charge and multiplicity as two integers separated by whitespace:
 
 ```text
-0 1    # neutral singlet
-1 2    # +1 cation doublet
--1 1   # -1 anion singlet
+0 1
+1 2
+-1 1
 ```
+
+These examples denote a neutral singlet, a +1 cation doublet, and a −1 anion
+singlet, respectively; use only the line for the intended state.
 
 Check the following:
 
-- Include the correct sign for the charge. Do not put `+1`, `singlet`, or prose
-  on this line.
+- Include the correct sign for the charge; use integer values such as `1` or
+  `-1`. Do not put `singlet`, comments, or prose on this line.
 - The multiplicity is a positive integer consistent with `2S+1`; never use zero
   or a negative value.
-- The electron count must be compatible with the selected multiplicity. An even
-  electron system generally cannot be assigned a closed-shell singlet when the
-  electron count and state disagree. Set the actual state for radicals, ions,
-  and metals.
+- The electron count must be compatible with the selected multiplicity: an
+  even electron count requires an odd multiplicity, and an odd electron count
+  requires an even multiplicity. Parity alone does not select the physical
+  state; set the actual state for radicals, ions, and metals.
 - ONIOM, QST, multicomponent, or external-charge inputs can have additional
   charge/multiplicity lines. Follow the format for the selected keyword rather
   than merging those lines arbitrarily.
@@ -175,6 +178,12 @@ require more input. Common examples are:
 | `Geom=AllCheck`, `Guess=Read` | Data read from a checkpoint | Missing/incompatible checkpoint or conflicting inline sections |
 | ONIOM, external point charges | Layer, link-atom, or charge data | Wrong format, atom number, layer marker, or data order |
 
+Each QST2/QST3 structure has its own title section, blank line, charge/multiplicity
+line, coordinates, and terminating blank line. A second charge line placed
+directly after the first geometry's separator is not a complete second
+structure: Gaussian can consume it and the following coordinates as a title.
+Use the mapped QST preparer rather than concatenating coordinate blocks.
+
 Use the user guide for the selected Gaussian version for exact additional-section
 syntax. Do not add data merely to fill out the file; a section not required by
 the route can itself be misread by L101.
@@ -199,14 +208,13 @@ H  0.0 -0.8  0.6
 %chk=water.chk
 #p B3LYP/6-31G(d) Freq Geom=AllCheck
 
-Frequency from checkpoint
-
 ```
 
-When the second section uses `Geom=AllCheck`, whether geometry, charge, or
-multiplicity should be omitted depends on the checkpoint mode. Do not copy the
-first section's coordinates mechanically into every section. Each route,
-checkpoint, and electronic state must agree.
+`Geom=AllCheck` reads the title, charge, multiplicity, and geometry from the
+checkpoint; omit those inline sections in that link. Other checkpoint modes
+have different input requirements. Do not copy the first section's coordinates
+mechanically into every section. Each route, checkpoint, and electronic state
+must agree.
 
 ## Priority order for diagnosing L101
 
@@ -257,11 +265,16 @@ Before submission:
 
 When submitting a `.gjf` through TSPi's explicit-input executor, the file must
 still follow Gaussian syntax. The executor does not add a title, electronic
-state, coordinates, or additional sections to the route. Check the L101 items
-before starting the Job.
+state, coordinates, or additional sections to the route. Preparation runs the
+shared input checker before a request can be submitted; the runner repeats the
+check before starting Gaussian. It checks section structure, QST blocks,
+declared electronic state and resources, and explicit Cartesian geometry.
+Fix rejected inputs and re-prepare them. A software/environment check does not
+replace this per-input check.
 
 Use `chemical.gaussian-input@1`. The `--validation` option selects a later check
-type; it does not add keywords to the input. For example:
+of the calculated output; it does not add keywords to the input, and `none`
+does not disable input checks. For example:
 
 ```bash
 "$CORAGENT_PYTHON" -m research_agent.application.executors \
@@ -273,9 +286,18 @@ type; it does not add keywords to the input. For example:
 ```
 
 Successful preparation only means that the request and input format were
-accepted; Gaussian has not necessarily terminated normally. Inspect the actual
-output for the echoed route, convergence information, and
+accepted; it does not run Gaussian or prove the guess chemically appropriate.
+Submit the prepared request with `job_start`. Preserve this checked adapter
+when composing shell workflows rather than substituting a direct `g16` call.
+Inspect the actual output for the echoed route, convergence information, and
 `Normal termination of Gaussian`.
+
+For reactive guesses, reuse optimized fragment geometry and inspect the
+edited reaction-center angles and contacts. A nearly linear transfer center
+can be intentional; accidentally straightening a bent fragment is a different
+problem. If Gaussian remains in L101 while consuming CPU without new output,
+first inspect this geometry and the last echoed input. CPU use alone does not
+show that SCF or TS optimization has begun.
 
 ## Minimizing a failed input
 

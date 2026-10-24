@@ -1,16 +1,16 @@
 import json
+import math
 import sys
 from pathlib import Path
 
 import pytest
-pytest.importorskip('numpy')
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'skills/chemical/_shared'))
 sys.path.insert(0, str(ROOT / 'skills/chemical/gaussian/scripts'))
 
 from geometry_safety import assess, assess_gaussian_input  # noqa: E402
-from input_job import inspect_input  # noqa: E402
+from gaussian_input import inspect_input  # noqa: E402
 
 
 def test_reaction_center_can_be_non_equilibrium_but_cannot_collapse():
@@ -52,6 +52,55 @@ def test_nonreaction_bond_changes_are_reported_with_reference_distances():
     assert pair['delta_angstrom'] == pytest.approx(.5)
     reacting = assess(['C', 'H'], xyz, bonded_pairs=[(0, 1)], reaction_pairs=[(0, 1)], reference_coordinates=reference)
     assert reacting['checks']['bond_lengths'] == 'pass'
+
+
+def test_bent_fragment_straightening_is_reported_even_for_a_breaking_bond():
+    angle = math.radians(105.6)
+    reference = [[1.31, 0, 0], [0, 0, 0], [.98 * math.cos(angle), .98 * math.sin(angle), 0]]
+    linear = [[1.31, 0, 0], [0, 0, 0], [-.98, 0, 0]]
+    result = assess(['O', 'O', 'H'], linear, bonded_pairs=[(0, 1), (1, 2)],
+                    reaction_pairs=[(1, 2)], reference_coordinates=reference, profile='ts_candidate')
+    assert result['verdict'] == 'safe'  # A diagnostic, not a stationary-point verdict.
+    assert result['checks']['bond_angles'] == 'warning'
+    observed = next(w for w in result['warnings'] if w['kind'] == 'bond_angle_change')['angles'][0]
+    assert observed['atoms'] == [0, 1, 2]
+    assert observed['angle_degrees'] == pytest.approx(180.)
+    assert observed['reference_angle_degrees'] == pytest.approx(105.6)
+    assert observed['reaction_pairs'] == [[1, 2]]
+
+
+def test_reference_angle_check_preserves_linear_molecules_and_rigid_poses():
+    linear = [[-1.16, 0, 0], [0, 0, 0], [1.16, 0, 0]]
+    rotated = [[4, 2 + row[0], 3] for row in linear]
+    result = assess(['O', 'C', 'O'], rotated, bonded_pairs=[(0, 1), (1, 2)],
+                    reference_coordinates=linear)
+    assert result['verdict'] == 'safe'
+    assert result['checks']['bond_angles'] == 'pass'
+    assert not any(w['kind'] == 'bond_angle_change' for w in result['warnings'])
+    for metadata in ({}, {'bonded_pairs': [(0, 1), (1, 2)]}, {'reference_coordinates': linear}):
+        assert assess(['O', 'C', 'O'], linear, **metadata)['checks']['bond_angles'] == 'not_assessed'
+
+
+@pytest.mark.parametrize('coordinates,kind', [([[float('nan'), 0, 0]], 'nonfinite_coordinates'),
+                                             ([[float('inf'), 0, 0]], 'nonfinite_coordinates'),
+                                             ([[10001, 0, 0]], 'coordinates_out_of_bounds'),
+                                             (['000'], 'atom_coordinate_shape'),
+                                             ([0, 0, 0], 'atom_coordinate_shape'),
+                                             ([[0, 0]], 'atom_coordinate_shape')])
+def test_invalid_coordinate_arrays_are_rejected(coordinates, kind):
+    report = assess(['H'], coordinates)
+    assert report['verdict'] == 'unsafe'
+    assert report['hard_failures'][0]['kind'] == kind
+
+
+def test_scientific_array_callers_share_the_pure_geometry_checker():
+    import numpy as np
+    result = assess(['H', 'H'], np.array([[0, 0, 0], [.74, 0, 0]]),
+                    bonded_pairs=[(np.int64(0), np.int64(1))],
+                    reference_coordinates=np.array([[0, 0, 0], [.75, 0, 0]]))
+    assert result['verdict'] == 'safe'
+    with pytest.raises(ValueError, match='pair'):
+        assess(['H', 'H'], [[0, 0, 0], [.74, 0, 0]], reaction_pairs=[(np.bool_(False), 1)])
 
 
 @pytest.mark.parametrize('pairs', [[(0, 2)], [(0, 0)], [(False, 1)], [[0]]])

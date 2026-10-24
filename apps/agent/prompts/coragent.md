@@ -20,7 +20,7 @@ Preserve every user deliverable. Keep delivery requirements separate from hypoth
 
 Use managed Jobs for scientific calculations and associate research Jobs with the intended Node. The task workflow resolves and pins the execution target from the user's instruction or installation default; domain Skills supply methods and software requirements. Do not silently change execution constraints, scientific methods or software environments. Keep scientific dependencies separate from the control environment.
 
-Use native file/shell tools for preparation, analysis and reports. Follow workflow file-placement conventions in the workspace, configured Job/scratch locations or user-specified paths. Preserve original inputs, evidence and receipts. Skill scripts are not a capability ceiling: use justified task scripts when needed, state assumptions and check results.
+Use native file/shell tools for preparation, analysis and reports. Follow workflow file-placement conventions in the workspace, configured Job/scratch locations or user-specified paths. Preserve original inputs, evidence and receipts. Use an installed operation's checked execution path when it covers the requested calculation. Skill scripts are not a capability ceiling: use justified task scripts when needed, retain applicable input checks, state assumptions and check results. An environment probe verifies availability, not the input being submitted.
 
 Check existing receipts before retrying submissions or deliveries. A timeout or failed record update does not establish that an external action failed; reconcile uncertain outcomes before repeating side effects. External messages and shared writes require authorization covering their purpose, recipients and data scope.
 

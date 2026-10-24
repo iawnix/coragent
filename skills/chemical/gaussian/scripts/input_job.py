@@ -1,77 +1,13 @@
 """Run an explicit Gaussian input without prescribing a research sequence."""
 import hashlib
-import re
 import shutil
 import subprocess
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from gaussian_io import parse_log, parse_irc_log, write_irc_parse_artifacts, write_xyz, require_supported_energy
 from science import digest, write_json, new_result, finish
-from geometry_safety import assess_gaussian_input, require_safe
-from gaussian_input import inspect_qst_structures
+from gaussian_input import inspect_input
 from gaussian_binding import inspect_binding, check_output_origin
-
-
-def local_reference(value):
-    path = PurePosixPath(value.strip())
-    if path.is_absolute() or '..' in path.parts or not path.parts or '\\' in value:
-        raise ValueError('Gaussian file references must be relative staged paths')
-    return str(path)
-
-
-def inspect_input(path, method, basis, charge, multiplicity, threads, memory_mb):
-    text = Path(path).read_text()
-    if not text.endswith('\n\n'):
-        raise ValueError('Gaussian input must end with a blank line (two trailing newline characters)')
-    sections = re.split(r'(?im)^\s*--Link1--\s*$', text)
-    references, checkpoints, routes = set(), set(), []
-    for section in sections:
-        preceding_checkpoints = set(checkpoints)
-        route_match = re.search(r'(?ms)^\s*(#[^\n]*(?:\n[^\n]+)*?)\n\s*\n', section)
-        if not route_match:
-            raise ValueError('Gaussian input needs a route section followed by a blank line')
-        route = route_match.group(1).strip(); routes.append(route)
-        coordinate = r'(?im)^\s*(?:[A-Z][a-z]?|\d+)\s+(?:[-+]?\d+(?:\.\d*)?(?:[EeDd][-+]?\d+)?\s+){2}[-+]?\d+(?:\.\d*)?(?:[EeDd][-+]?\d+)?\s*$'
-        title = section[route_match.end():].split('\n\n', 1)[0]
-        if re.search(coordinate, route) or re.search(coordinate, title):
-            raise ValueError('Gaussian coordinate record in route/title section; restore blank section boundaries')
-        if f'{method}/{basis}'.lower() not in re.sub(r'\s+', '', route).lower():
-            raise ValueError('every Gaussian link must explicitly match the requested method/basis')
-        cpus = re.findall(r'(?im)^\s*%nproc(?:shared)?\s*=\s*(\d+)\s*$', section)
-        if len(cpus) != 1 or int(cpus[0]) != threads:
-            raise ValueError('every Gaussian link must declare the requested %nprocshared')
-        memory = re.findall(r'(?im)^\s*%mem\s*=\s*(\d+)\s*(MB|GB)\s*$', section)
-        if len(memory) != 1 or int(memory[0][0]) * (1024 if memory[0][1].upper() == 'GB' else 1) != memory_mb:
-            raise ValueError('every Gaussian link must declare the requested memory in MB or GB')
-        headers = re.findall(r'(?m)^\s*(-?\d+)\s+(\d+)\s*$', section[route_match.end():])
-        if not headers and not re.search(r'geom\s*=\s*\(?allcheck', route, re.I):
-            raise ValueError('missing charge/multiplicity header')
-        if any((int(c), int(m)) != (charge, multiplicity) for c, m in headers):
-            raise ValueError('input charge/multiplicity differs from request')
-        inspect_qst_structures(section[route_match.end():], route)
-        for key, value in re.findall(r'(?im)^\s*%(\w+)\s*=\s*(.*?)\s*$', section):
-            key = key.lower()
-            if key in {'chk', 'oldchk'}:
-                ref = local_reference(value)
-                if key == 'oldchk' and ref not in checkpoints: references.add(ref)
-                if key == 'chk': checkpoints.add(ref)
-                if key == 'chk' and re.search(r'(?:geom|guess)\s*=\s*\(?(?:allcheck|check|read)', route, re.I) and ref not in preceding_checkpoints and not re.search(r'(?im)^\s*%oldchk\s*=', section):
-                    references.add(ref)
-            elif key not in {'mem', 'nproc', 'nprocshared', 'nosave'}:
-                raise ValueError(f'unsupported Link 0 directive %{key}; use staged chk/oldchk, mem and nprocshared')
-        for ref in re.findall(r'(?m)^\s*@([^\s]+)\s*$', section): references.add(local_reference(ref))
-        if re.search(r'\b(external|include)\s*=', route, re.I):
-            raise ValueError('external executable and route include directives are unsupported')
-        if re.search(r'\birc\b', route, re.I):
-            size = re.search(r'\bstepsize\s*=\s*([^,\s)]+)', route, re.I)
-            if size and (not re.fullmatch(r'-?[1-9]\d*', size[1])):
-                raise ValueError('Gaussian IRC StepSize must be a nonzero integer; fractional values such as 0.5 are invalid')
-    geometry_reports = assess_gaussian_input(text, profile='ts_candidate')
-    for report in geometry_reports:
-        require_safe(report)
-    return {'routes': routes, 'references': sorted(references), 'checkpoints': sorted(checkpoints),
-            'geometry_safety': {'status': 'passed' if geometry_reports else 'not_assessed',
-                                'blocks': geometry_reports}}
 
 
 def run_input(args):

@@ -17,7 +17,9 @@ Use this Skill when separate reactants need a chemically plausible encounter geo
 
 Start with explicit atom IDs and `bond_changes`. `chemical.reactive-sites@1` derives reaction-center roles, local frames, alternative faces, and approach hypotheses from mapped structures. Pass each plausible hypothesis to `chemical.reactive-pose@1`, which samples fragment distance, approach cone, twist, and contact-safe rigid placements.
 
-Use several poses when the reaction has competing nucleophilic sites, electrophilic faces, catalyst orientations, proton relays, or conformers. Select approach axes from local substituent directions and steric accessibility; set distances from the expected bond order and the intended scan range. Keep fragment-internal geometry fixed during pose generation.
+Use several poses when the reaction has competing nucleophilic sites, electrophilic faces, catalyst orientations, proton relays, or conformers. Select approach axes from local substituent directions and steric accessibility; set distances from the expected bond order and the intended scan range. Reuse optimized fragment structures and keep their internal geometry fixed during pose generation; translate and rotate a fragment instead of reconstructing its atoms along an approach axis.
+
+A nearly linear donor–H–acceptor transfer center can be intentional. It does not justify making a bent fragment linear: for example, preserve the optimized O–O–H angle when placing HO₂ near an acceptor. Inspect the edited angles and nearby contacts before refinement. Supply the bonded graph, reaction pairs, and reference coordinates to `geometry-preflight` for warnings about bonded-angle changes, including their declared reaction context. A `safe` report does not establish that a fragment or TS guess is chemically plausible.
 
 ## Refine and revise
 

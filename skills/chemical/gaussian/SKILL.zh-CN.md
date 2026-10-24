@@ -17,6 +17,8 @@ Gaussian 用于优化、单点、QST/TS、频率、IRC、松弛扫描、电子�
 
 `chemical.gaussian@1`：XYZ 的 `sp/opt/opt-sp`；`chemical.gaussian-input@1`：完整 `.gjf/.com`，可做 QST、TS、频率、IRC、扫描和 Link1；`chemical.electronic-gaussian@1`：给定态的 `sp/opt`；`chemical.state-tracking@1`：电子态特征跟踪；`chemical.gaussian-evidence@1`：供 validation 使用的日志证据。路径梯度/NEB 位于 `candidate-generation`，鞍点/IRC 检查位于 `validation`。
 
+上述计算应通过已注册适配器准备请求，再将该请求交给 `job_start`。`chemical.gaussian-input@1` 在准备阶段和 Gaussian 启动前分别检查显式输入；XYZ 快捷方式在运行时检查几何。软件/环境检查只确认 Gaussian 能运行，不代表新输入已通过检查。自定义多步流程中也应保留有检查的适配器调用，不要替换成未经检查的 `g16 < input.gjf` 脚本；文件准备、分析以及适配器范围以外的操作仍可使用通用 shell 工具。
+
 ## XYZ 快捷方式
 
 ```bash
@@ -33,7 +35,9 @@ Gaussian 用于优化、单点、QST/TS、频率、IRC、松弛扫描、电子�
 "$CORAGENT_PYTHON" -m research_agent.application.executors --config "$CORAGENT_JOB_CONFIG" --executor chemical.gaussian-input --version 1 --input input=ts.gjf --collect results/ts.chk --output prepared/ts.json -- --method M062X --basis '6-31G**' --charge 0 --multiplicity 1 --validation none
 ```
 
-可用 `--validation opt|sp|frequency|minimum|saddle|irc` 选择解析检查。输入要有完整 Link1 元数据和末尾空白段。用 `job_start` 提交后检查 `gaussian.out`、`parsed.json`、checkpoint、几何和验证字段。
+可用 `--validation opt|sp|frequency|minimum|saddle|irc` 选择计算输出的检查类型；`--validation none` 只是不选择这些任务特定的输出检查，不会关闭输入验证。输入要有完整 Link1 元数据和末尾空白段。QST2/QST3 使用 [candidate-generation](../candidate-generation/SKILL.zh-CN.md) 的 `chemical.qst-prepare@1` 序列化映射结构，每套结构都有独立的标题、电子态和坐标块。将生成的输入交给 `chemical.gaussian-input@1` 准备，再用 `job_start` 提交准备好的请求，随后检查 `gaussian.out`、`parsed.json`、checkpoint、几何和验证字段。
+
+准备阶段检查 section 结构、QST 块、声明的电子态与资源，以及显式笛卡尔几何。输入被拒绝后应修正并重新准备，不要改成直接 shell 提交来绕过检查。检查通过不代表 TS 猜测在化学上合理；应复用已优化片段，在放置时保持片段内部几何，编辑后检查反应中心角度和接触，见[反应几何](../reactive-geometry/SKILL.zh-CN.md)。
 
 route 与解析细节见 [L101 输入指南](references/l101_input_guide.zh-CN.md)、[电子态](references/electronic_states.zh-CN.md)、[松弛扫描](references/relaxed_scans.zh-CN.md)和 [Gaussian 验证](references/gaussian_validation.zh-CN.md)。
 

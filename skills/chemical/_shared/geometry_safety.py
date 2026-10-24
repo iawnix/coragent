@@ -6,10 +6,9 @@ allowed to be non-equilibrium for a transition-state candidate.
 """
 from __future__ import annotations
 
+import math
+from numbers import Integral
 import re
-from pathlib import Path
-
-import numpy as np
 
 
 # Cordero/Slater-style covalent radii (angstrom) for the elements commonly
@@ -66,7 +65,7 @@ def _radii(elements):
             values.append(1.0)
         else:
             values.append(COVALENT_RADII.get(symbol, 1.0))
-    return np.asarray(values, dtype=float), unknown
+    return values, unknown
 
 
 def _pair_set(pairs, atom_count):
@@ -75,12 +74,68 @@ def _pair_set(pairs, atom_count):
         if not isinstance(pair, (list, tuple)) or len(pair) != 2:
             raise ValueError('atom pairs must contain two zero-based indexes')
         a, b = pair
-        if (isinstance(a, (bool, np.bool_)) or isinstance(b, (bool, np.bool_))
-                or not isinstance(a, (int, np.integer)) or not isinstance(b, (int, np.integer))
+        if (isinstance(a, bool) or isinstance(b, bool)
+                or not isinstance(a, Integral) or not isinstance(b, Integral)
                 or not 0 <= a < atom_count or not 0 <= b < atom_count or a == b):
             raise ValueError('atom pair indexes must be distinct and within the geometry')
         result.add(tuple(sorted((int(a), int(b)))))
     return result
+
+
+def _coordinates(value):
+    # Accept both JSON rows and arrays used by scientific runners, without
+    # importing their numerical runtime into the submission process.
+    if value is None:
+        return [], [0, 3]
+    if isinstance(value, (str, bytes)):
+        return [], []
+    try:
+        rows = list(value)
+    except TypeError:
+        return [], []
+    vectors = []
+    for row in rows:
+        if isinstance(row, (str, bytes)):
+            return rows, [len(rows)]
+        try:
+            vectors.append(list(row))
+        except TypeError:
+            return rows, [len(rows)]
+    widths = {len(row) for row in vectors}
+    shape = [len(rows), widths.pop()] if len(widths) == 1 else [len(rows)]
+    if shape != [len(rows), 3]:
+        return rows, shape
+    return [[float(component) for component in row] for row in vectors], shape
+
+
+def _angle(coordinates, left, center, right):
+    a = [x - y for x, y in zip(coordinates[left], coordinates[center])]
+    b = [x - y for x, y in zip(coordinates[right], coordinates[center])]
+    length = math.hypot(*a) * math.hypot(*b)
+    if length == 0:
+        return None
+    cosine = sum(x * y for x, y in zip(a, b)) / length
+    return math.degrees(math.acos(max(-1., min(1., cosine))))
+
+
+def _angle_changes(coordinates, reference, bonded, reaction):
+    neighbors = {}
+    for left, right in sorted(bonded):
+        neighbors.setdefault(left, []).append(right)
+        neighbors.setdefault(right, []).append(left)
+    changes = []
+    for center, atoms in sorted(neighbors.items()):
+        for index, left in enumerate(atoms):
+            for right in atoms[index + 1:]:
+                before = _angle(reference, left, center, right)
+                after = _angle(coordinates, left, center, right)
+                if before is not None and after is not None and abs(after - before) > 30.:
+                    changes.append({'atoms': [left, center, right], 'angle_degrees': after,
+                                    'reference_angle_degrees': before, 'delta_degrees': after - before,
+                                    'reaction_pairs': [list(pair) for pair in sorted(reaction)
+                                                       if pair in {tuple(sorted((left, center))),
+                                                                   tuple(sorted((center, right)))}]})
+    return changes
 
 
 def assess(elements, coordinates, *, bonded_pairs=None, reaction_pairs=(), profile='general',
@@ -103,15 +158,17 @@ def assess(elements, coordinates, *, bonded_pairs=None, reaction_pairs=(), profi
         'nonreaction_contacts': 'not_assessed',
         'reaction_center': 'not_assessed',
         'bond_lengths': 'not_assessed',
+        'bond_angles': 'not_assessed',
     }
-    array = np.asarray(coordinates, dtype=float) if coordinates is not None else np.empty((0, 3))
-    if array.ndim != 2 or array.shape != (len(elements), 3):
-        hard.append({'kind': 'atom_coordinate_shape', 'expected': [len(elements), 3], 'actual': list(array.shape)})
+    array, shape = _coordinates(coordinates)
+    if shape != [len(elements), 3]:
+        hard.append({'kind': 'atom_coordinate_shape', 'expected': [len(elements), 3], 'actual': shape})
         return _result('unsafe', checks, hard, warnings, array, None)
-    if not np.isfinite(array).all():
+    maximum = max((abs(component) for row in array for component in row), default=0.)
+    if not all(math.isfinite(component) for row in array for component in row):
         hard.append({'kind': 'nonfinite_coordinates'})
-    elif np.abs(array).max(initial=0.0) > max_coordinate:
-        hard.append({'kind': 'coordinates_out_of_bounds', 'maximum_abs_coordinate': float(np.abs(array).max())})
+    elif maximum > max_coordinate:
+        hard.append({'kind': 'coordinates_out_of_bounds', 'maximum_abs_coordinate': maximum})
     else:
         checks['finite_coordinates'] = 'pass'
     radii, unknown = _radii(elements)
@@ -134,8 +191,9 @@ def assess(elements, coordinates, *, bonded_pairs=None, reaction_pairs=(), profi
             raise ValueError('fragment groups must partition the atom indexes')
     reference = None
     if reference_coordinates is not None:
-        reference = np.asarray(reference_coordinates, dtype=float)
-        if reference.shape != array.shape or not np.isfinite(reference).all():
+        reference, reference_shape = _coordinates(reference_coordinates)
+        if (reference_shape != shape
+                or not all(math.isfinite(component) for row in reference for component in row)):
             raise ValueError('reference coordinates must be finite and match the atom order/shape')
     if bonded_pairs is None:
         warnings.append({'kind': 'bond_connectivity_not_supplied',
@@ -145,14 +203,14 @@ def assess(elements, coordinates, *, bonded_pairs=None, reaction_pairs=(), profi
                        'path_image': .72}.get(profile, .75)
     if not isinstance(clash_scale, (int, float)) or not 0.1 <= clash_scale <= 1.5:
         raise ValueError('clash_scale must be between 0.1 and 1.5')
-    distances = np.linalg.norm(array[:, None, :] - array[None, :, :], axis=2)
+    distances = [[math.dist(a, b) for b in array] for a in array]
     short_contacts = []
     collapse_pairs = []
     bond_outliers = []
     for i in range(len(elements)):
         for j in range(i):
             pair = (j, i)
-            distance = float(distances[i, j])
+            distance = distances[i][j]
             radius_sum = float(radii[i] + radii[j])
             hydrogen_pair = _symbol(elements[i]) == _symbol(elements[j]) == 'H'
             known_nonbonded = bonded_pairs is not None or (owners and owners[i] != owners[j])
@@ -176,7 +234,7 @@ def assess(elements, coordinates, *, bonded_pairs=None, reaction_pairs=(), profi
             if pair in bonded and pair not in reaction:
                 observed = {'atoms': [j, i], 'distance_angstrom': distance}
                 if reference is not None:
-                    before = float(np.linalg.norm(reference[i] - reference[j]))
+                    before = math.dist(reference[i], reference[j])
                     observed.update(reference_distance_angstrom=before, delta_angstrom=distance-before)
                     unusual = abs(distance-before) > max(.20, .20 * before)
                 else:
@@ -187,6 +245,11 @@ def assess(elements, coordinates, *, bonded_pairs=None, reaction_pairs=(), profi
         checks['bond_lengths'] = 'warning' if bond_outliers else 'pass'
     if bond_outliers:
         warnings.append({'kind': 'nonreaction_bond_length_change', 'pairs': bond_outliers})
+    if bonded_pairs is not None and reference is not None:
+        angle_changes = _angle_changes(array, reference, bonded, reaction)
+        checks['bond_angles'] = 'warning' if angle_changes else 'pass'
+        if angle_changes:
+            warnings.append({'kind': 'bond_angle_change', 'angles': angle_changes})
     if collapse_pairs:
         hard.append({'kind': 'catastrophic_overlap', 'pairs': collapse_pairs})
         checks['catastrophic_overlap'] = 'fail'
@@ -209,7 +272,7 @@ def assess(elements, coordinates, *, bonded_pairs=None, reaction_pairs=(), profi
 def _result(verdict, checks, hard, warnings, array, distances):
     minimum = None
     if distances is not None and len(array) > 1:
-        minimum = float(distances[np.triu_indices(len(array), 1)].min())
+        minimum = min(distances[i][j] for i in range(len(array)) for j in range(i))
     return {'verdict': verdict, 'hard_failures': hard, 'warnings': warnings,
             'checks': checks, 'minimum_pair_distance_angstrom': minimum,
             'atom_count': int(len(array)), 'scope':

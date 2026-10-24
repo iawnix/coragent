@@ -25,6 +25,8 @@ description: 根据映射端点、反应坐标和结构证据构建并搜索过�
 
 在 validation 或能量证据真正区分前，保留多个位点、进攻面、构象和机理假设。扫描极大值、NEB 图像和 QST 插值是候选/重启帧，经过 `validation` 后才可形成 TS 结论。
 
+不要对未对齐端点的笛卡尔坐标直接取平均来构造 TS 猜测。先建立原子映射和共同坐标系；即使端点已对齐，中点也可能造成键坍缩或片段相互穿过。使用映射 QST 准备器或有依据的反应姿态/路径方法，再检查接触和片段几何后交给 Gaussian 精修。
+
 ## 推荐闭环
 
 1. 明确原子映射、成键/断键、转移坐标和电子态。
@@ -40,7 +42,7 @@ description: 根据映射端点、反应坐标和结构证据构建并搜索过�
 `chemical.path-candidates@1`：映射 QST/路径输入；`chemical.qst-prepare@1`：QST2/QST3；`chemical.scan-xtb@1`、`chemical.scan-gaussian@1`：受限松弛扫描；`chemical.gradient-xtb@1`、`chemical.gradient-gaussian@1`：梯度/路径计算；`chemical.neb-xtb@2`、`chemical.neb-gaussian@2`：ASE NEB v2。
 `chemical.search-recovery@1`：搜索失败后的证据驱动下一路线决策。
 
-两个 QST 准备入口共用 `skills/chemical/_shared/gaussian_input.py` 的笛卡尔序列化器。生成后自动回读并核对电子态、元素顺序和坐标；向准备器提供显式原子映射，生成过程保留这一顺序。
+两个 QST 准备入口共用 `skills/chemical/_shared/gaussian_input.py` 的笛卡尔序列化器。生成后自动回读并核对电子态、元素顺序和坐标；向准备器提供显式原子映射，生成过程保留这一顺序。将生成的 `.gjf` 交给 `chemical.gaussian-input@1` 检查并准备，再用 `job_start` 提交其准备好的请求。
 
 方法判据见 [candidate_generation.zh-CN.md](references/candidate_generation.zh-CN.md)，路径操作见 [path_search.zh-CN.md](references/path_search.zh-CN.md)，QST 和 NEB 细节见对应 reference。姿态构建使用 [reactive-geometry](../reactive-geometry/SKILL.zh-CN.md)，鞍点/IRC 证据使用 [validation](../validation/SKILL.zh-CN.md)。
 

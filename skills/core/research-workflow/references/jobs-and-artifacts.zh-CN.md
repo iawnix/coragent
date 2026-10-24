@@ -8,7 +8,7 @@
 
 活动 Task 已有持久化计算位置后，按已安装领域 Skill 准备请求；位置为 null 时先用 `task_update action=bind_execution` 或创建执行计划，有计划时还须选中可执行项。把返回的 request_file 和 request_sha256 交给 job_start；用 node_id 明确研究归属。其它执行字段已固定在请求文件中。直接 argv 提交需声明实际输入、输出和 execution_target。准备允许不关联研究 Node，这与 Task 的计算位置绑定是不同事项；普通 bash 和平台诊断不要求该绑定。
 
-自定义科学脚本通过配置的执行准备入口使用 `--script <file.py> --backend <binding>`。直接 argv 提交不会选择科学 Python 或软件后端。准备请求和报告排版使用原生工具，科学计算使用受管 Job。
+已有操作覆盖计算需求时，使用它自带检查的准备入口和运行器。自定义科学脚本通过配置的执行准备入口使用 `--script <file.py> --backend <binding>`，并保留适用的领域输入检查。直接 argv 提交不会选择科学 Python 或软件后端，也不会运行领域检查器。环境探测不等于输入验证。准备请求和报告排版使用原生工具，科学计算使用受管 Job。
 
 适配层在提交时固定 Node 版本和实际输入；后来修改方案不改变旧 Job 检验的内容。Job Manager 是派发和终止事实的来源。job_status 查看、job_cancel 请求取消、job_reconcile 协调不确定性、job_collect 保存输出和来源，重复收集不会重新执行。
 
