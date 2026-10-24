@@ -60,6 +60,8 @@ export interface CommandParameters {
     "request_id"?: string;
     "read_basis"?: string | null;
     "subjects"?: Record<string, string>;
+    "references"?: Array<string>;
+    "as_assessment"?: boolean;
   };
   "research_result": {
     "node_id": string;

@@ -36,8 +36,7 @@ const researchSchema = shared.tools.task_update.properties.research;
 const blockKinds = new Set(shared.tools.task_update.properties.block_kind.enum);
 const contextProjection = data => {
   requireValue(data?.schema_version === "research-context/1", "research_context_invalid", "Unsupported research context schema");
-  requireValue(["complete", "incomplete"].includes(data.projection_status)
-    && ["not_requested", "ready", "failed"].includes(data.synthesis_status), "research_context_invalid", "Invalid context status");
+  requireValue(["complete", "incomplete"].includes(data.projection_status), "research_context_invalid", "Invalid context status");
   requireValue(["available", "unavailable"].includes(data.availability), "research_context_invalid", "Invalid context availability");
   for (const key of ["brief_id", "state_digest", "brief_digest"])
     requireValue(data[key] === null || typeof data[key] === "string", "research_context_invalid", `Invalid ${key}`);
@@ -46,7 +45,7 @@ const contextProjection = data => {
   requireValue(["initial", "scope_changed", "facts_changed", "retry"].includes(data.refresh_reason),
     "research_context_invalid", "Invalid context refresh reason");
   return { brief_id: data.brief_id, state_digest: data.state_digest, brief_digest: data.brief_digest,
-    availability: data.availability, projection_status: data.projection_status, synthesis_status: data.synthesis_status,
+    availability: data.availability, projection_status: data.projection_status,
     refresh_reason: data.refresh_reason, updated_at: stamp() };
 };
 const taskRecord = task => {
@@ -523,7 +522,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         const { task } = await currentTx(tx);
         if (!task || terminal.has(task.state) || expectedTaskId && task.user_task_id !== expectedTaskId) return null;
         const previous = task.research_context;
-        const same = previous && ["brief_id", "state_digest", "brief_digest", "availability", "projection_status", "synthesis_status", "refresh_reason"]
+        const same = previous && ["brief_id", "state_digest", "brief_digest", "availability", "projection_status", "refresh_reason"]
           .every(key => previous[key] === pointer[key]);
         if (!same) task.research_context = pointer;
         return copy(task);
@@ -656,6 +655,8 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         }
       }
       if (params.action === "wait") {
+        requireValue(typeof params.next_action === "string" && params.next_action.trim(),
+          "task_wait_invalid", "Wait must state the next action after the cited Jobs finish");
         const task = await getCurrent(ctx);
         const jobs = await ownedJobs(task?.user_task_id);
         requireValue(params.wait?.job_ids?.length && params.wait.job_ids.every(id => jobs.some(job => job.job_id === id)),
@@ -728,7 +729,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         } else if (params.action === "set_research") {
           task.research = copy(params.research);
         } else if (params.action === "wait") {
-          task.state = "waiting"; task.wait = params.wait; task.block_details = null;
+          task.state = "waiting"; task.wait = params.wait; task.next_action = params.next_action.trim(); task.block_details = null;
         } else if (params.action === "block") {
           requireValue(params.reason, "task_reason_required", "A blocker needs an explanation");
           const live = await tx.doc(LiveDoc, conversation.id);

@@ -219,23 +219,23 @@ test('hydration recovery reuses immutable memo, escapes data and grants no read 
 });
 
 test('scoped fact changes refresh on ordinary inputs and repeated events do not duplicate context', async () => {
-  let version = 1, calls = 0;
+  let version = 1;
   const manager = fixtureManager({ bridge: { async execute_command(_command, params) {
     assert.equal(params.view, 'brief');
     assert.equal(params.trigger, undefined);
     return {...snapshot(), state_digest: `sha256:${version}`, brief_digest: `sha256:${version}`,
       findings: [{kind:'result',ref:'result_1',summary:'Recorded evidence'}]};
-  } }, synthesizeBrief: async brief => { calls++; return {summary:'Evidence',source_state_digest:brief.state_digest}; } });
+  } } });
   const task = fullTask();
   const first = await manager.prepare({entries:[]},memoApi(),context,{task,input_ids:[1]});
-  assert.equal(first.data.synthesis_status,'ready');
+  assert.equal(decode(first.messages[0]).research_brief.findings[0].summary,'Recorded evidence');
   const view = {entries:[committed(first)]};
   assert.equal(await manager.prepare(view,memoApi(),context,{task,input_ids:[2]}),undefined);
   assert.equal(await manager.prepare(view,memoApi(),context,{task:{...task,event_inputs:[{event_ids:['event_1']}]},input_ids:[3]}),undefined);
   version++;
   const changed = await manager.prepare(view,memoApi(),context,{task,input_ids:[4]});
   assert.equal(changed.data.refresh_reason,'facts_changed');
-  assert.equal(calls,2);
+  assert.equal(decode(changed.messages[0]).research_brief.state_digest,'sha256:2');
 });
 
 test('persisted process notes refresh restored context without changing Node revision or selecting an assessment', async t => {
@@ -272,17 +272,47 @@ test('persisted process notes refresh restored context without changing Node rev
   assert.equal(await manager.prepare({entries:[...view.entries,committed(refreshed,5)]},memoApi(),context,{task}),undefined);
 });
 
-test('projection failures do not request synthesis and synthesis failures preserve deterministic facts', async () => {
-  let projectionStatus = 'incomplete', calls = 0;
+test('projection recovery preserves recorded facts without a second authored summary', async () => {
+  let projectionStatus = 'incomplete';
   const manager = fixtureManager({bridge:{async execute_command(){return {...snapshot(),projection_status:projectionStatus,
-    findings:[{kind:'result',ref:'result_1',summary:'Retained fact'}]};}},
-    synthesizeBrief:async()=>{calls++;throw Error('Unavailable synthesis');}});
+    findings:[{kind:'result',ref:'result_1',summary:'Retained fact'}]};}}});
   const first=await manager.prepare({entries:[]},memoApi(),context,{task:fullTask()});
-  assert.equal(first.data.synthesis_status,'not_requested');assert.equal(calls,0);
+  assert.equal(first.data.projection_status,'incomplete');
   projectionStatus='complete';
   const next=await manager.prepare({entries:[committed(first)]},memoApi(),context,{task:fullTask()});
-  assert.equal(next.data.synthesis_status,'failed');assert.equal(calls,1);
+  assert.equal(next.data.projection_status,'complete');
   assert.equal(decode(next.messages[0]).research_brief.findings[0].summary,'Retained fact');
+  assert.equal(decode(next.messages[0]).research_brief.synthesis,undefined);
+});
+
+test('an empty conversation restores the selected judgment and caveat after many process notes', async t => {
+  await mkdir(TEST_ROOT,{recursive:true});
+  const root=await mkdtemp(join(TEST_ROOT,'current-judgment-'));
+  const workspaces=create_workspace_initializer();
+  await workspaces.initialize_workspace({workspace_root:root,workspace_id:'current-judgment'});
+  await workspaces.admit_workspace(root);
+  const bridge=create_python_runtime_bridge({workspace_root:root,workspace_id:'current-judgment'});
+  t.after(async()=>{await bridge.close();await rm(root,{recursive:true,force:true});});
+  const tools=createResearchTools({commandBridge:bridge});
+  const run=async(name,args,callId)=>(await tools.find(tool=>tool.name===name).execute(args,
+    {callId,coragent:{workspace_root:root,session_id:'current-judgment',operation_id:callId,principal:'root_agent'}})).details.result;
+  const created=await run('research_create',{goal:'Compare routes with validated pathway evidence'},'create');
+  const evidence=await run('research_update',{node_id:created.node.id,note:'Endpoint comparison is recorded.'},'evidence');
+  const judgment='Endpoint energy is -150.123456 Eh. This is an endpoint minimum, not TS or IRC evidence. The competing route remains unresolved.';
+  const selected=await run('research_update',{node_id:created.node.id,note:judgment,
+    references:[evidence.ref],as_assessment:true,plan:'Inspect pathway structures and frequencies before comparing barriers.'},'judgment');
+  for (let i=0;i<8;i++) await run('research_update',{node_id:created.node.id,note:`Preparation step ${i} recorded.`},`step-${i}`);
+  const task={...fullTask(),sources:[],next_action:'Inspect the next pathway output before changing the mechanism claim.',
+    research:{entry_node_ids:[created.node.id],focus_node_ids:[created.node.id]}};
+  const manager=fixtureManager({bridge,sessionId:'new-conversation'});
+  const prepared=await manager.prepare({entries:[]},memoApi(),context,{task});
+  const restored=decode(prepared.messages[0]);
+  const current=restored.research_brief.findings.find(row=>row.ref===selected.ref);
+  assert.equal(current.selected_assessment,true);
+  assert.equal(current.summary,judgment);
+  assert.ok(current.references.includes(evidence.ref));
+  assert.equal(restored.task.next_action,task.next_action);
+  assert.ok(restored.research_brief.coverage.omitted.notes>0);
 });
 
 test('failed hydration is explicit and retried only at a new input boundary', async () => {

@@ -92,7 +92,8 @@ def reference_details(root, request):
     from research_agent.artifacts.registry import read_manifest
     from .job_state import execution
     details = {}
-    refs = request.get('input_refs', []) + request.get('inputs', []) + request.get('evidence_refs', [])
+    refs = (request.get('input_refs', []) + request.get('inputs', []) + request.get('evidence_refs', [])
+            + request.get('references', []))
     refs += list(request.get('subjects', {}).values()) + request.get('check_refs', [])
     refs += [item.get('artifact_ref') for item in request.get('files', []) if isinstance(item, dict)]
     for ref in refs:

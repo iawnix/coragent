@@ -1,7 +1,6 @@
 import { codingExecutionContext } from "../tasks/execution-plan.mjs";
 import { loadPi } from "./source.mjs";
 import { createContextManager, contextPolicy, contextInputBudget } from "../context/manager.mjs";
-import { createResearchSynthesis } from "../context/synthesis.mjs";
 import { recordUserSources } from "../tools/user-sources.mjs";
 import { createInputAdmission, createInputService, bindUserInputConversation, INPUT_ADMISSION_SERVICE_ID } from "./admission/input.mjs";
 import { createJobAdmission, JOB_ADMISSION_SERVICE_ID } from "./admission/jobs.mjs";
@@ -75,12 +74,7 @@ export async function createCoRAgentHarness(databasePath, options) {
 
     });
     const harnessSettings = contextPolicy(createHarnessSettings(settingsManager));
-    const synthesizeBrief = createResearchSynthesis({ modelRuntime, getModel: async () => {
-      const agent = await conversation.agent(PI_TODO_CONTEXT);
-      return agent?.model ? modelRuntime.getModel(agent.model.provider, agent.model.modelId) : null;
-    } });
     const contextManager = createContextManager({ bridge: commandBridge, coordinator: transactionCoordinator,
-      synthesizeBrief,
       sessionId, estimateContextTokens, getCompactionPolicy: () => harnessSettings.compaction,
     });
     const packageReadGuard = createPackageSourceReadGuard({ packageRoot: loadedSkills.packageRoot, cwd,

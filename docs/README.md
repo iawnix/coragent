@@ -25,7 +25,7 @@ reports are retained in Git history rather than used as operating instructions.
 | Runtime and storage ownership | [Architecture](ARCHITECTURE.md), [Execution boundaries](ARCHITECTURE_BOUNDARIES.md) |
 | Source directories, dependencies and release ownership | [Source ownership](SOURCE_LAYOUT.md) |
 | Task Controller, Job Manager and input admission | [Task and Job architecture (Chinese)](TASK_JOB_ARCHITECTURE.zh-CN.md) |
-| Research Memory selection, injection and synthesis | [Research context (Chinese)](RESEARCH_CONTEXT.zh-CN.md) |
+| Research Memory selection, continuity and context injection | [Research context (Chinese)](RESEARCH_CONTEXT.zh-CN.md) |
 | Node granularity, planning and correction | [Research planning (Chinese)](RESEARCH_PLANNING.zh-CN.md) |
 | Evidence, materials and provenance | [Research Memory Skill](../skills/core/research-memory/SKILL.md), [Evidence architecture (Chinese)](RESEARCH_EVIDENCE_ARCHITECTURE.zh-CN.md), [Artifact Store](ARTIFACT_PROVIDERS.md) |
 | Skill loading, prompt assembly and execution declarations | [Skills and execution catalog](EXTENSIONS.md) |

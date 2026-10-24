@@ -8,6 +8,7 @@
 | --- | --- |
 | research_create.source_refs | 原始用户需求；只接受 user_* 消息。 |
 | research_create.input_refs | 背景引用；接受已有 Node、Result、用户消息、笔记、运行时记录、Job、收集回执和已验证 Artifact。 |
+| research_update.references | 新 note 的实际支持引用；允许类型与 Node 的 input_refs 相同且必须验证存在。只在正文提到编号不会形成引用。 |
 | research_result.inputs | 推导结论实际使用的固定材料；只接受已有 Result 和已验证 Artifact。没有此类输入时省略。 |
 | research_result.evidence_refs | 支持性引用；允许类型与 Node 的 input_refs 相同，包括用户消息和执行记录。需求来源不等于科学证明。 |
 | research_result.files[].artifact_ref | 交付文件；必须是已验证 Artifact 引用，不能是可修改路径、Job ID 或回执。 |
@@ -24,6 +25,10 @@
 
 ## 修订与复核
 
+不需要独立发布 Result 时，读取当前 Node，再用简短的 `note`、`references` 和 `as_assessment:true` 调用 `research_update`，保存当前研究进展。note 应同时说明已有发现、未解决问题和局限，保留旧判断中仍有效的限制与反证。需要修订 `plan` 时，笔记、引用、计划和判断选定在同一次修订中提交；读取过期则均不提交。这不表示整个研究完成。省略选定标记或提供 `as_assessment:false` 的普通 note 不改变当前判断。
+
 Result 发布后不可覆盖。纠正时发布新的 Result，通过 `supersedes` 指向同一 Node 的旧结论，并说明证据或解释变化。普通发布不改变当前综合判断；最新或替代某个 Result 都不自动选定它。新结论确实代表 Node 当前判断时，先读取当前 Node，再以 `as_assessment=true` 发布。保存 Result 和选定它是一个原子操作，读取过期时两者均不保存；重新读取并判断后再重试。选择已发布的同 Node Result 或作者记录使用 `research_update.assessment_ref`。沿依赖引用复核下游结论，保留仍有效的材料与竞争解释。
+
+不要同时提供 `assessment_ref` 与 `as_assessment:true`，明确选择已有记录或这条新 note。两种操作使用同一个 Node 字段和不可变记录。新证据提示要求复核当前判断，不据此直接判定旧结论错误。
 
 Job 输出的生产来源通过 `job_collect` 保存；不要将原始输出重写为无来源文本。准备、提交和收集见[Job 与材料流程](../../research-workflow/references/jobs-and-artifacts.zh-CN.md)。

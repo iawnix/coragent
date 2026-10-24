@@ -87,6 +87,8 @@ test('tool schemas express research choices without exposing receipt and executi
   const validate=(key,args)=>validateToolArguments(contracts[key],{type:'toolCall',id:'c',name:contracts[key].name,arguments:args});
   assert.doesNotThrow(()=>validate('research_create',{goal:'Find the transition structure.'}));
   assert.doesNotThrow(()=>validate('research_update',{node_id:'node_1',note:'Failed optimization; inspect gradients.'}));
+  assert.doesNotThrow(()=>validate('research_update',{node_id:'node_1',note:'No pathway is established.',references:['result_1'],as_assessment:true}));
+  assert.throws(()=>validate('research_update',{node_id:'node_1',note:'Ambiguous selection',as_assessment:true,assessment_ref:'result_1'}));
   assert.doesNotThrow(()=>validate('research_result',{node_id:'node_1',conclusion:'Evidence is insufficient.'}));
   assert.doesNotThrow(()=>validate('research_read',{ref:'node_1',field:'subjects'}));
   assert.throws(()=>validate('research_read',{field:'subjects'}));

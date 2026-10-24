@@ -102,7 +102,12 @@ export function projectUserTask(task) {
     research: { entry_node_ids: task.research.entry_node_ids.slice(0, 8), focus_node_ids: task.research.focus_node_ids.slice(0, 8),
       entry_nodes_omitted: Math.max(0, task.research.entry_node_ids.length - 8),
       focus_nodes_omitted: Math.max(0, task.research.focus_node_ids.length - 8) },
-    research_context: task.research_context ? { ...task.research_context } : null,
+    research_context: task.research_context ? {
+      brief_id: task.research_context.brief_id, state_digest: task.research_context.state_digest,
+      brief_digest: task.research_context.brief_digest, availability: task.research_context.availability,
+      projection_status: task.research_context.projection_status, refresh_reason: task.research_context.refresh_reason,
+      updated_at: task.research_context.updated_at,
+    } : null,
     criteria: criteria.map(item => ({ id: text(item.id, 128), description: text(item.description, 256) })),
     criteria_omitted: task.criteria.length - criteria.length,
     sources: sources.map(source => ({ submission_id: source.submission_id, entry_id: source.entry_id,

@@ -26,7 +26,7 @@ Record a scientific finding as a note or Result according to its purpose; do not
 
 ## Wait, control and recover
 
-Read [Task lifecycle](references/task-lifecycle.md) when waiting for Jobs, facing a blocker, applying a user pause/resume/cancel, or recovering a failed run. It distinguishes task control from Job control and execution recovery. Respect the returned polling interval; when no independent work remains, record the wait and end the turn for Monitor.
+Read [Task lifecycle](references/task-lifecycle.md) when waiting for Jobs, facing a blocker, applying a user pause/resume/cancel, or recovering a failed run. It distinguishes task control from Job control and execution recovery. Respect the returned polling interval; when no independent work remains, record the wait and the required concrete `next_action` in the same `task_update`, then end the turn for Monitor. That action must describe how to inspect and use the awaited results, replacing the previous step.
 
 ## Assess and deliver
 

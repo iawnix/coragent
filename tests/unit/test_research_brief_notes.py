@@ -151,3 +151,154 @@ def test_only_explicit_selection_marks_a_note_or_other_record_as_assessment(tmp_
     assert finding['kind'] == selected_kind
     assert finding['selected_assessment'] is True
     assert relations.graph(tmp_path)['results'] == {}
+
+
+def test_cold_context_retains_selected_judgment_caveat_and_citations_after_note_flood(tmp_path):
+    workspace(tmp_path)
+    created = create(tmp_path, 'Compare reaction pathways', plan='Check structures, frequencies and reaction paths')
+    node_id = created['node']['id']
+    evidence = [execute('artifact_create', tmp_path, {'name': f'evidence {index}',
+        'content': f'raw evidence {index}'})['artifact_id'] for index in range(6)]
+    judgment = 'Endpoint energies have been checked. ' + 'The stationary point analysis is preliminary. ' * 12
+    caveat = 'These are minima, not transition states; no kinetic preference or IRC connectivity is established.'
+    current = execute('research_result', tmp_path, {'node_id': node_id,
+        'conclusion': judgment, 'limitations': caveat, 'evidence_refs': evidence,
+        'as_assessment': True, 'read_basis': created['read_basis']})['result']
+    for index in range(8):
+        add_note(tmp_path, node_id, f'Routine follow-up observation {index}')
+
+    # No transcript or model summary is supplied: only persisted research state.
+    brief = build(tmp_path, focus_node_ids=[node_id], waited_job_ids=['job_8'], jobs=[
+        {'job_id': 'job_5', 'node_id': node_id, 'state': 'succeeded', 'collection_state': 'complete'},
+        {'job_id': 'job_8', 'node_id': node_id, 'state': 'running', 'collection_state': 'not_collected'}])
+    findings = {item['ref']: item for item in brief['findings']}
+    restored = findings[current['id']]
+    assert restored['summary'] == judgment
+    assert restored['limitations'] == caveat
+    assert restored['references'] == evidence
+    assert restored['content_omitted'] is False
+    assert findings['job_8']['waited'] is True
+    assert 'job_5' not in findings
+    assert findings[node_id]['plan'] == 'Check structures, frequencies and reaction paths'
+    assert not any(item.get('code') == 'new_evidence_after_assessment' for item in brief['uncertainties'])
+
+
+@pytest.mark.parametrize('budget', [2048, 4096, 8000])
+def test_oversized_selected_judgment_is_explicitly_unread_never_partial(tmp_path, budget):
+    workspace(tmp_path)
+    created = create(tmp_path, 'Determine what the evidence supports')
+    node_id = created['node']['id']
+    text = 'Endpoint observation. ' * 2000 + 'No barrier or mechanism is established.'
+    saved = execute('research_update', tmp_path, {'node_id': node_id, 'note': text,
+        'as_assessment': True, 'read_basis': created['read_basis']})
+    for index in range(5):
+        add_note(tmp_path, node_id, f'Later routine observation {index}')
+    brief = read_brief(tmp_path, node_id, budget)
+    selected = next(item for item in brief['findings'] if item.get('selected_assessment'))
+    assert selected['ref'] == saved['ref']
+    assert selected['summary'] == ''
+    assert selected['content_omitted'] is True
+    assert selected['read'] == {'tool': 'research_read', 'ref': saved['ref']}
+    assert len(json.dumps(brief, ensure_ascii=False, separators=(',', ':')).encode()) <= budget
+    assert record(tmp_path, saved['ref'])['content'] == text
+
+
+def test_new_result_and_runtime_evidence_request_review_without_invalidating_assessment(tmp_path):
+    workspace(tmp_path)
+    created = create(tmp_path, 'Investigate alternatives')
+    node_id = created['node']['id']
+    selected = execute('research_update', tmp_path, {'node_id': node_id,
+        'note': 'Initial interpretation remains tentative.', 'as_assessment': True,
+        'read_basis': created['read_basis']})
+    initial = read_brief(tmp_path, node_id)
+    runtime = append_record(tmp_path, origin='runtime', kind='job', title='New calculation evidence',
+        content='Calculation completed; analysis is pending.', references=['job_8'], node_id=node_id,
+        data={'job_id': 'job_8', 'state': 'succeeded', 'collection_state': 'complete'})
+    later = execute('research_result', tmp_path, {'node_id': node_id,
+        'conclusion': 'New observation has not yet been compared with the current judgment.'})['result']
+    brief = read_brief(tmp_path, node_id)
+    cue = next(item for item in brief['uncertainties'] if item.get('code') == 'new_evidence_after_assessment')
+    assert cue['references'] == [runtime['ref'], later['id']]
+    assert cue['assessment_ref'] == selected['ref']
+    assert brief['state_digest'] != initial['state_digest']
+    assert nodes.get_node(tmp_path, node_id)['assessment_ref'] == selected['ref']
+    assert not any('new_evidence_after_assessment' in item.get('codes', []) for item in brief['contradictions'])
+    assert any(item['action'] == 'review_new_evidence' for item in brief['follow_up'])
+    updated = execute('research_update', tmp_path, {'node_id': node_id,
+        'note': 'Reviewed the new evidence; the initial interpretation is still tentative.',
+        'as_assessment': True, 'read_basis': selected['read_basis']})
+    refreshed = read_brief(tmp_path, node_id)
+    assert not any(item.get('code') == 'new_evidence_after_assessment' for item in refreshed['uncertainties'])
+    assert next(item for item in refreshed['findings'] if item.get('selected_assessment'))['ref'] == updated['ref']
+
+
+def test_selected_note_includes_only_its_direct_research_citations(tmp_path):
+    workspace(tmp_path)
+    dependency = create(tmp_path, 'Recorded comparison')
+    related_result = execute('research_result', tmp_path, {'node_id': dependency['node']['id'],
+        'conclusion': 'A comparison with a stated limitation'})['result']
+    other = create(tmp_path, 'Previously inspected question')
+    created = create(tmp_path, 'Main investigation')
+    node_id = created['node']['id']
+    execute('research_update', tmp_path, {'node_id': node_id, 'note': 'Past process note',
+        'references': [other['node']['id']]})
+    execute('research_update', tmp_path, {'node_id': node_id, 'note': 'Current judgment cites the comparison.',
+        'references': [related_result['id']], 'as_assessment': True, 'read_basis': created['read_basis']})
+    selection = select(tmp_path, focus_node_ids=[node_id])
+    assert set(selection['_basis']['node_ids']) == {node_id, dependency['node']['id']}
+
+
+@pytest.mark.parametrize('kind', ['note', 'result'])
+def test_explicit_reselection_reviews_new_evidence_but_plan_change_does_not(tmp_path, kind):
+    workspace(tmp_path)
+    created = create(tmp_path, 'Review later evidence')
+    node_id = created['node']['id']
+    request = {'node_id': node_id, 'as_assessment': True, 'read_basis': created['read_basis']}
+    selected = execute('research_update' if kind == 'note' else 'research_result', tmp_path,
+        {**request, 'note' if kind == 'note' else 'conclusion': 'Tentative judgment.'})
+    assessment_ref = selected['ref'] if kind == 'note' else selected['result']['id']
+    execute('research_result', tmp_path, {'node_id': node_id, 'conclusion': 'A later observation.'})
+    assert any(item.get('code') == 'new_evidence_after_assessment' for item in read_brief(tmp_path, node_id)['uncertainties'])
+    reviewed = execute('research_update', tmp_path, {'node_id': node_id,
+        'note': 'Reviewed the later observation; retain the selected judgment.',
+        'assessment_ref': assessment_ref, 'read_basis': selected['read_basis']})
+    assert not any(item.get('code') == 'new_evidence_after_assessment' for item in read_brief(tmp_path, node_id)['uncertainties'])
+    append_record(tmp_path, origin='runtime', kind='job', title='Additional calculation',
+        content='New evidence awaiting review.', node_id=node_id, data={'state': 'succeeded'})
+    assert any(item.get('code') == 'new_evidence_after_assessment' for item in read_brief(tmp_path, node_id)['uncertainties'])
+    execute('research_update', tmp_path, {'node_id': node_id, 'note': 'Arrange the work.',
+        'plan': 'Schedule an additional comparison', 'read_basis': reviewed['read_basis']})
+    assert any(item.get('code') == 'new_evidence_after_assessment' for item in read_brief(tmp_path, node_id)['uncertainties'])
+
+
+def test_selected_note_reports_a_cited_result_correction_without_replacing_it(tmp_path):
+    workspace(tmp_path)
+    source = create(tmp_path, 'Source evidence')['node']['id']
+    first = execute('research_result', tmp_path, {'node_id': source, 'conclusion': 'Preliminary observation.'})['result']
+    target = create(tmp_path, 'Interpret the source')
+    selected = execute('research_update', tmp_path, {'node_id': target['node']['id'],
+        'note': 'Tentative interpretation based on the cited observation.', 'references': [first['id']],
+        'as_assessment': True, 'read_basis': target['read_basis']})
+    correction = execute('research_result', tmp_path, {'node_id': source,
+        'conclusion': 'Corrected observation.', 'supersedes': first['id']})['result']
+    brief = read_brief(tmp_path, target['node']['id'])
+    finding = next(item for item in brief['findings'] if item.get('selected_assessment'))
+    assert finding['ref'] == selected['ref'] and finding['references'] == [first['id']]
+    assert finding['review_required'] is True
+    assert 'cited_result_superseded' in finding['review_codes']
+    assert correction['id'] in brief['source_refs']
+    assert nodes.get_node(tmp_path, target['node']['id'])['assessment_ref'] == selected['ref']
+
+
+def test_optional_old_large_result_is_removed_before_recent_small_result(tmp_path):
+    workspace(tmp_path)
+    created = create(tmp_path, 'Keep the current question and useful new evidence')
+    node_id = created['node']['id']
+    selected = execute('research_update', tmp_path, {'node_id': node_id,
+        'note': 'Current assessment remains tentative.', 'as_assessment': True, 'read_basis': created['read_basis']})
+    older = execute('research_result', tmp_path, {'node_id': node_id, 'conclusion': 'Long historical analysis. ' * 1000})['result']
+    newer = execute('research_result', tmp_path, {'node_id': node_id, 'conclusion': 'A useful new observation.'})['result']
+    brief = read_brief(tmp_path, node_id, 4096)
+    findings = {item['ref']: item for item in brief['findings']}
+    assert older['id'] not in findings and newer['id'] in findings
+    assert findings[selected['ref']]['selected_assessment'] is True

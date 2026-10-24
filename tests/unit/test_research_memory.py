@@ -450,3 +450,103 @@ def test_result_search_distinguishes_product_from_publication_history(tmp_path):
     history = execute('research_search', tmp_path, {'kind': 'result_published'})
     assert history['total'] == 1
     assert records.record(tmp_path, history['records'][0]['ref'])['data']['result_id'] == saved['id']
+
+
+def test_progress_update_selects_cited_note_and_plan_in_one_revision(tmp_path):
+    from research_agent.application.job_state import register_execution
+    from research_agent.jobs import JobSpec
+    workspace(tmp_path)
+    initial = execute('research_create', tmp_path, {'goal': 'Compare competing mechanisms', 'session_id': 's'})
+    node_id = initial['node']['id']
+    artifact = execute('artifact_create', tmp_path, {'name': 'endpoint-check', 'content': 'Minimum verified'})['artifact_id']
+    register_execution(tmp_path, JobSpec(job_id='job_1', cwd=tmp_path / 'runs/jobs/job_1', command=('true',),
+        metadata={'research_binding': {'node_id': node_id, 'node_revision': 1}}), 'test')
+    request = {'node_id': node_id, 'session_id': 's', 'request_id': 'assessed-progress',
+        'note': 'Endpoint minima are verified. No TS/IRC evidence exists; the kinetic ordering remains unknown.',
+        'references': [artifact, 'job_1'], 'as_assessment': True,
+        'plan': 'Compare candidate transition states and verify their connecting paths.',
+        'read_basis': initial['read_basis']}
+    saved = execute('research_update', tmp_path, request)
+    assert saved['node']['revision'] == 2
+    assert saved['node']['assessment_ref'] == saved['ref']
+    assert saved['node']['plan'] == request['plan']
+    note = records.record(tmp_path, saved['ref'])
+    assert note['kind'] == 'node_updated'
+    assert note['content'] == request['note'] and note['references'] == request['references']
+    assert note['node_revision'] == 2 and note['data']['node'] == saved['node']
+    assert note['data']['author'] == {'session_id': 's'}
+    citations = [edge for edge in saved['relations'] if edge['basis_refs'] == [saved['ref']]]
+    assert {(edge['source'], edge['target'], edge['kind']) for edge in citations} == {
+        (node_id, artifact, 'cites'), (node_id, 'job_1', 'cites')}
+    assert execute('research_update', tmp_path, request) == saved
+    assert retrieval.node_detail(tmp_path, node_id)['assessment'] == note
+    assert doctor._replay(tmp_path)[1] == relations.graph(tmp_path)
+
+
+def test_assessed_note_requires_observed_receipt_from_same_session(tmp_path):
+    workspace(tmp_path)
+    initial = create(tmp_path, session_id='s')
+    request = {'node_id': initial['node']['id'], 'session_id': 's',
+               'note': 'The candidate remains uncertain.', 'as_assessment': True}
+    with pytest.raises(ValueError, match='node_read_required'):
+        nodes.update(tmp_path, request)
+    basis.observe(tmp_path, {'session_id': 's', 'read_basis': initial['read_basis']})
+    with pytest.raises(ValueError, match='node_read_required'):
+        nodes.update(tmp_path, {**request, 'session_id': 'other'})
+    with pytest.raises(ValueError, match='read_basis_session_mismatch'):
+        nodes.update(tmp_path, {**request, 'session_id': 'other', 'read_basis': initial['read_basis']})
+    saved = nodes.update(tmp_path, request)
+    assert saved['node']['assessment_ref'] == saved['ref']
+
+
+def test_stale_progress_update_leaves_no_note_plan_or_citation(tmp_path):
+    workspace(tmp_path)
+    initial = create(tmp_path)
+    node_id = initial['node']['id']
+    evidence = records.record_event(tmp_path, {'kind': 'job', 'title': 'New evidence', 'node_id': node_id})
+    latest = nodes.update(tmp_path, {'node_id': node_id, 'note': 'Updated interpretation',
+        'plan': 'Check both candidates', 'as_assessment': True, 'read_basis': initial['read_basis']})
+    graph, journal = relations.graph(tmp_path), records.journal(tmp_path)
+    with pytest.raises(ValueError, match='node_revision_conflict'):
+        nodes.update(tmp_path, {'node_id': node_id, 'note': 'Outdated interpretation', 'as_assessment': True,
+            'plan': 'Only check the old candidate', 'references': [evidence['ref']], 'read_basis': initial['read_basis']})
+    assert nodes.get_node(tmp_path, node_id) == latest['node']
+    assert relations.graph(tmp_path) == graph and records.journal(tmp_path) == journal
+
+
+@pytest.mark.parametrize('references', [['art_999'], ['job_999'], ['note_999'], ['node_1', 'node_1']])
+def test_progress_update_rejects_unverified_references_without_mutation(tmp_path, references):
+    workspace(tmp_path)
+    initial = create(tmp_path)
+    graph, journal = relations.graph(tmp_path), records.journal(tmp_path)
+    with pytest.raises((ValueError, FileNotFoundError)):
+        execute('research_update', tmp_path, {'node_id': initial['node']['id'], 'note': 'Unsupported assessment',
+            'references': references, 'as_assessment': True, 'plan': 'Do not save', 'read_basis': initial['read_basis']})
+    assert nodes.get_node(tmp_path, initial['node']['id']) == initial['node']
+    assert relations.graph(tmp_path) == graph and records.journal(tmp_path) == journal
+
+
+@pytest.mark.parametrize('explicit', [None, 'note_1'])
+def test_progress_update_rejects_two_assessment_selection_modes(tmp_path, explicit):
+    workspace(tmp_path)
+    initial = create(tmp_path)
+    journal = records.journal(tmp_path)
+    with pytest.raises(ValueError, match='assessment_selection_conflict'):
+        nodes.update(tmp_path, {'node_id': initial['node']['id'], 'note': 'Ambiguous selection',
+            'as_assessment': True, 'assessment_ref': explicit, 'read_basis': initial['read_basis']})
+    assert nodes.get_node(tmp_path, initial['node']['id']) == initial['node']
+    assert records.journal(tmp_path) == journal
+
+
+@pytest.mark.parametrize('selection', [{}, {'as_assessment': False}])
+def test_cited_process_notes_leave_current_assessment_and_plan_unchanged(tmp_path, selection):
+    workspace(tmp_path)
+    initial = create(tmp_path)
+    selected = nodes.update(tmp_path, {'node_id': initial['node']['id'], 'note': 'Unresolved identity check',
+        'as_assessment': True, 'plan': 'Verify atom mapping', 'read_basis': initial['read_basis']})
+    saved = nodes.update(tmp_path, {'node_id': initial['node']['id'], 'note': 'Downloaded one calculation log',
+        'references': [selected['ref']], **selection})
+    assert saved['node'] == selected['node']
+    note = records.record(tmp_path, saved['ref'])
+    assert note['kind'] == 'note' and note['references'] == [selected['ref']]
+    assert 'node' not in note['data']

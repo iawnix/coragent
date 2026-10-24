@@ -4,13 +4,13 @@ Use actual submission IDs from `runtime_control`, not invented IDs, research `us
 
 ## Waiting and blockers
 
-When Jobs run, continue any independent authorized work. Follow `job_status` polling guidance; once independent work is exhausted, record the actual task Jobs and end the turn:
+When Jobs run, continue any independent authorized work. Follow `job_status` polling guidance; once independent work is exhausted, record the actual task Jobs and what to do when they finish in the same update, then end the turn:
 
 ```json
-{"expected_revision":3,"action":"wait","wait":{"job_ids":["<returned job_id>"],"mode":"all"}}
+{"expected_revision":3,"action":"wait","wait":{"job_ids":["<returned job_id>"],"mode":"all"},"next_action":"Collect the completed Job, inspect the optimized geometry and frequencies, and decide whether the candidate supports the next IRC calculation."}
 ```
 
-Choose `all` or `any` according to which completions enable the next action. Monitor supplies execution facts; check the task, relevant Jobs and current instructions after waking. A terminal process still needs collection and scientific inspection. Do not reread unchanged status/logs or send unchanged progress on every wake.
+Choose `all` or `any` according to which completions enable the next action. `next_action` is required for every wait and replaces the previous action atomically with the wait; write the concrete follow-up for these Jobs, including the evidence to inspect and the decision it enables. Monitor supplies execution facts; check the task, relevant Jobs and current instructions after waking. A terminal process still needs collection and scientific inspection. Do not reread unchanged status/logs or send unchanged progress on every wake.
 
 A missing result or uncertain method is work to do. Inspect available inputs and choose a bounded first experiment before declaring research blocked. Use `action=block` only when no independent authorized work can proceed. Provide `block_kind`, a concrete `reason` explaining that exhaustion, and `resume_when` describing what would unblock work. `execution_failure`, `budget_exhausted`, `scientific_dead_end` and `resource_unavailable` require `evidence_refs`. `missing_user_input` is only for indispensable information unavailable from existing sources, not optional preferences or unfinished analysis.
 
@@ -38,6 +38,6 @@ For final-response recovery, reuse saved completion evidence and receipts. Limit
 
 ## Progress and research association
 
-The runtime observes published evidence and current-task Job milestones through the existing tools; a research note or Result need not be copied into task progress. Use `task_update action=progress` when changing the next action or explicitly recording adopted fixed Results/Artifacts or current-task Jobs. Scientific hypotheses and plans stay in the Node's plan and notes. Notes alone are not substantive scientific progress, and collection receipts cannot directly serve as task progress references. `progress` does not resume paused or blocked work. New requirements or resolved blockers use `refine` with actual new user submissions.
+The runtime observes published evidence and current-task Job milestones through the existing tools; a research note or Result need not be copied into task progress. Use `task_update action=progress` when changing the next action or explicitly recording adopted fixed Results/Artifacts or current-task Jobs. Task `next_action` is the single place for the immediate next action; Node `plan` describes the research strategy, while its selected assessment records current findings, unresolved issues and evidence. Preserve unresolved limitations when updating that assessment after interpreting results, changing direction, entering a wait or preparing delivery. Notes alone are not substantive scientific progress, and collection receipts cannot directly serve as task progress references. `progress` does not resume paused or blocked work. New requirements or resolved blockers use `refine` with actual new user submissions.
 
 Use `action=set_research` with complete `entry_node_ids` and `focus_node_ids` arrays to set task navigation. Both arrays are replaced; an empty array clears that list. Use research-memory for problem decomposition and relations. Always use the current Task revision, which is separate from Node revision. See [acceptance](acceptance.md) for completion and partial delivery, and [target selection](execution-targets.md) for execution correction.

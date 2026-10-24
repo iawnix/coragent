@@ -55,7 +55,7 @@ test('task action contracts require their own payloads and reject ignored fields
     ['refine',{source_submission_ids:['12'],objective:'Updated objective'}],
     ['correct_execution',{reason:'Original scheduler misread',execution_intent:{source_submission_id:'12',source_text:'Use TRI',scheduler:'tri'}}],
     ['progress',{evidence_refs:['result_example']}],
-    ['wait',{wait:{job_ids:['job_example'],mode:'all'}}],
+    ['wait',{wait:{job_ids:['job_example'],mode:'all'},next_action:'Inspect the completed Job results.'}],
     ['block',{reason:'Missing user input',block_kind:'missing_user_input',resume_when:'The user supplies the missing input.'}],
     ['propose_completion',{completion_outcome:'full',completion:[{criterion_id:'c1',status:'met',assessment_ref:'art_1',evidence_refs:['art_2']}]}],
     ['set_research',{research:{entry_node_ids:[],focus_node_ids:[]}}],
@@ -67,7 +67,7 @@ test('task action contracts require their own payloads and reject ignored fields
     for (const field of ['block_kind','resume_when','next_action']) {
       const value = field === 'block_kind' ? 'missing_user_input' : 'Concrete next step';
       const args = {...base,action,...fields,[field]:value};
-      if (field === 'next_action' ? ['refine','progress'].includes(action) : action === 'block') check('task_update',args);
+      if (field === 'next_action' ? ['refine','progress','wait'].includes(action) : action === 'block') check('task_update',args);
       else assert.throws(()=>check('task_update',args));
     }
   }
@@ -86,7 +86,12 @@ test('task action contracts require their own payloads and reject ignored fields
     const args = {...blocker}; delete args[field];
     assert.throws(()=>check('task_update',args));
   }
-  assert.throws(()=>check('task_update',{...base,action:'wait',wait:{job_ids:['job_example'],mode:'all'},completion:[{criterion_id:'c1',evidence_refs:['a1']}]}));
+  const waiting={...base,action:'wait',wait:{job_ids:['job_example'],mode:'all'},next_action:'Inspect the completed calculation.'};
+  check('task_update',waiting);
+  const missingNextAction={...waiting}; delete missingNextAction.next_action;
+  assert.throws(()=>check('task_update',missingNextAction));
+  assert.throws(()=>check('task_update',{...waiting,next_action:' \n\t'}));
+  assert.throws(()=>check('task_update',{...waiting,completion:[{criterion_id:'c1',evidence_refs:['a1']}]}));
   assert.throws(()=>check('task_update',{...base,action:'refine',source_submission_ids:['user_1']}));
   for (const control of ['pause','resume']) {
     const args={...base,action:'apply_user_control',control,source_submission_ids:['12']};

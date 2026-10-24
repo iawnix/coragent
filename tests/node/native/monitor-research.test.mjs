@@ -11,7 +11,7 @@ const task = {
   research: { entry_node_ids: ['node_1', 'node_2'], focus_node_ids: ['node_3'] },
   updated_at: '2026-10-10T00:00:00Z', revision: 7,
   research_context: { brief_id: 'brief_state', state_digest: 'sha256:state',
-    brief_digest: 'sha256:review', availability: 'available', projection_status: 'complete', synthesis_status: 'not_requested', refresh_reason: 'initial', updated_at: '2026-10-10T00:00:01Z' },
+    brief_digest: 'sha256:review', availability: 'available', projection_status: 'complete', refresh_reason: 'initial', updated_at: '2026-10-10T00:00:01Z' },
 };
 const snapshot = {
   schema_version: 'research-snapshot/3', sequence: 42,

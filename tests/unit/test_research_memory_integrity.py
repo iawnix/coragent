@@ -170,6 +170,44 @@ def test_node_record_preserves_the_updating_session(tmp_path):
     assert nodes.get_node(tmp_path,node['id'])['author']['session_id']=='first'
 
 
+@pytest.mark.parametrize('boundary', ['record', 'node', 'map'])
+def test_interrupted_progress_selection_replays_same_note_and_citations(tmp_path, monkeypatch, boundary):
+    from research_agent.foundation import transactions
+    workspace(tmp_path)
+    initial = nodes.create(tmp_path, {'goal': 'Continue from durable research state'})
+    node_id = initial['node']['id']
+    evidence = records.record_event(tmp_path, {'kind': 'job', 'title': 'Endpoint completed', 'node_id': node_id})
+    request = {'node_id': node_id, 'note': 'The endpoint is complete; pathway connectivity is still unknown.',
+        'references': [evidence['ref']], 'as_assessment': True, 'plan': 'Verify the connecting path',
+        'read_basis': initial['read_basis'], 'request_id': 'atomic-progress'}
+    original = transactions._atomic_json
+    armed = [True]
+    def crash(path, value):
+        relative = str(path.relative_to(tmp_path))
+        selected = (boundary == 'record' and relative.startswith('research/records/')) or (
+            boundary == 'node' and relative == f'research/nodes/{node_id}/node.json') or (
+            boundary == 'map' and relative == 'research/map.json')
+        if armed[0] and selected:
+            armed[0] = False
+            raise OSError('interrupted progress replay')
+        return original(path, value)
+    with monkeypatch.context() as patch:
+        patch.setattr(transactions, '_atomic_json', crash)
+        with pytest.raises(OSError, match='interrupted progress replay'):
+            nodes.update(tmp_path, copy.deepcopy(request))
+    assert not armed[0]
+    with TransactionCoordinator(tmp_path).locked():
+        saved = nodes.update(tmp_path, copy.deepcopy(request))
+    assert saved['node']['revision'] == 2 and saved['node']['assessment_ref'] == saved['ref']
+    assert records.record(tmp_path, saved['ref'])['data']['node'] == saved['node']
+    assert nodes.update(tmp_path, copy.deepcopy(request)) == saved
+    assert sum(row['kind'] == 'node_updated' for row in records.journal(tmp_path)['records']) == 1
+    citations = [edge for edge in relations.graph(tmp_path)['relations'].values()
+                 if edge['basis_refs'] == [saved['ref']]]
+    assert len(citations) == 1 and citations[0]['target'] == evidence['ref']
+    assert doctor.inspect_workspace(tmp_path)['valid']
+
+
 def test_a_copied_node_cannot_be_used_as_a_cross_workspace_reference(tmp_path):
     from research_agent.research.workspace import initialize_workspace, admit_research_workspace
     first, second = tmp_path/'first', tmp_path/'second'

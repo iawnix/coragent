@@ -4,13 +4,13 @@
 
 ## 等待与阻塞
 
-Job 运行期间继续独立的已授权工作。遵循 `job_status` 返回的查询间隔；独立工作耗尽后登记当前任务的实际 Job，并结束本轮：
+Job 运行期间继续独立的已授权工作。遵循 `job_status` 返回的查询间隔；独立工作耗尽后，在同一次更新中登记当前任务的实际 Job 和它们结束后要做什么，再结束本轮：
 
 ```json
-{"expected_revision":3,"action":"wait","wait":{"job_ids":["<返回的 job_id>"],"mode":"all"}}
+{"expected_revision":3,"action":"wait","wait":{"job_ids":["<返回的 job_id>"],"mode":"all"},"next_action":"收集已结束的 Job，检查优化结构与频率，再判断该候选是否支持下一步 IRC 计算。"}
 ```
 
-根据哪些完成事件能够推进下一步，选择 `all` 或 `any`。Monitor 提供执行事实；唤醒后检查任务、相关 Job 和当前指令。进程结束仍需收集与科学检查。不要反复读取无变化的状态或日志，也不要每次唤醒都发送相同进展。
+根据哪些完成事件能够推进下一步，选择 `all` 或 `any`。每次等待必须提供 `next_action`；它与等待条件一起原子保存，替换旧行动。明确写出针对这些 Job 的后续工作、要检查的证据以及要据此作出的决定。Monitor 提供执行事实；唤醒后检查任务、相关 Job 和当前指令。进程结束仍需收集与科学检查。不要反复读取无变化的状态或日志，也不要每次唤醒都发送相同进展。
 
 缺少结果或方法尚不确定属于待办。宣布研究受阻前，先检查可用输入，选择有界的初步实验。只有没有其它可独立推进的已授权工作时才使用 `action=block`。传入 `block_kind`、说明为何无法继续的具体 `reason`，以及解除阻塞所需的 `resume_when`。`execution_failure`、`budget_exhausted`、`scientific_dead_end` 和 `resource_unavailable` 必须带 `evidence_refs`。`missing_user_input` 仅适用于现有来源无法提供的必要信息，不适用于可选偏好或未完成分析。
 
@@ -38,6 +38,6 @@ Job 运行期间继续独立的已授权工作。遵循 `job_status` 返回的�
 
 ## 登记进展与关联研究
 
-运行时通过现有工具观察已发布证据和当前任务 Job 里程碑，不必把研究 note 或 Result 再抄成任务进展。改变下一项行动或明确记录采用的固定 Result/Artifact、当前任务 Job 时，使用 `task_update action=progress`。科学假设和计划保留在 Node 的 plan 与 note 中。笔记本身不是实质科学进展，收集回执不能直接充当任务进展引用。`progress` 不恢复暂停或阻塞任务。需要新要求或解除阻塞时，`refine` 引用实际新用户提交。
+运行时通过现有工具观察已发布证据和当前任务 Job 里程碑，不必把研究 note 或 Result 再抄成任务进展。改变下一项行动或明确记录采用的固定 Result/Artifact、当前任务 Job 时，使用 `task_update action=progress`。下一次具体行动只维护在 Task 的 `next_action` 中；Node 的 `plan` 描述研究策略，选定的当前判断记录已有发现、未解决问题和证据。解释结果、改变路线、进入等待或准备交付时，更新当前判断并保留仍然有效的限制。笔记本身不是实质科学进展，收集回执不能直接充当任务进展引用。`progress` 不恢复暂停或阻塞任务。需要新要求或解除阻塞时，`refine` 引用实际新用户提交。
 
 用 `action=set_research` 设置任务入口和焦点，完整提供 `entry_node_ids` 与 `focus_node_ids`；数组整体替换，空数组清空相应列表。研究关系与问题拆分见 research-memory。始终使用 Task 的当前 revision；Node revision 属于另一个对象。完成与部分交付见[验收说明](acceptance.zh-CN.md)，执行目标纠错见[目标选择](execution-targets.zh-CN.md)。

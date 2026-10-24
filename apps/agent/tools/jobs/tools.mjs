@@ -34,7 +34,7 @@ export function createJobTools({ commandBridge, getTaskBinding = async () => nul
         observations.set(key, { state: result.state, count });
         if (observations.size > 256) observations.delete(observations.keys().next().value);
         const polling = { unchanged_observations: count, recommended_interval_seconds: Math.min(60, 10 * 2 ** Math.min(count, 3)),
-          guidance: "Continue independent work. If none remains, use task_update action=wait with this job_id and finish the turn; Monitor will wake the task. Repeated unchanged reads are not progress." };
+          guidance: "Continue independent work. If none remains, use task_update action=wait with this job_id and a concrete next_action describing what to inspect after completion, then finish the turn; Monitor will wake the task. Repeated unchanged reads are not progress." };
         const output = toolResult(result, JSON.stringify({ ...result, polling }, null, 2));
         output.details.polling = polling;
         return output;

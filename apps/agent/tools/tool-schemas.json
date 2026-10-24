@@ -274,7 +274,7 @@
           "minLength": 1,
           "maxLength": 64000,
           "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,64000}(?![\\s\\S])",
-          "description": "Maximum 64000 Unicode characters (code points), not UTF-8 bytes.",
+          "description": "Research observation or current judgment. For as_assessment=true, write a concise, complete account of established findings, unresolved questions and limitations; place full evidence in referenced records. Maximum 64000 Unicode characters.",
           "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
         },
         "plan": {
@@ -359,7 +359,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 256,
-          "description": "Select an existing Result or agent-authored note/record belonging to this same Node as its current synthesis. Use its exact returned reference; a user message, Job or Artifact cannot be selected."
+          "description": "Select an existing Result or agent-authored note/record belonging to this Node as its current research judgment. Use as_assessment=true to select the note written by this call instead. Selection does not certify scientific validity."
         },
         "subjects": {
           "type": "object",
@@ -371,9 +371,43 @@
             "type": "string"
           },
           "description": "Named roles such as target and calculated, pointing only to existing result_* or verified Artifact references. Nodes, user messages, Jobs, receipts and file paths are not accepted. Labels do not certify identity."
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 64,
+          "uniqueItems": true,
+          "description": "Explicit existing research, Job or Artifact references supporting this note. Use exact returned IDs; references do not certify scientific validity."
+        },
+        "as_assessment": {
+          "type": "boolean",
+          "description": "Atomically select this new note as the current research judgment and optionally revise the plan. Keep established findings, unresolved questions and important limitations together. Read the Node first. Cannot be combined with assessment_ref."
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "as_assessment": {
+                "const": true
+              }
+            },
+            "required": [
+              "as_assessment"
+            ]
+          },
+          "then": {
+            "properties": {
+              "assessment_ref": false
+            }
+          }
+        }
+      ]
     },
     "research_result": {
       "type": "object",
@@ -1271,7 +1305,7 @@
             "select_execution_item",
             "complete_execution_item"
           ],
-          "description": "refine requires source_submission_ids; progress requires evidence_refs; wait requires wait; block requires reason, block_kind and resume_when; all kinds except missing_user_input also require evidence_refs; propose_completion requires completion; set_research requires research. Send only the fields for the selected action. apply_user_control applies an explicit user pause/resume/cancel instruction with control and source_submission_ids; cancel also requires jobs. correct_execution fixes an incorrect target interpretation using an original task source, execution_intent and reason; it does not authorize a new destination. bind_execution fixes the first calculation destination using the existing task sources; call it before preparation or direct job_start. With no target it resolves the configured default subject to the original user constraints. set_execution_plan also binds an unbound task. Once bound, destination changes still require refine or correct_execution."
+          "description": "refine requires source_submission_ids; progress requires evidence_refs; wait requires wait and next_action; block requires reason, block_kind and resume_when; all kinds except missing_user_input also require evidence_refs; propose_completion requires completion; set_research requires research. Send only the fields for the selected action. apply_user_control applies an explicit user pause/resume/cancel instruction with control and source_submission_ids; cancel also requires jobs. correct_execution fixes an incorrect target interpretation using an original task source, execution_intent and reason; it does not authorize a new destination. bind_execution fixes the first calculation destination using the existing task sources; call it before preparation or direct job_start. With no target it resolves the configured default subject to the original user constraints. set_execution_plan also binds an unbound task. Once bound, destination changes still require refine or correct_execution."
         },
         "reason": {
           "type": "string",
@@ -1358,7 +1392,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 2000,
-          "description": "progress or refine only: the next concrete evidence-producing action for the active task.",
+          "description": "progress, refine or wait: the next concrete evidence-producing action. Required for wait; state how to inspect and use the awaited Job results. Saved atomically with the wait, replacing the previous action.",
           "pattern": "\\S"
         },
         "wait": {
@@ -1909,7 +1943,8 @@
           },
           "then": {
             "required": [
-              "wait"
+              "wait",
+              "next_action"
             ],
             "properties": {
               "completion": false,
@@ -1917,7 +1952,7 @@
               "evidence_refs": false,
               "block_kind": false,
               "resume_when": false,
-              "next_action": false,
+              "next_action": true,
               "objective": false,
               "research": false,
               "source_submission_ids": false,

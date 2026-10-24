@@ -1,6 +1,5 @@
 """Internal selection of bounded facts for the canonical Research Brief."""
 import json
-import re
 
 from . import relations
 from .context import result_notices
@@ -13,15 +12,50 @@ def size(value):
 
 
 def excerpt(text, budget):
-    """Prefer whole paragraphs/sentences; never paraphrase scientific content."""
+    """Include a complete field or leave it unread; a prefix can omit its caveat."""
     text = text or ''
-    if len(text.encode()) <= budget:
-        return text
-    prefix = text.encode()[:budget].decode('utf-8', errors='ignore')
-    boundaries = list(re.finditer(r'\n|[。！？.!?](?:\s|$)', prefix))
-    if boundaries and boundaries[-1].end() >= len(prefix) // 2:
-        prefix = prefix[:boundaries[-1].end()]
-    return prefix
+    return text if len(text.encode()) <= budget else ''
+
+
+def assessment_notices(root, assessment_ref, headers):
+    """Report newer evidence by journal order, without judging scientific validity."""
+    if not assessment_ref:
+        return []
+    assessment_sequence = next((header['sequence'] for header in headers
+                                if header['ref'] == assessment_ref), None)
+    publications = {}
+    if assessment_ref.startswith('result_'):
+        for header in reversed(headers):
+            if header['kind'] == 'result_published':
+                value = record(root, header['ref'])
+                publications[header['ref']] = value
+                if value['data']['result_id'] == assessment_ref:
+                    assessment_sequence = header['sequence']
+                    break
+    if assessment_sequence is None:
+        return []
+    # Explicitly selecting the same historical judgment records that review
+    # happened now. An unrelated plan/status edit cannot acknowledge evidence.
+    for header in reversed(headers):
+        if header['sequence'] < assessment_sequence:
+            break
+        if header['kind'] == 'node_updated':
+            data = record(root, header['ref'])['data']
+            if data.get('assessment_selected') and data['node']['assessment_ref'] == assessment_ref:
+                assessment_sequence = header['sequence']
+                break
+    newer = []
+    for header in headers:
+        if header['sequence'] <= assessment_sequence or header['kind'] not in {'result_published', 'job'}:
+            continue
+        value = publications.get(header['ref']) or record(root, header['ref'])
+        data = value['data']
+        if header['kind'] == 'result_published':
+            newer.append(data['result_id'])
+        elif data.get('state') in {'succeeded', 'failed', 'timed_out', 'cancelled'} or data.get('collection_state') == 'complete':
+            newer.append(header['ref'])
+    return ([{'code': 'new_evidence_after_assessment', 'assessment_ref': assessment_ref,
+              'references': list(dict.fromkeys(newer)), 'evidence_count': len(newer)}] if newer else [])
 
 
 def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
@@ -50,14 +84,15 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
                      else 'task_wait' if ref in waited_nodes else selection) for ref in primary}
     reasons.update({ref: 'task_entry' for ref in entries if ref not in reasons})
     owners = {ref: result['node_id'] for ref, result in graph['results'].items()}
-    selected_results = {graph['nodes'][ref].get('assessment_ref') for ref in primary}
+    selected_assessments = {graph['nodes'][ref].get('assessment_ref') for ref in primary} - {None}
     edges = []
     for edge in sorted(graph['relations'].values(), key=lambda e: e['id']):
         if not edge['active']:
             continue
         source, target = owners.get(edge['source'], edge['source']), owners.get(edge['target'], edge['target'])
         declared = edge['kind'] in relations.DECLARED
-        cited = edge['kind'] in {'uses', 'cites'} and edge['source'] in selected_results
+        cited = edge['kind'] in {'uses', 'cites'} and (edge['source'] in selected_assessments
+            or bool(selected_assessments.intersection(edge['basis_refs'])))
         if not (declared or cited) or target not in graph['nodes']:
             continue
         if source in primary or target in primary:
@@ -111,9 +146,14 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         return True
 
     def field(card, name, value):
+        previous = card.get(name)
+        existed = name in card
         card[name] = value
         if not fits():
-            del card[name]
+            if existed:
+                card[name] = previous
+            else:
+                del card[name]
             return False
         return True
 
@@ -133,7 +173,9 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         node = graph['nodes'][ref]
         assessment_ref = node.get('assessment_ref')
         assessment = (get_result(root, assessment_ref) if assessment_ref.startswith('result_') else record(root, assessment_ref)) if assessment_ref else None
-        notices = result_notices(root, assessment, graph) if assessment and assessment_ref.startswith('result_') else []
+        notices = result_notices(root, assessment, graph) if assessment else []
+        notices += assessment_notices(root, assessment_ref,
+            [row for row in index['records'] if row.get('node_id') == ref])
         assessments[ref] = (assessment, notices)
         title = excerpt(node['title'], 120)
         card = {'id': ref, 'revision': node['revision'], 'status': node['status'], 'title': title,
@@ -148,6 +190,9 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
             card['omitted_fields'].append('title')
         if assessment:
             card['omitted_fields'].append('assessment')
+            card['assessment'] = {'ref': assessment_ref,
+                'kind': 'result' if assessment_ref.startswith('result_') else assessment['kind'],
+                'conclusion': '', 'limitations': '', 'evidence_refs': [], 'content_omitted': True}
         if notices:
             card['omitted_fields'].append('review_notices')
         if add('nodes', card, node_ceiling):
@@ -178,13 +223,8 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
             if field(card, 'error', excerpt(error, 400)):
                 card['error_omitted'] = card['error'] != error
 
-    # A modest per-field allowance distributes detail across multiple focuses.
-    text_budget = max(96, min(720, (max_bytes - size(view)) // max(1, len(cards) * 6)))
-    for ref, card in cards.items():
-        original = graph['nodes'][ref]['goal']
-        value = excerpt(original, text_budget)
-        if field(card, 'goal', value) and value == original:
-            card['omitted_fields'].remove('goal')
+    # A selected judgment, its limitations and its citations are one unit.
+    # Scientific text is never a prefix: missing content has an explicit ref.
     for ref, card in cards.items():
         assessment, notices = assessments[ref]
         if notices and field(card, 'review_notices', notices):
@@ -193,17 +233,25 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
             is_result = card['assessment_ref'].startswith('result_')
             content = assessment.get('conclusion', '') if is_result else assessment['content']
             limitations = assessment.get('limitations') or ''
-            judgment = {'ref': card['assessment_ref'], 'conclusion': excerpt(content, text_budget),
+            judgment = {'ref': card['assessment_ref'], 'conclusion': content,
                         'kind': 'result' if is_result else assessment['kind'],
-                        'limitations': excerpt(limitations, text_budget),
-                        'evidence_refs': assessment.get('evidence_refs', assessment.get('references', []))[:4]}
+                        'limitations': limitations,
+                        'evidence_refs': assessment.get('evidence_refs', assessment.get('references', [])),
+                        'content_omitted': False}
             if assessment.get('inputs'):
-                judgment['inputs'] = assessment['inputs'][:4]
-            judgment['content_omitted'] = (judgment['conclusion'] != content or judgment['limitations'] != limitations
-                                           or len(assessment.get('evidence_refs', assessment.get('references', []))) > 4
-                                           or len(assessment.get('inputs', [])) > 4)
+                judgment['inputs'] = assessment['inputs']
+            if is_result:
+                judgment['evidence_refs'] = list(dict.fromkeys(judgment['evidence_refs']
+                    + assessment.get('check_refs', []) + list(assessment.get('subjects', {}).values())
+                    + [item['artifact_ref'] for item in assessment.get('files', [])]))
             if field(card, 'assessment', judgment):
                 card['omitted_fields'].remove('assessment')
+
+    for name in ('goal', 'plan'):
+        for ref, card in cards.items():
+            original = graph['nodes'][ref].get(name)
+            if field(card, name, original):
+                card['omitted_fields'].remove(name)
 
     # Give each selected question its newest note before adding older notes.
     for index in range(max((len(item['records']) for item in notes.values()), default=0)):
@@ -213,23 +261,17 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
                 continue
             note = records[index]
             value = {'ref': note['ref'], 'sequence': note['sequence'], 'created_at': note['created_at'],
-                     'content': excerpt(note['content'], text_budget), 'references': note['references'][:4],
+                     'content': note['content'], 'references': note['references'],
                      'content_omitted': False, 'reference_count': len(note['references'])}
-            value['content_omitted'] = value['content'] != note['content'] or len(note['references']) > 4
             card['recent_notes']['records'].append(value)
             card['recent_notes']['omitted'] -= 1
             view['bounds']['omitted']['notes'] -= 1
             if not fits():
-                card['recent_notes']['records'].pop()
-                card['recent_notes']['omitted'] += 1
-                view['bounds']['omitted']['notes'] += 1
-
-    for name in ('plan',):
-        for ref, card in cards.items():
-            original = graph['nodes'][ref].get(name)
-            value = excerpt(original, text_budget) if isinstance(original, str) else original
-            if field(card, name, value) and value == original:
-                card['omitted_fields'].remove(name)
+                value.update(content='', references=[], content_omitted=True)
+                if not fits():
+                    card['recent_notes']['records'].pop()
+                    card['recent_notes']['omitted'] += 1
+                    view['bounds']['omitted']['notes'] += 1
 
     for ref, card in cards.items():
         # Do not infer that collection, delivery or a newer output means review.

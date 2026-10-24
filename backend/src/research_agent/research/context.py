@@ -29,11 +29,12 @@ def result_notices(root, result, graph=None):
     if context and node and context['sha256'] != node_context(node):
         notices.append({'code': 'node_context_changed', 'node_id': node['id'],
                         'basis_revision': context['node_revision'], 'current_revision': node['revision']})
-    refs = {result['id'], *result.get('inputs', []), *result.get('evidence_refs', []),
+    identity = result.get('id', result.get('ref'))
+    refs = {identity, *result.get('inputs', []), *result.get('evidence_refs', []), *result.get('references', []),
             *result.get('check_refs', []), *result.get('subjects', {}).values()}
     for replacement in graph['results'].values():
         if replacement.get('supersedes') in refs:
-            notices.append({'code': 'result_superseded' if replacement['supersedes'] == result['id'] else 'cited_result_superseded',
+            notices.append({'code': 'result_superseded' if replacement['supersedes'] == identity else 'cited_result_superseded',
                             'used': replacement['supersedes'], 'superseded_by': replacement['id']})
     for binding in result.get('basis_refs', []):
         current = graph['nodes'].get(binding.get('node_id'))

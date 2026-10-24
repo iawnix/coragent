@@ -225,11 +225,11 @@ const nodeId = n => `node_${n + 1}`;
 const observed = (toolName, result) => [{ id: 200, model: [{ role: "toolResult", toolName, content: [], details: { result } }] }];
 
 test("Research Brief lifecycle is an idempotent Task pointer and does not advance revision", async t => {
-  const { controller, begin } = await fixture(t);
+  const { controller, begin, conversation } = await fixture(t);
   let task = await begin();
   const review = { schema_version: "research-context/1", brief_id: "brief_state",
     state_digest: "sha256:state", brief_digest: "sha256:brief", availability: "available",
-    projection_status: "complete", synthesis_status: "not_requested", refresh_reason: "initial" };
+    projection_status: "complete", refresh_reason: "initial" };
   const revision = task.revision;
   task = await controller.recordResearchContext(review, context, task.user_task_id);
   assert.equal(task.revision, revision);
@@ -238,6 +238,14 @@ test("Research Brief lifecycle is an idempotent Task pointer and does not advanc
   const again = await controller.recordResearchContext(review, context, task.user_task_id);
   assert.equal(again.revision, revision);
   assert.deepEqual(projectUserTask(again).research_context, task.research_context);
+  await conversation.commit(async tx => {
+    const stored = await tx.doc(UserTask, conversation.id, task.user_task_id, null);
+    stored.research_context.internal_metadata = { trace: "private-context-trace" };
+  }, context);
+  const saved = await controller.current(context);
+  assert.ok(saved.research_context.internal_metadata);
+  assert.deepEqual(projectUserTask(saved).research_context, task.research_context,
+    "public context metadata must not expose extra fields from durable storage");
 });
 
 test("research binding has one bounded write path, preserves task control and allows shared Nodes", async t => {
@@ -474,13 +482,43 @@ test("old task schema is rejected rather than initialized or migrated", async t 
 test("concrete Job waits do not generate inputs and reconcile already finished Jobs", async t => {
   const { controller, conversation, faux, begin, jobStates } = await fixture(t);
   let task = await begin(); jobStates.set("job_1", "running");
-  task = await controller.update({ expected_revision: task.revision, action: "wait", wait: { job_ids: ["job_1"], mode: "all" } }, "wait", context);
+  task = await controller.update({ expected_revision: task.revision, action: "wait", next_action: "Collect the waited Jobs and inspect their scientific evidence.", wait: { job_ids: ["job_1"], mode: "all" } }, "wait", context);
   await controller.reconcile(); await controller.reconcile();
   assert.equal((await controller.current(context)).continuation.sequence, 0);
   jobStates.set("job_1", "succeeded");
   faux.setResponses([fauxAssistantMessage("Analyze the finished Job")]);
   await controller.reconcile(); await conversation.waitForIdle(context);
   assert.equal((await controller.current(context)).continuation.sequence, 1);
+});
+
+test("Job wait and next action persist together without retaining an earlier continuation", async t => {
+  const env = await fixture(t, new MemoryStorage(), { enabled: false });
+  let task = await env.begin({ next_action: "Inspect job_a and choose a transition-state candidate." });
+  env.jobStates.set("job_a", "succeeded");
+  env.jobStates.set("job_b", "running");
+  const nextAction = "Collect job_b and check its imaginary mode before deciding whether to run IRC.";
+  const params = { expected_revision: task.revision, action: "wait",
+    wait: { job_ids: ["job_b"], mode: "all" }, next_action: nextAction };
+  for (const next_action of [undefined, "", " \n\t ", 123]) {
+    await assert.rejects(env.controller.update({ ...params, next_action }, "invalid-continuation", context), { code: "task_wait_invalid" });
+    assert.deepEqual(await env.controller.current(context), task, "invalid continuation must not change Task state, revision or wait");
+  }
+  task = await env.controller.update(params, "wait-new-evidence", context);
+  assert.equal(task.next_action, nextAction);
+  assert.equal(task.state, "waiting");
+  assert.deepEqual(task.wait, params.wait);
+  await assert.rejects(env.controller.update({ ...params, expected_revision: task.revision,
+    wait: { job_ids: ["job_foreign"], mode: "all" }, next_action: "Inspect foreign evidence." },
+  "invalid-job-wait", context), { code: "task_wait_invalid" });
+  assert.deepEqual(await env.controller.current(context), task, "invalid Job ownership must not replace the next action");
+  await env.reopen();
+  assert.deepEqual(await env.controller.current(context), task, "both fields must be recovered from the durable Task");
+  env.jobStates.set("job_b", "succeeded");
+  await env.controller.reconcile();
+  const ready = await env.controller.current(context);
+  assert.equal(ready.state, "active");
+  assert.equal(ready.wait, null);
+  assert.equal(ready.next_action, nextAction, "wake-up preserves the action saved with the completed wait");
 });
 
 test("Task and Monitor reads preserve waiting state and use isolated persisted Job queries", async t => {
@@ -493,7 +531,7 @@ test("Task and Monitor reads preserve waiting state and use isolated persisted J
   } };
   const { controller, begin, kernel, harness, conversation } = await fixture(t, new MemoryStorage(), { queryKernel, enabled: false });
   let task = await begin();
-  task = await controller.update({ expected_revision: task.revision, action: "wait",
+  task = await controller.update({ expected_revision: task.revision, action: "wait", next_action: "Collect the waited Jobs and inspect their scientific evidence.",
     wait: { job_ids: ["job_1"], mode: "all" } }, "wait-isolated", context);
   // A slow execution worker must not be needed to read Task or Monitor state.
   kernel.execute_command = async command => { throw new Error(`Execution worker unavailable: ${command}`); };
@@ -531,7 +569,7 @@ test("waiting for all Jobs requires every persisted Job and honors all result pa
   const { controller, begin } = await fixture(t, new MemoryStorage(), { queryKernel, enabled: false });
   let task = await begin();
   includeSecond = true;
-  task = await controller.update({ expected_revision: task.revision, action: "wait",
+  task = await controller.update({ expected_revision: task.revision, action: "wait", next_action: "Collect the waited Jobs and inspect their scientific evidence.",
     wait: { job_ids: ["job_1", "job_2"], mode: "all" } }, "wait-pages", context);
   includeSecond = false;
   await controller.reconcile();
@@ -679,7 +717,7 @@ for (const mode of ["all", "any"]) test(`completed ${mode} waits release Job bin
   try {
     jobStates.set("job_1", "running"); jobStates.set("job_2", "running");
     let task = await controller.current(context);
-    await controller.update({ action: "wait", expected_revision: task.revision,
+    await controller.update({ action: "wait", next_action: "Collect the waited Jobs and inspect their scientific evidence.", expected_revision: task.revision,
       wait: { job_ids: ["job_1", "job_2"], mode } }, "wait-live", context);
     await assert.rejects(controller.binding(context), { code: "task_not_active" });
     jobStates.set("job_1", "succeeded");
@@ -700,7 +738,7 @@ for (const mode of ["all", "any"]) test(`completed ${mode} waits release Job bin
 test("pause wins while completed waits are being observed", async t => {
   const { controller, begin, jobStates, kernel } = await fixture(t);
   let task = await begin(); jobStates.set("job_1", "running");
-  task = await controller.update({ action: "wait", expected_revision: task.revision,
+  task = await controller.update({ action: "wait", next_action: "Collect the waited Jobs and inspect their scientific evidence.", expected_revision: task.revision,
     wait: { job_ids: ["job_1"], mode: "all" } }, "wait", context);
   let entered, finish;
   const ready = new Promise(resolve => { entered = resolve; });
@@ -781,7 +819,7 @@ test("scope cannot be weakened by reusing the original instruction", async t => 
 test("transient wait status failure preserves user access and can recover", async t => {
   const { controller, begin, jobStates, kernel } = await fixture(t);
   let task = await begin({ execution_target: { platform: "local", scheduler_entry: "main" } }); jobStates.set("job_1", "running");
-  task = await controller.update({ action: "wait", expected_revision: task.revision,
+  task = await controller.update({ action: "wait", next_action: "Collect the waited Jobs and inspect their scientific evidence.", expected_revision: task.revision,
     wait: { job_ids: ["job_1"], mode: "all" } }, "wait-unavailable", context);
   const execute = kernel.execute_command;
   kernel.execute_command = async (command, params) => {
@@ -805,7 +843,7 @@ test("budget failure with a queued compaction settles after Job wait and resumes
     if (!block) return;
     block = false;
     let task = await env.controller.current(context);
-    await env.controller.update({ action: "wait", expected_revision: task.revision,
+    await env.controller.update({ action: "wait", next_action: "Collect the waited Jobs and inspect their scientific evidence.", expected_revision: task.revision,
       wait: { job_ids: ["job_1"], mode: "all" } }, "wait-before-budget-failure", context);
     const first = (await env.conversation.context(context)).entries[0].id;
     queued = await env.conversation.submit({ type: "write", requestId: "pending-summary",
@@ -924,7 +962,7 @@ test(`user recovery ${scenario} follows current input evidence and Pi outcome`, 
       env.jobStates.set("job_new", "running");
       await env.controller.observeToolResults(observed("job_start", { job_id: "job_new", submitted_at: "now" }), context);
       task = await env.controller.current(context);
-      await env.controller.update({ action: "wait", expected_revision: task.revision,
+      await env.controller.update({ action: "wait", next_action: "Collect the waited Jobs and inspect their scientific evidence.", expected_revision: task.revision,
         wait: { job_ids: ["job_new"], mode: "all" } }, "user-wait", context);
     } else if (scenario !== "query") {
       await env.controller.observeToolResults(observed("research_result", { result: { id: scenario === "duplicate" ? "result_old" : "result_new" } }), context);

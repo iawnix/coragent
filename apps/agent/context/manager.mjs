@@ -46,7 +46,7 @@ export function contextInputBudget(contextWindow, { reserveTokens = 16384, maxIn
 /** One policy over native history, research orientation, compaction and final
  * admission. Scientific facts remain in the research store; Pi owns persistence. */
 export function createContextManager({ bridge, coordinator, sessionId, estimateContextTokens,
-  inputTokens, reserveTokens = 16384, synthesizeBrief = null,
+  inputTokens, reserveTokens = 16384,
   getCompactionPolicy = () => ({ reserveTokens, maxInputTokens: inputTokens }) }) {
   async function projection(task, scope, eventIds) {
     const control = { task: projectDecisionTask(task) };
@@ -114,26 +114,17 @@ export function createContextManager({ bridge, coordinator, sessionId, estimateC
         await api.memo(memoKey, { prepared: null }, context);
         return;
       }
-      let synthesis = null;
-      let synthesisStatus = "not_requested";
-      const needsSynthesis = brief.projection_status === "complete" && (
-        brief.contradictions.length > 0 || brief.findings.some(item => item.kind === "result"
-          || item.kind === "job" && ["succeeded", "failed", "timed_out", "cancelled", "unknown"].includes(item.state)));
-      if (synthesizeBrief && needsSynthesis) {
-        try { synthesis = await synthesizeBrief(brief); } catch { /* The deterministic brief remains usable. */ }
-        synthesisStatus = synthesis ? "ready" : "failed";
-      }
       const refreshReason = !previous ? "initial" : previous.scope_id !== scopeId ? "scope_changed"
         : previous.availability === "unavailable" ? "retry" : "facts_changed";
       const { read_basis: _readBasis, ...research } = brief;
       const message = envelope("research_context", { task: projectDecisionTask(task),
-        research_brief: { ...research, synthesis_status: synthesisStatus, ...(synthesis ? { synthesis } : {}) },
+        research_brief: research,
         provenance: { scope, refresh_reason: refreshReason, observed_at: new Date().toISOString() },
         notice: "Historical research brief, not live state or a read receipt. Read current fields before replacing them." });
       const data = { schema_version: "research-context/1", scope_id: scopeId,
         availability: brief.availability ?? "available", status: brief.status, input_key: inputKey,
         brief_id: brief.brief_id, brief_digest: brief.brief_digest, state_digest: brief.state_digest,
-        projection_status: brief.projection_status, synthesis_status: synthesisStatus,
+        projection_status: brief.projection_status,
         refresh_reason: refreshReason, after_entry: boundary };
       const prepared = { key: KEY, messages: [message], data };
       await api.memo(memoKey, { prepared }, context);

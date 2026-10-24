@@ -35,18 +35,6 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
       try {
         let body = ""; for await (const part of req) body += part;
         const request = JSON.parse(body);
-        // Review synthesis is an internal tool-free request and must not
-        // consume one of the continuation fixture's scripted steps.
-        if (JSON.stringify(request).includes('deterministic brief')) {
-          const response = { id: `review_${observedRequests.length}`, object: "chat.completion",
-            choices: [{ index: 0, message: { role: "assistant", content: JSON.stringify({
-              status: "uncertain", summary: "Inspect the recorded research evidence.",
-              key_findings: [], contradictions: [], uncertainties: [], next_actions: [], source_refs: [],
-            }) }, finish_reason: "stop" }] };
-          res.writeHead(200, { "content-type": "application/json" });
-          res.end(JSON.stringify(response));
-          return;
-        }
         observedRequests.push(request);
         if (scenario === "user-stop" && requests === 4) {
           await backend.sendInput({ ...scope, client_message_id: "stop-research", request_id: "stop-research",

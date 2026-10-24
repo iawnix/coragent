@@ -66,6 +66,7 @@ test('session abort pauses a waiting Task without a live model run or cancelling
   const task = await controller.begin({ title: 'Waiting research', objective: 'Report the calculation result',
     source_submission_ids: [String(source.id)], criteria: [{ id: 'result', description: 'Report the result.' }] }, 'begin', context);
   const waiting = await controller.update({ expected_revision: task.revision, action: 'wait',
+    next_action: 'Collect job_1, inspect its output, and report the supported result.',
     wait: { job_ids: ['job_1'], mode: 'all' } }, 'wait', context);
   assert.equal(waiting.state, 'waiting');
   assert.equal((await harness.snapshot(LiveDoc, conversation.id, context)).run, undefined);

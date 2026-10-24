@@ -93,7 +93,6 @@ type UserTask = {
     brief_digest: string | null;
     availability: "available" | "unavailable";
     projection_status: "complete" | "incomplete";
-    synthesis_status: "not_requested" | "ready" | "failed";
     refresh_reason: "initial" | "scope_changed" | "facts_changed" | "retry";
     updated_at: string | null;
   } | null;

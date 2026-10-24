@@ -285,13 +285,38 @@
           },
           "subjects": {
             "$ref": "shared.json#/tools/research_update/properties/subjects"
+          },
+          "references": {
+            "$ref": "shared.json#/tools/research_update/properties/references"
+          },
+          "as_assessment": {
+            "$ref": "shared.json#/tools/research_update/properties/as_assessment"
           }
         },
         "required": [
           "node_id",
           "note"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "as_assessment": {
+                  "const": true
+                }
+              },
+              "required": [
+                "as_assessment"
+              ]
+            },
+            "then": {
+              "properties": {
+                "assessment_ref": false
+              }
+            }
+          }
+        ]
       },
       "examples": [
         {

@@ -2,7 +2,7 @@
 
 Research Memory 是持久研究记录。Research Context 是 Agent Runtime 内部的上下文准备模块，
 通过唯一的 `research_read(view="brief")` 接口读取 `research-brief/1` 研究概览。
-概览是程序筛选和摘取的结果，模型可附加 Research Synthesis（研究综合摘要）；两者都不代表科学评估。
+概览由程序确定性选择已记录事实，不再调用额外模型生成综合摘要，也不代表科学评估。
 研究记录、工作区与上下文仍属于完整研究核心。普通 Task 没有计算位置时也会建立研究概览；
 上下文读取只组合本地研究事实和已记录的 Job 观察，不解析平台或连接队列。Job Manager 负责
 刷新外部状态；本地事件投影负责将已持久化事实同步到研究记录，两者不另建一份 Job 状态。
@@ -13,6 +13,13 @@ Node 用 `goal` 保存研究问题，用 `plan` 保存当前调查方法，用 `
 当前判断。Node 第 2 版删除 `proposal` 与 `progress`，不要求把普通记录再复制成一份进度字段。
 普通 note 记录尝试、观察和后续想法；Result 保持不可变发布。关系和索引视图继续用于导航与复用。
 
+在获得重要结果、改变研究方向、等待作业或交付之前，可以通过
+`research_update(note=..., references=[...], as_assessment=true, plan=...)`
+一次原子保存记录、证据引用、当前判断和调查方案。判断应包含已知进展、未解问题、反证与限制，
+不要求已经得到最终答案。普通 note 仍作为历史。Node 的 `plan` 是调查策略；Task 的
+`next_action` 是唯一的下一步执行动作。`task_update(action="wait", wait=..., next_action=...)`
+同时保存等待条件和唤醒后的动作，避免等待新 Job 却保留旧动作。
+
 Brief 分别提供当前问题、显式 assessment、近期过程 notes 和待处理 Jobs。
 普通 note 的 finding 是 `kind="note"`、`selected_assessment=false`；只有 `assessment_ref`
 明确选中它时，后者才为 true。选中的其他历史记录使用 `kind="record"`，发布结果使用
@@ -20,13 +27,19 @@ Brief 分别提供当前问题、显式 assessment、近期过程 notes 和待�
 
 每个范围内 Node 最多提供 3 条近期过程 note，按不可变记录的 sequence 从新到旧选择。
 被显式选为 assessment 的旧 note 可以另外作为当前判断展示，也计入 note 覆盖数量。
-正文摘录和引用共同受 Brief 字节预算限制；`content_omitted`、`coverage.notes` 和
-`coverage.omitted.notes` 明确显示摘录、纳入数量及省略数量。通过 `research_read(ref=...)`
+当前判断优先于过程 notes，不会仅因新增记录而被近期窗口挤掉。完整判断、限制与全部显式引用
+作为一个整体纳入预算；放不下时使用 `content_omitted=true` 和确切读取入口，不保留可能丢失
+数值或限定条件的半句话。goal 和 plan 放不下时通过 `omitted_fields` 标明。
+模型在基于省略判断决策前必须读取原记录。`coverage.notes` 和 `coverage.omitted.notes`
+显示纳入与省略的历史数量。通过 `research_read(ref=...)`
 读取确切原记录，通过 `research_search(node_id=..., kind="note", limit=..., offset=...)`
 分页获取完整历史和总数。
 
 引用只能来自真实记录身份和显式引用字段，不能从 note 正文中猜测引用。
 即使 note 写得很肯定或包含初步结论，它仍是过程记录，不能因此获得科学验证或发布状态。
+缺少当前判断时给出 `current_assessment_missing` 提示。判断之后新增 Result 或 Job 终态、
+收集完成记录时，给出 `new_evidence_after_assessment` 提示，要求核对相关性；不会自动替换
+判断，也不会因记录时间较新就认定旧判断科学上失效。
 
 ## 选择与刷新
 
@@ -49,19 +62,13 @@ note 的内容指纹。不会为了计算版本而加载全部历史 note 正文
 不把最新研究状态倒填进旧摘要。正常恢复和压缩不单独要求重建概览。
 读取失败会注入明确的不可用状态，同一输入内不反复重试；新输入可重试。
 
-## 三种独立状态
+## 上下文状态
 
 - availability：研究背景可用或不可用。
 - projection_status：运行事件同步到研究记忆库是否完整，值为 complete / incomplete。
-- synthesis_status：模型补充摘要为 not_requested / ready / failed。
 
-取消 review_pending 和含义混合的 Review 生命周期。Task Controller 是否推进用户任务，
-与研究概览是否刷新、模型摘要是否成功分开判断。
-数据同步不完整时不请求模型摘要，避免用文本生成掩盖同步错误。
-
-概览包含结果、终态或异常 Job、矛盾时，可调用模型对已经筛选的概览做无工具综合。
-摘要输出最多 700 tokens，按具体概览指纹缓存；引用必须来自概览。
-失败保留确定性概览，不阻止 Agent 读取原始证据。模型摘要不会写入 Research Memory。
+Task Controller 是否推进任务与概览是否刷新分开判断。Agent 通过研究工具读取证据、形成判断
+并保存；上下文模块不调用第二个模型重新解释。数据同步不完整时直接呈现，不用生成摘要掩盖。
 整体背景以 2,000 tokens 为软目标，出现矛盾时可到 4,000；最终请求仍受输入预算检查。
 
 ## 压缩与输入预算

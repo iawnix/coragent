@@ -87,18 +87,6 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     server = createServer(async (req, res) => {
       let body = ""; for await (const part of req) body += part;
       const request = JSON.parse(body);
-      // Review synthesis is an internal, tool-free model call. Keep it out of
-      // the fixture's step counter while still returning a valid projection.
-      if (JSON.stringify(request).includes('deterministic brief')) {
-        const response = { id: `review_${requests.length}`, object: "chat.completion",
-          choices: [{ index: 0, message: { role: "assistant", content: JSON.stringify({
-            status: "attention", summary: "Inspect the recorded evidence before interpretation.",
-            key_findings: [], contradictions: [], uncertainties: [], next_actions: [], source_refs: [],
-          }) }, finish_reason: "stop" }] };
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(response));
-        return;
-      }
       requests.push(request);
       const createdResult = request.messages.filter(message => message.role === "tool").map(message => {
         try { return JSON.parse(message.content); } catch { return null; }

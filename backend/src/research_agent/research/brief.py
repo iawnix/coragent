@@ -19,16 +19,6 @@ def _size(value):
     return len(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode())
 
 
-def _text(value, limit=320):
-    if not value:
-        return ""
-    value = str(value)
-    encoded = value.encode("utf-8")
-    if len(encoded) <= limit:
-        return value
-    return encoded[:limit].decode("utf-8", errors="ignore")
-
-
 def _state_digest(graph, selection, jobs, projection, source_bindings):
     """Track scoped facts, including omitted records; unrelated activity is irrelevant."""
     basis = selection['_basis']
@@ -62,7 +52,7 @@ def _state_digest(graph, selection, jobs, projection, source_bindings):
 
 
 def _source(ref, kind, summary, **extra):
-    item = {"ref": ref, "kind": kind, "summary": _text(summary)}
+    item = {"ref": ref, "kind": kind, "summary": summary or ''}
     item.update(extra)
     return item
 
@@ -89,18 +79,36 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         source_refs.append(ref)
         status = node.get("status")
         assessment = node.get("assessment") or {}
-        summary = node.get("goal") or node.get("title")
-        finding = _source(ref, "node", summary, status=status, assessment_ref=node.get("assessment_ref"))
+        summary = node.get("goal", '')
+        omitted_fields = [field for field in node['omitted_fields'] if field in {'goal', 'plan'}]
+        finding = _source(ref, "node", summary, status=status, assessment_ref=node.get("assessment_ref"),
+                          read={'tool': 'research_read', 'ref': ref}, omitted_fields=omitted_fields)
         if node.get("plan"):
-            finding['plan'] = _text(node['plan'])
+            finding['plan'] = node['plan']
         findings.append(finding)
         if node.get("review_notice_count"):
             codes = sorted({notice.get("code", "review_required") for notice in node.get("review_notices", [])})
-            contradictions.append(_source(ref, "node_review", "; ".join(codes), codes=codes))
+            changed = [notice for notice in node.get('review_notices', [])
+                       if notice['code'] == 'new_evidence_after_assessment']
+            for notice in changed:
+                source_refs.extend(notice['references'])
+                uncertainties.append(_source(ref, 'assessment_review',
+                    'Evidence was recorded after the selected assessment; review its relevance before continuing.',
+                    assessment_ref=node['assessment_ref'], references=notice['references'],
+                    code=notice['code']))
+                follow_up.append({'action': 'review_new_evidence', 'ref': ref,
+                                  'reason': 'Newer evidence does not automatically invalidate the selected assessment.',
+                                  'read': {'tool': 'research_read', 'ref': ref}})
+            review_codes = [code for code in codes if code != 'new_evidence_after_assessment']
+            if review_codes or not codes:
+                contradictions.append(_source(ref, "node_review", "; ".join(review_codes) or 'Review notices omitted; read the node.',
+                                              codes=review_codes, read={'tool': 'research_read', 'ref': ref}))
         if status in {"open", "paused"} and not node.get("assessment_ref"):
-            uncertainties.append(_source(ref, "node", "No selected assessment is recorded", status=status))
+            uncertainties.append(_source(ref, "node", "No selected assessment is recorded", status=status,
+                                         code='current_assessment_missing'))
             follow_up.append({"action": "inspect_or_continue_node", "ref": ref,
-                              "reason": "The research question remains unresolved."})
+                              "reason": "Read the recorded progress and select a current judgment before relying on this brief.",
+                              'read': {'tool': 'research_read', 'ref': ref}})
         if node.get("assessment_ref"):
             source_refs.append(node["assessment_ref"])
             if assessment:
@@ -109,10 +117,12 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
                 findings.append(_source(node['assessment_ref'],
                     assessment['kind'] if assessment['kind'] in {'result', 'note'} else 'record',
                     assessment.get('conclusion'), node_id=ref, selected_assessment=True,
-                    references=refs, content_omitted=assessment.get('content_omitted', False)
-                    or _text(assessment.get('conclusion')) != assessment.get('conclusion')))
-            if assessment.get("limitations"):
-                limitations.append(_source(node["assessment_ref"], "result_limitation", assessment["limitations"]))
+                    limitations=assessment.get('limitations', ''), references=refs,
+                    content_omitted=assessment.get('content_omitted', False),
+                    read={'tool': 'research_read', 'ref': node['assessment_ref']}))
+                if node.get('review_notice_count'):
+                    findings[-1]['review_required'] = True
+                    findings[-1]['review_codes'] = codes or ['review_notices_omitted']
         for note in node.get('recent_notes', {}).get('records', []):
             if note['ref'] == node.get('assessment_ref'):
                 continue
@@ -121,7 +131,7 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
             findings.append(_source(note['ref'], 'note', note['content'], node_id=ref,
                 sequence=note['sequence'], created_at=note['created_at'], references=note['references'],
                 reference_count=note['reference_count'], selected_assessment=False,
-                content_omitted=note['content_omitted'] or _text(note['content']) != note['content']))
+                content_omitted=note['content_omitted'], read={'tool': 'research_read', 'ref': note['ref']}))
 
     # Published Results remain distinct from the selected assessment. Their
     # summaries and explicit citations compete for the same bounded context.
@@ -131,17 +141,17 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         source_refs.append(result["id"])
         full_result = get_result(root, result["id"])
         refs = list(dict.fromkeys(full_result.get('inputs', []) + full_result.get('evidence_refs', [])
+                    + full_result.get('check_refs', []) + list(full_result.get('subjects', {}).values())
                     + [item['artifact_ref'] for item in full_result.get('files', [])
                        if isinstance(item, dict) and item.get('artifact_ref')]))
-        source_refs.extend(refs[:4])
+        source_refs.extend(refs)
         if result["id"] not in {item.get("ref") for item in findings}:
-            summary = result.get("summary") or result.get("conclusion") or ''
+            summary = full_result['conclusion']
             findings.append(_source(result["id"], "result", summary,
                                     node_id=result.get("node_id"), supersedes=result.get("supersedes"),
-                                    references=refs[:4], reference_count=len(refs),
-                                    content_omitted=_text(summary) != summary or len(refs) > 4))
-        if result.get("limitations"):
-            limitations.append(_source(result["id"], "result_limitation", result["limitations"]))
+                                    limitations=full_result.get('limitations') or '',
+                                    references=refs, reference_count=len(refs), content_omitted=False,
+                                    read={'tool': 'research_read', 'ref': result['id']}))
 
     terminal = {"succeeded", "failed", "timed_out", "cancelled"}
     for job in selection.get("jobs", []):
@@ -149,9 +159,10 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         source_refs.append(ref)
         state = job.get("state")
         findings.append(_source(ref, "job", state or "unknown", node_id=job.get("node_id"), state=state,
-                                collection_state=job.get("collection_state")))
+                                collection_state=job.get("collection_state"), waited=ref in waited_job_ids,
+                                read={'tool': 'job_status', 'job_id': ref}))
         if state == "failed" or job.get("execution_conflict"):
-            reason = _text(job.get("error") or "Execution failed or conflicted")
+            reason = job.get("error") or "Execution failed or conflicted"
             contradictions.append(_source(ref, "job_failure", reason, state=state))
             follow_up.append({"action": "inspect_job", "ref": ref, "reason": reason,
                               "read": {"tool": "job_status", "job_id": ref}})
@@ -193,7 +204,7 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         "source_refs": list(dict.fromkeys(source_refs)),
         "read_more": {"research": {"tool": "research_read"}, "jobs": {"tool": "job_status"},
                       "history": {"tool": "research_search", "kind": "note"}},
-        "guidance": "This is a derived brief of recorded evidence. Notes are process records; only an explicit assessment_ref selects a current assessment. It does not certify scientific validity, authorize writes, schedule a run, or declare completion.",
+        "guidance": "This is a derived brief of recorded evidence. Notes are process records; only assessment_ref selects the current judgment. Read content_omitted records and omitted_fields before relying on them; no text is partially quoted. Newer evidence needs review, not automatic rejection. This brief does not certify validity or completion.",
         "projection_status": "incomplete" if projection and projection.get('pending') else "complete",
     }
     scoped = set(selection['_basis']['node_ids'])
@@ -218,7 +229,9 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         brief['brief_digest'] = 'sha256:' + digest({key: value for key, value in brief.items() if key != 'brief_digest'})
 
     refresh()
-    # Keep at least each question's latest note ahead of older process detail.
+    # Current judgments and live Job identities take precedence over process
+    # history. Full conclusions, caveats and references are kept or omitted
+    # together, never independently trimmed by a transport byte budget.
     note_nodes = set()
     older_notes = []
     for item in findings:
@@ -226,8 +239,10 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
             if item['node_id'] in note_nodes:
                 older_notes.append(item)
             note_nodes.add(item['node_id'])
-    optional = list(reversed(older_notes)) + [item for item in reversed(findings)
-                if item['kind'] == 'result' and not item.get('selected_assessment')]
+    optional = (list(reversed(older_notes))
+        + [item for item in findings if item['kind'] == 'result' and not item.get('selected_assessment')]
+        + [item for item in reversed(findings) if item['kind'] == 'note'
+           and not item.get('selected_assessment') and item not in older_notes])
     for item in optional:
         if _size(brief) <= max_bytes:
             break
@@ -237,11 +252,38 @@ def build(root, *, max_bytes=8000, session_id=None, entry_node_ids=(),
         if _size(brief) <= max_bytes:
             break
         if item.pop('plan', None) is not None:
+            item['omitted_fields'] = list(dict.fromkeys(item.get('omitted_fields', []) + ['plan']))
             refresh()
-    for key in ('uncertainties', 'limitations', 'follow_up', 'findings', 'contradictions'):
+
+    # Remove duplicate navigation prose before making the selected judgment
+    # unread. Every finding already carries its own exact read operation.
+    for key in ('follow_up', 'limitations', 'uncertainties', 'contradictions'):
         while brief[key] and _size(brief) > max_bytes:
             brief[key].pop()
             refresh()
+    for item in brief['findings']:
+        if _size(brief) <= max_bytes:
+            break
+        if item['kind'] == 'node' and item['summary']:
+            item['summary'] = ''
+            item['omitted_fields'] = list(dict.fromkeys(item['omitted_fields'] + ['goal']))
+            refresh()
+    for item in reversed(brief['findings']):
+        if _size(brief) <= max_bytes:
+            break
+        if item.get('selected_assessment') and not item['content_omitted']:
+            item.update(summary='', limitations='', references=[], content_omitted=True)
+            refresh()
+    # If even identities exceed the budget, omit peripheral entries first.
+    # Coverage reports their absence; no prefix is presented as evidence.
+    removal = sorted(brief['findings'], key=lambda item: (
+        bool(item.get('selected_assessment')), bool(item.get('waited')),
+        item['kind'] == 'job'), reverse=False)
+    for item in removal:
+        if _size(brief) <= max_bytes:
+            break
+        brief['findings'].remove(item)
+        refresh()
     if _size(brief) > max_bytes:
         raise ValueError('brief_budget_too_small')
     return brief

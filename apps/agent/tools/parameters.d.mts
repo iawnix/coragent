@@ -46,6 +46,8 @@ export interface ToolParameters {
     "remove_relations"?: Array<string>;
     "assessment_ref"?: string;
     "subjects"?: Record<string, string>;
+    "references"?: Array<string>;
+    "as_assessment"?: boolean;
   };
   research_result: {
     "root"?: string;

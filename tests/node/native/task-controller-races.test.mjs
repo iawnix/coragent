@@ -92,7 +92,7 @@ test("an early Job event cannot consume an all-Jobs wait", async t => {
   const env = await fixture(t);
   env.jobs.set("job_a", "succeeded"); env.jobs.set("job_b", "running");
   let task = await env.controller.current(context);
-  task = await env.controller.update({ expected_revision: task.revision, action: "wait", wait: { job_ids: ["job_a", "job_b"], mode: "all" } }, "wait-all", context);
+  task = await env.controller.update({ expected_revision: task.revision, action: "wait", next_action: "Collect the waited Jobs and inspect their scientific evidence.", wait: { job_ids: ["job_a", "job_b"], mode: "all" } }, "wait-all", context);
   env.faux.setResponses([fauxAssistantMessage("Unexpected early wake")]);
   const before = env.requests;
   const response = await env.monitor.admit({ requestId: "batch-wait", eventIds: ["event_1"], token: "fixture-token", mode: "next_run" }, context);
@@ -113,7 +113,7 @@ for (const pause of [false, true]) test(`persisted Job completion ${pause ? "res
   const env = await fixture(t);
   env.jobs.set("job_a", "running");
   let task = await env.controller.current(context);
-  task = await env.controller.update({ expected_revision: task.revision, action: "wait",
+  task = await env.controller.update({ expected_revision: task.revision, action: "wait", next_action: "Collect the waited Jobs and inspect their scientific evidence.",
     wait: { job_ids: ["job_a"], mode: "all" } }, "wait-persisted", context);
   if (pause) await env.controller.control({ user_task_id: task.user_task_id, expected_revision: task.revision,
     action: "pause", request_id: "pause-before-completion" }, context);
@@ -413,7 +413,7 @@ for (const consumption of ["direct", "successor"]) test(`Task reconcile clears r
   let task = await env.controller.current(context);
   assert.deepEqual(task.event_inputs, []);
   env.jobs.set("job_wait", "running");
-  task = await env.controller.update({ expected_revision: task.revision, action: "wait",
+  task = await env.controller.update({ expected_revision: task.revision, action: "wait", next_action: "Collect the waited Jobs and inspect their scientific evidence.",
     wait: { job_ids: ["job_wait"], mode: "all" } }, "wait-after-first", context);
   await env.conversation.commit(async tx => {
     const stored = await tx.doc(UserTask, env.conversation.id, task.user_task_id, null);

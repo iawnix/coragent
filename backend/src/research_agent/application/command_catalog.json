@@ -1937,7 +1937,9 @@
         "session_id",
         "request_id",
         "read_basis",
-        "subjects"
+        "subjects",
+        "references",
+        "as_assessment"
       ],
       "required": [
         "node_id",
@@ -1957,7 +1959,7 @@
             "minLength": 1,
             "maxLength": 64000,
             "pattern": "^(?=[\\s\\S]*\\S)[\\s\\S]{1,64000}(?![\\s\\S])",
-            "description": "Maximum 64000 Unicode characters (code points), not UTF-8 bytes.",
+            "description": "Research observation or current judgment. For as_assessment=true, write a concise, complete account of established findings, unresolved questions and limitations; place full evidence in referenced records. Maximum 64000 Unicode characters.",
             "$comment": "The pattern enforces Unicode code-point length even in validators whose maxLength counts grapheme clusters."
           },
           "goal": {
@@ -2013,7 +2015,7 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 256,
-                "description": "Select an existing Result or agent-authored note/record belonging to this same Node as its current synthesis. Use its exact returned reference; a user message, Job or Artifact cannot be selected."
+                "description": "Select an existing Result or agent-authored note/record belonging to this Node as its current research judgment. Use as_assessment=true to select the note written by this call instead. Selection does not certify scientific validity."
               },
               {
                 "type": "null"
@@ -2099,13 +2101,47 @@
               "type": "string"
             },
             "description": "Named roles such as target and calculated, pointing only to existing result_* or verified Artifact references. Nodes, user messages, Jobs, receipts and file paths are not accepted. Labels do not certify identity."
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "maxItems": 64,
+            "uniqueItems": true,
+            "description": "Explicit existing research, Job or Artifact references supporting this note. Use exact returned IDs; references do not certify scientific validity."
+          },
+          "as_assessment": {
+            "type": "boolean",
+            "description": "Atomically select this new note as the current research judgment and optionally revise the plan. Keep established findings, unresolved questions and important limitations together. Read the Node first. Cannot be combined with assessment_ref."
           }
         },
         "required": [
           "node_id",
           "note"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "as_assessment": {
+                  "const": true
+                }
+              },
+              "required": [
+                "as_assessment"
+              ]
+            },
+            "then": {
+              "properties": {
+                "assessment_ref": false
+              }
+            }
+          }
+        ]
       },
       "result": {
         "type": "object",

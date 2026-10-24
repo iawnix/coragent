@@ -116,7 +116,15 @@ def update(root, request):
     root = workspace(root)
     node = get_node(root, request['node_id'])
     note = text(request.get('note'), 'note', required=True, limit=64000)
+    selected = request.get('as_assessment', False)
+    if type(selected) is not bool:
+        raise ValueError('as_assessment_requires_boolean')
+    if selected and 'assessment_ref' in request:
+        raise ValueError('assessment_selection_conflict: use as_assessment or assessment_ref, not both')
+    references = validate_refs(root, request.get('references', []), request.get('_reference_details'))
     changed = set(request) & basis.EDIT_FIELDS
+    if selected:
+        changed.add('assessment_ref')
     if request.get('add_relations') or request.get('remove_relations'):
         changed.add('relations')
     basis.check(root, node, request, changed)
@@ -130,24 +138,32 @@ def update(root, request):
         if request['status'] not in {'open', 'paused', 'closed'}:
             raise ValueError('node_status_invalid')
         node['status'] = request['status']
-    if 'assessment_ref' in changed:
+    if 'assessment_ref' in request:
         ref = request['assessment_ref']
         if ref is not None:
             validate_refs(root, [ref])
             from .results import get_result
-            selected = get_result(root, ref) if ref.startswith('result_') else record(root, ref)
-            if selected.get('node_id') != node['id'] or selected.get('origin', 'agent') != 'agent':
+            assessment = get_result(root, ref) if ref.startswith('result_') else record(root, ref)
+            if assessment.get('node_id') != node['id'] or assessment.get('origin', 'agent') != 'agent':
                 raise ValueError('assessment_must_belong_to_node')
         node['assessment_ref'] = ref
     if changed:
         node['revision'] += 1
         node['updated_at'] = now()
+    identity = ['note', request.get('request_id') or uuid.uuid4().hex]
+    if selected:
+        # Reserve the exact immutable record identity before persisting its Node snapshot.
+        node['assessment_ref'] = allocate_id(root, 'note', identity)
     log = append_record(root, origin='agent', kind='node_updated' if changed else 'note', title=node['title'],
-                        content=note, node_id=node['id'], node_revision=node['revision'],
-                        data={**({'node': node} if changed else {}), 'author': {'session_id': request.get('session_id')}},
-                        identity=['note', request.get('request_id') or uuid.uuid4().hex])
+                        content=note, references=references, node_id=node['id'], node_revision=node['revision'],
+                        data={**({'node': node} if changed else {}),
+                              **({'assessment_selected': True} if selected or request.get('assessment_ref') else {}),
+                              'author': {'session_id': request.get('session_id')}},
+                        identity=identity)
     if changed:
         save(root, node)
         relations.change(root, node['id'], request.get('add_relations', []), request.get('remove_relations', []),
                          author={'session_id': request.get('session_id')})
+    for ref in references:
+        relations.cite(root, node['id'], ref, basis_ref=log['ref'])
     return response(root, node, request, ref=log['ref'])

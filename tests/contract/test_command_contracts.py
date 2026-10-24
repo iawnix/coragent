@@ -14,6 +14,8 @@ ROOT = Path(__file__).resolve().parents[2]
     ('research_create', {'goal': 'Investigate the reaction', 'session_id': 'session-fixture'}),
     ('research_observe', {'read_basis': 'read_' + 'a' * 64, 'session_id': 'session-fixture'}),
     ('research_update', {'node_id': 'node_' + 'a' * 32, 'note': 'Observation', 'assessment_ref': None}),
+    ('research_update', {'node_id': 'node_1', 'note': 'Evidence remains inconclusive.',
+                         'references': ['result_1'], 'as_assessment': True}),
     ('job_start', {'command': ['/bin/true'], 'environment': {'OMP_NUM_THREADS': '2'}}),
     ('artifact_read', {'artifact_id': 'art_1', 'offset': 0, 'limit': 4096}),
 ])
@@ -24,6 +26,10 @@ def test_application_contract_accepts_transport_values(command, params):
 @pytest.mark.parametrize('command,params', [
     ('research_create', {'goal': 'Investigate', 'unknown': True}),
     ('research_update', {'node_id': 'node_' + 'a' * 32}),
+    ('research_update', {'node_id': 'node_1', 'note': 'Ambiguous selection',
+                         'as_assessment': True, 'assessment_ref': 'result_1'}),
+    ('research_update', {'node_id': 'node_1', 'note': 'Ambiguous clearing',
+                         'as_assessment': True, 'assessment_ref': None}),
     ('research_search', {'origin': 'untrusted-origin'}),
     ('job_start', {'command': ['/bin/true'], 'environment': {'OMP_NUM_THREADS': 2}}),
     ('artifact_read', {'artifact_id': 'art_1', 'limit': '4096'}),
