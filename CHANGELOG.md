@@ -5,6 +5,11 @@ This file records user-visible changes. Current architecture is documented in
 
 ## Unreleased
 
+- Move independent maintenance tools to `libexec/maintenance/`. Upgrades write the
+  complete bundle and uninstall entrypoint before removing `runtimes/maintenance/`.
+  Retain entrypoint support for the old location and fix custom installation-root
+  detection from the maintenance bundle.
+
 - Consolidate job execution, background tracking and event delivery under Job Manager.
   Monitor names the management interface; Task Controller owns continuation policy.
   Execution records distinguish authenticated producer from execution reason.

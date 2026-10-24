@@ -14,7 +14,7 @@ def test_recovery_bundle_contains_the_complete_stdlib_configuration_boundary(tmp
     source = Path(__file__).resolve().parents[2]
     root = tmp_path / "installation"
     install_uninstaller(root, source)
-    maintenance = root / "runtimes/maintenance"
+    maintenance = root / "libexec/maintenance"
     env = {key: value for key, value in os.environ.items() if key != "PYTHONPATH"}
     script = """
 import json, pathlib, sys

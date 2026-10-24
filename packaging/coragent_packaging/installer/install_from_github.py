@@ -126,8 +126,12 @@ def install_uninstaller(install_root: Path, source_root: Path) -> Path:
             raise ValueError(f"installation root must be a physical directory: {destination}")
     else:
         destination.mkdir(mode=0o700, parents=True)
-    private = destination / "runtimes/maintenance"
-    for directory in (destination / "runtimes", private):
+    legacy = destination / "runtimes/maintenance"
+    for directory in (legacy.parent, legacy):
+        if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
+            raise ValueError(f"installer control path must be a physical directory: {directory}")
+    private = destination / "libexec/maintenance"
+    for directory in (destination / "libexec", private):
         if directory.exists() or directory.is_symlink():
             if directory.is_symlink() or not directory.is_dir():
                 raise ValueError(f"installer control path must be a physical directory: {directory}")
@@ -159,8 +163,9 @@ def install_uninstaller(install_root: Path, source_root: Path) -> Path:
         "backend/src/research_agent/jobs/qrun.py",
         "skills/chemical/material-preparation/scripts/materials/name_resolver_config.py",
     )
-    copies = [(source_root / "uninstall.sh", uninstaller, 0o755)]
-    copies.extend((source_root / relative, private / relative, 0o600) for relative in members)
+    copies = [(source_root / relative, private / relative, 0o600) for relative in members]
+    # Publish the entrypoint only after its complete recovery bundle is available.
+    copies.append((source_root / "uninstall.sh", uninstaller, 0o755))
     for source, target, mode in copies:
         target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         descriptor, temporary_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
@@ -173,6 +178,8 @@ def install_uninstaller(install_root: Path, source_root: Path) -> Path:
         finally:
             temporary.unlink(missing_ok=True)
     write_installation_marker(destination)
+    if legacy.exists():
+        shutil.rmtree(legacy)
     return uninstaller
 
 

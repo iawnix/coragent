@@ -23,6 +23,7 @@ reports are retained in Git history rather than used as operating instructions.
 | Need | Read |
 | --- | --- |
 | Runtime and storage ownership | [Architecture](ARCHITECTURE.md), [Execution boundaries](ARCHITECTURE_BOUNDARIES.md) |
+| Source directories, dependencies and release ownership | [Source ownership](SOURCE_LAYOUT.md) |
 | Task Controller, Job Manager and input admission | [Task and Job architecture (Chinese)](TASK_JOB_ARCHITECTURE.zh-CN.md) |
 | Research Memory selection, injection and synthesis | [Research context (Chinese)](RESEARCH_CONTEXT.zh-CN.md) |
 | Node granularity, planning and correction | [Research planning (Chinese)](RESEARCH_PLANNING.zh-CN.md) |

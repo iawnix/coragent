@@ -8,6 +8,7 @@ CoRAgent uses one Pi Harness. This layout separates runtime ownership from insta
 | --- | --- |
 | `apps/agent/` | Pi Agent, Host, terminal, task policy, research context and model tools |
 | `apps/cli/` | Thin Python entrypoints and managed-interpreter selection |
+| `libexec/` | The `coragent-host` service launcher |
 | `apps/web/` | Optional, independently released research browser |
 | `apps/relay/` | Independently deployed Link relay |
 | `backend/src/research_agent/` | One Python business package |
@@ -38,6 +39,12 @@ The Python `application/` layer dispatches commands and coordinates `research/`,
 ## Delivery and generated files
 
 CLI interpreter selection lives in `apps/cli/_bootstrap.py`. Installed business commands import their verified wheel after interpreter selection. Pre-install bootstrap belongs to the installer and uses standard-library modules.
+
+Source `libexec/coragent-host` ships inside the Agent release at
+`current/agent/libexec/`. The installer generates a separate installation-root
+`libexec/maintenance/` bundle for independent uninstall and its required modules.
+Maintain its source in `packaging/coragent_packaging/installer/` and the other owning
+directories. See [installation layout](APP_LAYOUT.md) for the installed paths.
 
 `packaging/` is deliberately not a Python package, so it does not shadow the third-party `packaging` library. Tools use the unique `coragent_packaging` namespace, grouped into `installer`, `build`, `manifests` and `pi`, so scientific scripts with names such as `build` cannot shadow packaging modules. Direct tooling entrypoints establish their source import paths; product applications do not import these tools.
 

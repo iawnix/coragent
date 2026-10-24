@@ -1616,9 +1616,10 @@ def test_install_uninstaller_copies_recovery_files_and_marks_ownership(tmp_path:
     uninstaller = install_uninstaller(root, ROOT)
     assert uninstaller == root / "uninstall.sh"
     assert uninstaller.is_file()
-    assert (root / "runtimes/maintenance/packaging/coragent_packaging/installer/uninstall.py").is_file()
-    assert (root / "runtimes/maintenance/packaging/coragent_packaging/installer/_qrun_install.py").is_file()
-    assert (root / "runtimes/maintenance/backend/src/research_agent/jobs/qrun.py").is_file()
+    assert (root / "libexec/maintenance/packaging/coragent_packaging/installer/uninstall.py").is_file()
+    assert (root / "libexec/maintenance/packaging/coragent_packaging/installer/_qrun_install.py").is_file()
+    assert (root / "libexec/maintenance/backend/src/research_agent/jobs/qrun.py").is_file()
+    assert not (root / "runtimes/maintenance").exists()
     marker = json.loads((app_paths(root).marker).read_text(encoding="utf-8"))
     assert marker["schema_version"] == "coragent-installation/3"
 

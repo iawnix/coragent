@@ -9,6 +9,7 @@ CoRAgent uses one operator-owned `config.toml` and an adjacent private
 | Content | Default location |
 | --- | --- |
 | Releases, Pi and Host environments | `~/soft/coragent/` |
+| Independent uninstall and maintenance code | `~/soft/coragent/libexec/maintenance/` |
 | Configuration and credentials | `~/soft/coragent/config/` |
 | Installation receipts, Host state, sessions, logs and caches | `~/soft/coragent/state/` |
 | Research workspaces and Job files | `~/DATA/coragent/workspaces/` |
@@ -30,6 +31,9 @@ second operator-owned configuration source.
 The flow is one way: validate the installation candidate, save `config.toml` and
 `credentials.json`, then derive component inputs. Generated files are never read
 back to infer user settings.
+
+See [installation layout](APP_LAYOUT.md) for directory responsibilities, migration
+of the old maintenance location and runtime environment paths.
 
 ## Configuration
 
@@ -114,6 +118,10 @@ installer to apply service settings such as service scope or Web listen addresse
 Updates use the same configuration and a local maintenance record. Failures before
 activation restore the prior release and configuration; failures after activation
 retain the new state and require rerunning the installer for forward repair.
+The updated installer writes maintenance tools to `libexec/maintenance/` and
+removes `runtimes/maintenance/` after completing the bundle and updating the
+uninstall entrypoint. Updating only these tools does not upgrade the application
+release selected by `current`.
 
 ```sh
 python3 /absolute/coragent/current/agent/packaging/coragent_packaging/installer/app_layout_doctor.py \
@@ -164,8 +172,15 @@ calculation directories by default. Unfinished Jobs block removal unless
 `--cancel-qrun-jobs` is supplied. `--purge-qrun-state` deletes queue history;
 `--purge-all` includes history cleanup but does not imply Job cancellation.
 Configuration cleanup does not recursively delete unrelated files in its parent.
-The necessary parser modules are installed with the uninstaller, so removing the
-source checkout does not prevent uninstall.
+The installation-root `uninstall.sh` loads independent code from
+`libexec/maintenance/`, so removing the source checkout does not prevent uninstall.
+Without `--install-root`, `--config` or `CORAGENT_CONFIG`, the maintenance tools
+infer the installation root from their own location. Explicit arguments and
+configuration take precedence. Default uninstall retains these tools;
+`--purge-config` also removes the maintenance bundle and uninstall entrypoint,
+including any old `runtimes/maintenance/` bundle.
+
+Backups are retained unless `--purge-backups` or `--purge-all` is selected. `--remove-root` also requires backup and Qrun state purge flags when those retained data exist inside the root. Ordinary uninstall preserves nested configuration, Job data and queue history.
 
 ## Local verification
 
@@ -173,5 +188,3 @@ Keep every test installation, dependency environment, cache, temporary file and
 artifact under repository `local_debug/`. Use deterministic local models and fake
 credentials, stop and remove test services, and never publish the private test root
 in Git, packages, external caches or attachments.
-
-Backups are retained unless `--purge-backups` or `--purge-all` is selected. `--remove-root` also requires backup and Qrun state purge flags when those retained data exist inside the root. Ordinary uninstall preserves nested configuration, Job data and queue history.

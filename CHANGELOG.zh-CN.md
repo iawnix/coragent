@@ -4,6 +4,9 @@
 
 ## 未发布
 
+- 将独立维护工具移至 `libexec/maintenance/`；升级时先写完整新代码和卸载入口，再清理旧的
+  `runtimes/maintenance/`。卸载入口兼容旧位置，修复从维护工具位置识别自定义安装根的逻辑。
+
 - 统一 Job Manager 的执行、后台跟踪和事件投递职责；Monitor 只表示管理界面。
   Task Controller 统一执行推进策略，执行记录区分可信来源与实际执行原因。
 - 研究上下文改用 research-brief/1，按当前范围的事实指纹刷新；取消 review_pending，

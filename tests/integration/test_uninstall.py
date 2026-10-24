@@ -177,11 +177,21 @@ def test_uninstall_purge_removes_the_dedicated_installation_root(tmp_path: Path)
     assert not root.exists()
 
 
-def test_installed_uninstaller_runs_with_its_private_ui_module(tmp_path: Path) -> None:
+@pytest.mark.parametrize("layout", ["libexec", "runtimes", "upgrade"])
+def test_installed_uninstaller_runs_with_its_private_ui_module(tmp_path: Path, layout: str) -> None:
     root = tmp_path / "install"
     from research_agent.bootstrap.layout import paths
     paths(root).initialize()
     install_uninstaller(root, Path(__file__).resolve().parents[2])
+    if layout != "libexec":
+        (root / "libexec/maintenance").rename(root / "runtimes/maintenance")
+    if layout == "upgrade":
+        # An older entrypoint only knows the legacy location.
+        entrypoint = root / "uninstall.sh"
+        entrypoint.write_text(entrypoint.read_text().replace(
+            '  "${SCRIPT_ROOT}/libexec/maintenance/packaging/coragent_packaging/installer/installer.py" \\\n', ""))
+        install_uninstaller(root, Path(__file__).resolve().parents[2])
+        assert not (root / "runtimes/maintenance").exists()
 
     completed = subprocess.run(
         [
@@ -201,7 +211,94 @@ def test_installed_uninstaller_runs_with_its_private_ui_module(tmp_path: Path) -
 
     assert completed.returncode == 0, completed.stderr
     assert json.loads(completed.stdout)["ok"] is True
-    assert (root / "runtimes/maintenance/packaging/coragent_packaging/installer/_terminal_ui.py").is_file()
+    bundle = "runtimes" if layout == "runtimes" else "libexec"
+    assert (root / bundle / "maintenance/packaging/coragent_packaging/installer/_terminal_ui.py").is_file()
+
+
+def test_failed_maintenance_migration_preserves_legacy_uninstaller(tmp_path: Path, monkeypatch) -> None:
+    from coragent_packaging.installer import install_from_github
+
+    root = tmp_path / "install"
+    source = Path(__file__).resolve().parents[2]
+    install_uninstaller(root, source)
+    (root / "libexec/maintenance").rename(root / "runtimes/maintenance")
+    entrypoint = root / "uninstall.sh"
+    old_script = entrypoint.read_text().replace(
+        '  "${SCRIPT_ROOT}/libexec/maintenance/packaging/coragent_packaging/installer/installer.py" \\\n', "")
+    entrypoint.write_text(old_script)
+    copyfile = install_from_github.shutil.copyfile
+
+    def fail_copy(src, dst):
+        if src.name == "_terminal_ui.py":
+            raise OSError("simulated incomplete maintenance copy")
+        return copyfile(src, dst)
+
+    monkeypatch.setattr(install_from_github.shutil, "copyfile", fail_copy)
+    with pytest.raises(OSError, match="incomplete maintenance copy"):
+        install_uninstaller(root, source)
+    assert entrypoint.read_text() == old_script
+    completed = subprocess.run([str(entrypoint), "--help"], capture_output=True, text=True, timeout=10)
+    assert completed.returncode == 0, completed.stderr
+    assert "--purge-config" in completed.stdout
+
+
+def test_uninstall_purge_config_removes_both_maintenance_locations(tmp_path: Path) -> None:
+    root = tmp_path / "install"
+    install_uninstaller(root, Path(__file__).resolve().parents[2])
+    legacy = root / "runtimes/maintenance"
+    legacy.mkdir()
+    (legacy / "old.py").write_text("# old recovery bundle\n")
+    result = uninstall(_args(root, purge_config=True))
+    assert result["ok"] is True
+    assert not (root / "libexec/maintenance").exists()
+    assert not legacy.exists()
+    assert not (root / "uninstall.sh").exists()
+
+
+def test_uninstall_rejects_external_libexec_directory(tmp_path: Path) -> None:
+    root = tmp_path / "install"
+    args = _args(root, purge_config=True)
+    external = tmp_path / "external"
+    (external / "maintenance").mkdir(parents=True)
+    kept = external / "maintenance/keep.py"
+    kept.write_text("# external code\n")
+    (root / "libexec").symlink_to(external, target_is_directory=True)
+    with pytest.raises(ValueError, match="symbolic link"):
+        uninstall(args)
+    assert kept.is_file()
+
+
+@pytest.mark.parametrize("layout", ["libexec", "runtimes"])
+def test_interactive_uninstaller_infers_root_from_maintenance_bundle(tmp_path: Path, monkeypatch, layout: str) -> None:
+    root = tmp_path / "custom-install"
+    monkeypatch.setattr(uninstaller, "__file__", str(
+        root / layout / "maintenance/packaging/coragent_packaging/installer/uninstall.py"))
+    monkeypatch.setattr(uninstaller.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(uninstaller.sys.stdout, "isatty", lambda: True)
+    monkeypatch.setattr(uninstaller, "ask", lambda _prompt, default: default)
+
+    def check_root(args, **kwargs):
+        assert args.install_root == str(root)
+        return {"ok": True}
+
+    monkeypatch.setattr(uninstaller, "uninstall", check_root)
+    assert uninstaller.main(["--json"]) == 0
+
+
+@pytest.mark.parametrize("selection", ["root", "config", "environment"])
+def test_maintenance_location_does_not_override_explicit_installation(tmp_path: Path, monkeypatch, selection: str) -> None:
+    bundled = tmp_path / "bundle/libexec/maintenance/packaging/coragent_packaging/installer/uninstall.py"
+    monkeypatch.setattr(uninstaller, "__file__", str(bundled))
+    selected = tmp_path / "selected"
+    layout = app_paths(selected).initialize()
+    if selection == "root":
+        argv = ["--install-root", str(selected)]
+    elif selection == "config":
+        argv = ["--config", str(layout.config_file)]
+    else:
+        monkeypatch.setenv("CORAGENT_CONFIG", str(layout.config_file))
+        argv = []
+    assert uninstaller.parse_args(argv).install_root == str(selected)
 
 
 def test_installed_uninstaller_removes_an_immutable_partial_release(tmp_path: Path) -> None:

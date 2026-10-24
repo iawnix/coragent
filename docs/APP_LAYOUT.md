@@ -21,12 +21,12 @@ The canonical implementation is `backend/src/research_agent/bootstrap/layout.py`
   current -> releases/<id>
   releases/<id>/             # application code and bundled Skills
   runtimes/pi/<commit>/      # pinned Pi runtime
-  runtimes/maintenance/      # independent uninstall/recovery code
+  libexec/maintenance/       # independent uninstall/recovery code
   host-envs/                 # default Host Python environment store
   config/                   # configuration directory below
   state/                    # state root below
   generated/                # generated component configuration
-  jobs/                     # local Qrun calculation files
+  jobs/                     # reserved installation-level Job directory
   backups/                  # retained installation backups
 
 <configuration_directory>/
@@ -49,6 +49,23 @@ The canonical implementation is `backend/src/research_agent/bootstrap/layout.py`
   operations/
   artifacts/
 ```
+
+`libexec/maintenance/` contains the uninstaller and the Python modules it needs to
+read configuration and remove services and queues. The installation-root
+`uninstall.sh` loads this bundle independently of `releases/`, so it remains usable
+after removing the source checkout or application releases. It runs no background
+service and contains no complete Python environment. The installer copies the
+required files from source directories including `packaging/coragent_packaging/installer/`.
+
+Upgrades write the complete new bundle, update the uninstall entrypoint, then
+remove `runtimes/maintenance/`. Install and uninstall scripts can still load the
+maintenance entrypoint from the old location. Default uninstall retains these
+tools; `--purge-config` removes both maintenance locations and the installation-root
+`uninstall.sh`. See [uninstall options](INSTALLATION.md#uninstall).
+
+The application version is selected by `current`. Updating only the maintenance
+tools does not switch that release. A full installer upgrade still stops services,
+switches releases and restores services; managed Qrun code updates require drained queues.
 
 The tree shows the default layout. If `paths.state_root` is outside the software
 root, `generated/`, `jobs/` and `backups/` live under that state root instead.
@@ -101,4 +118,4 @@ The layout schema is `coragent-installation/3`. Old installation-root `etc/`,
 redeploying into the current layout. Uninstall options and ownership rules are
 documented in [Installation](INSTALLATION.md).
 
-Existing installations with separate configuration and state roots retain those paths. Only the dedicated `config/` and `state/` children may overlap the software root; data must never live in `releases/` or `current`. Moving an existing installation requires stopping its services and updating ownership records, queue configuration and service paths together.
+Existing installations with separate configuration and state roots retain those paths. Only the dedicated `config/` and `state/` children may overlap the software root; data must never live in `releases/` or `current`. Moving the software, configuration or state root requires stopping services and updating ownership records, queue configuration and service paths together.

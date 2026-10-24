@@ -8,6 +8,7 @@ CoRAgent 采用一份主配置 `config.toml` 和相邻的 `credentials.json`。
 | 内容 | 默认位置 |
 | --- | --- |
 | 程序版本、Pi 和 Host 运行环境 | `~/soft/coragent/` |
+| 独立卸载与维护代码 | `~/soft/coragent/libexec/maintenance/` |
 | 主配置与凭据 | `~/soft/coragent/config/` |
 | 安装记录、Host 状态、会话、日志、缓存 | `~/soft/coragent/state/` |
 | 研究工作区与 Job 文件 | `~/DATA/coragent/workspaces/` |
@@ -24,6 +25,8 @@ CoRAgent 采用一份主配置 `config.toml` 和相邻的 `credentials.json`。
 `generated/` 及 `pi/agent/models.json` 是组件需要的生成文件，不能作为第二份配置修改。
 配置只沿一个方向流动：校验待安装设置，保存 `config.toml` 和 `credentials.json`，再生成组件输入。
 安装器不会从生成文件反向推断用户设置。
+
+各子目录职责、维护工具的旧路径迁移和运行环境位置见[安装布局](APP_LAYOUT.zh-CN.md)。
 
 ## 准备配置
 
@@ -106,6 +109,8 @@ password = "credential:smtp_password"
 模型和通知设置修改后重启 Host 生效；服务范围、Web 地址等服务设置修改后，重新运行安装器应用。
 同一安装的更新复用主配置，通过本地维护记录保护服务停止、版本切换与失败恢复。
 激活前失败恢复原配置和版本；激活后失败保留新状态，重新运行安装器修复。
+新版安装器会将维护工具更新到 `libexec/maintenance/`，完整写入并更新卸载入口后清理旧的
+`runtimes/maintenance/`。仅更新维护工具不代表 `current` 指向的主程序版本已升级。
 
 ```sh
 python3 /absolute/coragent/current/agent/packaging/coragent_packaging/installer/app_layout_doctor.py \
@@ -148,11 +153,14 @@ fed1/fed2 共享软件时，在有写权限的节点安装一次，两个节点�
 未完成作业会阻止卸载，除非传入 `--cancel-qrun-jobs`；`--purge-qrun-state`
 可删除队列历史。`--purge-all` 包含历史清理，但不隐含取消作业。
 它不会清理独立计算环境、独立管理的 Qrun 或 TRI。卸载只删除选定配置文件，不递归删除其父目录中的其他文件。
-卸载器的必要解析代码随安装保存，因此删除源码检出后仍可卸载。
+安装根下的 `uninstall.sh` 使用 `libexec/maintenance/` 中的独立代码，因此删除源码检出后仍可卸载。
+未指定 `--install-root`、`--config` 或 `CORAGENT_CONFIG` 时，维护工具会从自身位置推断安装根；
+显式参数和配置仍优先。默认卸载保留维护工具，`--purge-config` 同时删除维护目录与该卸载入口，
+并清理旧的 `runtimes/maintenance/`。
+
+备份默认保留，只有 `--purge-backups` 或 `--purge-all` 才会删除。安装根内存在备份或受管队列时，`--remove-root` 还要求对应的备份、队列清理选项。普通卸载保留目录内的配置、任务数据和队列历史。
 
 ## 测试
 
 所有本机测试安装、环境、缓存、临时文件和证据必须位于项目的 `local_debug/`，使用本地确定性
 模型与假凭据。测试结束后停止并删除测试服务。该目录不得进入 Git、发布包、外部缓存或附件。
-
-备份默认保留，只有 `--purge-backups` 或 `--purge-all` 才会删除。安装根内存在备份或受管队列时，`--remove-root` 还要求对应的备份、队列清理选项。普通卸载保留目录内的配置、任务数据和队列历史。

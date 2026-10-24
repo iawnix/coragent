@@ -6,6 +6,7 @@ CoRAgent 使用唯一的 Pi Harness。目录按运行职责与发行阶段划分
 | --- | --- |
 | `apps/agent/` | Pi Agent、Host、终端、任务控制、研究上下文和业务工具适配 |
 | `apps/cli/` | Python 命令行入口及选择托管解释器的最小启动代码 |
+| `libexec/` | Host 服务启动脚本 `coragent-host` |
 | `apps/web/` | 可选、独立发行的只读研究浏览器 |
 | `apps/relay/` | 独立运行的 Link 中继服务 |
 | `backend/src/research_agent/` | 单一 Python 业务包 |
@@ -44,6 +45,10 @@ CoRAgent 使用唯一的 Pi Harness。目录按运行职责与发行阶段划分
 ## 启动与发行
 
 CLI 的解释器选择代码位于 `apps/cli/_bootstrap.py`；选定托管解释器后，业务命令从已安装 wheel 导入。源码安装与尚未安装环境时的引导逻辑归 `packaging/coragent_packaging/installer/`，不要求先运行业务应用。
+
+源码的 `libexec/coragent-host` 随 Agent 发行到 `current/agent/libexec/`。安装根下的
+`libexec/maintenance/` 则由安装器生成，保存可独立使用的卸载代码及必要依赖；其源码仍在
+`packaging/coragent_packaging/installer/` 等目录维护。安装后的目录关系见[安装布局](APP_LAYOUT.zh-CN.md)。
 
 `packaging/` 本身不是 Python 包，避免覆盖第三方 `packaging` 库。打包工具统一使用 `coragent_packaging` 命名空间，其下按 `installer`、`build`、`manifests` 和 `pi` 分组，避免与科学脚本中的同名模块冲突；直接执行的入口显式设置工具导入路径。产品应用不导入这些工具模块。
 

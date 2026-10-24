@@ -21,12 +21,12 @@
   current -> releases/<id>
   releases/<id>/             # 应用代码和随包 Skill
   runtimes/pi/<commit>/      # 固定 Pi 运行时
-  runtimes/maintenance/      # 独立卸载和恢复程序
+  libexec/maintenance/       # 独立卸载和恢复程序
   host-envs/                 # Host Python 环境的默认存储目录
   config/                   # 下述配置目录
   state/                    # 下述状态根目录
   generated/                # 生成的组件配置
-  jobs/                     # 本机 Qrun 计算文件
+  jobs/                     # 安装级预留 Job 目录
   backups/                  # 保留的安装备份
 
 <configuration_directory>/
@@ -49,6 +49,17 @@
   operations/
   artifacts/
 ```
+
+`libexec/maintenance/` 保存卸载器及其配置解析、服务和队列清理所需的 Python 模块，由安装根下的
+`uninstall.sh` 加载。它独立于 `releases/`，删除源码检出或清理程序版本后仍可使用；自身不运行后台服务，
+也不包含完整 Python 环境。源码位于 `packaging/coragent_packaging/installer/` 等目录，安装器只复制所需文件。
+
+升级时先写完整的新维护代码，再更新卸载入口，最后删除旧的 `runtimes/maintenance/`。
+安装和卸载脚本仍可从旧位置加载维护入口。默认卸载保留维护工具，`--purge-config` 会清理新旧两处
+维护目录和安装根下的 `uninstall.sh`。完整卸载选项见[安装与运维](INSTALLATION.zh-CN.md#卸载)。
+
+主程序版本由 `current` 指向的发行版决定。单独更新维护工具不会切换该发行版；完整安装器升级仍会执行
+服务停止、版本切换和服务恢复，涉及受管 Qrun 代码更新时需先排空队列。
 
 上图是默认布局。如果 `paths.state_root` 位于软件根之外，`generated/`、`jobs/`、
 `backups/` 会改为该状态根下的目录。通过下方 layout doctor 获取实际解析路径。
@@ -89,4 +100,4 @@ python3 -B packaging/coragent_packaging/installer/app_layout_doctor.py --config 
 `.pi/` 和 `.agents/` 不会自动迁移；重新部署时应保留原有数据。
 卸载选项和归属规则见[安装与运维](INSTALLATION.zh-CN.md)。
 
-已有的分离式配置和状态目录仍受支持，不会自动搬迁。仅允许软件根下专用的 `config/`、`state/` 与软件根嵌套，数据不得放进 `releases/` 或 `current`。迁移必须先停止服务，并同步更新归属记录、队列配置和服务路径。
+已有的分离式配置和状态目录仍受支持，不会自动搬迁。仅允许软件根下专用的 `config/`、`state/` 与软件根嵌套，数据不得放进 `releases/` 或 `current`。迁移软件根、配置根或状态根前必须停止服务，并同步更新归属记录、队列配置和服务路径。

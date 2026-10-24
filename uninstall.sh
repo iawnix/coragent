@@ -7,7 +7,10 @@ SCRIPT_ROOT=""
 if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
   SCRIPT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 fi
-for candidate in "${SCRIPT_ROOT}/packaging/coragent_packaging/installer/installer.py" "${SCRIPT_ROOT}/runtimes/maintenance/packaging/coragent_packaging/installer/installer.py"; do
+for candidate in \
+  "${SCRIPT_ROOT}/packaging/coragent_packaging/installer/installer.py" \
+  "${SCRIPT_ROOT}/libexec/maintenance/packaging/coragent_packaging/installer/installer.py" \
+  "${SCRIPT_ROOT}/runtimes/maintenance/packaging/coragent_packaging/installer/installer.py"; do
   if [[ -f "${candidate}" ]]; then
     if [[ ! -t 0 ]] && { true </dev/tty; } 2>/dev/null; then
       exec python3 -B "${candidate}" uninstall "$@" </dev/tty

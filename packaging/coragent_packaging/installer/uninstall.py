@@ -59,6 +59,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
+    if not args.install_root and not args.config and not os.environ.get("CORAGENT_CONFIG"):
+        bundled = Path(__file__).resolve()
+        if bundled.parents[3].name == "maintenance" and bundled.parents[4].name in {"libexec", "runtimes"}:
+            args.install_root = str(bundled.parents[5])
     from coragent_packaging.installer._configuration import apply
     apply(args, validate_credentials=False)
     return args
@@ -84,7 +88,7 @@ def validate_root(path: Path) -> Path:
     resolved = path.expanduser().resolve()
     if resolved == Path("/") or resolved == Path.home() or resolved == Path.home().parent:
         raise ValueError(f"refusing to remove broad path: {resolved}")
-    for relative in ("releases", "runtimes"):
+    for relative in ("releases", "runtimes", "libexec"):
         if (resolved / relative).is_symlink():
             raise ValueError(f"installation state directory cannot be a symbolic link: {resolved / relative}")
     installation_identity(resolved)
@@ -410,7 +414,7 @@ def uninstall(args: argparse.Namespace, *, show_progress: bool = False) -> dict[
                 managed.append(env_root)
             managed.append(app_paths(root).state / 'installation/python')
         if args.purge_config:
-            managed.extend([app_paths(root).pi_config, app_paths(root).marker, app_paths(root).locator, app_paths(root).config_file, app_paths(root).credentials, app_paths(root).generated, root / "runtimes/maintenance", root / "uninstall.sh", app_paths(root).state / 'host/link.json', app_paths(root).state / 'host/host.token'])
+            managed.extend([app_paths(root).pi_config, app_paths(root).marker, app_paths(root).locator, app_paths(root).config_file, app_paths(root).credentials, app_paths(root).generated, root / "libexec/maintenance", root / "runtimes/maintenance", root / "uninstall.sh", app_paths(root).state / 'host/link.json', app_paths(root).state / 'host/host.token'])
         if getattr(args, 'purge_backups', False):
             managed.append(layout.backups)
         if args.purge_workspaces:
@@ -469,9 +473,7 @@ def main(argv: list[str] | None = None) -> int:
                 raise RuntimeError("interactive uninstall requires a TTY; use --non-interactive --yes")
             title("CoRAgent Uninstaller", "Remove CoRAgent while keeping research data by default.", tone="warning")
         if not args.install_root and not args.non_interactive:
-            bundled = Path(__file__).resolve()
-            default = str(bundled.parents[5]) if bundled.parents[3].name == "maintenance" and bundled.parents[4].name == "runtimes" else str(Path.home() / "soft/coragent")
-            args.install_root = ask("CoRAgent installation directory", default)
+            args.install_root = ask("CoRAgent installation directory", str(Path.home() / "soft/coragent"))
         if not args.install_root:
             raise ValueError("--install-root is required")
         result = uninstall(args, show_progress=not args.json)
