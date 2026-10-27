@@ -3420,7 +3420,7 @@
               }
             },
             "additionalProperties": false,
-            "description": "Explicitly authorize another identical execution: identify the matching predecessor_job_id and explain reason and budget. Use a new request/work identity; replaying the same request still reuses its Job. On duplicate_execution normally use the returned job_id with job_status/job_collect."
+            "description": "Explicitly authorize another identical execution after its predecessor has settled: identify predecessor_job_id and explain reason and budget. Direct submissions use a new request_id while retaining work_id for retries. Prepared submissions derive an idempotent attempt identity from repeat without editing the request file or work_id. Replaying the same request/repeat reuses its Job. On duplicate_execution normally use the returned job_id with job_status/job_collect."
           },
           "prepared_ref": {
             "type": "string"
@@ -3527,13 +3527,29 @@
                 "type": "object",
                 "properties": {
                   "max_in_flight": {
-                    "type": "integer",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
                     "minimum": 1,
-                    "maximum": 1000
+                    "maximum": 1000,
+                    "description": "Optional task concurrency cap. Omitted/null delegates concurrency to configured entries and schedulers. Unknown/conflicting Jobs retain their slot."
                   },
                   "max_attempts": {
-                    "type": "integer",
-                    "minimum": 1
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1,
+                    "description": "Legacy field name for an optional cumulative Job creation cap, including successful Jobs. Omitted/null means no task total cap. This is not a retry limit."
+                  },
+                  "max_retries_per_work": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "description": "Optional retries per stable work_id after its initial Job. Zero permits only the initial Job; omitted/null imposes no retry cap. Distinct work does not consume this allowance."
                   }
                 },
                 "required": [
@@ -3732,6 +3748,61 @@
               "code",
               "job_id",
               "execution_fingerprint",
+              "recovery"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "accepted": {
+                "const": false
+              },
+              "code": {
+                "enum": [
+                  "execution_entry_capacity_reached",
+                  "execution_task_capacity_reached",
+                  "execution_task_job_limit_reached",
+                  "execution_work_retry_limit_reached"
+                ]
+              },
+              "scope": {
+                "enum": [
+                  "entry",
+                  "task",
+                  "work"
+                ]
+              },
+              "used": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "job_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^job_[1-9][0-9]*$"
+                }
+              },
+              "retryable": {
+                "type": "boolean"
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "accepted",
+              "code",
+              "scope",
+              "used",
+              "limit",
+              "job_ids",
+              "retryable",
               "recovery"
             ],
             "additionalProperties": false
@@ -4940,7 +5011,7 @@
               }
             },
             "additionalProperties": false,
-            "description": "Explicitly authorize another identical execution: identify the matching predecessor_job_id and explain reason and budget. Use a new request/work identity; replaying the same request still reuses its Job. On duplicate_execution normally use the returned job_id with job_status/job_collect."
+            "description": "Explicitly authorize another identical execution after its predecessor has settled: identify predecessor_job_id and explain reason and budget. Direct submissions use a new request_id while retaining work_id for retries. Prepared submissions derive an idempotent attempt identity from repeat without editing the request file or work_id. Replaying the same request/repeat reuses its Job. On duplicate_execution normally use the returned job_id with job_status/job_collect."
           }
         },
         "required": [
@@ -5099,7 +5170,7 @@
               }
             },
             "additionalProperties": false,
-            "description": "Explicitly authorize another identical execution: identify the matching predecessor_job_id and explain reason and budget. Use a new request/work identity; replaying the same request still reuses its Job. On duplicate_execution normally use the returned job_id with job_status/job_collect."
+            "description": "Explicitly authorize another identical execution after its predecessor has settled: identify predecessor_job_id and explain reason and budget. Direct submissions use a new request_id while retaining work_id for retries. Prepared submissions derive an idempotent attempt identity from repeat without editing the request file or work_id. Replaying the same request/repeat reuses its Job. On duplicate_execution normally use the returned job_id with job_status/job_collect."
           },
           "prepared_ref": {
             "type": "string"

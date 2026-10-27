@@ -44,6 +44,14 @@ test('task action contracts require their own payloads and reject ignored fields
   const base={expected_revision:1};
   check('task_update',{...base,action:'bind_execution'});
   check('task_update',{...base,action:'bind_execution',execution_target:{platform:'Com30',scheduler_entry:'qrun'}});
+  const adjust={...base,action:'set_execution_limits',source_submission_ids:['12'],reason:'User raised the limit',
+    execution_limits:{max_attempts:null,max_in_flight:4,max_retries_per_work:0}};
+  check('task_update',adjust);
+  for (const execution_limits of [{}, {max_attempts:0}, {max_retries_per_work:-1}, {max_in_flight:1.5}, {placements:[]}])
+    assert.throws(()=>check('task_update',{...adjust,execution_limits}));
+  assert.throws(()=>check('task_update',{...adjust,execution_target:{platform:'Com30'}}));
+  assert.throws(()=>check('task_update',{...base,action:'set_execution_limits',execution_limits:{max_attempts:null}}));
+  assert.throws(()=>check('task_update',{...base,action:'bind_execution',execution_limits:{max_attempts:null}}));
   for (const [field,value] of [['source_submission_ids',['12']],['objective','Ignored scope'],['reason','Ignored reason'],['execution_plan',{items:[]}]]) {
     assert.throws(()=>check('task_update',{...base,action:'bind_execution',[field]:value}));
   }

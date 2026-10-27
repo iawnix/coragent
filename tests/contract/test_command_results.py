@@ -108,6 +108,9 @@ def test_result_schemas_cover_non_success_variants():
     checked('job_start', {'job_id': 'job_fixture', 'state': 'unknown', 'error': 'dispatch uncertain'})
     checked('job_start', {'job_id': 'job_fixture', 'accepted': False, 'code': 'duplicate_execution',
                           'execution_fingerprint': 'fixture-digest', 'recovery': 'Reuse existing job'})
+    checked('job_start', {'accepted': False, 'code': 'execution_task_capacity_reached', 'scope': 'task',
+                          'used': 1, 'limit': 1, 'job_ids': ['job_1'], 'retryable': True,
+                          'recovery': 'Wait for the occupying Job, then resume the request'})
     checked('job_status', {'job_id': 'job_fixture', 'platform': 'local', 'state': 'unknown', 'error': 'No receipt'})
     checked('job_probe', {'platform': 'unconfigured', 'available': False, 'reason': 'No adapter'})
     checked('job_probe', {'platform': 'remote', 'available': False, 'transport': 'ssh',

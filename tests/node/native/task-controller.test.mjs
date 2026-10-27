@@ -729,7 +729,7 @@ for (const mode of ["all", "any"]) test(`completed ${mode} waits release Job bin
     assert.ok((await harness.snapshot(LiveDoc, conversation.id, context)).run);
     task = await controller.current(context);
     assert.equal(task.state, "active"); assert.equal(task.wait, null);
-    assert.deepEqual(await controller.binding(context), { user_task_id: task.user_task_id, execution_context: { selection: { target: { platform: "local", scheduler_entry: "main" }, route_digest: "sha256:" + "a".repeat(64) }, policy: { max_in_flight: 1, max_attempts: 100 } } });
+    assert.deepEqual(await controller.binding(context), { user_task_id: task.user_task_id, execution_context: { selection: { target: { platform: "local", scheduler_entry: "main" }, route_digest: "sha256:" + "a".repeat(64) }, policy: { max_in_flight: null, max_attempts: null, max_retries_per_work: null } } });
     assert.equal(task.continuation.sequence, 1, "settling wait must not submit another run");
   } finally { finish(); }
   await conversation.waitForIdle(context);
@@ -831,7 +831,7 @@ test("transient wait status failure preserves user access and can recover", asyn
   await assert.rejects(controller.binding(context), { code: "task_not_active" });
   assert.equal(controller.health().error.code, "task_wait_observation_failed");
   kernel.execute_command = execute; jobStates.set("job_1", "succeeded");
-  assert.deepEqual(await controller.binding(context), { user_task_id: task.user_task_id, execution_context: { selection: { target: { platform: "local", scheduler_entry: "main" }, route_digest: "sha256:" + "a".repeat(64) }, policy: { max_in_flight: 1, max_attempts: 100 } } });
+  assert.deepEqual(await controller.binding(context), { user_task_id: task.user_task_id, execution_context: { selection: { target: { platform: "local", scheduler_entry: "main" }, route_digest: "sha256:" + "a".repeat(64) }, policy: { max_in_flight: null, max_attempts: null, max_retries_per_work: null } } });
 });
 
 const transientFailure = () => ({ ...fauxAssistantMessage(""), stopReason: "error", errorMessage: "503 Service Unavailable" });
@@ -1324,7 +1324,7 @@ test("first calculation binding resolves once, survives recovery and cannot repl
   task = await f.controller.update(params, "bind-first-calculation", context);
   assert.equal(task.execution_selection.version, 1);
   assert.equal(task.execution_target.platform, "local");
-  assert.deepEqual((await f.controller.binding(context)).execution_context.policy, { max_in_flight: 1, max_attempts: 100 });
+  assert.deepEqual((await f.controller.binding(context)).execution_context.policy, { max_in_flight: null, max_attempts: null, max_retries_per_work: null });
   assert.deepEqual(await f.controller.update(params, "bind-first-calculation", context), task);
   await f.reopen();
   assert.deepEqual(codingExecutionContext(await f.controller.current(context)), (await f.controller.binding(context)).execution_context);
@@ -1393,7 +1393,7 @@ test("first execution plan atomically binds the requested destination and budget
   assert.deepEqual(codingExecutionContext(task), { unselected: true });
   task = await f.controller.update({ action: "select_execution_item", expected_revision: task.revision,
     execution_item_id: "compute" }, "first-item", context);
-  assert.deepEqual((await f.controller.binding(context)).execution_context.policy, { max_in_flight: 2, max_attempts: 6 });
+  assert.deepEqual((await f.controller.binding(context)).execution_context.policy, { max_in_flight: 2, max_attempts: 6, max_retries_per_work: null });
   assert.equal(codingExecutionContext(task).item.work_id, "compute");
 });
 
@@ -1422,7 +1422,7 @@ test("compute destination persists and only a new user source can change it", as
     source_submission_ids: [String(source.id)], execution_target: { platform: "local", scheduler_entry: "main" } }, "good-refine", context);
   const binding = (await f.controller.binding(context)).execution_context;
   assert.equal(binding.selection.target.platform, "local");
-  assert.deepEqual(binding.policy, { max_in_flight: 3, max_attempts: 7 });
+  assert.deepEqual(binding.policy, { max_in_flight: 3, max_attempts: 7, max_retries_per_work: null });
 });
 
 test("correcting a misread original target is distinct from changing user requirements", async t => {
@@ -1498,4 +1498,42 @@ test("execution plans release dependencies only for collected artifacts cited by
   assert.deepEqual((await f.controller.binding(context)).execution_context.item.input_artifact_ids, ["art_1"]);
   await f.reopen();
   assert.equal((await f.controller.read({ user_task_id: task.user_task_id }, context)).execution_plan.items[0].completion.artifact_ids[0], "art_1");
+});
+
+test("user-directed limits can change on an existing plan without replacing work or evidence", async t => {
+  const f = await fixture(t);
+  let task = await f.begin();
+  task = await f.controller.update({ action: "set_execution_plan", expected_revision: task.revision,
+    execution_plan: { items: [{ id: "compute", work_id: "compute", resources: { cpus: 1, memory_mb: 512 } }] } }, "plan-limits", context);
+  const plan = structuredClone(task.execution_plan), selection = structuredClone(task.execution_selection);
+  const oldSources = task.sources.map(source => source.submission_id);
+  await assert.rejects(f.controller.update({ action: "set_execution_limits", expected_revision: task.revision,
+    source_submission_ids: oldSources, execution_limits: { max_attempts: null }, reason: "Invented permission" }, "limits-no-source", context),
+  { code: "task_source_required" });
+  f.jobStates.set("job_1", "failed");
+  f.jobStates.set("job_2", "unknown");
+  task = await f.controller.update({ action: "block", expected_revision: task.revision,
+    block_kind: "budget_exhausted", reason: "Explicit execution limit reached", resume_when: "User adjusts execution limits",
+    evidence_refs: ["job_1"] }, "blocked-limits", context);
+  f.faux.setResponses([fauxAssistantMessage("Adjust the requested execution limits")]);
+  const source = await f.admission.submitUser({ requestId: "raise-limits", content: "Remove the cumulative Job cap, allow 4 concurrent Jobs and 2 retries per work; continue the existing plan." }, context);
+  await f.conversation.waitForIdle(context);
+  task = await f.controller.current(context);
+  const params = { action: "set_execution_limits", expected_revision: task.revision, source_submission_ids: [String(source.id)],
+    execution_limits: { max_attempts: null, max_in_flight: 4, max_retries_per_work: 2 }, reason: "Apply the user's requested limits",
+    next_action: "Reconcile job_2 before retrying compute." };
+  await assert.rejects(f.controller.update({ ...params, expected_revision: task.revision - 1 }, "stale-limits", context),
+    { code: "task_revision_conflict" });
+  const updated = await f.controller.update(params, "update-limits", context);
+  assert.equal(updated.state, "active");
+  assert.deepEqual(updated.execution_plan, plan);
+  assert.deepEqual(updated.execution_selection, selection);
+  assert.equal(updated.user_task_id, task.user_task_id);
+  assert.equal(updated.audit.at(-1).execution_limits_after.max_in_flight, 4);
+  assert.deepEqual(updated.audit.at(-1).source_submission_ids, [String(source.id)]);
+  assert.deepEqual(await f.controller.update(params, "update-limits", context), updated, "replaying adjustment is idempotent");
+  await f.reopen();
+  const read = await f.controller.current(context);
+  assert.deepEqual(read.execution_usage, { limits: params.execution_limits, jobs_created: 2, in_flight: 1, in_flight_job_ids: ["job_2"] });
+  assert.deepEqual(read.execution_plan, plan);
 });

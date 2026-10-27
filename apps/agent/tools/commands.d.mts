@@ -155,8 +155,9 @@ export interface CommandParameters {
         "route_digest": string;
       };
       "policy": {
-        "max_in_flight": number;
-        "max_attempts": number;
+        "max_in_flight": number | null;
+        "max_attempts": number | null;
+        "max_retries_per_work"?: number | null;
       };
       "item"?: {
         "id": string;
@@ -711,6 +712,15 @@ export interface CommandResults {
     "code": "duplicate_execution";
     "job_id": string;
     "execution_fingerprint": string;
+    "recovery": string;
+  } | {
+    "accepted": false;
+    "code": "execution_entry_capacity_reached" | "execution_task_capacity_reached" | "execution_task_job_limit_reached" | "execution_work_retry_limit_reached";
+    "scope": "entry" | "task" | "work";
+    "used": number;
+    "limit": number;
+    "job_ids": Array<string>;
+    "retryable": boolean;
     "recovery": string;
   };
   "job_status": {

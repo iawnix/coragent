@@ -3,6 +3,29 @@ import { resolveTaskSelection } from "./execution-selection.mjs";
 const key = target => `${target.platform}/${target.scheduler_entry}`;
 const fail = message => { throw Object.assign(new Error(message), { code: "execution_plan_invalid" }); };
 
+export function executionLimits(policy) {
+  return { max_in_flight: policy?.max_in_flight ?? null, max_attempts: policy?.max_attempts ?? null,
+    max_retries_per_work: policy?.max_retries_per_work ?? null };
+}
+
+export function validateExecutionLimits(limits) {
+  if (!limits || typeof limits !== "object" || Array.isArray(limits) || !Object.keys(limits).length)
+    fail("Supply at least one execution limit; null explicitly removes that limit");
+  for (const [key, value] of Object.entries(limits)) {
+    if (!Object.hasOwn(executionLimits(null), key) || value !== null && (!Number.isSafeInteger(value)
+      || value < (key === "max_retries_per_work" ? 0 : 1) || key === "max_in_flight" && value > 1000))
+      fail("Invalid execution limit: " + key);
+  }
+  return { ...limits };
+}
+
+export function projectExecutionUsage(task, jobs) {
+  const inFlight = jobs.filter(job => !["succeeded", "failed", "timed_out", "cancelled"].includes(job.state)
+    || job.execution_conflict);
+  return { limits: executionLimits(task.execution_policy), jobs_created: jobs.length,
+    in_flight: inFlight.length, in_flight_job_ids: inFlight.map(job => job.job_id) };
+}
+
 export async function resolveTaskExecution(kernel, params, sources, previous = null) {
   const selection = await resolveTaskSelection(kernel, { ...params,
     execution_target: params.execution_target || (params.execution_intent && previous?.execution_target
@@ -10,8 +33,7 @@ export async function resolveTaskExecution(kernel, params, sources, previous = n
   sources, previous?.execution_selection);
   const policy = await resolveExecutionPolicy(kernel, params.execution_policy, selection, sources);
   if (!params.execution_policy && previous?.execution_policy) {
-    policy.max_in_flight = previous.execution_policy.max_in_flight;
-    policy.max_attempts = previous.execution_policy.max_attempts;
+    Object.assign(policy, executionLimits(previous.execution_policy));
   }
   return { selection, policy };
 }
@@ -22,7 +44,7 @@ export async function resolveExecutionPolicy(kernel, policy, selection, sources)
   if (new Set(selections.map(item => key(item.target))).size !== selections.length) fail("Duplicate policy placement");
   if (!selections.some(item => key(item.target) === key(selection.target))) fail("Default placement must be allowed by the policy");
   selections.sort((a, b) => Number(key(b.target) === key(selection.target)) - Number(key(a.target) === key(selection.target)));
-  return { selections, max_in_flight: policy?.max_in_flight ?? 1, max_attempts: policy?.max_attempts ?? 100,
+  return { selections, ...executionLimits(policy),
     automatic_placement: policy?.automatic_placement ?? false };
 }
 
@@ -106,7 +128,10 @@ export function executionItemContext(task, id) {
     "Bind the task with task_update action=bind_execution before preparing or submitting a calculation"),
   { code: "execution_selection_required" });
   const pinned = selection => ({ target: selection.target, route_digest: selection.route_digest });
-  const policy = { max_in_flight: task.execution_policy.max_in_flight, max_attempts: task.execution_policy.max_attempts };
+  const policy = executionLimits(task.execution_policy);
+  // Preserve the transport shape of legacy tasks whose request digests include
+  // the full policy. New tasks explicitly persist all three limits.
+  if (!Object.hasOwn(task.execution_policy, "max_retries_per_work")) delete policy.max_retries_per_work;
   if (!task.execution_plan) return { selection: pinned(task.execution_selection), policy };
   const item = task.execution_plan.items.find(row => row.id === id);
   if (!item) fail("Select an execution item before preparation or submission");

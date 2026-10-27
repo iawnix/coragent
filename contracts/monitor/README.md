@@ -82,8 +82,9 @@ type UserTask = {
   execution_selection: ExecutionSelection | null;
   execution_policy: {
     selections: ExecutionSelection[];
-    max_in_flight: number;
-    max_attempts: number;
+    max_in_flight: number | null;
+    max_attempts: number | null; // Explicit cumulative Job cap, including successes.
+    max_retries_per_work?: number | null; // Extra attempts for a stable work_id.
     automatic_placement: boolean;
   } | null;
   research: { entry_node_ids: string[]; focus_node_ids: string[] };

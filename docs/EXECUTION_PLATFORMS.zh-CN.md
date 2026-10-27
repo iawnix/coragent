@@ -66,10 +66,25 @@ execution 字段，原子保存未绑定任务的位置与计划；已绑定任�
 Job Manager 仍是实际作业状态的唯一来源；task_read 的 execution_progress 展示依赖、
 原生执行状态、collecting 与 validating 阶段。
 
-任务的 max_in_flight／max_attempts，以及入口 limits.max_in_flight，在同一工作区事务锁内检查。
-入口在途限制作用于该工作区；跨工作区的资源池由 Qrun／原调度器统一控制。
-unknown 或状态冲突的 Job 继续占名额。失去提交回执时核对原身份，禁止盲目重提。
-计划不能修改或删除已提交的工作项；明确重算使用新工作项与 work_id，并保留前驱和预算约束。
+任务限制均为显式可选策略：max_in_flight、max_attempts、max_retries_per_work 省略或为 null，
+分别表示不额外限制任务并发数、累计 Job 数、同一工作项重试数。max_attempts 保留旧字段名，
+表示包含成功计算在内的累计 Job 数，不是失败重试额度。重试限制要求稳定 work_id，0 表示只允许首次执行。
+旧任务已有的数值限制保留，不会自动清除。任务与入口限额仍在同一工作区事务锁内检查，
+跨工作区的资源池由 Qrun／原调度器控制；unknown 或状态冲突的 Job 继续占名额。
+并发占满返回 accepted:false、execution_task_capacity_reached 或 execution_entry_capacity_reached，
+以及实际用量、上限和占位 Job ID，不创建或排入新 Job。继续独立工作；没有独立工作时，
+用 task_update action=wait 等待本任务已有 Job，再恢复同一请求。未知／冲突状态先核实。
+显式累计额度和重试额度分别返回 execution_task_job_limit_reached、execution_work_retry_limit_reached。
+task_read.execution_usage 展示限制、累计用量和占位 Job。
+
+通过 task_update action=set_execution_limits 提交 execution_limits、当前版本、原因和新的用户
+source_submission_ids，可在保留计划的情况下调整限额；省略字段保持原值，null 清除限制。
+审计记录保留调整前后数值与用户来源，原 Job、产物和位置不变。budget_exhausted 阻塞可随调整恢复，
+其它阻塞和暂停状态不会被解除。确认 failed／timed_out／cancelled 的工作项可沿用 item/work_id，
+使用新请求身份重试；相同计算仍须声明 repeat 的前驱、原因和预算。成功或执行结果不明的项不能这样重试，
+已提交计划项的定义仍不可修改或删除。
+对于已准备的文件／引用，repeat 自动派生稳定的尝试身份，保留原请求字节和 work_id；
+重复同一声明复用该次 Job，再次重试则引用上一次 Job 作为前驱。
 
 可选 automatic_placement=true 只允许在用户授权位置内，从工作项明确给定的 candidates 选择。
 工作项还须声明 backend 和 CPU／内存需求。选择要求绑定存在、空闲资源已知且足够，排除暂停／过期

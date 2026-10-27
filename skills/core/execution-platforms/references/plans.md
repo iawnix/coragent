@@ -20,7 +20,8 @@ When an unbound Task needs calculation, bind its default and explicitly permitte
        "intent": {"source_submission_id": "1", "source_text": "Use FEDCluster with Tri"}}
     ],
     "max_in_flight": 4,
-    "max_attempts": 100
+    "max_attempts": null,
+    "max_retries_per_work": null
   }
 }
 ```
@@ -36,12 +37,12 @@ Submitted/completed items cannot be changed or removed by a plan revision.
 For an unbound task, the first `set_execution_plan` can include the execution target, intent and policy to
 bind them atomically with the plan; omitting them resolves the configured default under the task's user
 constraints. A failed plan leaves the task unbound. A bound task's plan uses its existing policy; change
-that policy with `refine` and a new user source before creating a plan. An existing plan pins its policy.
+that policy with `refine` and a new user source before creating a plan. An existing plan pins placement policy. Numeric limits can still change through `set_execution_limits`.
 
 Select a ready item with task_update action=select_execution_item and execution_item_id. Preparation bash
 receives its trusted CORAGENT_TASK_EXECUTION context; ordinary commands still run locally. Prepare with the
 item's work identity, input artifacts and resources. Submit the returned request unchanged. Runtime enforces
-the context, task/entry in-flight limits and attempt budget. An unknown Job still occupies a slot.
+the context and any explicitly configured concurrency, total-Job and per-work retry limits. An unknown Job still occupies a slot.
 
 Use task_read execution_progress for ready/blocked items and their Job states. Dispatch independent ready
 items within the budget; wait through the existing task workflow when all remaining work is blocked on Jobs.
@@ -55,8 +56,12 @@ Validation Results must cite every handoff Artifact in inputs or evidence_refs. 
 requires recollection, not another scientific execution. Native exit success alone does not release dependencies.
 
 Pause stops new dispatch; cancellation distinguishes retaining Jobs from requesting their cancellation.
-Preserve submitted work and evidence in plan revisions. Deliberate recalculation uses a new item and work_id;
-identical computation also requires the existing job_start repeat predecessor/reason/budget contract.
+Preserve submitted work and evidence in plan revisions. Retry a settled failed/timed-out/cancelled item with
+the same item/work_id and a new request identity; it consumes only that work's retry allowance. Never evade
+a retry cap by renaming the work. Identical computation also requires the job_start repeat predecessor/reason/budget
+contract. Successful items require collection/validation, not automatic resubmission.
+For prepared files/references, supply `repeat` with the settled predecessor. The runtime derives a stable
+attempt identity; preserve the original request bytes and work_id. Repeating that declaration reuses its Job.
 
 For optional automatic placement set execution_policy.automatic_placement=true. An item supplies backend
 and candidates instead of target. Every candidate must belong to the pinned policy. Selection requires
@@ -65,3 +70,26 @@ for earlier allocations in the same plan. It records a placement_reason; prepara
 Unknown capacity (including GPU and current non-Qrun handlers) cannot justify automatic placement.
 Use explicit placement for those entries. max_in_flight limits admission in the workspace; the underlying
 scheduler/Qrun pool controls shared capacity across workspaces.
+
+Task limits default to null (no extra task cap). The example explicitly opts into four concurrent Jobs.
+`max_attempts` is the legacy name for cumulative Jobs, including successful work; it is independent of
+`max_retries_per_work`. A retry cap of zero allows only the initial Job. Existing numeric policies are preserved.
+Read `task_read.execution_usage` for current limits and usage. Capacity responses carry occupying Job IDs
+and create no new Job; continue independent work or wait for owned Jobs with `mode=any`, then retry the
+same request after capacity becomes available. Reconcile unknown/conflicting Jobs first.
+
+To adjust limits on an existing plan, cite the user's new instruction and use the current revision:
+
+```json
+{
+  "action": "set_execution_limits",
+  "expected_revision": 4,
+  "source_submission_ids": ["2"],
+  "reason": "The user requested removal of the cumulative Job cap",
+  "execution_limits": {"max_attempts": null}
+}
+```
+
+Omitted limits stay unchanged. This preserves Jobs, artifacts, plan definitions and placements, records
+old/new limits in the audit, and resumes a task blocked for `budget_exhausted`. It does not resume unrelated
+blockers or paused tasks. A new task or manual record edits are unnecessary.

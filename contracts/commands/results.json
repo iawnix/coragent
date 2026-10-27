@@ -2433,6 +2433,61 @@
         "file_mode"
       ],
       "additionalProperties": false
+    },
+    "JobAdmissionDeferred": {
+      "type": "object",
+      "properties": {
+        "accepted": {
+          "const": false
+        },
+        "code": {
+          "enum": [
+            "execution_entry_capacity_reached",
+            "execution_task_capacity_reached",
+            "execution_task_job_limit_reached",
+            "execution_work_retry_limit_reached"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "entry",
+            "task",
+            "work"
+          ]
+        },
+        "used": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "job_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^job_[1-9][0-9]*$"
+          }
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "recovery": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "accepted",
+        "code",
+        "scope",
+        "used",
+        "limit",
+        "job_ids",
+        "retryable",
+        "recovery"
+      ],
+      "additionalProperties": false
     }
   },
   "commands": {
@@ -2499,6 +2554,9 @@
         },
         {
           "$ref": "results.json#/definitions/JobDuplicate"
+        },
+        {
+          "$ref": "results.json#/definitions/JobAdmissionDeferred"
         }
       ]
     },

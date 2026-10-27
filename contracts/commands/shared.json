@@ -595,7 +595,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Direct submission work identity. For an intentional recalculation of a prepared request, rerun preparation with a new --work-id; do not override this field alongside request_file/prepared_ref."
+          "description": "Direct submission logical work identity. Retain it when retrying the same failed work so its retry allowance remains meaningful. Prepared requests own this field; do not override it alongside request_file/prepared_ref."
         },
         "repeat": {
           "type": "object",
@@ -620,7 +620,7 @@
             }
           },
           "additionalProperties": false,
-          "description": "Explicitly authorize another identical execution: identify the matching predecessor_job_id and explain reason and budget. Use a new request/work identity; replaying the same request still reuses its Job. On duplicate_execution normally use the returned job_id with job_status/job_collect."
+          "description": "Explicitly authorize another identical execution after its predecessor has settled: identify predecessor_job_id and explain reason and budget. Direct submissions use a new request_id while retaining work_id for retries. Prepared submissions derive an idempotent attempt identity from repeat without editing the request file or work_id. Replaying the same request/repeat reuses its Job. On duplicate_execution normally use the returned job_id with job_status/job_collect."
         },
         "request_file": {
           "type": "string",
@@ -1181,9 +1181,10 @@
             "correct_execution",
             "set_execution_plan",
             "select_execution_item",
-            "complete_execution_item"
+            "complete_execution_item",
+            "set_execution_limits"
           ],
-          "description": "refine requires source_submission_ids; progress requires evidence_refs; wait requires wait and next_action; block requires reason, block_kind and resume_when; all kinds except missing_user_input also require evidence_refs; propose_completion requires completion; set_research requires research. Send only the fields for the selected action. apply_user_control applies an explicit user pause/resume/cancel instruction with control and source_submission_ids; cancel also requires jobs. correct_execution fixes an incorrect target interpretation using an original task source, execution_intent and reason; it does not authorize a new destination. bind_execution fixes the first calculation destination using the existing task sources; call it before preparation or direct job_start. With no target it resolves the configured default subject to the original user constraints. set_execution_plan also binds an unbound task. Once bound, destination changes still require refine or correct_execution."
+          "description": "refine requires source_submission_ids; progress requires evidence_refs; wait requires wait and next_action; block requires reason, block_kind and resume_when; all kinds except missing_user_input also require evidence_refs; propose_completion requires completion; set_research requires research. Send only the fields for the selected action. apply_user_control applies an explicit user pause/resume/cancel instruction with control and source_submission_ids; cancel also requires jobs. correct_execution fixes an incorrect target interpretation using an original task source, execution_intent and reason; it does not authorize a new destination. bind_execution fixes the first calculation destination using the existing task sources; call it before preparation or direct job_start. With no target it resolves the configured default subject to the original user constraints. set_execution_plan also binds an unbound task. Once bound, destination changes still require refine or correct_execution. set_execution_limits adjusts only numeric limits, including for an existing plan; cite new user source_submission_ids and a reason. Null removes a limit. It preserves placements, Jobs and artifacts."
         },
         "reason": {
           "type": "string",
@@ -1252,7 +1253,7 @@
           "minItems": 1,
           "uniqueItems": true,
           "maxItems": 32,
-          "description": "refine or apply_user_control: actual user submission IDs as decimal strings, from runtime_control. For task control, cite the latest actual user instruction consumed by the current run; internal continuations, quotations and historical sources are not new authorization. For refine, a new instruction resolving a blocker reactivates work; a question alone does not."
+          "description": "refine or apply_user_control: actual user submission IDs as decimal strings, from runtime_control. For task control, cite the latest actual user instruction consumed by the current run; internal continuations, quotations and historical sources are not new authorization. For refine, a new instruction resolving a blocker reactivates work; a question alone does not. set_execution_limits also requires new user instructions authorizing the adjustment."
         },
         "evidence_refs": {
           "type": "array",
@@ -1611,6 +1612,9 @@
           },
           "minItems": 1,
           "maxItems": 1000
+        },
+        "execution_limits": {
+          "$ref": "shared.json#/definitions/execution_limits"
         }
       },
       "required": [
@@ -2133,6 +2137,50 @@
               "artifact_ids": false
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "set_execution_limits"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "required": [
+              "execution_limits",
+              "source_submission_ids",
+              "reason"
+            ],
+            "properties": {
+              "block_kind": false,
+              "resume_when": false,
+              "objective": false,
+              "criteria": false,
+              "evidence_refs": false,
+              "wait": false,
+              "completion": false,
+              "research": false,
+              "control": false,
+              "jobs": false,
+              "execution_target": false,
+              "execution_intent": false,
+              "completion_outcome": false,
+              "stop_basis": false,
+              "execution_policy": false,
+              "execution_plan": false,
+              "execution_item_id": false,
+              "artifact_ids": false
+            }
+          },
+          "else": {
+            "properties": {
+              "execution_limits": false
+            }
+          }
         }
       ]
     },
@@ -2235,23 +2283,37 @@
           "maxItems": 32
         },
         "max_in_flight": {
-          "type": "integer",
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 1,
-          "maximum": 1000
+          "maximum": 1000,
+          "description": "Optional task concurrency cap. Omitted/null delegates concurrency to configured entries and schedulers. Unknown/conflicting Jobs retain their slot."
         },
         "max_attempts": {
-          "type": "integer",
-          "minimum": 1
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "description": "Legacy field name for an optional cumulative Job creation cap, including successful Jobs. Omitted/null means no task total cap. This is not a retry limit."
         },
         "automatic_placement": {
           "type": "boolean",
           "description": "Allow resource-based selection only among explicit item candidates within the allowed placements."
+        },
+        "max_retries_per_work": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Optional retries per stable work_id after its initial Job. Zero permits only the initial Job; omitted/null imposes no retry cap. Distinct work does not consume this allowance."
         }
       },
       "required": [
-        "placements",
-        "max_in_flight",
-        "max_attempts"
+        "placements"
       ],
       "additionalProperties": false
     },
@@ -2279,13 +2341,29 @@
           "type": "object",
           "properties": {
             "max_in_flight": {
-              "type": "integer",
+              "type": [
+                "integer",
+                "null"
+              ],
               "minimum": 1,
-              "maximum": 1000
+              "maximum": 1000,
+              "description": "Optional task concurrency cap. Omitted/null delegates concurrency to configured entries and schedulers. Unknown/conflicting Jobs retain their slot."
             },
             "max_attempts": {
-              "type": "integer",
-              "minimum": 1
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1,
+              "description": "Legacy field name for an optional cumulative Job creation cap, including successful Jobs. Omitted/null means no task total cap. This is not a retry limit."
+            },
+            "max_retries_per_work": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "description": "Optional retries per stable work_id after its initial Job. Zero permits only the initial Job; omitted/null imposes no retry cap. Distinct work does not consume this allowance."
             }
           },
           "required": [
@@ -2359,6 +2437,38 @@
         "selection",
         "policy"
       ],
+      "additionalProperties": false
+    },
+    "execution_limits": {
+      "type": "object",
+      "properties": {
+        "max_in_flight": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "Optional task concurrency cap. Omitted/null delegates concurrency to configured entries and schedulers. Unknown/conflicting Jobs retain their slot."
+        },
+        "max_attempts": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "description": "Legacy field name for an optional cumulative Job creation cap, including successful Jobs. Omitted/null means no task total cap. This is not a retry limit."
+        },
+        "max_retries_per_work": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Optional retries per stable work_id after its initial Job. Zero permits only the initial Job; omitted/null imposes no retry cap. Distinct work does not consume this allowance."
+        }
+      },
+      "minProperties": 1,
       "additionalProperties": false
     }
   }

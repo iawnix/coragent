@@ -109,11 +109,28 @@ See the [plan contract and examples](../skills/core/execution-platforms/referenc
 Job Manager remains the sole authority for actual execution state; `task_read.execution_progress`
 projects ready/blocked, native Job states, collecting and validating from those records.
 
-Task `max_in_flight` and `max_attempts`, and per-entry `limits.max_in_flight`, are checked under the
-workspace transaction lock. Entry admission limits cover that workspace; Qrun/schedulers enforce their
-shared pool across workspaces. Unknown or conflicting execution retains its slot. A lost response is
-reconciled under the original identity. Submitted items cannot be edited or removed. Deliberate retries
-use a new item/work ID, preserve the predecessor and consume the existing submission budget.
+Task limits are optional: omitted/null `max_in_flight`, `max_attempts`, and `max_retries_per_work`
+impose no task concurrency, cumulative Job count, or per-work retry cap, respectively. The legacy name
+`max_attempts` means total Jobs, including successes; it is not a failed-Job retry allowance. A retry cap
+requires a stable `work_id`; zero permits the initial Job only. Existing numeric policies retain their limits.
+Task and per-entry limits are checked under the workspace transaction lock. Entry limits cover that
+workspace; Qrun/schedulers enforce shared pools across workspaces. Unknown/conflicting Jobs retain slots.
+Capacity responses are `accepted:false`, with `execution_task_capacity_reached` or
+`execution_entry_capacity_reached`, counts and occupying Job IDs. They do not create or enqueue a Job.
+Continue independent work; otherwise wait for owned Jobs with `task_update action=wait`, then resume
+the same request. Reconcile unknown/conflicting Jobs first. Explicit cumulative/retry caps return
+`execution_task_job_limit_reached` / `execution_work_retry_limit_reached`, never a generic budget error.
+`task_read.execution_usage` exposes limits, cumulative usage and occupying Jobs.
+
+Use `task_update action=set_execution_limits` with `execution_limits`, a reason, current revision and
+new user `source_submission_ids` to adjust limits even with an existing plan. Omitted fields stay unchanged;
+null removes a cap. The audit retains old/new limits and sources; Jobs, artifacts and placements are preserved.
+A task blocked for `budget_exhausted` resumes after the adjustment; other blockers and pauses remain in force.
+A settled failed/timed-out/cancelled item can be retried with the same item/work ID and a new request identity.
+Identical computation still requires the `repeat` predecessor/reason/budget declaration. Successful or
+uncertain items cannot be retried this way; submitted plan definitions remain immutable.
+For prepared files/references, `repeat` derives a stable attempt identity without changing the request
+bytes or work ID. Repeating the same declaration reuses that attempt; another retry cites its predecessor.
 
 Optional `automatic_placement=true` permits selection only among an item's explicit `candidates` inside
 the task's authorized placements. The item declares `backend` and CPU/memory requirements. Selection

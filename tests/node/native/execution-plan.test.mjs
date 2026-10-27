@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveExecutionPolicy, resolveExecutionPlan, executionItemContext, projectExecutionPlan } from "../../../apps/agent/tasks/execution-plan.mjs";
+import { resolveExecutionPolicy, resolveExecutionPlan, executionItemContext, projectExecutionPlan,
+  resolveTaskExecution, executionLimits, validateExecutionLimits } from "../../../apps/agent/tasks/execution-plan.mjs";
 
 const selection = platform => ({ target: { platform, scheduler_entry: "main" }, executor: "qrun",
   route_digest: "sha256:" + "a".repeat(64), selection_mode: "explicit" });
@@ -11,6 +12,19 @@ const kernel = { async execute_command(command, params) {
 const policy = { selections: [selection("FEDCluster"), selection("Com30")], max_in_flight: 2, max_attempts: 10 };
 const item = (id, platform, depends_on = []) => ({ id, work_id: id, target: { platform }, depends_on,
   resources: { cpus: 2, memory_mb: 1024 } });
+
+test("new tasks have no hidden task caps and existing numeric policies survive refinement", async () => {
+  const initial = await resolveExecutionPolicy(kernel, undefined, selection("Com30"), []);
+  assert.deepEqual(executionLimits(initial), { max_in_flight: null, max_attempts: null, max_retries_per_work: null });
+  const previous = { execution_target: selection("Com30").target, execution_selection: selection("Com30"),
+    execution_policy: { ...initial, max_in_flight: 1, max_attempts: 100 } };
+  const resolved = await resolveTaskExecution(kernel, {}, [], previous);
+  assert.deepEqual(executionLimits(resolved.policy), { max_in_flight: 1, max_attempts: 100, max_retries_per_work: null });
+  assert.deepEqual(validateExecutionLimits({ max_attempts: null, max_retries_per_work: 0 }),
+    { max_attempts: null, max_retries_per_work: 0 });
+  for (const limits of [{}, { max_attempts: 0 }, { max_in_flight: -1 }, { max_retries_per_work: 1.5 }, { placements: [] }])
+    assert.throws(() => validateExecutionLimits(limits), { code: "execution_plan_invalid" });
+});
 
 test("one task resolves independent items on multiple platforms", async () => {
   const plan = await resolveExecutionPlan(kernel, { items: [item("a", "FEDCluster"), item("b", "Com30")] }, policy, null, []);

@@ -229,7 +229,8 @@ def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
         return list_executions(root, session_id=params.get("session_id"), user_task_id=params.get("user_task_id"),
                                limit=params.get("limit", 50), cursor=params.get("cursor"))
     preparation = None
-    if operation == "start" and (params.get("prepared_ref") or params.get("request_file")):
+    prepared_submission = operation == "start" and bool(params.get("prepared_ref") or params.get("request_file"))
+    if prepared_submission:
         from research_agent.application.references import read_prepared_file, resolve_prepared_job
         transport = {key: params[key] for key in ("root", "workspace_root", "session_id", "user_task_id", "execution_context") if key in params}
         controls = {key: params[key] for key in ("timeout_seconds", "repeat", "node_id") if key in params}
@@ -277,7 +278,8 @@ def dispatch(operation: str, params: dict[str, Any]) -> dict[str, Any]:
         settings = load_job_config(_job_config_path())
         actual = bound_target(settings, params.get("execution_target"), params.get("execution_context"))
         params["execution_target"] = target_identity(actual)
-        return _start(root, _job_manager(root), params, preparation=preparation)
+        return _start(root, _job_manager(root), params, preparation=preparation,
+                      prepared_repeat=prepared_submission and bool(params.get("repeat")))
     if operation == "probe":
         runtime = _job_manager(root)
         # Probe is a capability query and intentionally does not require a
@@ -370,8 +372,12 @@ def _commit_result(root, request):
     return value
 
 
-def _request_digest(params):
+def _request_digest(params, *, include_policy=False):
     semantic = {k: v for k, v in params.items() if k not in {"root", "workspace_root", "session_id", "principal"}}
+    if not include_policy and semantic.get("execution_context"):
+        # Admission limits may change without changing the computation or its
+        # idempotency key. Placement and work identity remain part of the digest.
+        semantic["execution_context"] = {key: value for key, value in semantic["execution_context"].items() if key != "policy"}
     return hashlib.sha256(json.dumps(semantic, sort_keys=True, default=str).encode()).hexdigest()
 
 
@@ -403,7 +409,7 @@ def _admit_start(root, params):
     previous = root / _intent_path(root, job_id)
     if previous.is_file():
         old = json.loads(previous.read_text())
-        fingerprint = _request_digest(params)
+        fingerprint = _request_digest(params, include_policy=old.get("request_digest_version") != 2)
         if old.get("request_digest") != fingerprint: raise ValueError("job ID reused with different parameters")
         path = _receipt_path(root, job_id)
         if path.is_file(): return _start_result(_receipt(root, params), old)
@@ -526,30 +532,64 @@ def _stage_start(root, runtime, params, job_id, preparation=None, prepared_param
     def active(row):
         observation = observations[row["job_id"]]
         return observation["state"] not in TERMINAL or observation.get("execution_conflict")
-    from research_agent.jobs.config_contract import load_job_config
-    limit = load_job_config(os.environ["CORAGENT_JOB_CONFIG"])["targets"][target_name].get("limits", {}).get("max_in_flight")
-    if limit and sum(row["platform"] == target_name and bool(active(row)) for row in prior_intents) >= limit:
-        raise ValueError("execution_entry_capacity_reached")
-    if context and context.get("policy"):
-        owned = [row for row in prior_intents if row.get("user_task_id") == params.get("user_task_id")]
-        policy = context["policy"]
-        if len(owned) >= policy["max_attempts"] or sum(bool(active(row)) for row in owned) >= policy["max_in_flight"]:
-            raise ValueError("execution_task_budget_reached")
-        if context.get("item") and any(row.get("execution_item", {}).get("id") == context["item"]["id"] for row in owned):
-            raise ValueError("execution_item_already_submitted: reconcile its existing Job")
+
+    def declined(code, scope, used, limit, rows, recovery, retryable=False):
+        # Admission has not committed an intent or dispatched anything. Keep the
+        # request identity available for resumption after capacity/limits change.
+        shutil.rmtree(staging_root)
+        return {"accepted": False, "code": code, "scope": scope, "used": used, "limit": limit,
+                "job_ids": [row["job_id"] for row in rows], "retryable": retryable, "recovery": recovery}
 
     duplicates = [i for i in prior_intents if i.get("execution_fingerprint") == execution_fingerprint]
     repeat = params.get("repeat")
     if repeat:
         if (not isinstance(repeat, dict) or not repeat.get("reason") or not repeat.get("budget")
                 or repeat.get("predecessor_job_id") not in {i["job_id"] for i in duplicates}):
-            shutil.rmtree(root / "runs/jobs" / job_id)
+            shutil.rmtree(staging_root)
             raise ValueError("repeat_invalid: identify an identical predecessor, reason and budget")
+        predecessor = next(row for row in duplicates if row["job_id"] == repeat["predecessor_job_id"])
+        if active(predecessor):
+            raise ValueError("repeat_predecessor_unsettled: reconcile the existing Job before repeating its computation")
     elif duplicates:
-        shutil.rmtree(root / "runs/jobs" / job_id)
+        shutil.rmtree(staging_root)
         return {"accepted": False, "code": "duplicate_execution", "job_id": duplicates[0]["job_id"],
                 "execution_fingerprint": execution_fingerprint,
                 "recovery": "Reuse job_status/collect or submit repeat with predecessor_job_id, reason and budget"}
+
+    from research_agent.jobs.config_contract import load_job_config
+    limit = load_job_config(os.environ["CORAGENT_JOB_CONFIG"])["targets"][target_name].get("limits", {}).get("max_in_flight")
+    entry_active = [row for row in prior_intents if row["platform"] == target_name and active(row)]
+    if limit is not None and len(entry_active) >= limit:
+        return declined("execution_entry_capacity_reached", "entry", len(entry_active), limit, entry_active,
+                        "No Job was submitted. Query/reconcile these Jobs and resume the same request when entry capacity is available.", True)
+    if context and context.get("policy"):
+        owned = [row for row in prior_intents if row.get("user_task_id") == params.get("user_task_id")]
+        policy = context["policy"]
+        limit = policy.get("max_attempts")
+        if limit is not None and len(owned) >= limit:
+            return declined("execution_task_job_limit_reached", "task", len(owned), limit, owned,
+                            "Explicit cumulative Job limit reached. Use task_update action=set_execution_limits with user instructions to adjust max_attempts; history is retained.")
+        owned_active = [row for row in owned if active(row)]
+        limit = policy.get("max_in_flight")
+        if limit is not None and len(owned_active) >= limit:
+            return declined("execution_task_capacity_reached", "task", len(owned_active), limit, owned_active,
+                            "No Job was submitted. Continue independent work or use task_update action=wait (mode=any) for these Jobs, then resume the same request. Reconcile unknown/conflicting Jobs first.", True)
+        if context.get("item"):
+            item_jobs = [row for row in owned if row.get("execution_item", {}).get("id") == context["item"]["id"]]
+            if any(active(row) or observations[row["job_id"]]["state"] not in {"failed", "timed_out", "cancelled"}
+                   for row in item_jobs):
+                raise ValueError("execution_item_already_submitted: reconcile or collect its existing Job; only settled unsuccessful items may be retried")
+        limit = policy.get("max_retries_per_work")
+        if limit is not None:
+            if not params.get("work_id"):
+                raise ValueError("execution_work_id_required: a per-work retry limit requires a stable work_id")
+            attempts = [row for row in owned if (row.get("work_id") or row.get("execution_item", {}).get("work_id")
+                        or observations[row["job_id"]].get("metadata", {}).get("work_id")) == params["work_id"]]
+            if any(active(row) for row in attempts):
+                raise ValueError("execution_work_unsettled: reconcile the existing work before consuming a retry")
+            if attempts and len(attempts) - 1 >= limit:
+                return declined("execution_work_retry_limit_reached", "work", len(attempts) - 1, limit, attempts,
+                                "This work has used its explicit retry allowance. Inspect prior attempts; use task_update action=set_execution_limits with user instructions to adjust max_retries_per_work.")
 
     intent = {
         "schema_version": "job_intent/4", "job_id": spec.job_id, "state": "dispatching",
@@ -557,9 +597,11 @@ def _stage_start(root, runtime, params, job_id, preparation=None, prepared_param
         "fingerprint_complete": bool(spec.metadata.get("configuration_sha256") and spec.metadata.get("resources_sha256")),
         "repeat": repeat,
         "user_task_id": params.get("user_task_id"),
+        "work_id": params.get("work_id"),
         **({"execution_item": context["item"]} if context and context.get("item") else {}),
         **spec.metadata.get("research_binding", {"node_id": None, "node_revision": None}),
         "request_digest": _request_digest(params),
+        "request_digest_version": 2,
         "command": list(spec.command), "cwd": str(spec.cwd), "workspace_id": spec.workspace_id,
         "platform": target_name,
         "target_name": target_name,
@@ -595,12 +637,22 @@ def _commit_dispatch(root, request):
     return intent
 
 
-def _start(root, runtime, params, preparation=None):
+def _start(root, runtime, params, preparation=None, *, prepared_repeat=False):
     if not params.get("request_id"):
         raise ValueError("request_id_required: supply a stable request identity")
     coordinator = TransactionCoordinator(root)
     with coordinator.locked():
         params = {**params, "job_id": allocate_id(root, "job", params["request_id"])}
+        if prepared_repeat:
+            previous = root / _intent_path(root, params["job_id"])
+            old = json.loads(previous.read_text()) if previous.is_file() else None
+            # Preserve legacy prepared repeats already submitted under the base
+            # identity. New repeats derive an idempotent attempt identity while
+            # retaining the prepared bytes and logical work_id.
+            if not old or old.get("repeat") != params["repeat"]:
+                repeat_digest = hashlib.sha256(json.dumps(params["repeat"], sort_keys=True).encode()).hexdigest()
+                params = {**params, "request_id": params["request_id"] + ":repeat:" + repeat_digest}
+                params["job_id"] = allocate_id(root, "job", params["request_id"])
         replay = _admit_start(root, params)
     if replay is not None:
         return replay

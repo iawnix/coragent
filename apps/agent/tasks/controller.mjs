@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { defineDoc, defineDocFamily } from "@earendil-works/pi-durable";
-import { resolveTaskExecution, resolveExecutionPlan, executionItemContext, projectExecutionPlan } from "./execution-plan.mjs";
+import { resolveTaskExecution, resolveExecutionPlan, executionItemContext, projectExecutionPlan,
+  executionLimits, validateExecutionLimits, projectExecutionUsage } from "./execution-plan.mjs";
 import { verifyAssessment, checkCompletion } from "./assessment.mjs";
 import { taskRecoveryPolicy, retryableSubmission, recoveryReady, classifyExecutionFailure, normalizeTaskBlockKind } from "./recovery.mjs";
 import { hasPendingInput } from "../runtime/admission/input.mjs";
@@ -477,8 +478,14 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     },
     async current(ctx) {
       const task = await getCurrent(ctx);
-      return task?.execution_plan
-        ? { ...task, execution_progress: projectExecutionPlan(task, await ownedJobs(task.user_task_id)) } : task;
+      if (!task?.execution_selection) return task;
+      let jobs;
+      try { jobs = await ownedJobs(task.user_task_id); }
+      catch {
+        ctx?.abortSignal?.throwIfAborted();
+        return { ...task, execution_progress: null, execution_usage: null, execution_usage_error: "execution_usage_unavailable" };
+      }
+      return { ...task, execution_progress: projectExecutionPlan(task, jobs), execution_usage: projectExecutionUsage(task, jobs) };
     },
     pauseInTransaction,
     async binding(ctx) {
@@ -492,7 +499,14 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     async read({ user_task_id }, ctx) {
       const task = await harness.snapshot(UserTask, conversation.id, user_task_id, ctx);
       requireValue(task?.user_task_id, "task_not_found", "User task does not exist in this conversation");
-      return { ...taskRecord(task), execution_progress: task.execution_plan ? projectExecutionPlan(task, await ownedJobs(task.user_task_id)) : null };
+      let jobs = [];
+      try { if (task.execution_selection) jobs = await ownedJobs(task.user_task_id); }
+      catch {
+        ctx?.abortSignal?.throwIfAborted();
+        return { ...taskRecord(task), execution_progress: null, execution_usage: null, execution_usage_error: "execution_usage_unavailable" };
+      }
+      return { ...taskRecord(task), execution_progress: projectExecutionPlan(task, jobs),
+        ...(task.execution_selection ? { execution_usage: projectExecutionUsage(task, jobs) } : {}) };
     },
     /** Bind the first research Node to an otherwise unbound active task.
      * This is a derived runtime convenience: it deliberately does not advance
@@ -576,8 +590,14 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           request_id: requestId, expected_revision: params.expected_revision, jobs: params.jobs }, ctx,
         { sources, payload: params, control_epoch: basis.control_epoch });
       }
-      const sources = params.action === "refine" ? await sourceRecords(params.source_submission_ids, ctx) : null;
+      const settingLimits = params.action === "set_execution_limits";
+      const sources = params.action === "refine" || settingLimits ? await sourceRecords(params.source_submission_ids, ctx) : null;
       requireValue(basis && !terminal.has(basis.state), "task_not_active", "No nonterminal task exists");
+      const limits = settingLimits ? validateExecutionLimits(params.execution_limits) : null;
+      if (settingLimits) {
+        requireValue(basis.execution_selection, "execution_selection_required", "Bind execution before adjusting its limits");
+        requireValue(typeof params.reason === "string" && params.reason.trim(), "task_reason_required", "Explain the user-directed limit adjustment");
+      }
       requireValue(params.action === "set_research" || params.research === undefined, "task_research_invalid", "Research bindings use set_research");
       const bindingExecution = params.action === "bind_execution" || params.action === "set_execution_plan" && !basis.execution_selection;
       requireValue(params.action !== "bind_execution" || !basis.execution_selection, "execution_already_bound",
@@ -669,9 +689,27 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
         requireValue(task.user_task_id === basis?.user_task_id && task.control_epoch === basis.control_epoch,
           "task_superseded", "Task control changed while references were being verified");
         requireValue(task.state !== "paused", "task_paused", "Only the user may resume a paused task");
-        requireValue(task.state !== "blocked" || ["refine", "correct_execution", "progress", "set_research", "block"].includes(params.action),
+        requireValue(task.state !== "blocked" || ["refine", "correct_execution", "progress", "set_research", "block", "set_execution_limits"].includes(params.action),
           "task_blocked", "Resolve the blocker with refine and the new user submission ID before continuing work");
-        if (params.action === "refine") {
+        let limitAudit = {};
+        if (settingLimits) {
+          requireValue(sources.some(source => !task.sources.some(previous => previous.submission_id === source.submission_id)),
+            "task_source_required", "Adjusting execution limits requires a new user instruction");
+          const before = executionLimits(task.execution_policy);
+          task.execution_policy = { ...task.execution_policy, ...limits };
+          limitAudit = { execution_limits_before: before, execution_limits_after: executionLimits(task.execution_policy),
+            source_submission_ids: sources.map(source => source.submission_id) };
+          task.sources.push(...sources); task.control_epoch += 1;
+          if (task.state === "blocked" && task.block_details?.kind === "budget_exhausted") {
+            task.state = "active"; task.reason = null; task.wait = null; task.block_details = null;
+            task.execution_recovery = null; task.continuation.no_progress = 0;
+          }
+          if (task.state === "completing") {
+            task.state = "active"; task.completion = null; task.completion_outcome = null; task.completion_stop_basis = null;
+            delete task.completion_submission_id; delete task.completion_control_epoch;
+          }
+          if (params.next_action !== undefined) task.next_action = params.next_action;
+        } else if (params.action === "refine") {
           if (params.objective !== undefined || params.criteria !== undefined || changingTarget) {
             requireValue(sources.some(source => !task.sources.some(previous => previous.submission_id === source.submission_id)),
               "task_source_required", "Changing the agreed scope requires a new user instruction; partial evidence does not reduce delivery criteria");
@@ -751,7 +789,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           task.completion_submission_id = live.run.inputs[0]; task.completion_control_epoch = task.control_epoch;
           task.execution_recovery = null;
         } else throw taskError("task_action_invalid", "Unknown task update action");
-        changed(task, params.action, "agent", params.reason || null);
+        changed(task, params.action, "agent", params.reason || null, limitAudit);
         return copy(task);
       }), ctx);
     },

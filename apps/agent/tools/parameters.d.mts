@@ -192,15 +192,16 @@ export interface ToolParameters {
           "scheduler"?: string;
         };
       }>;
-      "max_in_flight": number;
-      "max_attempts": number;
+      "max_in_flight"?: number | null;
+      "max_attempts"?: number | null;
       "automatic_placement"?: boolean;
+      "max_retries_per_work"?: number | null;
     };
   };
   task_read: Record<string, never>;
   task_update: {
     "expected_revision": number;
-    "action": "refine" | "progress" | "bind_execution" | "wait" | "block" | "propose_completion" | "set_research" | "apply_user_control" | "correct_execution" | "set_execution_plan" | "select_execution_item" | "complete_execution_item";
+    "action": "refine" | "progress" | "bind_execution" | "wait" | "block" | "propose_completion" | "set_research" | "apply_user_control" | "correct_execution" | "set_execution_plan" | "select_execution_item" | "complete_execution_item" | "set_execution_limits";
     "reason"?: string;
     "block_kind"?: "missing_user_input" | "resource_unavailable" | "execution_failure" | "budget_exhausted" | "scientific_dead_end";
     "resume_when"?: string;
@@ -257,9 +258,10 @@ export interface ToolParameters {
           "scheduler"?: string;
         };
       }>;
-      "max_in_flight": number;
-      "max_attempts": number;
+      "max_in_flight"?: number | null;
+      "max_attempts"?: number | null;
       "automatic_placement"?: boolean;
+      "max_retries_per_work"?: number | null;
     };
     "execution_plan"?: {
       "items": Array<{
@@ -285,6 +287,11 @@ export interface ToolParameters {
     };
     "execution_item_id"?: string;
     "artifact_ids"?: Array<string>;
+    "execution_limits"?: {
+      "max_in_flight"?: number | null;
+      "max_attempts"?: number | null;
+      "max_retries_per_work"?: number | null;
+    };
   };
   job_platforms: Record<string, never>;
   job_resources: {
