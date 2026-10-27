@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { defineDoc, defineDocFamily } from "@earendil-works/pi-durable";
 import { resolveTaskExecution, resolveExecutionPlan, executionItemContext, projectExecutionPlan } from "./execution-plan.mjs";
 import { verifyAssessment, checkCompletion } from "./assessment.mjs";
-import { taskRecoveryPolicy, retryableSubmission, recoveryReady } from "./recovery.mjs";
+import { taskRecoveryPolicy, retryableSubmission, recoveryReady, classifyExecutionFailure, normalizeTaskBlockKind } from "./recovery.mjs";
 import { hasPendingInput } from "../runtime/admission/input.mjs";
 import shared from "../tools/tool-schemas.json" with { type: "json" };
 
@@ -82,9 +82,9 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     const index = await tx.doc(UserTasks, conversation.id);
     return { index, task: taskRecord(index.current ? await tx.doc(UserTask, conversation.id, index.current, null) : null) };
   };
-  const changed = (task, action, actor, reason) => {
+  const changed = (task, action, actor, reason, failure = {}) => {
     task.revision += 1; task.updated_at = stamp();
-    task.audit.push({ action, actor, reason, revision: task.revision, at: task.updated_at });
+    task.audit.push({ action, actor, reason, revision: task.revision, at: task.updated_at, ...failure });
   };
   const getCurrent = async ctx => {
     const index = await harness.snapshot(UserTasks, conversation.id, ctx);
@@ -734,11 +734,14 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
           requireValue(params.reason, "task_reason_required", "A blocker needs an explanation");
           const live = await tx.doc(LiveDoc, conversation.id);
           const finalization = await tx.doc(BlockFinalization, conversation.id, task.user_task_id, null);
+          const blockKind = normalizeTaskBlockKind(params.block_kind, task.execution_recovery, params.reason);
+          const failureDetails = blockKind !== params.block_kind
+            ? { ...classifyExecutionFailure(task.execution_recovery), submission_id: task.execution_recovery.submission_id } : {};
           // Generation task IDs change after tools; Pi input IDs identify the continuing run.
           Object.assign(finalization, { submission_id: live.run?.inputs[0] ?? null,
             submission_ids: live.run?.inputs ?? [], control_epoch: task.control_epoch });
           task.state = "blocked"; task.reason = params.reason; task.wait = null;
-          task.block_details = { kind: params.block_kind, resume_when: params.resume_when, evidence_refs: params.evidence_refs ?? [] };
+          task.block_details = { kind: blockKind, resume_when: params.resume_when, evidence_refs: params.evidence_refs ?? [], ...failureDetails };
           task.execution_recovery = null; task.completion = null; task.completion_outcome = null; task.completion_stop_basis = null; delete task.completion_submission_id; delete task.completion_control_epoch;
         } else if (params.action === "propose_completion") {
           const live = await tx.doc(LiveDoc, conversation.id);
@@ -990,9 +993,11 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     task.execution_recovery = { state: retry ? "retrying" : "attention_required", phase, failures,
       submission_id: record.id, control_epoch: task.control_epoch,
       reason: record.reason || "execution_failed", detail: record.detail || null,
+      ...classifyExecutionFailure(record),
       next_retry_at: retry ? new Date(now() + delay).toISOString() : null };
-    changed(task, "execution_failure", "task_controller", retry
-      ? "Execution failed; bounded recovery is scheduled" : "Execution needs attention; research has not been marked blocked");
+    changed(task, "runtime_failure", "task_controller", retry
+      ? "Agent execution failed; bounded recovery is scheduled" : "Agent execution needs attention; research has not been marked blocked",
+    { ...classifyExecutionFailure(record), submission_id: record.id });
   }
   function schedule() {
     if (!started || stopped || scheduled || running) return;

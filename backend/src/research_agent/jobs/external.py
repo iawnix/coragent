@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import secrets
 from pathlib import Path
 import shlex
 import subprocess
@@ -115,20 +116,26 @@ class ExternalJobPlatform(StagedJobPlatform):
         probe = self.probe(spec)
         if not all(probe[key] for key in ("available", "cwd_exists", "inputs_present")):
             raise ValueError(f"external execution probe failed: {probe}")
-        directory = self._remote_dir(spec)
+        # A recreated workspace may reuse its ID, path and Job counter. Give
+        # each new execution its own identity; spec.json persists it before
+        # submission, and recovery always uses that recorded request.
+        execution_id = secrets.token_hex(16)
+        directory = self._remote_dir(spec, execution_id)
         wrapper, scratch, timeout = self._wrapper(spec, directory,
             inherit_environment=("CUDA_VISIBLE_DEVICES", "NVIDIA_VISIBLE_DEVICES"))
         # In shared mode prepare only private execution controls; the ordinary
         # Job API has already placed immutable inputs in this directory.
-        storage = self.stage_inputs(spec) if self.shared else {}
+        storage = self.stage_inputs(spec, directory) if self.shared else {}
         if self.shared:
             wrapper = '#!/bin/sh\n' + self.shared.guard(directory, storage['shared_token']) + wrapper.removeprefix('#!/bin/sh\n')
-        identity = hashlib.sha256(json.dumps([self.name, spec.workspace_id, str(spec.cwd.resolve()), spec.job_id]).encode()).hexdigest()
+        identity = hashlib.sha256(json.dumps([self.name, spec.workspace_id, str(spec.cwd.resolve()),
+                                              spec.job_id, execution_id]).encode()).hexdigest()
         request = {"schema_version": PROTOCOL, "action": "submit", "job_id": spec.job_id,
                    "request_id": "coragent-" + identity, "cwd": directory,
                    "script": directory + "/.coragent/run.sh", "resources": spec.metadata.get("resources", {}),
                    "queue": spec.metadata.get("queue"), "timeout_seconds": timeout}
-        metadata = {**spec.metadata, **storage, "file_mode": self.file_mode, "remote_dir": directory, "scratch_path": scratch,
+        metadata = {**spec.metadata, **storage, "execution_id": execution_id,
+                    "file_mode": self.file_mode, "remote_dir": directory, "scratch_path": scratch,
                     "execution_timeout_seconds": timeout, "external_request": request,
                     "transport": self.transport.name, "driver": "external", "target_name": self.name,
                     "scope": getattr(self, "scope", "local"), "cluster_name": getattr(self, "cluster_name", None),
@@ -137,7 +144,7 @@ class ExternalJobPlatform(StagedJobPlatform):
                     "outputs": [output.__dict__ for output in spec.outputs], "metadata": metadata,
                     "workspace_id": spec.workspace_id, "remote_dir": directory})
         if not self.shared:
-            self.stage_inputs(spec)
+            self.stage_inputs(spec, directory)
         with tempfile.NamedTemporaryFile("w", dir=spec.cwd, delete=False) as stream:
             path = Path(stream.name)
             stream.write(wrapper)

@@ -24,9 +24,9 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def staged_directory(work_root, cwd, job_id, workspace_id):
+def staged_directory(work_root, cwd, job_id, workspace_id, execution_id):
     """Locate a new staged execution without reusing another workspace's files."""
-    identity = json.dumps([workspace_id, str(Path(cwd).resolve())]).encode()
+    identity = json.dumps([workspace_id, str(Path(cwd).resolve()), execution_id]).encode()
     scope = hashlib.sha256(identity).hexdigest()[:24]
     return f"{work_root.rstrip('/')}/{job_id}-{scope}"
 
@@ -54,16 +54,15 @@ class StagedJobPlatform(ExecutionPlatform):
     def _pull_path(self, remote_path: str, local_path: Path, *, recursive: bool = False):
         return self.transport.pull(remote_path, local_path, recursive=recursive)
 
-    def _remote_dir(self, spec: JobSpec) -> str:
+    def _remote_dir(self, spec: JobSpec, execution_id: str) -> str:
         job_id = spec.job_id
         if not isinstance(job_id, str) or not re.fullmatch(r"job_[1-9][0-9]*", job_id):
             raise ValueError("remote job id has an invalid format")
         if self.shared:
             return str(self.shared.directory(spec.cwd, job=True))
-        return staged_directory(self.remote_root, spec.cwd, job_id, spec.workspace_id)
+        return staged_directory(self.remote_root, spec.cwd, job_id, spec.workspace_id, execution_id)
 
-    def stage_inputs(self, spec: JobSpec) -> dict[str, Any]:
-        remote_dir = self._remote_dir(spec)
+    def stage_inputs(self, spec: JobSpec, remote_dir: str) -> dict[str, Any]:
         if self.shared:
             return {'remote_dir': remote_dir, 'shared_token': self.shared.prepare(spec)}
         self.run_command(f"umask 077; mkdir -- {shlex.quote(remote_dir)} && "

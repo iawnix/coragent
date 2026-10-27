@@ -1,6 +1,8 @@
 import { codingExecutionContext } from "../tasks/execution-plan.mjs";
 import { loadPi } from "./source.mjs";
 import { createContextManager, contextPolicy, contextInputBudget } from "../context/manager.mjs";
+import { createCacheDiagnostics, cacheDiagnosticWriter } from "../context/cache-diagnostics.mjs";
+import { requestCaptureWriter } from "../context/request-capture.mjs";
 import { recordUserSources } from "../tools/user-sources.mjs";
 import { createInputAdmission, createInputService, bindUserInputConversation, INPUT_ADMISSION_SERVICE_ID } from "./admission/input.mjs";
 import { createJobAdmission, JOB_ADMISSION_SERVICE_ID } from "./admission/jobs.mjs";
@@ -53,7 +55,7 @@ export async function createCoRAgentHarness(databasePath, options) {
   const settingsManager = SettingsManager.create(cwd);
   configureHarnessHttp(settingsManager);
   const executionEnvs = new ExecutionEnvs(cwd);
-  let commandBridge, queryBridge, harness, taskController;
+  let commandBridge, queryBridge, harness, taskController, cacheLog;
   try {
     const resolved = await findInitialAgentModel(
       settingsManager,
@@ -74,6 +76,11 @@ export async function createCoRAgentHarness(databasePath, options) {
 
     });
     const harnessSettings = contextPolicy(createHarnessSettings(settingsManager));
+    const captureRequest = process.env.CORAGENT_REQUEST_CAPTURE === "1"
+      ? requestCaptureWriter(join(dirname(databasePath), "request-bodies"), { sessionId, workspaceId }) : undefined;
+    cacheLog = process.env.CORAGENT_CACHE_DIAGNOSTICS === "1" || captureRequest
+      ? cacheDiagnosticWriter(join(dirname(databasePath), "request-cache.jsonl")) : null;
+    const cacheDiagnostics = cacheLog ? createCacheDiagnostics({ write: record => cacheLog.write(record), captureRequest }) : null;
     const contextManager = createContextManager({ bridge: commandBridge, coordinator: transactionCoordinator,
       sessionId, estimateContextTokens, getCompactionPolicy: () => harnessSettings.compaction,
     });
@@ -111,6 +118,7 @@ export async function createCoRAgentHarness(databasePath, options) {
       hooks: [
         hook(GenerationTask, {
           prepareContext: async (view, api, context) => {
+            cacheDiagnostics?.context(api.taskId, view.head?.id);
             const live = await api.snapshot(LiveDoc, api.conversationId, context);
             const task = await taskController.current(context);
             const sources = await recordUserSources({ harness, admission: inputAdmission, jobAdmission, taskController, api, context,
@@ -137,10 +145,12 @@ export async function createCoRAgentHarness(databasePath, options) {
                 bridge: commandBridge, sessionId, recordedIds: recordedUserSources });
               const task = await taskController.current(context);
               await recordRun({ conversation, api, inputIds: live?.run?.inputs || [], userTaskId: task?.user_task_id ?? null, context });
-              const actualUserIds = [];
+              const actualUserIds = [], sources = [];
               for (const id of live?.run?.inputs || []) {
                 const record = await (await harness.submission(id, context)).status(context);
-                if ((await inputAdmission.origin(record, context))?.producer === "user") actualUserIds.push(String(id));
+                const origin = await inputAdmission.origin(record, context);
+                if (origin?.producer === "user") actualUserIds.push(String(id));
+                sources.push({ producer: origin?.producer ?? "unknown", reason: origin?.reason ?? "unknown" });
               }
               const admitted = await contextManager.admit(request, String(api.taskId), {
                 task, actual_user_submission_ids: actualUserIds,
@@ -152,6 +162,7 @@ export async function createCoRAgentHarness(databasePath, options) {
                 const origin = await inputAdmission.origin(record, context);
                 if (origin.producer !== "user") await taskController.assertExecutionAllowed(record, origin, context);
               }
+              if (admitted.messages) cacheDiagnostics?.tag(admitted.messages, { generation_id: String(api.taskId), sources });
               return admitted;
             })();
           },
@@ -171,7 +182,7 @@ export async function createCoRAgentHarness(databasePath, options) {
       ],
     }));
     harness = await Harness.open(await openNodeSqliteStorage(databasePath), {
-      models: modelRuntime,
+      models: cacheDiagnostics ? cacheDiagnostics.wrap(modelRuntime) : modelRuntime,
       registry,
       settings: harnessSettings,
       env: executionEnvs.env,
@@ -204,7 +215,8 @@ export async function createCoRAgentHarness(databasePath, options) {
             const model = agent.model && modelRuntime.getModel(agent.model.provider, agent.model.modelId);
             // Reuse Pi's compaction-aware request estimate. It is not an exact tokenizer count.
             const contextWindow = model?.contextWindow || null;
-            const inputBudgetTokens = contextWindow === null ? null : contextInputBudget(contextWindow, harnessSettings.compaction);
+            const inputBudgetTokens = contextWindow === null ? null : contextInputBudget(contextWindow, harnessSettings.compaction,
+              harnessSettings.stream?.maxTokens ?? model.maxTokens);
             return { model: agent.model || null, contextWindow,
               contextTokens: estimateContext(view, []), inputBudgetTokens,
               reserveTokens: harnessSettings.compaction.reserveTokens ?? null,
@@ -213,7 +225,7 @@ export async function createCoRAgentHarness(databasePath, options) {
           },
         }));
       } })]),
-      cleanup: async (context) => { await taskController.close(); try { await executionEnvs.cleanup(context); } finally { await Promise.all([commandBridge.close(), queryBridge.close()]); } },
+      cleanup: async (context) => { await taskController.close(); try { await executionEnvs.cleanup(context); } finally { await Promise.all([commandBridge.close(), queryBridge.close(), cacheLog?.flush()]); } },
     };
   } catch (error) {
     await taskController?.close();
@@ -221,6 +233,7 @@ export async function createCoRAgentHarness(databasePath, options) {
     await queryBridge?.close().catch(() => {});
     await harness?.close(PI_TODO_CONTEXT).catch(() => {});
     await executionEnvs.cleanup(PI_TODO_CONTEXT).catch(() => {});
+    await cacheLog?.flush();
     throw error;
   }
 }

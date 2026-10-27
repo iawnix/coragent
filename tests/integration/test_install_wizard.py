@@ -779,8 +779,10 @@ def test_interactive_smtp_password_is_written_to_the_default_private_file(tmp_pa
     assert "163-authorization-code" not in (app_paths(root).email_config).read_text(encoding="utf-8")
 
 
-def test_app_server_service_is_one_installation_host(tmp_path: Path) -> None:
+@pytest.mark.parametrize("service_scope", ["user", "system"])
+def test_app_server_service_is_one_installation_host(tmp_path: Path, service_scope: str) -> None:
     args = _options(tmp_path)
+    args.service_scope = service_scope
     root = Path(args.install_root)
     unit = wizard.app_server_unit(args)
 
@@ -790,10 +792,16 @@ def test_app_server_service_is_one_installation_host(tmp_path: Path) -> None:
     assert "CORAGENT_SERVER_EXTENSIONS" not in unit
     assert 'Environment="XDG_RUNTIME_DIR=' in unit
     assert f'PI_CODING_AGENT_DIR={app_paths(root).pi_config}' in unit
-    assert str(Path(os.environ["XDG_RUNTIME_DIR"]) / "coragent") in unit
+    runtime_directory = Path("/run/coragent") if service_scope == "system" else Path(os.environ["XDG_RUNTIME_DIR"]) / "coragent"
+    assert f'Environment="CORAGENT_APP_SERVER_RUNTIME_DIR={runtime_directory}"' in unit
+    # systemd must create this directory before applying ReadWritePaths,
+    # including after a reboot has cleared the user's runtime directory.
+    assert "RuntimeDirectory=coragent\nRuntimeDirectoryMode=0700\n" in unit
+    assert f'ReadWritePaths="{runtime_directory}"' in unit
     assert f'ReadWritePaths="{app_paths(root).state}"' in unit
     assert f'ReadWritePaths="{app_paths(root).workspace_root}"' in unit
-    assert "WantedBy=default.target" in unit
+    target = "multi-user.target" if service_scope == "system" else "default.target"
+    assert f"WantedBy={target}" in unit
     assert "CoRHub" not in unit
     assert "session-host" not in unit
 

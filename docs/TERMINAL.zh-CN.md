@@ -9,6 +9,8 @@ Pi 的 editor、transcript 渲染或输入循环。它与普通 Pi 的 Interacti
 
 工作区统一使用 research 模式，启动时无需选择模式。创建或继续工作区的命令见下文。
 
+运行 `coragent -h` 查看常用命令和示例；运行 `coragent --help-all` 同时查看 SSH 参数和后台服务说明。
+
 ## 运行边界
 
 ```text

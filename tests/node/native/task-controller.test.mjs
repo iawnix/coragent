@@ -837,6 +837,45 @@ test("transient wait status failure preserves user access and can recover", asyn
 const transientFailure = () => ({ ...fauxAssistantMessage(""), stopReason: "error", errorMessage: "503 Service Unavailable" });
 const recoveryOptions = clock => ({ recoveryPolicy: { maxRetries: 2, baseDelayMs: 100, maxDelayMs: 200 }, now: () => clock.value });
 
+for (const quotaBlock of [true, false]) test(`provider quota recovery preserves ${quotaBlock ? "resource" : "independent Job"} blocker attribution`, async t => {
+  const clock = { value: 1000 }, env = await fixture(t, new MemoryStorage(), {
+    ...recoveryOptions(clock),
+  });
+  await env.begin();
+  env.jobStates.set("job_1", "running");
+  env.jobStates.set("job_2", "failed");
+  env.faux.setResponses([{ ...fauxAssistantMessage(""), stopReason: "error", errorMessage: "429 DAILY_LIMIT_EXCEEDED" }]);
+  await env.controller.reconcile(); await env.conversation.waitForIdle(context); await env.controller.reconcile();
+  const current = await env.controller.current(context);
+  assert.deepEqual({ failure_domain: current.execution_recovery.failure_domain, failure_kind: current.execution_recovery.failure_kind }, {
+    failure_domain: "agent_runtime", failure_kind: "provider_quota",
+  });
+  assert.equal(current.execution_recovery.state, "attention_required");
+  assert.equal(current.execution_recovery.next_retry_at, null);
+  assert.equal(current.state, "active");
+  assert.equal(current.block_details, null);
+  await env.reopen(); clock.value = 2000;
+  await env.controller.reconcile();
+  assert.equal((await env.controller.current(context)).continuation.sequence, 1, "daily quota does not trigger short retries after restart");
+  assert.equal(env.jobStates.get("job_1"), "running");
+  assert.equal(env.calls.some(call => ["job_start", "job_cancel"].includes(call.command)), false);
+  const audit = current.audit.find(item => item.action === "runtime_failure");
+  assert.equal(audit.failure_kind, "provider_quota");
+  assert.equal(audit.submission_id, current.execution_recovery.submission_id);
+  const resumeWhen = quotaBlock ? "The model provider quota is restored." : "The Gaussian input is corrected.";
+  const evidenceRefs = quotaBlock ? ["result_1"] : ["job_2"];
+  const blocked = await env.controller.update({ action: "block", expected_revision: current.revision,
+    block_kind: "execution_failure", reason: quotaBlock ? "The model provider reports DAILY_LIMIT_EXCEEDED." : "Gaussian did not converge.",
+    resume_when: resumeWhen, evidence_refs: evidenceRefs }, "quota-block", context);
+  assert.deepEqual(blocked.block_details, {
+    kind: quotaBlock ? "resource_unavailable" : "execution_failure", resume_when: resumeWhen, evidence_refs: evidenceRefs,
+    ...(quotaBlock ? { failure_domain: "agent_runtime", failure_kind: "provider_quota", submission_id: current.execution_recovery.submission_id } : {}),
+  });
+  await env.reopen();
+  assert.deepEqual((await env.controller.current(context)).block_details, blocked.block_details);
+  assert.ok((await env.controller.current(context)).audit.some(item => item.action === "runtime_failure" && item.failure_kind === "provider_quota"));
+});
+
 test("budget failure with a queued compaction settles after Job wait and resumes once", async t => {
   let block = false, queued;
   const env = await fixture(t, new MemoryStorage(), {}, async () => {

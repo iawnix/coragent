@@ -52,6 +52,10 @@ uses its default idle retention (ten minutes). Patch 010 persists research orien
 with the request cutoff and carries historical scope metadata through native
 compaction. Only current control data remains request-only. The estimator
 now uses 3.5 characters per token, so budget admission may compact earlier.
+Patch 016 reserves the requested output plus 4,096 safety tokens when this exceeds
+the configured reserve. Native background/blocking thresholds, final admission
+and terminal input-budget telemetry use the same rule; stream output overrides
+remain effective. The summary output budget still uses the configured reserve.
 
 Research tool cards show Pi's recorded `durationMs` for final results, including
 after reconnect, and omit it for older or untimed results. For `job_start` this

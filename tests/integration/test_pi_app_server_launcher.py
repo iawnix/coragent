@@ -290,7 +290,8 @@ def test_service_host_does_not_require_a_workspace_mode() -> None:
 
 def test_launcher_usage_keeps_internal_transport_modes_out_of_daily_help() -> None:
     assert "coragent --workspace <name>" in launcher.USAGE
-    assert "coragent.service" in launcher.USAGE
+    assert "--help-all" in launcher.USAGE
+    assert "coragent.service" in launcher.EXTENDED_USAGE
     for internal_mode in ("--service-host", "--app-server", "--app-client", "--gateway", "--standalone"):
         assert internal_mode not in launcher.USAGE
 

@@ -79,6 +79,12 @@ explicitly scoped digest. Scoped candidates omitted by the display budget still
 participate in refresh decisions. The next generation appends new `pi.context`
 only when scope or relevant facts change; identical facts are not reinjected.
 
+Automatically injected model background omits `brief_id`, `state_digest`,
+`brief_digest`, and `read_basis`. Brief identity and version fingerprints remain
+in durable runtime metadata for deduplication and recovery after compaction.
+Research facts, contradictions, evidence references, and retrieval routes remain
+visible to the model. This projection does not change research-tool read receipts.
+
 Pi memo pins prepared context to the generation boundary. Recovery reuses that
 prepared value. Compaction summarizes selected historical context and does not
 insert today's research state into an earlier summary. Read failures produce an
@@ -98,9 +104,52 @@ remains visible and is not hidden by generated prose.
 Research background targets 2,000 tokens, or 4,000 when contradictions need more
 space. The complete request still includes conversation history, tool results,
 compaction, and recent inputs. Its input limit is the smaller of
-`contextWindow - reserveTokens` and an optional `maxInputTokens`. Pi may perform
+`contextWindow - max(reserveTokens, maxTokens + 4096)` and an optional
+`maxInputTokens`, floored at zero. `maxTokens` is the stream override or model
+output maximum. Pi may perform
 one blocking compaction before a request; a request that still exceeds its budget
 is not sent. `/usage` exposes request estimates.
+
+## Cache diagnostics
+
+Set `CORAGENT_CACHE_DIAGNOSTICS=1` in a new Worker's environment to enable local
+diagnostics (off by default). Existing Workers do not change automatically.
+`request-cache.jsonl` beside the session's `session.sqlite` rotates at about
+8 MiB and retains one previous file. Records never enter model context.
+
+The observer covers `openai-completions` and `openai-responses` HTTP/SSE requests.
+Each HTTP attempt has request and response records linked by `request_id` and
+`attempt`, with generation ID, authenticated input sources/reasons, compaction
+head ID, request gap, and numeric input/cache usage from the raw response.
+`not_reported` is distinct from an explicit zero cache count. `completeSimple`
+calls, including summaries, use a separate `auxiliary` comparison stream.
+
+Comparison uses the final HTTP JSON message array, with separate comparisons for
+tools and top-level instructions. `common_prefix_bytes_lower_bound` measures
+matching 1 KiB JSON byte blocks, **not tokens** or guaranteed cache reuse. Keyed
+fingerprints remain in process memory; the first comparison after restart is
+unknown. No bodies, tool results, URLs, headers, credentials, or raw errors are
+logged. Unsupported transports and missing fields remain unknown. Diagnostic
+write failures do not prevent inference.
+
+Check compaction, message prefixes, tools, and instructions before attributing
+low cache usage to the gateway or upstream. Use synthetic long-context controls
+starting near 128k, comparing exact repeats and appended messages; high cache
+reuse in a small prompt does not establish long-context behavior.
+
+Run `python3 -B tools/test/cache_probe.py --size-k 128` for the deterministic local
+probe. Add `--live --installation /path/to/coragent` to use configured credentials
+and incur real model usage (default `CPA/gpt-6-astra`; override with `--provider`
+and `--model`). Specify `--pi-runtime` if multiple runtimes are installed.
+The probe uses the installed Pi adapter and current context/diagnostic source;
+it is not full research Worker acceptance. It sends at most four requests: cold,
+exact repeat, appended instruction, and a local echo tool result. Each request
+allows 512 output tokens and 120 seconds, with no retries. Size is approximate;
+provider usage is authoritative. Synthetic content is generated in memory, with
+no research workspace or session reads. Credentials stay in process memory.
+Private manifests, diagnostics and reports live under `local_debug/cache-probes/`.
+The probe stops on failure or unexpectedly large input. Larger 256/512 scales
+must be selected explicitly; ordinary test suites never run live probes.
 
 Only `view="brief"` and `research-brief/1` define this read contract. Caller-chosen
 refresh triggers and the former `view="review"` are not accepted. The Task context

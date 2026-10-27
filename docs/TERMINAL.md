@@ -10,6 +10,9 @@ bound to one installation-level Pi Harness SQLite durable session.
 
 Workspaces use the research mode automatically. No mode selection is needed; see the workspace commands below.
 
+Use `coragent -h` for common commands and examples, or `coragent --help-all`
+to include SSH options and background service details.
+
 ## Runtime shape
 
 There is one Agent Server owner and several clients:

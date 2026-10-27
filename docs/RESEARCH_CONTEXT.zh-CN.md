@@ -58,6 +58,10 @@ note 的内容指纹。不会为了计算版本而加载全部历史 note 正文
 首次进入、范围变化或相关事实变化才追加新的 pi.context，相同事实不重复注入。
 输入来自用户、Job Manager 或 Task Controller 不影响这个判断。
 
+自动注入的模型背景不包含 `brief_id`、`state_digest`、`brief_digest` 或 `read_basis`。
+概览身份和版本指纹保留在程序侧的持久化元数据中，用于去重和压缩后恢复。
+模型仍可看到研究事实、矛盾、证据引用和读取入口；研究工具的读取回执不受此投影影响。
+
 读取通过 Pi memo 与 generation 截止位置一起固定；恢复复用固定结果。压缩只总结所选的历史，
 不把最新研究状态倒填进旧摘要。正常恢复和压缩不单独要求重建概览。
 读取失败会注入明确的不可用状态，同一输入内不反复重试；新输入可重试。
@@ -75,13 +79,52 @@ Task Controller 是否推进任务与概览是否刷新分开判断。Agent 通�
 
 研究概览只是上下文的一部分。Pi 管理对话历史、工具结果、压缩摘要和最近保留内容；
 `beforeRequest` 附加当前任务控制信息，然后检查整个请求的估算大小。
-输入预算取 `contextWindow - reserveTokens` 与可选 `maxInputTokens` 的较小值。
+输入预算取 `contextWindow - max(reserveTokens, maxTokens + 4096)` 与可选
+`maxInputTokens` 的较小值，最低为零。`maxTokens` 使用 stream 输出配置或模型最大输出。
 `reserveTokens` 是回答和请求开销的预留；它与研究概览的 2,000/4,000 token 软目标不同。
 模型窗口、输出额度和部署上限的配置见[模型配置](MODEL_COMPATIBILITY.zh-CN.md)。
 
 `prepareSummary` 只根据被压缩的历史生成补充说明和上下文锚点，不读取最新研究并倒填历史。
 最终请求超预算时可要求 Pi 做一次阻塞压缩；仍无法满足预算时不会发出主模型请求。
 窗口估算和输入预算由终端显示，详细计数可通过 `/usage` 查看。
+
+## 缓存诊断
+
+在新 Worker 的环境中设置 `CORAGENT_CACHE_DIAGNOSTICS=1` 可启用本地诊断，默认关闭。
+已有 Worker 不会因环境变化自动开启。诊断文件为会话 `session.sqlite` 同目录的
+`request-cache.jsonl`；单文件约 8 MiB 时轮转，保留一个旧文件。记录不进入模型上下文。
+
+当前观察 `openai-completions` 和 `openai-responses` 的 HTTP/SSE 路径：每次 HTTP 尝试
+记录发送与响应两行，以 `request_id` 和 `attempt` 关联。记录 generation ID、已验证的
+输入来源和原因、压缩 head ID、请求间隔、原始响应 usage 中的输入量与缓存读取量。
+`not_reported` 表示没有可用缓存字段，不等同于服务明确报告零命中。摘要等
+`completeSimple` 调用标为 `auxiliary`，与主执行分开比较；该标签不是新的用户 Task。
+
+前缀比较基于最终 HTTP JSON 中的消息数组，并独立比较工具和顶层 instructions。
+`common_prefix_bytes_lower_bound` 是按 1 KiB 块比较得到的 JSON 字节下界，**不是 Token 数**，
+也不证明服务端缓存必然命中。程序只在内存中保留带随机密钥的指纹；重启后首次比较为空。
+不保存正文、工具结果、URL、请求头、凭据或原始错误文本。不支持的传输和缺失字段保持未知，
+诊断写入失败不阻止模型执行。
+
+排查时先看是否发生压缩、消息前缀是否变化、工具/instructions 是否变化，再对照缓存读取量。
+如果这些都稳定而命中下降，需要进一步核对转发服务和上游行为。用合成内容从 128k 附近
+逐步扩大对照，分别测试完全重复与末尾追加；小上下文高命中不能代替长上下文验证。
+
+仓库提供固定四步的合成测试脚本，无需部署或启动研究会话：
+
+```bash
+python3 -B tools/test/cache_probe.py --size-k 128
+python3 -B tools/test/cache_probe.py --live --size-k 128 --installation /home/iaw/soft/coragent
+```
+
+第一条使用本地假响应，验证请求流程；第二条使用安装配置中的 `CPA/gpt-6-astra`，会产生真实用量。
+可用 `--provider`、`--model` 选择已配置模型，多个 Pi runtime 时须指定 `--pi-runtime`。
+测试使用已安装的 Pi 适配器和当前源码的上下文管理、诊断代码；不是完整研究 Worker 验收。
+按首次、完全重复、追加新指令、一次本地回声工具结果的顺序发送，最多四次请求，
+每次输出上限 512 Token、超时 120 秒，不自动重试。`--size-k` 是近似规模，实际输入量以服务返回为准。
+脚本不会读取研究工作区或已有会话；合成内容只在内存生成。凭据从安装配置读取并仅在进程内传递。
+清单、诊断和汇总报告写入 `local_debug/cache-probes/` 的独立目录，不进入普通测试或发布产物。
+首次失败或规模明显超限时停止。只有需要验证规模差异时，才显式选择 256 或 512。
 
 ## 单一合同
 

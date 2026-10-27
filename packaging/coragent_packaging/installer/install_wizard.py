@@ -2231,7 +2231,6 @@ def app_server_unit(args: argparse.Namespace) -> str:
     # through systemctl and never need to invoke the Host process directly.
     command = _systemd_quote(root / "current/agent/libexec/coragent-host")
     wanted_by = "multi-user.target" if args.service_scope == "system" else "default.target"
-    runtime_directory = "RuntimeDirectory=coragent\nRuntimeDirectoryMode=0700" if args.service_scope == "system" else ""
     return f"""[Unit]
 Description=CoRAgent Agent Server (Host API and Pi SDK Harness)
 After=network-online.target
@@ -2252,7 +2251,8 @@ Environment={_systemd_quote('CORAGENT_APP_SERVER_RUNTIME_DIR=' + ('/run/coragent
 {f'User={_systemd_value(service_user)}' if args.service_scope == 'system' else ''}
 {f'Group={_systemd_value(args.service_group)}' if getattr(args, 'service_group', None) and args.service_scope == 'system' else ''}
 {_notification_environment_directive(args)}
-{runtime_directory}
+RuntimeDirectory=coragent
+RuntimeDirectoryMode=0700
 Restart=on-failure
 RestartSec=3s
 UMask=0077

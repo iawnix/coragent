@@ -84,7 +84,8 @@ def run_job(root, request, timeout):
             settings = load_job_config(os.environ['CORAGENT_JOB_CONFIG'])
             target = configured_targets(settings)[target_key(request['execution_target'])]
             remote = receipt['metadata']['remote_dir']
-            expected = staged_directory(target['work_root'], receipt['cwd'], receipt['job_id'], receipt['workspace_id'])
+            expected = staged_directory(target['work_root'], receipt['cwd'], receipt['job_id'], receipt['workspace_id'],
+                                        receipt['metadata']['execution_id'])
             if remote != expected:
                 raise RuntimeError('acceptance_cleanup_path_mismatch')
             platform = platforms_from_config(Path(os.environ['CORAGENT_JOB_CONFIG']))[0][target_key(request['execution_target'])]

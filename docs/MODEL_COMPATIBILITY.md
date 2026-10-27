@@ -49,13 +49,16 @@ definitions must match the actual service; marketing specifications are not read
 at runtime. The operating input budget is:
 
 ```text
-min(contextWindow - reserveTokens, maxInputTokens)
+max(0, min(contextWindow - max(reserveTokens, maxTokens + 4096), maxInputTokens))
 ```
 
-Without `maxInputTokens`, only the first term applies. Pi's `reserveTokens` leaves
-room for the answer and request overhead. `CORAGENT_CONTEXT_INPUT_TOKENS` provides
+Without `maxInputTokens`, no additional input cap applies. The reserve covers at
+least the requested output plus 4,096 safety tokens, so compaction starts before
+the SDK shrinks the output allowance. `CORAGENT_CONTEXT_INPUT_TOKENS` provides
 an optional lower input cap and is unset by default. `maxTokens` is the current
-output allowance, separate from the context window. The terminal displays input
+output allowance (stream override or model maximum), separate from the context
+window. For a 1,050,000 window and 128,000 output, the input budget is 917,904;
+default background compaction starts another 32,768 tokens earlier. The terminal displays input
 budget and model window; `/usage` provides usage details. Estimates are not billing
 measurements. See [Architecture](ARCHITECTURE.md#context-and-next_run) for compaction
 and research context preparation.

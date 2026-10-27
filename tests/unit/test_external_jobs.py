@@ -394,12 +394,38 @@ def test_reused_local_path_with_new_workspace_identity_keeps_separate_staging(qu
     assert len(tasks(state)) == 2
 
 
-def test_staging_never_merges_with_an_existing_execution_directory(queue, tmp_path):
+@pytest.mark.parametrize('file_mode', ['staged', 'shared'])
+def test_recreated_workspace_has_new_execution_and_request_identity(queue, tmp_path, file_mode):
+    config, state = queue
+    if file_mode == 'shared':
+        config = {**config, 'file_mode': file_mode, 'work_root': str(tmp_path)}
+    platform = ExternalJobPlatform(config)
+    first = spec(tmp_path, command=('/bin/true',), workspace_id='workspace')
+    first_receipt = platform.start(first)
+    first_task = tasks(state)[0]
+    original_script = Path(first_task['script']).read_bytes()
+    first.cwd.rename(tmp_path / 'archived-controller')
+    second = spec(tmp_path, command=('/bin/false',), workspace_id='workspace')
+    second_receipt = ExternalJobPlatform(config).start(second)
+    assert first_receipt.metadata['external_request']['request_id'] != second_receipt.metadata['external_request']['request_id']
+    assert first_receipt.metadata['execution_id'] != second_receipt.metadata['execution_id']
+    assert len(tasks(state)) == 2
+    if file_mode == 'staged':
+        assert first_receipt.metadata['remote_dir'] != second_receipt.metadata['remote_dir']
+        assert Path(first_task['script']).read_bytes() == original_script
+    recovered = ExternalJobPlatform(config).recover_receipt(second.job_id, second.cwd)
+    assert recovered.metadata['external_request'] == second_receipt.metadata['external_request']
+    assert recovered.metadata['scheduler_id'] == second_receipt.metadata['scheduler_id']
+    assert len(tasks(state)) == 2
+
+
+def test_staging_never_merges_with_an_existing_execution_directory(queue, tmp_path, monkeypatch):
     config, state = queue
     platform = ExternalJobPlatform(config)
     request = spec(tmp_path, command=('/bin/true',), workspace_id='workspace')
-    remote = Path(platform._remote_dir(request))
+    remote = Path(config['work_root']) / 'existing-execution'
     remote.mkdir()
+    monkeypatch.setattr(platform, '_remote_dir', lambda *_: str(remote))
     old_output = remote / 'result.txt'
     old_output.write_text('older execution evidence')
     receipt = platform.start(request)

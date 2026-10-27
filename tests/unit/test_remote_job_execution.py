@@ -134,7 +134,9 @@ def test_lost_submit_response_recovers_scoped_directory_without_resubmission(clu
     with pytest.raises(subprocess.TimeoutExpired):
         platform.start(spec)
     recovered = platform.recover_receipt(spec.job_id, spec.cwd)
-    assert recovered.metadata['remote_dir'] == platform._remote_dir(spec)
+    saved = json.loads((spec.cwd / 'spec.json').read_text())
+    assert recovered.metadata['remote_dir'] == saved['remote_dir']
+    assert recovered.metadata['external_request'] == saved['metadata']['external_request']
     assert platform.status(recovered).state == JobState.SUCCEEDED
     assert (Path(recovered.metadata['remote_dir']) / 'submission-count').read_text() == '1'
     with pytest.raises(ValueError, match='reconcile instead of resubmitting'):

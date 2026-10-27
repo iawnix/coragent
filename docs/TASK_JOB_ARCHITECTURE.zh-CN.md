@@ -34,6 +34,15 @@ Task 保存 objective、criteria、next_action、execution_plan、进展依据�
 控制器在执行变化和周期核对时检查任务；没有新的 Job 事件也能续接活跃任务。
 用户输入优先。暂停允许当前回复和已有 Job 收尾；取消任务明确选择保留或请求取消 Job。
 临时执行故障可触发有限自动重试，需人工处理的故障保存在恢复记录中。
+`execution_recovery` 用 `failure_domain` 和 `failure_kind` 保存故障来源，
+当前 Agent 输入失败归属 `agent_runtime`，区分 `provider_quota`、`provider_error`、
+`context_limit`、`runtime_blocked`、`agent_fault` 和未分类的 `runtime_error`。
+日配额等明确额度耗尽直接进入 `attention_required`，普通 429 限流仍按有界退避恢复。
+恢复事件以 `runtime_failure` 保存归因和原始 `submission_id`，恢复记录清除后仍可审计。
+这些记录不改变已有 Job 状态，也不证明计算提交失败。Task 的 `block_kind` 表示阻塞影响：
+当仍有对应配额恢复记录，且 Agent 用明确配额错误作为 `execution_failure` 的理由时，
+控制器将其规范为 `resource_unavailable` 并保留来源；独立的 Job 故障不继承模型配额归因。
+旧恢复记录可按原始 `reason/detail` 识别，无需重写会话数据库；外层状态展示保持简洁。
 运行时通过现有工具观察 Result、Artifact 和归属 Job 里程碑并记录进展，单纯改计划或
 重复查询不计为新证据；下一步、等待和控制仍由 Agent 明确维护。
 

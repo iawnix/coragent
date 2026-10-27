@@ -1322,7 +1322,7 @@
             "budget_exhausted",
             "scientific_dead_end"
           ],
-          "description": "block only: classify the concrete reason work cannot continue."
+          "description": "block only: classify the concrete reason work cannot continue. Use resource_unavailable when an external Agent/runtime dependency such as a model-provider quota prevents continuation; reserve execution_failure for an accepted Job or scientific program that actually failed."
         },
         "resume_when": {
           "type": "string",

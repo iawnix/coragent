@@ -127,7 +127,7 @@ test('explicit cap and Pi reserve share one admission budget', async () => {
   assert.equal(telemetry.at(-1).input_budget_tokens,8192);
   const native = fixtureManager({inputTokens:undefined, reserveTokens:16384,
     coordinator:{async commit_files(r){telemetry.push(r.payload);}}});
-  const nativeRequest = {...request, model:{contextWindow:20000}};
+  const nativeRequest = {...request, model:{contextWindow:20000}, maxTokens:1024};
   assert.ok((await native.admit({...nativeRequest,messages:[{role:'user',content:'x'.repeat(20000)}]},'native')).block);
   assert.equal(telemetry.at(-1).input_budget_tokens,3616);
   assert.equal(telemetry[0].snapshot,undefined);
@@ -137,7 +137,7 @@ test('explicit cap and Pi reserve share one admission budget', async () => {
   assert.equal(contextPolicy({},'131072').compaction.maxInputTokens,131072);
 });
 
-test('default admission follows model window and Pi reserve without the old fixed cap', async () => {
+test('default admission preserves output room without the old fixed input cap', async () => {
   const telemetry = [];
   const manager = fixtureManager({inputTokens:undefined,reserveTokens:16384,
     coordinator:{async commit_files(r){telemetry.push(r.payload);}}});
@@ -145,9 +145,9 @@ test('default admission follows model window and Pi reserve without the old fixe
     model:{contextWindow:1000000},maxTokens:128000};
   assert.ok((await manager.admit(request,'large-window')).messages);
   assert.ok(telemetry.at(-1).input_tokens > 131072);
-  assert.equal(telemetry.at(-1).input_budget_tokens,983616);
+  assert.equal(telemetry.at(-1).input_budget_tokens,867904);
   assert.ok((await manager.admit({...request,model:{contextWindow:200000}},'smaller-window')).block);
-  assert.equal(telemetry.at(-1).input_budget_tokens,183616);
+  assert.equal(telemetry.at(-1).input_budget_tokens,67904);
   assert.equal(contextInputBudget(200000,{reserveTokens:0}),200000);
   assert.equal(contextInputBudget(200000,{reserveTokens:16384,maxInputTokens:999999}),183616);
   let reserveTokens=16384;
@@ -155,6 +155,58 @@ test('default admission follows model window and Pi reserve without the old fixe
   const native=contextPolicy(settings);
   reserveTokens=32768;
   assert.equal(contextInputBudget(200000,native.compaction),167232,'native settings remain live');
+});
+
+test('920k input compacts with a 128k output allowance, including cached input', async () => {
+  const telemetry=[];
+  const manager=fixtureManager({inputTokens:undefined,reserveTokens:16384,
+    coordinator:{async commit_files(r){telemetry.push(r.payload);}}});
+  const previous=fauxAssistantMessage('Previous response');
+  previous.usage={...previous.usage,input:20000,cacheRead:900000,output:0,totalTokens:920000};
+  const request={messages:[previous,{role:'user',content:'Continue',timestamp:Date.now()}],
+    model:{contextWindow:1050000},maxTokens:128000};
+  assert.equal((await manager.admit(request,'large-output')).compact,true);
+  assert.equal(telemetry.at(-1).input_budget_tokens,917904);
+  assert.equal(telemetry.at(-1).safety_tokens,4096);
+  assert.ok((await manager.admit({...request,maxTokens:16384},'explicit-smaller-output')).messages);
+  const {contextInputBudget:nativeBudget}=await import(pathToFileURL(join(pinnedPiSource(),'packages/durable/src/harness/compaction.ts')));
+  for (const window of [10000,200000,1050000]) for (const reserveTokens of [0,16384,160000]) {
+    for (const maxTokens of [0,1024,128000]) for (const maxInputTokens of [undefined,65536]) {
+      const policy={reserveTokens,maxInputTokens};
+      assert.equal(contextInputBudget(window,policy,maxTokens),nativeBudget(window,policy,maxTokens));
+    }
+  }
+});
+
+for (const scenario of [
+  {name:'model output default',tokens:920000,compacts:true},
+  {name:'blocking',tokens:920000,maxTokens:128000,compacts:true},
+  {name:'background',tokens:900000,maxTokens:128000,compacts:true},
+  {name:'explicit output override',tokens:920000,maxTokens:16384,compacts:false},
+]) test(`native million-token ${scenario.name} threshold reserves output before dispatch`, {timeout:20000}, async t => {
+  const faux=fauxProvider({models:[{id:'faux-1',contextWindow:1050000,maxTokens:128000}]});
+  const models=createModels();models.setProvider(faux.provider);
+  const calls=[];
+  const harness=await Harness.open(new MemoryStorage(),{models,registry:createRegistry(),
+    settings:{...(scenario.maxTokens===undefined?{}:{stream:{maxTokens:scenario.maxTokens}}),
+      compaction:{keepRecentTokens:1000},retry:{enabled:false}}},context);
+  t.after(()=>harness.close(context));
+  const conversation=await harness.root(context,{agent:{model:{provider:'faux',modelId:'faux-1'}}});
+  const respond=request=>{
+    const summary=JSON.stringify(request.messages[0]).includes('context summarization assistant');
+    calls.push(summary?'summary':'main');
+    return fauxAssistantMessage(summary?'Preserved original goal and constraints.':'Continued');
+  };
+  faux.setResponses(Array(4).fill(respond));
+  await (await conversation.submit({type:'write',entry:{kind:'fixture.history',model:[
+    {role:'user',content:'x'.repeat(scenario.tokens*3.5),timestamp:0},
+  ]}},context)).wait(context);
+  const outcome=await (await conversation.submit({type:'input',content:'Continue '.repeat(500)},context)).wait(context);
+  await conversation.waitForIdle(context);
+  assert.notEqual(outcome.status,'unanswered');
+  assert.equal(calls.filter(c=>c==='summary').length,scenario.compacts?1:0);
+  assert.equal(calls.filter(c=>c==='main').length,1);
+  if (scenario.name==='blocking'||scenario.name==='model output default') assert.deepEqual(calls,['summary','main']);
 });
 
 test('unchanged scoped facts are checked without duplicate injection; scope changes and reset inject', async () => {
@@ -218,6 +270,43 @@ test('hydration recovery reuses immutable memo, escapes data and grants no read 
   assert.ok(await manager.prepare({entries:[{kind:'pi.user',model:first.messages}]},memoApi(),context,{task}));
 });
 
+test('automatic background keeps fingerprints private while retaining evidence and retrieval routes', async () => {
+  const brief = {...snapshot(), read_basis:'private-read-receipt',
+    findings:[{kind:'result',ref:'result_1',summary:'Recorded evidence',artifact_digest:'sha256:evidence'}],
+    contradictions:[{summary:'Conflicting observations',refs:['result_1','result_2']}],
+    source_refs:['result_1','result_2'],
+    read_more:{research:{tool:'research_read'},jobs:{tool:'job_status'}}};
+  const original = structuredClone(brief);
+  const estimatedBackgrounds = [];
+  const manager = fixtureManager({bridge:{async execute_command(){return brief;}},
+    estimateContextTokens(messages) {
+      for (const message of messages) {
+        const projected = decode(message).research_brief;
+        if (projected) estimatedBackgrounds.push(projected);
+      }
+      return estimateContextTokens(messages);
+    }});
+  const task = fullTask();
+  const prepared = await manager.prepare({entries:[]},memoApi(),context,{task});
+  const visible = decode(prepared.messages[0]).research_brief;
+  for (const key of ['brief_id','state_digest','brief_digest','read_basis']) {
+    assert.equal(Object.hasOwn(visible,key),false);
+  }
+  for (const key of ['findings','contradictions','source_refs','read_more']) {
+    assert.deepEqual(visible[key],brief[key]);
+  }
+  assert.ok(estimatedBackgrounds.length > 0);
+  assert.deepEqual(estimatedBackgrounds.at(-1),visible);
+  for (const key of ['brief_id','state_digest','brief_digest']) {
+    assert.equal(prepared.data[key],brief[key]);
+  }
+  assert.deepEqual(brief,original,'projection must not mutate the backend response');
+  const summary = manager.prepareSummary({entries:[committed(prepared)],firstKept:3});
+  assert.deepEqual(summary.metadata.anchor,prepared.data);
+  const restored = {entries:[{id:4,kind:'pi.compaction',data:{metadata:[summary.metadata]}}]};
+  assert.equal(await manager.prepare(restored,memoApi(),context,{task,input_ids:[2]}),undefined);
+});
+
 test('scoped fact changes refresh on ordinary inputs and repeated events do not duplicate context', async () => {
   let version = 1;
   const manager = fixtureManager({ bridge: { async execute_command(_command, params) {
@@ -235,7 +324,8 @@ test('scoped fact changes refresh on ordinary inputs and repeated events do not 
   version++;
   const changed = await manager.prepare(view,memoApi(),context,{task,input_ids:[4]});
   assert.equal(changed.data.refresh_reason,'facts_changed');
-  assert.equal(decode(changed.messages[0]).research_brief.state_digest,'sha256:2');
+  assert.equal(changed.data.state_digest,'sha256:2');
+  assert.equal(Object.hasOwn(decode(changed.messages[0]).research_brief,'state_digest'),false);
 });
 
 test('persisted process notes refresh restored context without changing Node revision or selecting an assessment', async t => {

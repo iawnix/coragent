@@ -99,6 +99,7 @@ class LaunchRequest:
     remote_proxy_path: str | None = None
     ssh_config: str | None = None
     ssh_options: tuple[str, ...] = ()
+    show_all_help: bool = False
 
 
 @dataclass(frozen=True)
@@ -124,24 +125,37 @@ USAGE = """Usage:
   coragent phone revoke <device-id>
 
 Options:
-  --workspace <name>   Open a research workspace.
-  --session-id <id>   Continue one exact conversation.
+  --workspace <name>  Open a research workspace.
   -c, --continue      Continue the latest conversation.
-  --remote-host <host>  Connect the terminal to a Host through SSH.
-  --remote-host-socket <path>  Remote Host Unix socket path.
-  --remote-proxy-path <path>  Remote apps/agent/transport/ssh.mjs path.
-  --ssh-config <path>  SSH config file.
-  --ssh-option <value>  Additional SSH option (repeatable).
-  --version          Show this installed product version.
+  --session-id <id>   Continue a specific conversation.
+  --version          Show the installed version.
   -h, --help          Show this help.
+  --help-all          Include SSH options and service details.
 
-The terminal runs Pi's native experimental client TUI against an installation-
-owned durable Harness server. Session history is isolated under the installation
-Host state; Phone and monitor requests address the same Pi lane. The Native
-Pi Harness is the only supported runtime backend.
-The managed Host service is coragent.service.
-To select another Host session, open the terminal and run /resume. Startup
--r/--resume is not supported by the Host-mediated client.
+Examples:
+  coragent --workspace reaction-a
+  coragent --workspace reaction-a -c
+
+Inside the terminal, use /resume to switch conversations.
+"""
+
+
+EXTENDED_USAGE = """
+Remote connection (SSH):
+  --remote-host <host>          Connect to a remote Host.
+  --remote-host-socket <path>  Remote Host Unix socket path.
+  --remote-proxy-path <path>   Remote apps/agent/transport/ssh.mjs path.
+  --ssh-config <path>          SSH config file.
+  --ssh-option <value>         Additional SSH option (repeatable).
+
+Provide both the remote socket and proxy paths when using --remote-host.
+
+Service and sessions:
+  The terminal connects to the background service coragent.service.
+  Conversations are stored by that installation and shared with Phone and Monitor.
+  Startup -r/--resume is unsupported; use /resume inside the terminal.
+
+See docs/TERMINAL.md for remote setup and runtime architecture.
 """
 
 
@@ -161,6 +175,7 @@ def parse_launch_request(argv: list[str]) -> LaunchRequest:
             return LaunchRequest(None, "research", None, False, False, (), phone_action="revoke", phone_device_id=argv[2])
         raise CoRAgentHostError("usage: coragent phone pair|devices|revoke <device-id>", exit_code=2)
     show_help = False
+    show_all_help = False
     workspace_name: str | None = None
     session_id: str | None = None
     continue_latest = False
@@ -262,6 +277,9 @@ def parse_launch_request(argv: list[str]) -> LaunchRequest:
             )
         elif value in {"-h", "--help"}:
             show_help = True
+        elif value == "--help-all":
+            show_help = True
+            show_all_help = True
         else:
             pi_args.append(value)
         index += 1
@@ -276,6 +294,7 @@ def parse_launch_request(argv: list[str]) -> LaunchRequest:
         session_id=session_id,
         continue_latest=continue_latest,
         show_help=show_help,
+        show_all_help=show_all_help,
         pi_args=tuple(pi_args),
         gateway=gateway,
         host=host,
@@ -1463,7 +1482,7 @@ def prepare_remote_terminal_cwd(installation: Installation, workspace_name: str)
 def launch(argv: list[str], *, package_root: str | Path, install_root: str | Path) -> int:
     request = parse_launch_request(argv)
     if request.show_help:
-        print(SERVER_USAGE if request.host else USAGE, end="")
+        print(SERVER_USAGE if request.host else USAGE + (EXTENDED_USAGE if request.show_all_help else ""), end="")
         return 0
     from research_agent.bootstrap.installation_maintenance import assert_installation_available
     try:

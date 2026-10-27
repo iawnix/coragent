@@ -5,6 +5,12 @@ import { JOB_EVENT_IDS_LIMIT } from "../contracts/monitor.mjs";
 const KEY = "coragent.research-context/2";
 const PROJECTION_MAX_BYTES = 16000;
 const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+// Version fingerprints belong to the runtime anchor, not the model's research
+// background. Keep evidence references and retrieval routes in the projection.
+function modelResearchBrief(brief) {
+  const { brief_id, state_digest, brief_digest, read_basis, ...research } = brief;
+  return research;
+}
 const envelope = (tag, value) => ({ role: "user", timestamp: 0,
   content: `<${tag} origin="runtime">\n${JSON.stringify(value).replaceAll("<", "\\u003c").replaceAll(">", "\\u003e")}\n</${tag}>` });
 
@@ -39,8 +45,11 @@ export function contextPolicy(settings, value = process.env.CORAGENT_CONTEXT_INP
 }
 
 /** Pi durable's threshold, shared by final admission and terminal telemetry. */
-export function contextInputBudget(contextWindow, { reserveTokens = 16384, maxInputTokens } = {}) {
-  return Math.min(contextWindow - reserveTokens, maxInputTokens ?? Infinity);
+export function contextInputBudget(contextWindow, { reserveTokens = 16384, maxInputTokens } = {}, maxTokens = 0) {
+  // Preserve the requested answer budget before the SDK has to shrink it.
+  // Match Pi's patched threshold and its 4096-token request safety margin.
+  const reserve = Math.max(reserveTokens, maxTokens > 0 ? maxTokens + 4096 : 0);
+  return Math.max(0, Math.min(contextWindow - reserve, maxInputTokens ?? Infinity));
 }
 
 /** One policy over native history, research orientation, compaction and final
@@ -69,7 +78,7 @@ export function createContextManager({ bridge, coordinator, sessionId, estimateC
       }
       if (Buffer.byteLength(JSON.stringify(brief)) > limit) throw new Error("Research brief exceeds its byte budget");
       if (brief.contradictions.length) target = 4000;
-      const tokens = estimateContextTokens([envelope("research_context", { ...control, research_brief: brief })]).tokens;
+      const tokens = estimateContextTokens([envelope("research_context", { ...control, research_brief: modelResearchBrief(brief) })]).tokens;
       if (tokens <= target || limit === 2048 || attempt === 2) break;
       limit = Math.max(2048, Math.floor(limit * Math.max(0.25, (target - taskTokens) / Math.max(1, tokens - taskTokens)) * 0.9));
     }
@@ -116,9 +125,8 @@ export function createContextManager({ bridge, coordinator, sessionId, estimateC
       }
       const refreshReason = !previous ? "initial" : previous.scope_id !== scopeId ? "scope_changed"
         : previous.availability === "unavailable" ? "retry" : "facts_changed";
-      const { read_basis: _readBasis, ...research } = brief;
       const message = envelope("research_context", { task: projectDecisionTask(task),
-        research_brief: research,
+        research_brief: modelResearchBrief(brief),
         provenance: { scope, refresh_reason: refreshReason, observed_at: new Date().toISOString() },
         notice: "Historical research brief, not live state or a read receipt. Read current fields before replacing them." });
       const data = { schema_version: "research-context/1", scope_id: scopeId,
@@ -147,15 +155,15 @@ export function createContextManager({ bridge, coordinator, sessionId, estimateC
       } : null, actual_user_submission_ids, automatic_continuation_enabled });
       const messages = [...request.messages, control];
       const estimate = estimateContextTokens(messages);
-      // Match Pi durable's native threshold: contextWindow - reserveTokens.
+      // Match Pi durable's native threshold, including the requested output.
       const policy = getCompactionPolicy();
       const reserve = policy.reserveTokens ?? 16384;
-      const limit = contextInputBudget(request.model.contextWindow, policy);
+      const limit = contextInputBudget(request.model.contextWindow, policy, request.maxTokens);
       const blocked = estimate.tokens > limit;
       const telemetry = { schema_version: "research-request-context/4", session_id: sessionId, request_id: requestId,
         input_tokens: estimate.tokens, usage_tokens: estimate.usageTokens, input_budget_tokens: limit,
         control_tokens: estimateContextTokens([control]).tokens, output_reserve_tokens: request.maxTokens,
-        reserve_tokens: reserve, safety_tokens: 0, model_context_window: request.model.contextWindow, blocked,
+        reserve_tokens: reserve, safety_tokens: request.maxTokens > 0 ? 4096 : 0, model_context_window: request.model.contextWindow, blocked,
         estimated: true, history_digest: hash(request.messages), control_digest: hash(control) };
       // Telemetry contains sizes and identities, never another full snapshot.
       try {

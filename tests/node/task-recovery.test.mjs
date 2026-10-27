@@ -1,6 +1,38 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { taskRecoveryPolicy, retryableSubmission, recoveryReady } from "../../apps/agent/tasks/recovery.mjs";
+import { classifyExecutionFailure, normalizeTaskBlockKind, taskRecoveryPolicy, retryableSubmission, recoveryReady } from "../../apps/agent/tasks/recovery.mjs";
+
+test("execution recovery keeps provider quota failures in the Agent runtime domain", () => {
+  assert.deepEqual(classifyExecutionFailure({ reason: "model_error", detail: "429 DAILY_LIMIT_EXCEEDED" }), {
+    failure_domain: "agent_runtime", failure_kind: "provider_quota",
+  });
+  assert.deepEqual(classifyExecutionFailure({ reason: "model_error", detail: "503 Service Unavailable" }), {
+    failure_domain: "agent_runtime", failure_kind: "provider_error",
+  });
+  assert.deepEqual(classifyExecutionFailure({ reason: "faulted", detail: "Worker crashed" }), {
+    failure_domain: "agent_runtime", failure_kind: "agent_fault",
+  });
+  const recovery = { reason: "model_error", detail: "429 DAILY_LIMIT_EXCEEDED" };
+  assert.equal(normalizeTaskBlockKind("execution_failure", recovery, "429 DAILY_LIMIT_EXCEEDED"), "resource_unavailable");
+  assert.equal(normalizeTaskBlockKind("execution_failure", recovery, "Gaussian did not converge"), "execution_failure");
+  assert.equal(normalizeTaskBlockKind("execution_failure", { failure_domain: "agent_runtime", failure_kind: "provider_error" }), "execution_failure");
+});
+
+test("daily quotas require attention while ordinary 429s remain retryable", () => {
+  for (const detail of ["429 DAILY_LIMIT_EXCEEDED", '429 {"code":"USAGE_LIMIT_EXCEEDED"}',
+    "429 insufficient_quota", "Daily limit exceeded"]) {
+    assert.equal(classifyExecutionFailure({ reason: "model_error", detail }).failure_kind, "provider_quota");
+    assert.equal(retryableSubmission({ reason: "model_error", detail }), false);
+  }
+  for (const detail of ["429 rate limit exceeded", "429 provider rate limit", "500 Service unavailable"]) {
+    assert.equal(classifyExecutionFailure({ reason: "model_error", detail }).failure_kind, "provider_error");
+    assert.equal(retryableSubmission({ reason: "model_error", detail }), true);
+  }
+  assert.equal(classifyExecutionFailure({ reason: "model_error", detail: "Context length limit exceeded" }).failure_kind, "context_limit");
+  assert.equal(classifyExecutionFailure({ reason: "model_error", detail: "request_hook_failed: DAILY_LIMIT_EXCEEDED" }).failure_kind, "agent_fault");
+  assert.equal(classifyExecutionFailure({ reason: "faulted", detail: "429 DAILY_LIMIT_EXCEEDED" }).failure_kind, "agent_fault");
+  assert.equal(classifyExecutionFailure({ reason: "request_blocked", detail: "429 DAILY_LIMIT_EXCEEDED" }).failure_kind, "runtime_blocked");
+});
 
 test("execution recovery classifies provider failures conservatively", () => {
   for (const detail of ["503 Service Unavailable", "429 rate limit", "fetch failed", "ECONNRESET", "Request timed out"]) {

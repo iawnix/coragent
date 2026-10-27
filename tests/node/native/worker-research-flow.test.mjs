@@ -33,6 +33,7 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
   let stage = "prepare";
   try {
     process.env.CORAGENT_DEBUG = "1";
+    process.env.CORAGENT_CACHE_DIAGNOSTICS = "1";
     process.env.CORAGENT_PI_DIAGNOSTIC_FILE = join(root, "pi-child.log");
     const agentDir = join(root, "agent");
     const workspaceRoot = join(root, "workspaces");
@@ -247,6 +248,14 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     assert.equal(Date.parse(activityBeforeRestart), Math.max(...read.snapshot.messages.map(message => message.timestamp)));
     await host.close();
     host = undefined;
+    const cacheLog = await readFile(join(root, "sessions", "flow", session_id, "request-cache.jsonl"), "utf8");
+    const cacheRows = cacheLog.trim().split("\n").map(JSON.parse).filter(row => row.phase === "response");
+    assert.equal(cacheRows.length, requestCount);
+    assert.ok(cacheRows.every(row => row.cache_read_status === "not_reported"));
+    assert.ok(cacheRows.some(row => row.sources.some(source => source.producer === "user")));
+    assert.ok(cacheRows.some(row => row.sources.some(source => source.producer === "job_manager")));
+    assert.ok(cacheRows.some(row => row.prefix.common_prefix_bytes_lower_bound > 0));
+    assert.doesNotMatch(cacheLog, /fixture-only|Exercise the local fixture|fixture evidence|runtime_control/);
     backend = await createCoRAgentHarnessBackend(backendOptions);
     assert.equal((await backend.listSessions("flow"))[0].updated_at, activityBeforeRestart);
     const recovered = await backend.sendInput(monitorRequest);

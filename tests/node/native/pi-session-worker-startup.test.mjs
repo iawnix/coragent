@@ -74,7 +74,7 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
     await writeFile(join(process.env.PI_CODING_AGENT_DIR, "models.json"), JSON.stringify({ providers: { fixture: {
       baseUrl: `http://127.0.0.1:${modelServer.address().port}/v1`, apiKey: "fixture-only", api: "openai-completions",
       models: [{id:"fixture", name:"Fixture", reasoning:false, input:["text"],
-        cost:{input:0, output:0, cacheRead:0, cacheWrite:0}, contextWindow:200000, maxTokens:4096}],
+        cost:{input:0, output:0, cacheRead:0, cacheWrite:0}, contextWindow:1050000, maxTokens:128000}],
     } } }));
     process.env.CORAGENT_PYTHON = managedPython();
     process.env.PYTHONDONTWRITEBYTECODE = "1";
@@ -122,6 +122,7 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
       const telemetry = await queries.telemetry(BACKGROUND_CONTEXT);
       assert.equal(telemetry.session_id, created.session.session_id);
       assert.ok(telemetry.result.contextWindow > 0);
+      assert.equal(telemetry.result.inputBudgetTokens,917904);
       assert.ok(telemetry.result.contextTokens >= 0);
       assert.equal(telemetry.result.estimated, true);
       const summary = await queries.research("", BACKGROUND_CONTEXT);

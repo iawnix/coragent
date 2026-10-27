@@ -41,10 +41,10 @@ CoRAgent 的模型测试使用本地确定性 provider，验证调用和错误�
 自定义 endpoint 的模型定义需要与实际服务相符。输入预算为：
 
 ```text
-min(contextWindow - reserveTokens, maxInputTokens)
+max(0, min(contextWindow - max(reserveTokens, maxTokens + 4096), maxInputTokens))
 ```
 
-没有配置 `maxInputTokens` 时，只使用前一项。Pi 的 `reserveTokens` 预留回答和请求开销；
+没有配置 `maxInputTokens` 时，不施加额外输入上限。预留空间取 Pi 的 `reserveTokens` 与本次最大输出加 4,096 token 安全余量中的较大值，压缩会在 SDK 缩减输出额度之前触发；
 `CORAGENT_CONTEXT_INPUT_TOKENS` 可设置额外的输入上限，默认不设置。
-`maxTokens` 是本次输出额度，和整个上下文窗口不同。终端显示输入预算及模型窗口，
+`maxTokens` 优先使用本次 stream 配置，否则使用模型的最大输出额度，和整个上下文窗口不同。例如窗口 1,050,000、输出 128,000 时，输入预算为 917,904；默认后台压缩再提前 32,768 tokens。终端显示输入预算及模型窗口，
 `/usage` 提供用量详情；估算 token 不等于账单用量。压缩及研究概览见[研究上下文](RESEARCH_CONTEXT.zh-CN.md)。
