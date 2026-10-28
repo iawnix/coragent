@@ -76,6 +76,26 @@ export function createHostSessions({ sessionBackend, workspace, deduplicate, cli
   sessionBackend.setEventHandler(acceptBackendEvent);
 
   async function handle(client, method, params) {
+    if (["session/query", "session/compact", "session/configure", "session/reload", "session/pause"].includes(method)) {
+      await workspace(params.workspace_id);
+      validateId(params.session_id, "session_id");
+      if (method === "session/query") {
+        if (!["view", "telemetry", "research", "systemPrompt", "compaction"].includes(params.query)
+          || (params.args !== undefined && (typeof params.args !== "string" || params.args.length > 16_384))) {
+          throw protocolError("invalid_query", "Invalid session query");
+        }
+        return sessionBackend.query(params);
+      }
+      if (method === "session/compact" && params.instructions !== undefined
+        && (typeof params.instructions !== "string" || params.instructions.length > 16_384)) {
+        throw protocolError("invalid_input", "Compaction instructions must be text within the size limit");
+      }
+      if (method === "session/configure" && !["off", "minimal", "low", "medium", "high", "xhigh"].includes(params.thinking_level)) {
+        throw protocolError("invalid_input", "Unknown thinking level");
+      }
+      const action = { "session/compact": "compact", "session/configure": "configure", "session/reload": "reload", "session/pause": "pause" }[method];
+      return deduplicate(method, params.request_id, cleanRequest(params), () => sessionBackend[action](params));
+    }
     if (method === "session/list") return { sessions: (await listSessions(params.workspace_id)).map((session) => stripSessionClient(session)) };
     if (method === "session/read" || method === "session/attach") {
       const requestedCursor = parseSessionCursor(params, epoch);

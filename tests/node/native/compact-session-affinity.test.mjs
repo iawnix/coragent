@@ -43,3 +43,25 @@ test('affinity opt-out, provider header format, and explicit overrides remain ef
   const override=await capture({sendSessionAffinityHeaders:true},{headers:{'x-session-affinity':'explicit'}});
   assert.equal(override.headers.get('x-session-affinity'),'explicit');
 });
+
+for (const mode of ['auto','enabled','disabled']) {
+  test(`proxy prompt cache key policy ${mode} preserves retention and routing semantics`,async()=>{
+    const compat={promptCacheKeyMode:mode,sendSessionAffinityHeaders:true};
+    const short=await capture(compat,{cacheRetention:'short'});
+    assert.equal(short.body.prompt_cache_key,mode==='enabled'?'same-conversation':undefined);
+    assert.equal(short.body.prompt_cache_retention,undefined);
+    assert.equal(short.headers.get('x-session-affinity'),'same-conversation');
+    const none=await capture(compat);
+    assert.equal(none.body.prompt_cache_key,undefined);
+    const long=await capture({...compat,supportsLongCacheRetention:true},{cacheRetention:'long'});
+    assert.equal(long.body.prompt_cache_key,mode==='disabled'?undefined:'same-conversation');
+    assert.equal(long.body.prompt_cache_retention,'24h');
+  });
+}
+
+test('explicit proxy cache keys remain bounded and permit caller payload overrides',async()=>{
+  const key=await capture({promptCacheKeyMode:'enabled'},{cacheRetention:'short',sessionId:'x'.repeat(100)});
+  assert.ok(key.body.prompt_cache_key.length<=64);
+  const override=await capture({promptCacheKeyMode:'enabled'},{cacheRetention:'short',onPayload:payload=>({...payload,prompt_cache_key:'caller-key'})});
+  assert.equal(override.body.prompt_cache_key,'caller-key');
+});

@@ -8,6 +8,6 @@ const pi = JSON.parse(readFileSync(packagePath("packaging/coragent_packaging/pi/
 export const hostIdentity = Object.freeze({
   product: Object.freeze({ name: manifest.name, version: manifest.version }),
   runtime: Object.freeze({ node: process.versions.node, pi: Object.freeze({
-    version: pi.tag.replace(/^v/u, ""), commit: pi.commit, protocol_version: pi.protocolVersion,
+    version: pi.tag.replace(/^v/u, ""), commit: pi.commit,
   }) }),
 });

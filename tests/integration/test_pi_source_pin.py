@@ -13,15 +13,16 @@ def test_pi_source_pin_is_explicit_and_uses_latest_durable_runtime() -> None:
     assert pin == {
         "component": "pi-sdk-runtime",
         "repository": "https://github.com/earendil-works/pi.git",
-        "tag": "v1.1.0",
-        "commit": "abe508e1b89912adde45528136c3221eb69acdd7",
-        "protocolVersion": 8,
+        "tag": "v1.4.0",
+        "commit": "4a080252f06caf63a525d7873c5d94d3c23887e0",
     }
     patch = "\n".join(path.read_text(encoding="utf-8") for path in sorted((ROOT / "packaging/coragent_packaging/pi/patches").glob("*.patch")))
-    assert "PI_SESSION_WORKER_ENTRY" in patch
-    assert "CORAGENT_PI_DIAGNOSTIC_FILE" in patch
-    assert "workspaceId" in patch
-    assert "session.sqlite" in patch
+    assert "prepareContext" in patch
+    assert "prepareSummary" in patch
+    assert "CORAGENT_CREDENTIALS_FILE" in patch
+    assert "promptCacheKeyMode" in patch
+    assert "src/experimental/" not in patch
+    assert "@earendil-works/pi-server" not in patch
 
 
 def test_prepare_pi_source_verifies_a_matching_checkout() -> None:
@@ -35,13 +36,13 @@ def test_prepare_pi_source_verifies_a_matching_checkout() -> None:
     assert result.returncode == 0, result.stderr
 
 
-def test_prepare_pi_source_rejects_incorrect_protocol_metadata(monkeypatch) -> None:
+def test_prepare_pi_source_rejects_incorrect_package_version(monkeypatch) -> None:
     import pytest
     from coragent_packaging.pi import prepare
     source = Path(os.environ["CORAGENT_TEST_PI_RUNTIME_ROOT"])
-    descriptor = {**prepare.pin(), "protocolVersion": -1}
+    descriptor = {**prepare.pin(), "tag": "v0.0.0"}
     monkeypatch.setattr(prepare, "pin", lambda: descriptor)
-    with pytest.raises(prepare.PiSourceError, match="protocol version"):
+    with pytest.raises(prepare.PiSourceError, match="package version"):
         prepare.verify(source)
 
 

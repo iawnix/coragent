@@ -1,402 +1,234 @@
 import { MONITOR_SERVICE_ID } from "../contracts/monitor.mjs";
-import { loadPi } from "./source.mjs";
 import { JOB_ADMISSION_SERVICE_ID } from "./admission/jobs.mjs";
 import { SESSION_ADMISSION_SERVICE_ID } from "./admission/session.mjs";
+import { CLIENT_QUERIES_SERVICE_ID } from "./services/queries.mjs";
+import { createSessionCatalog } from "./session-catalog.mjs";
+import { startSessionWorker } from "./worker-process.mjs";
 import { realpath, mkdir, open, lstat } from "node:fs/promises";
 import { createWorkspaceCatalog } from "../host/workspaces.mjs";
 import { randomBytes } from "node:crypto";
 import { join, resolve } from "node:path";
-
 import { sessionActivityAt } from "../host/session-selection.mjs";
 
-const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/u;
+const INPUT_SERVICE = "coragent.input-admission";
 
-/**
- * Start Pi's experimental server and expose the CoRAgent Agent Server backend.
- *
- * The experimental server remains the owner of session files, durable Harness,
- * lanes, and transcripts. This adapter translates Agent Server requests to
- * Pi's SessionManagement/AgentController services, so every client reaches
- * the same durable lane.
- */
+/** CoRAgent owns processes and session discovery; Pi Durable owns execution and storage. */
 export async function createCoRAgentHarnessBackend(options = {}) {
   const sourceRoot = absolute(options.sourceRoot || process.env.CORAGENT_PI_RUNTIME_ROOT, "sourceRoot");
-  // Node resolves module symlinks; Worker entry identity must use that same path.
   const packageRoot = await realpath(absolute(options.packageRoot || process.env.CORAGENT_PACKAGE_ROOT, "packageRoot"));
   const workspaceRoot = absolute(options.workspaceRoot, "workspaceRoot");
   const serverDirectory = absolute(options.serverDirectory, "serverDirectory");
   const sessionDir = absolute(options.sessionDir, "sessionDir");
   const stateRoot = absolute(options.stateRoot || join(serverDirectory, ".."), "stateRoot");
-  const workerEntry = join(packageRoot, "apps/agent/runtime/worker.mjs");
   const producerToken = await internalProducerToken(stateRoot);
-  process.env.CORAGENT_INPUT_PRODUCER_TOKEN = producerToken;
-
-  // Install Pi's source aliases before importing any TypeScript source module.
-  process.env.PI_EXPERIMENTAL = "1";
-  process.env.CORAGENT_PI_RUNTIME_ROOT = sourceRoot;
-  process.env.CORAGENT_PACKAGE_ROOT = packageRoot;
-  process.env.PI_SESSION_WORKER_ENTRY = workerEntry;
-  process.env.CORAGENT_WORKSPACE_ROOT = workspaceRoot;
-  await loadPi("resolver", sourceRoot);
-
-  const [{ BACKGROUND_CONTEXT }, serverModule, runtimeModule] = await Promise.all([
-    loadPi("context", sourceRoot),
-    loadPi("server", sourceRoot),
-    loadPi("clientRuntime", sourceRoot),
-  ]);
-  const { defineService } = await loadPi("chord", sourceRoot);
-  const { INPUT_ADMISSION_SERVICE_ID } = await import("./admission/input.mjs");
-  const InputAdmission = defineService(INPUT_ADMISSION_SERVICE_ID);
-  const MonitorAdmission = defineService(JOB_ADMISSION_SERVICE_ID);
-  const SessionAdmission = defineService(SESSION_ADMISSION_SERVICE_ID);
-  const Monitor = defineService(MONITOR_SERVICE_ID);
-  const { startForegroundServer } = serverModule;
-  const { openClientRuntime, activateBuiltinClientServices } = runtimeModule;
-
-  const piRuntime = await startForegroundServer({
-    directory: serverDirectory,
-    serverId: options.serverId,
-    sessionDir,
-    // CoRAgent server tools and skills are loaded by pi-session-worker.mjs. An
-    // empty presentation selection leaves the interactive UI entirely Pi-owned.
-    pluginPackages: [],
-    provider: options.model?.provider,
-    model: options.model?.id,
-  });
-  const connectCommand = {
-    command: "client",
-    connect: { transport: "unix", serverId: piRuntime.serverId, path: piRuntime.socketPath },
-  };
-  let adminRuntime;
-  let admin;
-  try {
-    adminRuntime = await openClientRuntime(connectCommand);
-    admin = await activateBuiltinClientServices(adminRuntime.servers[0]);
-  } catch (cause) {
-    // startForegroundServer owns detached coordinator/server processes. If
-    // client activation fails, the backend has not been returned to the
-    // caller yet, so close the Pi runtime here rather than relying on the
-    // outer Host cleanup (which cannot see this partially-built backend).
-    await adminRuntime?.dispose?.().catch(() => {});
-    await piRuntime.close().catch(() => {});
-    throw cause;
-  }
-  const bindings = new Map();
-  // `openBinding` is called by every Host RPC (and by recovery callbacks).
-  // Keep initialization itself single-flight; otherwise two simultaneous
-  // attaches can create two client runtimes and two transcript subscriptions
-  // for the same worker lane.
-  const bindingPromises = new Map();
-  let eventHandler = () => {};
-  let closed = false;
-
   const workspaceCatalog = options.workspaceCatalog || createWorkspaceCatalog(workspaceRoot);
-  async function workspace(workspaceId, options = {}) {
-    return (await workspaceCatalog.resolve(workspaceId, options)).source_root;
+  const catalog = createSessionCatalog(sessionDir);
+  const summaries = new Map((await catalog.list()).map(item => [`${item.workspaceId}/${item.id}`, item]));
+  const bindings = new Map(), pending = new Map(), restarts = new Map(), removals = new Map();
+  const timers = new Set();
+  const serverId = options.serverId || "local";
+  let socketPath = options.socketPath || join(serverDirectory, `${serverId}.sock`);
+  let eventHandler = () => {}, closed = false;
+  const recoveryHealth = { state: "recovering", recovered: 0, failures: [] };
+  const workspace = async (id, extra = {}) => (await workspaceCatalog.resolve(id, extra)).source_root;
+  const clientDescriptor = sessionId => ({ transport: "unix", server_id: serverId,
+    socket_path: socketPath, server_directory: serverDirectory, session_id: sessionId });
+  function summaryFor(summary, binding) {
+    const raw = binding?.snapshot || normalizeLane(null);
+    const created = new Date(summary.createdAt).toISOString();
+    return { workspace_id: summary.workspaceId, session_id: summary.id, cwd: summary.cwd,
+      online: Boolean(binding && !binding.worker.isClosed()), is_streaming: Boolean(raw.operation),
+      turn_id: raw.operation?.operationId || null, name: null, created_at: created,
+      updated_at: sessionActivityAt(summary.createdAt, raw), model: normalizeModelIdentity(raw.configuration?.model),
+      client: binding ? clientDescriptor(summary.id) : null };
   }
-
-  function summaryFor(summary, root, snapshot, bound = true) {
-    const raw = normalizeLane(snapshot);
-    const operation = raw.operation;
-    const createdValue = typeof summary.createdAt === "number"
-      ? summary.createdAt
-      : typeof summary.createdAt === "string" && Number.isFinite(Date.parse(summary.createdAt))
-        ? Date.parse(summary.createdAt)
-        : Date.now();
-    const created = new Date(createdValue).toISOString();
-    return {
-      workspace_id: summary.workspaceId,
-      session_id: summary.sessionId,
-      cwd: root,
-      online: bound,
-      is_streaming: operation !== null && operation !== undefined,
-      turn_id: operation?.operationId || operation?.id || null,
-      name: null,
-      created_at: created,
-      updated_at: sessionActivityAt(createdValue, raw),
-      model: normalizeModelIdentity(raw.configuration?.model),
-      client: bound ? {
-        transport: "unix",
-        server_id: piRuntime.serverId,
-        socket_path: piRuntime.socketPath,
-        server_directory: serverDirectory,
-        session_id: summary.sessionId,
-      } : null,
-    };
-  }
-
   function findSummary(workspaceId, sessionId) {
-    if (!SESSION_ID.test(sessionId)) throw error("invalid_identifier", "session_id is invalid");
-    const sessions = admin.directory.state.value?.sessions || [];
-    const matches = sessions.filter((item) => item.sessionId === sessionId && item.workspaceId === workspaceId);
-    if (matches.length === 0) throw error("session_not_found", "Session is not present in this workspace");
-    return matches[0];
+    const summary = summaries.get(`${workspaceId}/${sessionId}`);
+    if (!summary) throw error("session_not_found", "Session is not present in this workspace");
+    return summary;
   }
-
-  async function openBinding(workspaceId, sessionId) {
-    const key = `${workspaceId}/${sessionId}`;
-    if (closed) throw error("backend_closed", "Pi Harness backend is closed", true);
-    const existing = bindings.get(key);
-    if (existing?.closed) bindings.delete(key);
-    else if (existing) return existing;
-    const pending = bindingPromises.get(key);
-    if (pending) return pending;
-    const promise = (async () => {
-      const root = await workspace(workspaceId, { attach: true });
-      const summary = findSummary(workspaceId, sessionId);
-      const clientRuntime = await openClientRuntime(connectCommand);
-      let active;
-      let binding;
-      try {
-        active = await activateBuiltinClientServices(clientRuntime.servers[0]);
-        await active.plugins.prepareSession({ sessionId, packagePaths: null }, BACKGROUND_CONTEXT);
-        await active.management.attach(sessionId, BACKGROUND_CONTEXT);
-        const services = active.session.open({ services: [InputAdmission, MonitorAdmission, SessionAdmission, Monitor], assertAccess() {}, onError() {} });
-        await services.ready(BACKGROUND_CONTEXT);
-        binding = {
-          key,
-          workspaceId,
-          root,
-          summary,
-          clientRuntime,
-          active,
-          services,
-          unsubscribe: null,
-          snapshot: null,
-          sequence: 0,
-          closed: false,
-        };
-        if (closed) throw error("backend_closed", "Pi Harness backend is closed", true);
-        bindings.set(key, binding);
-        binding.unsubscribe = active.transcript.state.subscribe((view, _context, delivery) => {
-          if (binding.closed) return;
-          binding.snapshot = normalizeLane(view);
-          binding.sequence = Number.isSafeInteger(delivery?.sequence) ? delivery.sequence : binding.sequence + 1;
-          const session = summaryFor(summary, root, binding.snapshot, true);
-          eventHandler({ workspace_id: workspaceId, session_id: sessionId, snapshot: hostSnapshot(binding.snapshot), session, event: null });
-          if (!view.docs["pi.live"]?.run) {
-            void refreshOutcome(binding).then(() => {
-              if (binding.closed) return;
-              eventHandler({ workspace_id: workspaceId, session_id: sessionId, snapshot: hostSnapshot(binding.snapshot),
-                session: summaryFor(summary, root, binding.snapshot, true), event: null });
-            }).catch(() => {});
-          }
-        });
-        return binding;
-      } catch (cause) {
-        if (binding) bindings.delete(key);
-        await binding?.services.dispose(BACKGROUND_CONTEXT).catch(() => {});
-        await active?.management?.detach(BACKGROUND_CONTEXT).catch(() => {});
-        await clientRuntime.dispose().catch(() => {});
-        throw cause;
-      }
-    })();
-    bindingPromises.set(key, promise);
-    try {
-      return await promise;
-    } finally {
-      if (bindingPromises.get(key) === promise) bindingPromises.delete(key);
-    }
+  function publish(binding) {
+    if (closed || binding.closed || removals.has(binding.key)) return;
+    eventHandler({ workspace_id: binding.summary.workspaceId, session_id: binding.summary.id,
+      session: summaryFor(binding.summary, binding), snapshot: hostSnapshot(binding.snapshot), event: null });
   }
-
-  async function closeBinding(binding) {
-    if (binding.closed) return;
-    binding.closed = true;
-    bindings.delete(binding.key);
-    binding.unsubscribe?.();
-    await binding.services.dispose(BACKGROUND_CONTEXT).catch(() => {});
-    await binding.active.management.detach(BACKGROUND_CONTEXT).catch(() => {});
-    await binding.clientRuntime.dispose().catch(() => {});
+  async function serviceCall(binding, service, method, args) {
+    return binding.worker.request("service", { service, method, ...(args === undefined ? {} : { args }) });
   }
-
-  async function refreshBinding(workspaceId, sessionId, operation) {
-    let binding = await openBinding(workspaceId, sessionId);
-    try {
-      return await operation(binding);
-    } catch (cause) {
-      if (!isStaleBindingError(cause)) throw cause;
-      // A closed Chord service instance cannot be revived. Drop the adapter's
-      // cached binding and attach a new client runtime to the same durable
-      // session before retrying the control operation. Abort is idempotent at
-      // the Conversation boundary, so this retry is safe after a stale-instance
-      // rejection (which occurs before the remote method is invoked).
-      await closeBinding(binding);
-      binding = await openBinding(workspaceId, sessionId);
-      return operation(binding);
-    }
-  }
-
-  function clientDescriptor(sessionId) {
-    return {
-      transport: "unix",
-      server_id: piRuntime.serverId,
-      socket_path: piRuntime.socketPath,
-      server_directory: serverDirectory,
-      session_id: sessionId,
-    };
-  }
-
-  async function applyRequestedModel(binding, model) {
-    if (model === undefined) return;
-    await binding.active.models.select({ provider: model.provider, modelId: model.id }, BACKGROUND_CONTEXT);
-  }
-
-  async function serviceCall(binding, service, method, params) {
-    try {
-      return params === undefined ? await binding.services.use(service)[method](BACKGROUND_CONTEXT)
-        : await binding.services.use(service)[method](params, BACKGROUND_CONTEXT);
-    } catch (cause) {
-      throw Object.assign(new Error(`Worker service ${method}: ${cause.message}`, { cause }), { code: cause.code });
-    }
-  }
-
   async function refreshOutcome(binding) {
     const sequence = binding.sequence;
-    const response = await serviceCall(binding, InputAdmission, "latest");
+    const response = await serviceCall(binding, INPUT_SERVICE, "latest");
     if (response.error) throw error(response.error.code, response.error.message);
-    if (binding.sequence === sequence && binding.snapshot) {
-      binding.snapshot = { ...binding.snapshot, lastResult: submissionOutcome(response.result),
-        faulted: response.result ? response.result.status === "unanswered" && response.result.reason === "faulted" : null };
-    }
+    if (!binding.closed && sequence === binding.sequence) binding.snapshot = { ...binding.snapshot,
+      lastResult: submissionOutcome(response.result),
+      faulted: response.result?.status === "unanswered" && response.result?.reason === "faulted" };
   }
-
+  function restart(binding) {
+    if (closed || binding.closed) return;
+    binding.closed = true; bindings.delete(binding.key);
+    const attempt = (restarts.get(binding.key) || 0) + 1;
+    restarts.set(binding.key, attempt);
+    if (attempt > 5) {
+      recoveryHealth.state = "degraded";
+      recoveryHealth.failures.push({ workspace_id: binding.summary.workspaceId, session_id: binding.summary.id,
+        code: "worker_restart_limit", message: "Session worker failed repeatedly; reopen the session to retry" });
+      return;
+    }
+    const timer = setTimeout(() => {
+      timers.delete(timer);
+      if (closed || removals.has(binding.key) || !summaries.has(binding.key)) return;
+      void openBinding(binding.summary.workspaceId, binding.summary.id).catch(cause => {
+        recoveryHealth.state = "degraded";
+        recoveryHealth.failures.push({ workspace_id: binding.summary.workspaceId, session_id: binding.summary.id,
+          code: cause.code || "worker_restart_failed", message: cause.message });
+      });
+    }, Math.min(5000, 250 * 2 ** (attempt - 1)));
+    timers.add(timer);
+  }
+  async function openBinding(workspaceId, sessionId, model) {
+    const key = `${workspaceId}/${sessionId}`;
+    if (closed) throw error("backend_closed", "Harness backend is closed");
+    if (removals.has(key)) throw error("session_removing", "Session is being removed");
+    if (bindings.get(key) && !bindings.get(key).worker.isClosed()) return bindings.get(key);
+    if (pending.has(key)) return pending.get(key);
+    const opening = (async () => {
+      const root = await workspace(workspaceId, { attach: true });
+      const summary = findSummary(workspaceId, sessionId);
+      if (await realpath(summary.cwd) !== await realpath(root)) throw error("workspace_mismatch", "Session directory does not match its workspace");
+      const binding = { key, summary, snapshot: normalizeLane(null), sequence: 0, closed: false, view: null };
+      const update = view => {
+        if (binding.closed || closed) return;
+        binding.view = view; binding.snapshot = normalizeLane(view); binding.sequence++;
+        publish(binding);
+        if (!view.docs["pi.live"]?.run) void refreshOutcome(binding).then(() => publish(binding)).catch(() => {});
+      };
+      binding.worker = startSessionWorker({ sourceRoot, packageRoot, metadata: summary, producerToken,
+        model: model || options.model, onView: update, onExit: () => restart(binding) });
+      try {
+        const view = await binding.worker.startup;
+        if (closed) throw error("backend_closed", "Harness backend is closed");
+        if (binding.worker.isClosed()) throw error("worker_unavailable", "Session worker exited during startup");
+        bindings.set(key, binding); update(view);
+        const stable = setTimeout(() => { timers.delete(stable); if (!binding.closed) restarts.delete(key); }, 60_000);
+        stable.unref(); timers.add(stable);
+        return binding;
+      } catch (cause) { binding.closed = true; await binding.worker.close(); throw cause; }
+    })();
+    pending.set(key, opening);
+    try { return await opening; } finally { pending.delete(key); }
+  }
   async function inputStatus(binding, requestId) {
-    const response = await serviceCall(binding, InputAdmission, "status", { requestId });
+    const response = await serviceCall(binding, INPUT_SERVICE, "status", { requestId });
     if (response.error) throw error(response.error.code, response.error.message);
     return submissionReceipt(response.result, requestId);
   }
-
-  async function dispatchInput(binding, params) {
-    const requestId = params.client_message_id;
-    if (["job_manager"].includes(params.source)) {
-      const response = await serviceCall(binding, MonitorAdmission,
-        "admit",
-        { requestId, eventIds: params.event_ids, mode: params.mode, token: producerToken });
-      if (!response.accepted || response.skipped) return { ...response, client_message_id: requestId,
-        state: response.skipped ? "completed" : "rejected" };
-      return { ...await inputStatus(binding, requestId), pending: response.pending === true, consumed: response.consumed === true };
-    } else {
-      const modes = { auto: "followUp", follow_up: "followUp", steer: "steer" };
-      const whenBusy = modes[params.mode || "auto"];
-      if (!whenBusy) throw error("invalid_input", "Unsupported input mode");
-      const response = await serviceCall(binding, InputAdmission, "submit", {
-        requestId, content: params.text, whenBusy,
-      });
-      if (response.error) return { client_message_id: requestId, state: "rejected", accepted: false, error: response.error };
-    }
-    return inputStatus(binding, requestId);
+  async function applyModel(binding, model) {
+    if (model) await binding.worker.request("model/select", model);
   }
-
-  const recoveryHealth = { state: "recovering", recovered: 0, failures: [] };
-  async function recoverDurableSessions() {
-    // The catalog is only discovery. Opening the owning SessionWorker restores
-    // Pi execution and reconciles its durable user task, including idle tasks.
-    const result = await recoverSessionCatalog({
-      sessions: [...(admin.directory.state.value?.sessions || [])],
-      workspaceCatalog,
-      openSession: summary => openBinding(summary.workspaceId, summary.sessionId),
-      isClosed: () => closed,
-    });
-    Object.assign(recoveryHealth, result);
+  async function resultFor(binding) {
+    binding.view = await binding.worker.request("snapshot");
+    binding.snapshot = normalizeLane(binding.view); binding.sequence++;
+    await refreshOutcome(binding);
+    return { session: summaryFor(binding.summary, binding), snapshot: hostSnapshot(binding.snapshot),
+      client: clientDescriptor(binding.summary.id) };
   }
-
-  const backend = {
-    workspaceCatalog,
-    serverId: piRuntime.serverId,
-    socketPath: piRuntime.socketPath,
-    setEventHandler(handler) { eventHandler = typeof handler === "function" ? handler : () => {}; },
+  const recovery = recoverSessionCatalog({ sessions: [...summaries.values()], workspaceCatalog,
+    openSession: summary => openBinding(summary.workspaceId, summary.id), isClosed: () => closed,
+  }).then(result => Object.assign(recoveryHealth, result));
+  return {
+    workspaceCatalog, serverId,
+    get socketPath() { return socketPath; },
+    setHostSocket(path) { socketPath = path; },
+    setEventHandler(handler) { eventHandler = handler; },
     async listSessions(workspaceId) {
-      await recovery;
-      const root = await workspace(workspaceId);
-      const harness = (admin.directory.state.value?.sessions || [])
-        .filter((item) => item.workspaceId === workspaceId)
-        .map((item) => {
-          const binding = bindings.get(`${workspaceId}/${item.sessionId}`);
-          return summaryFor(item, root, binding?.snapshot, Boolean(binding));
-        });
-      return harness.sort((left, right) => right.updated_at.localeCompare(left.updated_at));
+      await recovery; await workspace(workspaceId);
+      return [...summaries.values()].filter(item => item.workspaceId === workspaceId)
+        .map(item => summaryFor(item, bindings.get(`${workspaceId}/${item.id}`)))
+        .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
     },
-    async readSession(workspaceId, sessionId) {
-      const binding = await openBinding(workspaceId, sessionId);
-      await refreshOutcome(binding);
-      return { session: summaryFor(binding.summary, binding.root, binding.snapshot, true), snapshot: hostSnapshot(binding.snapshot) };
-    },
+    async readSession(workspaceId, sessionId) { return resultFor(await openBinding(workspaceId, sessionId)); },
     async createSession({ workspace_id: workspaceId, session_id: sessionId, model }) {
-      const root = await workspace(workspaceId);
-      const created = await admin.management.create({ ...(sessionId ? { id: sessionId } : {}), cwd: root, workspaceId }, BACKGROUND_CONTEXT);
-      await admin.plugins.prepareSession({ sessionId: created.sessionId, packagePaths: null }, BACKGROUND_CONTEXT);
-      const binding = await openBinding(workspaceId, created.sessionId);
-      await applyRequestedModel(binding, model);
-      return {
-        session: summaryFor(created, root, binding.snapshot, true),
-        snapshot: hostSnapshot(binding.snapshot),
-        client: clientDescriptor(created.sessionId),
-      };
+      const cwd = await workspace(workspaceId);
+      const summary = await catalog.create({ workspaceId, sessionId, cwd });
+      summaries.set(`${workspaceId}/${summary.id}`, summary);
+      return resultFor(await openBinding(workspaceId, summary.id, model));
     },
     async resumeSession({ workspace_id: workspaceId, session_id: sessionId, model }) {
-      const root = await workspace(workspaceId, { attach: true });
-      const summary = findSummary(workspaceId, sessionId);
+      restarts.delete(`${workspaceId}/${sessionId}`);
       const binding = await openBinding(workspaceId, sessionId);
-      await applyRequestedModel(binding, model);
-      return {
-        session: summaryFor(summary, root, binding.snapshot, true),
-        snapshot: hostSnapshot(binding.snapshot),
-        client: clientDescriptor(sessionId),
-      };
+      await applyModel(binding, model); return resultFor(binding);
     },
     async removeSession(workspaceId, sessionId) {
-      const root = await workspace(workspaceId, { attach: true });
-      const summary = findSummary(workspaceId, sessionId);
-      const binding = bindings.get(`${workspaceId}/${sessionId}`);
-      if (binding) await closeBinding(binding);
-      await admin.management.remove(summary.sessionId, BACKGROUND_CONTEXT);
-      return { accepted: true, recoverable: false };
+      const key = `${workspaceId}/${sessionId}`;
+      if (removals.has(key)) return removals.get(key);
+      const removing = (async () => {
+        await workspace(workspaceId, { attach: true }); findSummary(workspaceId, sessionId);
+        await pending.get(key)?.catch(() => {});
+        const binding = bindings.get(key);
+        if (binding) { binding.closed = true; await binding.worker.close(); bindings.delete(key); }
+        await catalog.remove(workspaceId, sessionId); summaries.delete(key); restarts.delete(key);
+        return { accepted: true, recoverable: false };
+      })();
+      removals.set(key, removing);
+      try { return await removing; } finally { removals.delete(key); }
     },
     async sendInput(params) {
-      // Durable idempotency belongs to Pi. A dropped response is safe to retry
-      // with the same business ID; transport request IDs do not create receipts.
-      return refreshBinding(params.workspace_id, params.session_id, binding => dispatchInput(binding, params));
+      const binding = await openBinding(params.workspace_id, params.session_id);
+      const requestId = params.client_message_id;
+      if (params.source === "job_manager") {
+        const response = await serviceCall(binding, JOB_ADMISSION_SERVICE_ID, "admit", {
+          requestId, eventIds: params.event_ids, mode: params.mode, token: producerToken });
+        if (!response.accepted || response.skipped) return { ...response, client_message_id: requestId,
+          state: response.skipped ? "completed" : "rejected" };
+        return { ...await inputStatus(binding, requestId), pending: response.pending === true, consumed: response.consumed === true };
+      }
+      const whenBusy = { auto: "followUp", follow_up: "followUp", steer: "steer" }[params.mode || "auto"];
+      if (!whenBusy) throw error("invalid_input", "Unsupported input mode");
+      const response = await serviceCall(binding, INPUT_SERVICE, "submit", { requestId, content: params.text, whenBusy });
+      if (response.error) return { client_message_id: requestId, state: "rejected", accepted: false, error: response.error };
+      return inputStatus(binding, requestId);
     },
-    async inputStatus(params) {
-      return refreshBinding(params.workspace_id, params.session_id, binding => inputStatus(binding, params.client_message_id));
-    },
+    async inputStatus(params) { return inputStatus(await openBinding(params.workspace_id, params.session_id), params.client_message_id); },
     async monitor(method, params) {
-      return refreshBinding(params.workspace_id, params.session_id, async binding => {
-        const response = await serviceCall(binding, Monitor, "handle", { method, params });
-        if (response.error) throw error(response.error.code, response.error.message);
-        return method === "monitor/health" ? { ...response.result, recovery: structuredClone(recoveryHealth) } : response.result;
-      });
+      const response = await serviceCall(await openBinding(params.workspace_id, params.session_id), MONITOR_SERVICE_ID, "handle", { method, params });
+      if (response.error) throw error(response.error.code, response.error.message);
+      return method === "monitor/health" ? { ...response.result, recovery: structuredClone(recoveryHealth) } : response.result;
     },
-    async interrupt(params) {
-      return refreshBinding(params.workspace_id, params.session_id,
-        binding => serviceCall(binding, SessionAdmission, "interrupt", { turnId: params.turn_id }));
-    },
+    async interrupt(params) { return serviceCall(await openBinding(params.workspace_id, params.session_id),
+      SESSION_ADMISSION_SERVICE_ID, "interrupt", { turnId: params.turn_id }); },
     async models(params) {
-      return refreshBinding(params.workspace_id, params.session_id, (binding) => (
-        normalizeModels(binding.active.models.state.value)
-      ));
+      const result = await (await openBinding(params.workspace_id, params.session_id)).worker.request("models/list");
+      return { ...result, selected: normalizeModelIdentity(result.selected) };
     },
     async selectModel(params) {
-      await refreshBinding(params.workspace_id, params.session_id, (binding) => (
-        applyRequestedModel(binding, params.model)
-      ));
+      await applyModel(await openBinding(params.workspace_id, params.session_id), params.model);
       return { accepted: true, model: params.model };
     },
+    async query(params) {
+      const binding = await openBinding(params.workspace_id, params.session_id);
+      if (params.query === "view") {
+        const result = await resultFor(binding);
+        return { ...binding.view, failure: result.snapshot.runtime_error };
+      }
+      if (params.query === "compaction") return binding.worker.request("compaction/status", { task_id: params.args });
+      if (!["telemetry", "research", "systemPrompt"].includes(params.query)) throw error("invalid_query", "Unsupported session query");
+      return serviceCall(binding, CLIENT_QUERIES_SERVICE_ID, params.query, params.args);
+    },
+    async compact(params) { return (await openBinding(params.workspace_id, params.session_id)).worker.request("compact", { instructions: params.instructions }); },
+    async configure(params) { return (await openBinding(params.workspace_id, params.session_id)).worker.request("configure", { thinkingLevel: params.thinking_level }); },
+    async reload(params) { return (await openBinding(params.workspace_id, params.session_id)).worker.request("reload"); },
+    async pause(params) { return (await openBinding(params.workspace_id, params.session_id)).worker.request("abort"); },
     async close() {
       if (closed) return;
       closed = true;
-      await Promise.allSettled([...bindingPromises.values()]);
-      const current = [...bindings.values()];
-      for (const binding of current) await closeBinding(binding);
-      await adminRuntime.dispose().catch(() => {});
-      await piRuntime.close().catch(() => {});
+      for (const timer of timers) clearTimeout(timer);
+      await Promise.allSettled([...pending.values()]);
+      await Promise.allSettled([...removals.values()]);
+      await Promise.allSettled([...bindings.values()].map(async binding => { binding.closed = true; await binding.worker.close(); }));
+      bindings.clear();
       if (!options.workspaceCatalog) await workspaceCatalog.close();
     },
   };
-  // Recover durable active/queued lanes after a Host or Pi coordinator restart
-  // even when no presentation client reconnects.
-  const recovery = recoverDurableSessions();
-  return backend;
 }
 
 /** Recover only sessions owned by the current workspace catalog. */
@@ -488,7 +320,7 @@ function normalizeLane(value) {
   const operation = run ? {
     // `id` remains the Pi scheduler task identity for diagnostics. CoRAgent's
     // public operation/turn identity is the admitted submission ID returned
-    // by AgentController.prompt().
+    // by input admission.
     id: String(run.taskId),
     taskId: String(run.taskId),
     operationId: submissionId,
@@ -588,35 +420,10 @@ export function failureSummary(code, statusCode = null) {
   }
 }
 
-/**
- * Keep the Harness endpoint on the small Host wire shape. Pi's experimental
- * Models service exposes a richer catalog and
- * uses `modelId`; Phone/Host clients use `id` and `selected` instead.
- */
-function normalizeModels(value) {
-  if (!value) return { models: [], selected: null };
-  const models = value.catalog.availableModels.map(({ modelId, ...model }) => ({ ...model, id: modelId }));
-  return { models, selected: normalizeModelIdentity(value.configuration.model) };
-}
-
 function normalizeModelIdentity(value) {
   if (!value || typeof value !== "object" || typeof value.provider !== "string") return null;
   const id = value.modelId;
   return typeof id === "string" ? { provider: value.provider, id } : null;
-}
-
-function isStaleBindingError(value, seen = new Set()) {
-  if (value === null || value === undefined) return false;
-  if (typeof value === "object" || typeof value === "function") {
-    if (seen.has(value)) return false;
-    seen.add(value);
-  }
-  if (value?.code === "service_stale_instance" || value?.code === "service_closed") return true;
-  const message = String(value?.message || value);
-  if (/Remote service .*binding is closed|Remote service binding is disposed|service instance .*closed/u.test(message)) return true;
-  if (value?.cause && isStaleBindingError(value.cause, seen)) return true;
-  if (value instanceof AggregateError && value.errors.some((item) => isStaleBindingError(item, seen))) return true;
-  return false;
 }
 
 function absolute(value, label) {

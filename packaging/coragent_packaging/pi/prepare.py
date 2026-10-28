@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 PIN_PATH = ROOT / "packaging/coragent_packaging/pi/source.json"
 PATCH_ROOT = ROOT / "packaging/coragent_packaging/pi/patches"
-PATCH_NAMES = ("001-workspaces.patch", "002-worker-launch.patch", "003-client-connection.patch", "004-client-lifecycle.patch", "005-client-history.patch", "006-tool-presentation.patch", "007-client-status.patch", "008-request-admission.patch", "009-input-identity.patch", "010-context-lifecycle.patch", "011-markdown-presentation.patch", "012-skill-presentation.patch", "013-monitor-presentation.patch", "014-runtime-presentation.patch", "015-configuration-credentials.patch", "016-output-context-budget.patch", "017-compaction-system-baseline.patch", "018-compaction-coordination.patch", "019-compaction-session-affinity.patch", "020-proxy-prompt-cache-key.patch")
+PATCH_NAMES = ("001-durable-policy.patch", "002-configuration-credentials.patch", "003-proxy-cache-affinity.patch", "004-terminal-input.patch")
 class PiSourceError(RuntimeError): pass
 
 def pin():
@@ -28,22 +28,18 @@ def git(source,*args):
 def verify(source):
     expected=pin()["commit"]
     if git(source,"rev-parse","HEAD") != expected: raise PiSourceError(f"Pi source commit mismatch: expected {expected}")
-    required=[
-      source/"packages/coding-agent/src/experimental/process.ts",
-      source/"packages/coding-agent/src/experimental/session-catalog.ts",
-      source/"packages/coding-agent/src/experimental/session-worker.ts",
-      source/"packages/coding-agent/src/experimental/session-worker-manager.ts",
-      source/"packages/coding-agent/src/experimental/server.ts",
-      source/"packages/coding-agent/src/experimental/services/sessions.ts",
-      source/"packages/coding-agent/src/experimental/client-tui.ts",
+    required = [
+        "packages/durable/src/index.ts", "packages/durable/src/storage/sqlite/node.ts",
+        "packages/coding-agent/src/core/model-runtime.ts", "packages/tui/src/index.ts",
     ]
-    if any(not p.is_file() for p in required): raise PiSourceError("Pi source is missing the durable experimental runtime")
+    if any(not (source / path).is_file() for path in required):
+        raise PiSourceError("Pi source is missing the public Durable runtime")
+    for package in ("ai", "durable", "coding-agent", "tui"):
+        version = json.loads((source / "packages" / package / "package.json").read_text())["version"]
+        if "v" + version != pin()["tag"]:
+            raise PiSourceError("Pi package version does not match the pinned source descriptor")
     if not verify_patches(source):
         raise PiSourceError("Pi patches are missing or incompatible")
-    protocol = (source / "packages/protocol/src/protocol.ts").read_text()
-    version = re.search(r"export const PROTOCOL_VERSION = (\d+) as const;", protocol)
-    if version is None or int(version[1]) != pin()["protocolVersion"]:
-        raise PiSourceError("Pi protocol version does not match the pinned source descriptor")
     return expected
 
 def patches():
@@ -55,7 +51,7 @@ def patches():
 def verify_patches(source):
     """Check the ordered patch stack without mutating the managed checkout.
 
-    Presentation patches intentionally touch the same files.  Each reverse
+    Patches can touch the same files.  Each reverse
     check therefore has to run after the later patch has been removed; doing
     independent checks against the final tree rejects a valid stack.
     """
@@ -98,7 +94,7 @@ def apply_patch(source):
     # no longer reverses independently against the final tree.
     if verify_patches(source):
         return
-    # Apply patches in order. Later presentation patches intentionally build
+    # Apply patches in order. Later patches can build
     # on earlier managed patches, so checking every patch against the pristine
     # checkout would reject a valid ordered patch group.
     for patch in patches():
@@ -129,7 +125,7 @@ def install(root):
 
 def _install_locked(destination, commit):
     if destination.exists():
-        if not (destination/"packages/coding-agent/src/experimental/process.ts").is_file(): raise PiSourceError(f"invalid managed Pi source: {destination}")
+        if not (destination/"packages/durable/src/index.ts").is_file(): raise PiSourceError(f"invalid managed Pi source: {destination}")
         try:
             apply_patch(destination)
         except PiSourceError:
@@ -169,17 +165,6 @@ def hydrate_model_data(source):
     if not npm: raise PiSourceError("npm is required")
     subprocess.run([npm,"run","hydrate:model-data"],cwd=source,check=True,stdout=sys.stderr)
 
-    # The model catalog is fetched from a moving upstream source.  New model
-    # metadata can add fields that are valid at runtime but narrower than the
-    # pinned provider type in this Pi release, making TypeScript reject the
-    # generated catalog.  The provider still validates its API map at runtime;
-    # keep the pinned source buildable until the next Pi release updates its
-    # generated type contract.
-    provider = source / "packages/ai/src/providers/opencode-go.ts"
-    text = provider.read_text()
-    needle = "models: Object.values(OPENCODE_GO_MODELS),"
-    if needle in text and "Object.values(OPENCODE_GO_MODELS) as any" not in text:
-        provider.write_text(text.replace(needle, "models: Object.values(OPENCODE_GO_MODELS) as any,"))
 
 def prepare_build(source):
     npm=shutil.which("npm")

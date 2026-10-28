@@ -6,10 +6,9 @@ import { Harness, MemoryStorage, createRegistry, LiveDoc, InboxDoc } from "@eare
 import { createModels, fauxProvider, fauxAssistantMessage } from "@earendil-works/pi-ai";
 import { TODO_CONTEXT as context } from "@earendil-works/chord/context";
 import { pinnedPiSource } from "./test-environment.mjs";
-import { createInputAdmission, bindUserInputConversation, hasPendingInput } from "../../../apps/agent/runtime/admission/input.mjs";
+import { createInputAdmission, bindUserInputConversation, createInputService, hasPendingInput } from "../../../apps/agent/runtime/admission/input.mjs";
 
 const { admitSubmission } = await import(pathToFileURL(join(pinnedPiSource(), "packages/durable/src/harness/submissions.ts")).href);
-const { createAgentController } = await import(pathToFileURL(join(pinnedPiSource(), "packages/coding-agent/src/experimental/services/agent-controller-provider.ts")).href);
 async function fixture(t) {
   const faux = fauxProvider();
   faux.setResponses([fauxAssistantMessage("done")]);
@@ -87,17 +86,17 @@ test("request ID spelling cannot impersonate an internal producer", async t => {
   await assert.rejects(admission.submitInternal({ requestId, content: "Actual user request", producer: "job_manager" }, context), { code: "request_id_reused" });
 });
 
-test("pinned native controller preserves business identity and specific rejection codes", async t => {
-  const { harness, conversation, admission, native } = await fixture(t);
-  const controller = createAgentController(harness, native);
-  const input = { requestId: "native-business-input", message: "User request", images: null };
-  const first = await controller.followUp(input, context);
-  assert.equal(first.accepted, true);
+test("Worker admission service preserves business identity and specific rejection codes", async t => {
+  const { conversation, admission } = await fixture(t);
+  const service = createInputService(admission);
+  const input = { requestId: "native-business-input", content: "User request", whenBusy: "followUp" };
+  const first = await service.submit(input, context);
+  assert.equal(first.error, null);
   await conversation.waitForIdle(context);
-  assert.equal((await controller.followUp(input, context)).entryId, first.entryId);
-  const conflict = await controller.followUp({ ...input, message: "Changed request" }, context);
+  assert.equal((await service.submit(input, context)).result.id, first.result.id);
+  const conflict = await service.submit({ ...input, content: "Changed request" }, context);
   assert.equal(conflict.error.code, "request_id_reused");
-  assert.equal((await controller.prompt({ message: "No identity", images: null }, context)).error.code, "invalid_request_id");
+  assert.equal((await service.submit({ content: "No identity" }, context)).error.code, "invalid_request_id");
   assert.equal((await admission.latest(context)).requestId, input.requestId);
 });
 

@@ -2,10 +2,9 @@
 
 [English](TERMINAL.md) | [简体中文](TERMINAL.zh-CN.md)
 
-`coragent --workspace <name>` 是用户侧统一入口，启动 Pi 官方的远程 `ExperimentalClientTui`，不会替换
-Pi 的 editor、transcript 渲染或输入循环。它与普通 Pi 的 InteractiveMode 是两套界面，
-命令和扩展能力以实验性远程客户端为准。选中的 workspace
-绑定到安装级 Pi Harness SQLite durable 会话。
+`coragent --workspace <name>` 启动基于公开 Pi TUI 组件的 CoRAgent 终端。
+CoRAgent 负责会话连接、命令和记录展示，Pi Durable 负责执行及 SQLite 持久化。
+终端通过 Host RPC 连接会话。
 
 工作区统一使用 research 模式，启动时无需选择模式。创建或继续工作区的命令见下文。
 
@@ -17,7 +16,7 @@ Pi 的 editor、transcript 渲染或输入循环。它与普通 Pi 的 Interacti
 CoRHub/Web ── Link/HTTP ──┐
 Pi 原生 TUI ─ Unix/SSH ─────┼─> CoRAgent Agent Server / Host API
 Monitor ─ Host RPC ─────────┘       ├─ Agent Session
-                                    └─ Harness / Pi App Server / SessionWorker
+                                    └─ Harness / Host / SessionWorker
 ```
 
 Host 是 Agent Server 的 API 和宿主层，负责路由、认证、会话管理 RPC 回执、会话发现
@@ -43,7 +42,7 @@ socket。SSH transport 只改变连接路径，不改变 workspace、session 或
 proxy 示例假定远端软件根是 `/opt/coragent`；使用源码检出时则为
 `<checkout>/apps/agent/transport/ssh.mjs`。
 
-启动器会对 Host 返回的 Pi App Server socket 再使用同一个 SSH proxy，并给 Pi 一个本地私有
+启动器会对 Host 返回的 Host socket 再使用同一个 SSH proxy，并给 Pi 一个本地私有
 Unix endpoint。workspace 和 session 仍由远端 Host 持有；本地目录只用于 presentation cwd。
 
 ## 打开工作区
@@ -54,7 +53,7 @@ Unix endpoint。workspace 和 session 仍由远端 Host 持有；本地目录只
 ```
 
 启动器先确保安装级 Host 在线，再请求 session descriptor，直接把 Pi 官方 native client
-连接到 Pi App Server socket。Native Pi Harness 是唯一支持的后端，不提供 tmux 或 PTY scraping
+连接到 Host socket。Native Pi Harness 是唯一支持的后端，不提供 tmux 或 PTY scraping
 路径。同一 workspace 的第二个终端会连接同一个 SQLite durable session；客户端关闭不会
 停止 worker，也不会打断当前 turn。
 
@@ -69,8 +68,8 @@ system service 去掉 `--user`。Host 私有 socket 位于配置的 runtime 目�
 
 ## 会话和操作
 
-远程 `ExperimentalClientTui` 提供 `/resume`、`/model`、`/thinking`、`/compact`、
-`/reload` 以及 Native CoRAgent 命令。`/resume` 只能切换当前 workspace 中的 SQLite durable
+CoRAgent 终端 提供 `/resume`、`/model`、`/thinking`、`/compact`、
+`/reload` 以及 CoRAgent 命令。`/reload` 刷新模型配置与凭据。`/resume` 只能切换当前 workspace 中的 SQLite durable
 session，不会跨 workspace。切换会释放当前 TUI 连接，再附着选中的会话；后台任务继续运行。
 独立 Pi 的其它会话命令在这个远程客户端中不可用。
 

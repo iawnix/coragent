@@ -1216,40 +1216,6 @@ def resolve_pi_source(installation: Installation) -> Path:
     return source
 
 
-def build_harness_client_command(installation: Installation, request: LaunchRequest) -> list[str]:
-    """Attach Pi's own experimental client TUI to the persistent harness."""
-    source = resolve_pi_source(installation)
-    entry = source / "packages/coding-agent/src/experimental/source-resolver.ts"
-    client = installation.package_root / "apps/agent/runtime/client.mjs"
-    if not entry.is_file() or not client.is_file():
-        raise CoRAgentHostError("Pi harness client source is unavailable; prepare the pinned Pi source or reinstall CoRAgent")
-    command = [_node_binary(), "--import", str(entry), str(client)]
-    if request.session_id:
-        command.extend(["--session-id", request.session_id])
-    elif request.continue_latest:
-        command.append("--continue")
-    command.extend(request.pi_args)
-    return command
-
-
-def launch_harness_client(installation: Installation, request: LaunchRequest, workspace: Path) -> NoReturn:
-    """Run Pi's native remote TUI against the installation-owned harness."""
-    if request.session_id and not SESSION_ID.fullmatch(request.session_id):
-        raise CoRAgentHostError("invalid session identity", exit_code=2)
-    os.environ["CORAGENT_SESSION_CWD"] = str(workspace)
-    os.environ["CORAGENT_WORKSPACE_ID"] = request.workspace_name
-    os.environ["CORAGENT_PI_RUNTIME_ROOT"] = str(resolve_pi_source(installation))
-    os.environ["CORAGENT_HOST_STATE_ROOT"] = str(paths(installation.root).host_state)
-    os.environ["CORAGENT_SESSION_ROOT"] = str(paths(installation.root).sessions)
-    os.environ["PI_SERVER_DIR"] = str(app_paths(installation.root).state / 'host/pi-server')
-    os.environ["PI_EXPERIMENTAL"] = "1"
-    os.environ["CORAGENT_PACKAGE_ROOT"] = str(installation.package_root)
-    os.environ["PI_SESSION_WORKER_ENTRY"] = str(installation.package_root / "apps/agent/runtime/worker.mjs")
-    os.environ["CORAGENT_WORKSPACE_ROOT"] = str(installation.workspaces_root)
-    os.environ.pop("CORAGENT_CUSTOM_UI", None)
-    exec_pi(build_harness_client_command(installation, request), workspace)
-
-
 def build_gateway_command(
     installation: Installation,
     request: LaunchRequest,
@@ -1444,9 +1410,9 @@ def exec_pi(command: list[str], workspace: Path) -> NoReturn:
 def launch_terminal(installation: Installation, request: LaunchRequest, workspace: Path) -> NoReturn:
     """Run the Host-mediated Native Pi client.
 
-    The Harness Host is the only owner of the Pi server and session worker.
-    The terminal process is just Pi's official experimental client, connected
-    to the descriptor selected by ``coragent-terminal-client.mjs``.
+    The Harness Host supervises the durable session workers.
+    The terminal process is just CoRAgent's terminal client, connected
+    to the descriptor selected by ``apps/agent/terminal/main.mjs``.
     """
     if request.session_id and not SESSION_ID.fullmatch(request.session_id):
         raise CoRAgentHostError("invalid session identity", exit_code=2)

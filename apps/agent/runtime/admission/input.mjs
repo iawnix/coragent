@@ -7,11 +7,11 @@ export const INPUT_ADMISSION_SERVICE_ID = "coragent.input-admission";
 // is stored here; acceptance, placement and completion remain Pi-owned.
 export const InputProvenance = defineDocFamily({
   kind: "coragent.input-provenance", version: 1, family: true,
-  scope: "conversation", history: "latest", fork: "initial", initial: () => ({}),
+  scope: "conversation", history: "latest", fork: "initial", checkpointWhen: () => false, initial: () => ({}),
 });
 // An index into Pi-owned records, never a copy of their status.
 export const InputHead = defineDoc({ kind: "coragent.input-head", version: 1,
-  scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
+  scope: "conversation", history: "latest", fork: "initial", checkpointWhen: () => false, initial: () => ({}) });
 
 const queueModes = { steeringMode: "one-at-a-time", followUpMode: "one-at-a-time" };
 const keyFor = requestId => createHash("sha256").update(requestId).digest("hex");
@@ -92,7 +92,7 @@ export function createInputAdmission({ harness, conversation, LiveDoc, InboxDoc,
       const control = await policy?.beforeAdmission(tx, { producer, identity, basis });
       // Only Pi reads/writes occur inside this commit. Domain assessment and
       // Python I/O happen before it and are revalidated before consumption.
-      const id = await admitSubmission(tx, conversation.id, {
+      const { id } = await admitSubmission(tx, conversation.id, {
         type: "input", requestId, content: markInternalInput(content, producer), whenBusy,
       }, Date.now(), queueModes);
       Object.assign(provenance, { producer, reason, fingerprint, identity: identity ?? null, admission_basis: basis });
@@ -157,7 +157,7 @@ export function createInputAdmission({ harness, conversation, LiveDoc, InboxDoc,
   };
 }
 
-// Service errors are data: Chord deliberately masks arbitrary remote errors.
+// Keep specific admission errors on the Worker/Host wire.
 export function createInputService(admission) {
   const call = async action => {
     try { return { result: await action(), error: null }; }
@@ -170,7 +170,7 @@ export function createInputService(admission) {
   };
 }
 
-/** Native AgentController calls exactly the same admission boundary as Host. */
+/** All user submissions and pause requests share the Host admission boundary. */
 export function bindUserInputConversation(conversation, admission, harness, sessionAdmission) {
   return new Proxy(conversation, {
     get(target, property) {

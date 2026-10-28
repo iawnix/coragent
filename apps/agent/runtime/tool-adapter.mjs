@@ -11,7 +11,8 @@ export function adaptCodingTool(tool) {
       context.abortSignal?.throwIfAborted();
       // Pi's grep/find/ls return bounded final output and do not emit updates.
       // Preserve their content, details and errors unchanged for Durable.
-      return tool.execute(api.callId, args, context.abortSignal);
+      const { content, ...metadata } = await tool.execute(api.callId, args, context.abortSignal);
+      return { ...metadata, output: content };
     },
   };
 }

@@ -1,6 +1,5 @@
 import { loadPi } from "../../runtime/source.mjs";
 import { parseSlashCommand, slashCompletions, SLASH_COMMAND_DEFINITIONS } from "../../tools/commands.mjs";
-import { CLIENT_QUERIES_SERVICE_ID } from "../../runtime/services/queries.mjs";
 import { createStatusPresentation } from "../status/presentation.mjs";
 import { createDocumentView } from "../renderers/document.mjs";
 import { createCommandPresentation } from "./panel.mjs";
@@ -11,24 +10,13 @@ import { formatResearchOverview, formatResearchDetail, formatResearchSearch, res
 export async function createCoRAgentNativeClientFacet({ sourceRoot, session } = {}) {
   if (typeof sourceRoot !== "string" || !sourceRoot) throw new TypeError("sourceRoot is required");
 
-  const [{ defineFacet, defineService }, { SlashCommands }, { PresentationUI }, components, { Transcript }, themeModule, { BACKGROUND_CONTEXT, withAbortSignal }] = await Promise.all([
-    loadPi("chord", sourceRoot),
-    loadPi("slashCommands", sourceRoot),
-    loadPi("presentationUI", sourceRoot),
-    loadPi("tui", sourceRoot),
-    loadPi("transcript", sourceRoot),
-    loadPi("theme", sourceRoot),
-    loadPi("context", sourceRoot),
+  const [components, themeModule, { BACKGROUND_CONTEXT, withAbortSignal }] = await Promise.all([
+    loadPi("tui", sourceRoot), loadPi("theme", sourceRoot), loadPi("context", sourceRoot),
   ]);
-  const queriesService = defineService(CLIENT_QUERIES_SERVICE_ID);
-  return defineFacet({
-    id: "@coragent/native-client-commands",
-    setup(env) {
-      const commands = env.use(SlashCommands);
-      const ui = env.use(PresentationUI);
-      const queries = env.use(queriesService);
-      const transcript = env.use(Transcript);
-      env.onActivate(() => {
+  return {
+    activate({ commands, ui, queries, transcript }) {
+      const disposals = [];
+      const env = { own: dispose => disposals.push(dispose) };
         const theme = new Proxy({}, { get: (_, key) => {
           const value = themeModule.theme[key];
           return typeof value === 'function' ? value.bind(themeModule.theme) : value;
@@ -78,9 +66,9 @@ export async function createCoRAgentNativeClientFacet({ sourceRoot, session } = 
         } })) {
           env.own(commands.replace(command));
         }
-      });
+      return () => { for (const dispose of disposals.reverse()) dispose(); };
     },
-  });
+  };
 }
 
 /** One in-flight read per source; bursts request only one follow-up refresh. */

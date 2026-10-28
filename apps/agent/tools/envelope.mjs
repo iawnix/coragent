@@ -155,9 +155,11 @@ export function wrapToolForHarness(tool, { toolContext, invocation } = {}) {
         const result = withToolResultEnvelope(
           await tool.execute(params, { ...api, coragent: bound }, context), tool.name, api.callId,
         );
-        return result.details?.envelope?.ok === false ? { ...result, isError: true } : result;
+        const { content, ...metadata } = result;
+        return { ...metadata, output: content, ...(result.details?.envelope?.ok === false ? { isError: true } : {}) };
       } catch (error) {
-        return { ...toolErrorResult(error, tool.name, api.callId), isError: true };
+        const { content, ...metadata } = toolErrorResult(error, tool.name, api.callId);
+        return { ...metadata, output: content, isError: true };
       }
     },
   };

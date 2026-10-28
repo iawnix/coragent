@@ -1,0 +1,80 @@
+diff --git a/packages/ai/src/api/openai-completions.ts b/packages/ai/src/api/openai-completions.ts
+index 083b6dc8..b3662c6d 100644
+--- a/packages/ai/src/api/openai-completions.ts
++++ b/packages/ai/src/api/openai-completions.ts
+@@ -170,6 +170,7 @@ interface OpenAICompatCacheControl {
+ type ResolvedOpenAICompletionsCompat = Omit<
+ 	Required<OpenAICompletionsCompat>,
+ 	| "cacheControlFormat"
++	| "promptCacheKeyMode"
+ 	| "supportsThinkingTokenBudget"
+ 	| "thinkingTokenBudgetField"
+ 	| "supportsMidConvoSystemMessages"
+@@ -177,6 +178,7 @@ type ResolvedOpenAICompletionsCompat = Omit<
+ 	| "vllmPriority"
+ > & {
+ 	cacheControlFormat?: OpenAICompletionsCompat["cacheControlFormat"];
++	promptCacheKeyMode?: OpenAICompletionsCompat["promptCacheKeyMode"];
+ 	supportsThinkingTokenBudget?: OpenAICompletionsCompat["supportsThinkingTokenBudget"];
+ 	thinkingTokenBudgetField?: OpenAICompletionsCompat["thinkingTokenBudgetField"];
+ 	supportsMidConvoSystemMessages?: OpenAICompletionsCompat["supportsMidConvoSystemMessages"];
+@@ -345,7 +347,7 @@ export const stream: StreamFunction<"openai-completions", OpenAICompletionsOptio
+ 				compat.supportsOpenAIGrammarTools,
+ 			);
+ 			const cacheRetention = resolveCacheRetention(options?.cacheRetention, options?.env);
+-			const cacheSessionId = cacheRetention === "none" ? undefined : options?.sessionId;
++			// Session routing affinity persists even when prompt caching is disabled.
+ 			const client = createClient(
+ 				model,
+ 				normalizedContext,
+@@ -353,7 +355,7 @@ export const stream: StreamFunction<"openai-completions", OpenAICompletionsOptio
+ 				options?.headers,
+ 				options?.identity,
+ 				options?.fetch,
+-				cacheSessionId,
++				options?.sessionId,
+ 				compat,
+ 			);
+ 			let params = buildParams(
+@@ -824,14 +826,19 @@ function buildParams(
+ 		grammarToolInputProperties,
+ 	});
+ 	const cacheControl = getCompatCacheControl(compat, cacheRetention);
++	const promptCacheKeyMode = compat.promptCacheKeyMode ?? "auto";
++	const supportsPromptCacheKey =
++		promptCacheKeyMode === "enabled" ||
++		(promptCacheKeyMode === "auto" &&
++			(model.baseUrl.includes("api.openai.com") ||
++				(cacheRetention === "long" && compat.supportsLongCacheRetention)));
+ 
+ 	const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming = {
+ 		model: model.id,
+ 		messages,
+ 		stream: true,
+ 		prompt_cache_key:
+-			(model.baseUrl.includes("api.openai.com") && cacheRetention !== "none") ||
+-			(cacheRetention === "long" && compat.supportsLongCacheRetention)
++			cacheRetention !== "none" && supportsPromptCacheKey
+ 				? clampOpenAIPromptCacheKey(options?.sessionId)
+ 				: undefined,
+ 		prompt_cache_retention: cacheRetention === "long" && compat.supportsLongCacheRetention ? "24h" : undefined,
+@@ -1739,6 +1746,7 @@ function getCompat(model: Model<"openai-completions">): ResolvedOpenAICompletion
+ 		sendSessionAffinityHeaders: model.compat.sendSessionAffinityHeaders ?? detected.sendSessionAffinityHeaders,
+ 		sessionAffinityFormat: model.compat.sessionAffinityFormat ?? detected.sessionAffinityFormat,
+ 		supportsLongCacheRetention: model.compat.supportsLongCacheRetention ?? detected.supportsLongCacheRetention,
++		promptCacheKeyMode: model.compat.promptCacheKeyMode,
+ 		vllmPriority: model.compat.vllmPriority,
+ 	};
+ }
+diff --git a/packages/ai/src/providers/compat-schema.ts b/packages/ai/src/providers/compat-schema.ts
+index b3ba8198..4154baed 100644
+--- a/packages/ai/src/providers/compat-schema.ts
++++ b/packages/ai/src/providers/compat-schema.ts
+@@ -331,6 +331,7 @@ export const OpenAICompletionsCompatSchema = Type.Object(
+ 			description:
+ 				"Session-affinity header format. openai sends session_id, x-client-request-id, and x-session-affinity; openai-nosession sends x-client-request-id and x-session-affinity; openrouter sends x-session-id. Does not affect prompt_cache_key. Default: auto-detected.",
+ 		}),
++		promptCacheKeyMode: Type.Optional(Type.Union([Type.Literal("auto"), Type.Literal("enabled"), Type.Literal("disabled")])),
+ 		supportsLongCacheRetention: optionalCompatBoolean({
+ 			description:
+ 				'Whether the provider supports long prompt cache retention (prompt_cache_retention: "24h" or Anthropic-style cache_control.ttl: "1h", depending on format). Default: auto-detected from provider and URL.',

@@ -38,7 +38,7 @@
 ## 待实施提案
 
 [Pi 1.3.0 升级审查](PI_1_3_MIGRATION.zh-CN.md)是注明日期的上游对照和未实施建议。
-当前 `packaging/coragent_packaging/pi/source.json` 仍固定 Pi 1.1.0，不能把该审查当作可直接执行的升级步骤。
+当前固定 Pi 1.4.0；参见[迁移与回滚说明](PI_1_4_MIGRATION.zh-CN.md)。
 
 ## 文档维护
 

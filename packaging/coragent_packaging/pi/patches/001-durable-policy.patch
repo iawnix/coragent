@@ -1,0 +1,460 @@
+diff --git a/packages/durable/src/harness/compaction.ts b/packages/durable/src/harness/compaction.ts
+index b7376a88..044f8973 100644
+--- a/packages/durable/src/harness/compaction.ts
++++ b/packages/durable/src/harness/compaction.ts
+@@ -1,4 +1,4 @@
+-import type { Context, Draft } from "@earendil-works/chord";
++import type { Context, Draft, JsonValue } from "@earendil-works/chord";
+ import type { AssistantMessage, Message, ModelThinkingLevel, SimpleStreamOptions } from "@earendil-works/pi-ai";
+ import { calculateContextTokens, estimateMessageTokens } from "@earendil-works/pi-ai/utils/estimate";
+ import { isRetryableAssistantError, retryDelayMs } from "@earendil-works/pi-ai/utils/retry";
+@@ -15,6 +15,7 @@ import type {
+ 	Tx,
+ } from "../types.ts";
+ import { orderToolResults } from "./context.ts";
++import { InboxDoc } from "./inbox.ts";
+ import {
+ 	addCompactionStatus,
+ 	compactionStatus,
+@@ -50,6 +51,8 @@ export type SummaryRequest = {
+ 	tail: EntryId;
+ 	/** First entry kept verbatim; the summary's `head`. */
+ 	firstKept: EntryId;
++	/** Selected once, immutable over provider retries and recovery. */
++	supplements?: { instructions?: string; metadata?: JsonValue }[];
+ };
+ 
+ export type CompactionCheckpoint =
+@@ -140,7 +143,21 @@ export const CompactionTask = defineTask<CompactionInput, CompactionCheckpoint,
+ 			});
+ 			if (decision !== undefined && "decline" in decision) return complete(runtime, context);
+ 			if (decision !== undefined) return place(runtime, firstKept, decision.summary, context);
++			const supplements: { instructions?: string; metadata?: JsonValue }[] = [];
++			let supplementError: string | undefined;
++			await runtime.hooks.each("prepareSummary", async (hook) => {
++				if (supplementError !== undefined) return;
++				try {
++					const supplement = await hook({ entries: compaction.entries, firstKept }, runtime, context);
++					if (supplement !== undefined) supplements.push(structuredClone(supplement));
++				} catch (error) {
++					runtime.signal.throwIfAborted();
++					supplementError = `summary_prepare_failed: ${String(error)}`;
++				}
++			});
++			if (supplementError !== undefined) throw new Error(supplementError);
+ 			const request: SummaryRequest = {
++				supplements,
+ 				attempt: 1,
+ 				model: ref,
+ 				thinkingLevel: agent.thinkingLevel,
+@@ -167,7 +184,7 @@ export const CompactionTask = defineTask<CompactionInput, CompactionCheckpoint,
+ 				{ role: "system", content: SUMMARIZATION_SYSTEM_PROMPT, timestamp: now },
+ 				{
+ 					role: "user",
+-					content: [{ type: "text", text: summaryPrompt(summarizedMessages(view, cut), task.input.instructions) }],
++					content: [{ type: "text", text: summaryPrompt(summarizedMessages(view, cut), [task.input.instructions, ...(request.supplements ?? []).map(item => item.instructions)].filter(Boolean).join("\n\n")) }],
+ 					timestamp: now,
+ 				},
+ 			];
+@@ -240,8 +257,10 @@ export const CompactionTask = defineTask<CompactionInput, CompactionCheckpoint,
+ });
+ 
+ /**
+- * Create a compaction task with its status in this commit. `owner` is the generation that waits for it (a blocking
+- * compaction); without one it is conversation-owned, and `background` unless it is manual.
++ * Reuse an active compaction or a completed summary still awaiting placement. A generation joining a conversation-
++ * owned task must place its write at a boundary before preparing its next request; task ownership never changes.
++ * Read before the commit's first table write. Different explicit manual instructions are rejected, not discarded.
++ * A new task is generation-owned when `owner` is supplied, otherwise conversation-owned and background unless manual.
+  */
+ export async function createCompaction(
+ 	tx: Tx,
+@@ -249,12 +268,30 @@ export async function createCompaction(
+ 	input: CompactionInput,
+ 	owner?: TaskId,
+ ): Promise<TaskId<CompactionResult>> {
++	const live = await tx.doc(LiveDoc, conversationId);
++	const candidates = (live.compactions ?? []).map((status) => status.taskId);
++	for (const item of (await tx.doc(InboxDoc, conversationId)).items) {
++		if (item.mode !== "write" || item.entry.kind !== CompactionEntry.kind) continue;
++		const submission = await tx.submission(item.id);
++		const match = /^compaction:(\d+)$/.exec(submission?.requestId ?? "");
++		if (match !== null) candidates.push(Number(match[1]) as TaskId<CompactionResult>);
++	}
++	for (const id of candidates) {
++		const task = await tx.task(id);
++		if (task === undefined || task.kind !== CompactionTask.definition.name || task.conversationId !== conversationId)
++			continue;
++		const existing = task.input as CompactionInput;
++		if (input.reason === "manual" && input.instructions !== undefined && input.instructions !== existing.instructions) {
++			throw new Error("Compaction is already in progress with different instructions; wait for it to finish");
++		}
++		return id;
++	}
+ 	const ownership =
+ 		owner === undefined ? ({ kind: "conversation" } as const) : { kind: "task" as const, taskId: owner };
+ 	const background = owner === undefined && input.reason !== "manual";
+ 	const taskId = await tx.createTask(CompactionTask, input, { ownership, conversationId, background });
+ 	const status = { taskId, reason: input.reason, blocking: owner !== undefined, attempt: 1 };
+-	addCompactionStatus(await tx.doc(LiveDoc, conversationId), status);
++	addCompactionStatus(live, status);
+ 	return taskId;
+ }
+ 
+@@ -267,6 +304,7 @@ export function compactionPolicy(settings: Settings, model: ModelRef): Compactio
+ 		reserveTokens: override?.reserveTokens ?? policy.reserveTokens,
+ 		keepRecentTokens: override?.keepRecentTokens ?? policy.keepRecentTokens,
+ 		backgroundTokens: override?.backgroundTokens ?? policy.backgroundTokens,
++		...((override?.maxInputTokens ?? policy.maxInputTokens) === undefined ? {} : { maxInputTokens: override?.maxInputTokens ?? policy.maxInputTokens }),
+ 	};
+ }
+ 
+@@ -345,6 +383,12 @@ export function estimateContext(view: ContextView, extra: readonly Message[]): n
+ 	return tokens;
+ }
+ 
++/** Input budget before the SDK shrinks the requested output to fit the context. */
++export function contextInputBudget(contextWindow: number, policy: Pick<CompactionPolicy, "reserveTokens" | "maxInputTokens">, maxTokens = 0): number {
++	const reserve = Math.max(policy.reserveTokens, maxTokens > 0 ? maxTokens + 4096 : 0);
++	return Math.max(0, Math.min(contextWindow - reserve, policy.maxInputTokens ?? Number.POSITIVE_INFINITY));
++}
++
+ /** The summary of a clean `stop` with text and no tool call; anything else is not a summary. */
+ function summaryText(message: AssistantMessage): string | undefined {
+ 	if (message.stopReason !== "stop" || message.content.some((content) => content.type === "toolCall"))
+@@ -446,7 +490,10 @@ async function placeSummary(
+ 		kind: CompactionEntry.kind,
+ 		head: firstKept,
+ 		model: [{ role: "user", content: [{ type: "text", text }], timestamp: runtime.now() }],
+-		data: { reason: current.input.reason },
++		data: { reason: current.input.reason,
++			...(current.state.checkpoint.phase !== "select" && current.state.checkpoint.supplements
++				? { metadata: current.state.checkpoint.supplements.flatMap(item => item.metadata === undefined ? [] : [item.metadata]) } : {}),
++		},
+ 	} satisfies EntryDraft;
+ 	const result: CompactionResult =
+ 		current.owner === undefined
+diff --git a/packages/durable/src/harness/generation.ts b/packages/durable/src/harness/generation.ts
+index c8d26791..d378ad3a 100644
+--- a/packages/durable/src/harness/generation.ts
++++ b/packages/durable/src/harness/generation.ts
+@@ -29,7 +29,7 @@ import type {
+ 	TypedEntry,
+ } from "../types.ts";
+ import { addTools, sectionExtension } from "./agent.ts";
+-import { compactionPolicy, createCompaction, estimateContext, selectCut } from "./compaction.ts";
++import { contextInputBudget, compactionPolicy, createCompaction, estimateContext, selectCut } from "./compaction.ts";
+ import { applyBoundary, type Boundary, prepareBoundary, withdrawQueuedInputs } from "./inbox.ts";
+ import { assignJson } from "./json.ts";
+ import { endRun, LiveDoc, type LiveState, type ToolSlot } from "./live.ts";
+@@ -57,10 +57,11 @@ export type GenerationCheckpoint =
+ 	| {
+ 			phase: "prepare";
+ 			attempt: number;
+-			/** The blocking compaction this generation waited for; it starts no other compaction (spec §8.3). */
++			/** The compaction this generation waited for, possibly shared; it starts no other compaction. */
+ 			compacted?: TaskId<CompactionResult>;
+ 			/** Error text of the overflow that started `compacted`; checked once when `prepare` resumes. */
+ 			overflow?: string;
++			failureReason?: "request_blocked";
+ 			/** Set when the blocking threshold started `compacted`; its outcome is checked once when `prepare` resumes. */
+ 			threshold?: true;
+ 	  }
+@@ -137,19 +138,38 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint,
+ 			const { model, thinkingLevel } = agent;
+ 			const resolved = model === undefined ? undefined : runtime.models.getModel(model.provider, model.modelId);
+ 			if (model === undefined || resolved === undefined) return failNoModel(runtime, model, context);
+-			const { attempt, compacted, overflow, threshold: blocked } = task.state.checkpoint;
+-			if (compacted !== undefined && overflow !== undefined) {
++			const { attempt, compacted, overflow, failureReason, threshold: blocked } = task.state.checkpoint;
++			if (compacted !== undefined) {
+ 				const [outcome] = await runtime.outcomes([compacted], context);
+-				if (outcome?.status !== "completed" || outcome.result.entryId === undefined) {
+-					return failModelError(runtime, overflow, context);
++				let placed = outcome?.status === "completed" && outcome.result.entryId !== undefined;
++				if (outcome?.status === "completed" && outcome.result.submissionId !== undefined) {
++					const submissionId = outcome.result.submissionId;
++					let reset = false;
++					// A shared background/manual summary is queued while this generation owns the run.
++					// Apply a boundary here instead of waiting on a write that only this run can place.
++					await runtime.commit(async (tx): Promise<Next | undefined> => {
++						if ((await tx.submission(submissionId))?.status !== "queued") return undefined;
++						const boundary = await prepareBoundary(tx, conversationId, runtime.settings);
++						const live = await tx.doc(LiveDoc, conversationId);
++						const result = await applyBoundary(tx, boundary, "postTools", runtime.now());
++						reset = result.reset;
++						if (reset) {
++							endRun(tx, live, runtime.taskId, { status: "unanswered", reason: "reset" });
++							if (result.users.length > 0) await startRun(tx, conversationId, live, result.users);
++							return { status: "terminal", outcome: { status: "aborted" } };
++						}
++						if (live.run?.taskId === runtime.taskId) live.run.inputs.push(...result.users);
++						return undefined;
++					}, context);
++					if (reset) return;
++					await runtime.commit(async (tx) => {
++						placed = (await tx.submission(submissionId))?.status === "done";
++						return undefined;
++					}, context);
+ 				}
+-			}
+-			// A threshold compaction that found nothing to compact or was declined leaves a request that may still fit. One
+-			// that failed left a context it judged too large: sending it would at best leave no room for the answer.
+-			if (compacted !== undefined && blocked === true) {
+-				const [outcome] = await runtime.outcomes([compacted], context);
+-				if (outcome !== undefined && outcome.status !== "completed") {
+-					return failModelError(runtime, compactionFailure(outcome), context);
++				if (!placed && (blocked === true || overflow !== undefined || outcome?.status !== "completed")) {
++					const detail = outcome?.status === "failed" ? outcome.error.message : "no summary was placed";
++					return failRequest(runtime, overflow ?? `Compaction failed: ${detail}`, context, failureReason);
+ 				}
+ 			}
+ 			const view = await runtime.context(conversationId, context);
+@@ -176,7 +196,7 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint,
+ 			const entries = planSystemEntries(view, desired, agent.tools, runtime.now());
+ 			const threshold =
+ 				compacted === undefined
+-					? thresholdCompaction(view, entries, resolved.contextWindow, compactionPolicy(settings, model))
++					? thresholdCompaction(view, entries, resolved.contextWindow, compactionPolicy(settings, model), settings.stream.maxTokens ?? resolved.maxTokens)
+ 					: undefined;
+ 			if (threshold === "blocking") {
+ 				// Compact first and prepare again; the transcript is unchanged until the compaction appends.
+@@ -187,14 +207,33 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint,
+ 				}, context);
+ 				return;
+ 			}
++			const prepared: { key: string; messages: readonly Message[]; data?: JsonValue }[] = [];
++			let preparationError: string | undefined;
++			await runtime.hooks.each("prepareContext", async (hook) => {
++				if (preparationError !== undefined) return;
++				try {
++					const item = await hook(view, runtime, context);
++					if (item !== undefined) prepared.push(structuredClone(item));
++				} catch (error) {
++					runtime.signal.throwIfAborted();
++					preparationError = `context_prepare_failed: ${String(error)}`;
++				}
++			});
++			if (preparationError !== undefined) return failRequest(runtime, preparationError, context, "request_blocked");
+ 			await runtime.commit(async (tx) => {
+ 				let cutoff = (await tx.scanEntries({ conversationId }, 1)).items[0]?.id;
+-				for (const entry of entries) cutoff = (await tx.appendEntry(SystemEntry, conversationId, entry)).id;
+-				if (cutoff === undefined) throw new Error(`Conversation ${conversationId} has no entries to send`);
+-				// Checked in this commit, so a compaction admitted during preparation counts.
+-				if (threshold === "background" && (await tx.doc(LiveDoc, conversationId)).compactions === undefined) {
++				// Reuse active or queued summaries. All compaction lookup reads precede table writes.
++				if (threshold === "background") {
+ 					await createCompaction(tx, conversationId, { reason: "threshold" });
+ 				}
++				for (const item of prepared) {
++					cutoff = (await tx.appendEntry(conversationId, {
++						kind: "pi.context", model: item.messages,
++						data: { key: item.key, value: item.data ?? null },
++					})).id;
++				}
++				for (const entry of entries) cutoff = (await tx.appendEntry(SystemEntry, conversationId, entry)).id;
++				if (cutoff === undefined) throw new Error(`Conversation ${conversationId} has no entries to send`);
+ 				const request = {
+ 					attempt,
+ 					...(compacted === undefined ? {} : { compacted }),
+@@ -219,10 +258,54 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint,
+ 			if (model === undefined) return failNoModel(runtime, ref, context);
+ 			const view = await runtime.context(conversationId, context, { at: cutoff });
+ 			let messages = view.messages;
++			let blocked: { block: string; compact?: boolean } | undefined;
+ 			await runtime.hooks.each("beforeRequest", async (hook) => {
+-				const replaced = await hook({ messages }, runtime, context);
+-				if (replaced !== undefined) messages = replaced.messages;
++				if (blocked) return;
++				try {
++					const replaced = await hook(
++						{
++							messages,
++							model,
++							maxTokens: streamOptions.maxTokens ?? model.maxTokens,
++						},
++						runtime,
++						context,
++					);
++					if (replaced && "block" in replaced) blocked = replaced;
++					else if (replaced) messages = replaced.messages;
++				} catch (error) {
++					runtime.signal.throwIfAborted();
++					blocked = {
++						block: `request_hook_failed: ${error instanceof Error ? error.message : String(error)}`,
++					};
++				}
+ 			});
++			if (blocked) {
++				const failure = blocked.block;
++				if (
++					blocked.compact &&
++					compacted === undefined &&
++					selectCut(view, runtime.settings.compaction.keepRecentTokens) !== undefined
++				) {
++					await runtime.commit(async (tx): Promise<Next> => {
++						const child = await createCompaction(tx, conversationId, { reason: "overflow" }, runtime.taskId);
++						return {
++							status: "waiting",
++							checkpoint: {
++								phase: "prepare",
++								attempt,
++								compacted: child,
++								overflow: failure,
++								failureReason: "request_blocked",
++							},
++							on: [child],
++							policy: "allSettled",
++						};
++					}, context);
++					return;
++				}
++				return failRequest(runtime, failure, context, "request_blocked");
++			}
+ 			const options: SimpleStreamOptions = {
+ 				...streamOptions,
+ 				signal: runtime.signal,
+@@ -338,7 +421,7 @@ function createToolTask(tx: Tx, runtime: Runtime, assistant: EntryId, callId: st
+ 
+ /**
+  * Which threshold compaction preparation starts before its request (spec §8.3): `blocking` above
+- * `contextWindow - reserveTokens`, `background` above the background threshold, and only when range selection finds a
++ * the input budget (reserving the requested output plus safety), `background` above the background threshold, and only when range selection finds a
+  * cut. The caller starts a background one only while no compaction is listed.
+  */
+ function thresholdCompaction(
+@@ -346,13 +429,14 @@ function thresholdCompaction(
+ 	planned: readonly { readonly model?: readonly Message[] }[],
+ 	contextWindow: number,
+ 	policy: CompactionPolicy,
++	maxTokens: number,
+ ): "blocking" | "background" | undefined {
+ 	if (!policy.enabled || contextWindow <= 0) return undefined;
+ 	const tokens = estimateContext(
+ 		view,
+ 		planned.flatMap((entry) => entry.model ?? []),
+ 	);
+-	const blocking = contextWindow - policy.reserveTokens;
++	const blocking = contextInputBudget(contextWindow, policy, maxTokens);
+ 	const background = blocking - policy.backgroundTokens;
+ 	const over =
+ 		tokens > blocking ? "blocking" : policy.backgroundTokens > 0 && tokens > background ? "background" : undefined;
+@@ -374,14 +458,14 @@ function compactionFailure(outcome: Exclude<TaskOutcome<CompactionResult>, { sta
+ }
+ 
+ /** Settle the run's inputs `unanswered` with `model_error` and fail with `text`. */
+-async function failModelError(runtime: Runtime, text: string, context: Context): Promise<void> {
++async function failRequest(runtime: Runtime, text: string, context: Context, reason = "model_error"): Promise<void> {
+ 	await runtime.commit(async (tx) => {
+-		const failure = await prepareFailure(tx, runtime);
++		const failure = reason === "request_blocked" ? { policy: "keep" as const } : await prepareFailure(tx, runtime);
+ 		const live = await tx.doc(LiveDoc, runtime.conversationId);
+-		await endFailedRun(tx, runtime, live, failure, { status: "unanswered", reason: "model_error", detail: text });
++		await endFailedRun(tx, runtime, live, failure, { status: "unanswered", reason, detail: text });
+ 		return {
+ 			status: "terminal",
+-			outcome: { status: "failed", error: { message: text, detail: { reason: "model_error" } } },
++			outcome: { status: "failed", error: { message: text, detail: { reason } } },
+ 		};
+ 	}, context);
+ }
+@@ -547,9 +631,9 @@ async function classify(
+ 			const text = message.errorMessage ?? "Context overflow";
+ 			await runtime.commit(async (tx): Promise<Next> => {
+ 				const live = await tx.doc(LiveDoc, conversationId);
++				const child = await createCompaction(tx, conversationId, { reason: "overflow" }, runtime.taskId);
+ 				await appendAssistant(tx, conversationId, message);
+ 				delete live.generation;
+-				const child = await createCompaction(tx, conversationId, { reason: "overflow" }, runtime.taskId);
+ 				const checkpoint = { phase: "prepare", attempt, compacted: child, overflow: text } as const;
+ 				return { status: "waiting", checkpoint, on: [child], policy: "allSettled" };
+ 			}, context);
+diff --git a/packages/durable/src/harness/types.ts b/packages/durable/src/harness/types.ts
+index 289b5c4e..9e076cf7 100644
+--- a/packages/durable/src/harness/types.ts
++++ b/packages/durable/src/harness/types.ts
+@@ -1,5 +1,7 @@
+ import type { AttachedReplicatedState, Context, JsonValue } from "@earendil-works/chord";
+ import type {
++	Api,
++	Model,
+ 	AssistantMessage,
+ 	CacheRetention,
+ 	ClientIdentity,
+@@ -482,6 +484,8 @@ export type ConversationCreateOptions = {
+ 
+ /** Curated pi-ai request options; absent fields use pi-ai defaults. */
+ export type ConversationStreamOptions = {
++	/** Requested output allowance, also supplied to request admission hooks. */
++	maxTokens?: number;
+ 	transport?: Transport;
+ 	timeoutMs?: number;
+ 	/** Provider/SDK retries inside one request attempt. */
+@@ -511,6 +515,8 @@ export type CompactionPolicy = {
+ 	keepRecentTokens: number;
+ 	/** Background compaction starts `backgroundTokens` below the blocking threshold; `0` disables it. */
+ 	backgroundTokens: number;
++	/** Optional operating input budget, independent of the provider context window. */
++	maxInputTokens?: number;
+ };
+ 
+ /**
+@@ -850,18 +856,30 @@ export type HookResult<T> = T | undefined | Promise<T | undefined>;
+ 
+ /** Hooks of the built-in generation task. */
+ export interface GenerationHooks {
+-	/** Before every request attempt, including recovery; the result is used for that request only. */
++	/**
++	 * Before each attempt; replacements are request-only. The first block stops the request.
++	 * A compact block permits at most one blocking compaction, then reruns admission.
++	 * A thrown hook fails closed; it never sends an unvalidated request to the model.
++	 */
+ 	beforeRequest(
+-		request: { readonly messages: readonly Message[] },
++		request: { readonly messages: readonly Message[]; readonly model: Model<Api>; readonly maxTokens: number },
+ 		api: HookApi,
+ 		context: Context,
+-	): HookResult<{ readonly messages: readonly Message[] }>;
++	): HookResult<{ readonly messages: readonly Message[] } | { readonly block: string; readonly compact?: boolean }>;
+ 	/** Every terminal provider message, before classification. */
+ 	afterResponse(message: AssistantMessage, api: HookApi, context: Context): void | Promise<void>;
+ 	/** A final answer; the first `continue` appends a user message and continues the run. */
+ 	onYield(answer: AssistantMessage, api: HookApi, context: Context): HookResult<{ readonly continue: UserInput }>;
+ 	/** After every tool of the round is terminal; `results` are the round's result entries in call order. */
+ 	afterTools(assistant: EntryId, results: readonly EntryId[], api: HookApi, context: Context): void | Promise<void>;
++	/** Prepare passive context at a generation boundary. Committed with the request cutoff;
++	 * never admitted as user input. Use memo for immutable external reads across recovery.
++	 * Throws fail closed. Entries must be data messages, not head markers or context edits. */
++	prepareContext(
++		view: ContextView,
++		api: HookApi,
++		context: Context,
++	): HookResult<{ readonly key: string; readonly messages: readonly Message[]; readonly data?: JsonValue }>;
+ }
+ 
+ /** A call as tool hooks see it; `parent` is set for a nested call, one a running tool made through `executeTool()`. */
+@@ -904,4 +922,11 @@ export interface CompactionHooks {
+ 		api: HookApi,
+ 		context: Context,
+ 	): HookResult<{ readonly decline: true } | { readonly summary: string }>;
++	/** Supplements bound to the selected old range, persisted before the summary call.
++	 * Metadata is stored with the summary, never grants tool read/write permissions. */
++	prepareSummary(
++		compaction: { readonly entries: readonly EntryRecord[]; readonly firstKept: EntryId },
++		api: HookApi,
++		context: Context,
++	): HookResult<{ readonly instructions?: string; readonly metadata?: JsonValue }>;
+ }
+diff --git a/packages/durable/src/types.ts b/packages/durable/src/types.ts
+index fe69f8e2..18e0c496 100644
+--- a/packages/durable/src/types.ts
++++ b/packages/durable/src/types.ts
+@@ -928,6 +928,8 @@ export interface Tx {
+ 	): Promise<Page<TaskRecord<JsonValue, JsonValue, JsonValue>, Cursor>>;
+ 	/** Committed submission with a conversation-scoped request ID. */
+ 	submissionByRequest(conversationId: ConversationId, requestId: string): Promise<SubmissionRecord | undefined>;
++	/** Committed submission by ID; read before the commit's first table write. */
++	submission(id: SubmissionId): Promise<SubmissionRecord | undefined>;
+ 
+ 	/** Create a conversation with explicitly selected ownership. */
+ 	createConversation(options: { readonly ownership: ConversationOwnership }): Promise<ConversationRecord>;

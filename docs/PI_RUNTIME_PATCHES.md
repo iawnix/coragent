@@ -1,142 +1,47 @@
 # Managed Pi runtime patches
 
-CoRAgent pins Pi v1.1.0 at `abe508e1b89912adde45528136c3221eb69acdd7`
-in `packaging/coragent_packaging/pi/source.json`. The experimental transport protocol remains version 8.
-Terminal presentation uses Pi's experimental client, separately from ordinary
-`InteractiveMode`.
+CoRAgent pins Pi **1.4.0** at `4a080252f06caf63a525d7873c5d94d3c23887e0`.
+The [integration registry](../packaging/coragent_packaging/pi/README.md) describes
+each remaining patch, its regression tests and removal conditions.
 
-The [Pi 1.3.0 migration audit](PI_1_3_MIGRATION.zh-CN.md) records upstream
-coverage and migration work for the fourteen patches present at the time of that audit and the installer model
-type workaround. Pi 1.2.0 removed the experimental server/client stack; 1.3.0
-requires replacing that integration before changing the active pin.
+Pi 1.2 removed the unpublished experimental server/client/plugin stack. CoRAgent
+now owns session discovery, one supervised Worker per SQLite session, Host RPC,
+reconnection and the terminal presentation. Pi Durable supplies the Harness,
+transactions, execution and recovery. Public pi-tui components supply the editor,
+layout, scrolling and rendering. The Host wire protocol remains `coragent-host/3`;
+there is no separate Pi server protocol or second SSH socket.
 
-`packaging/coragent_packaging/pi/prepare.py` checks and applies the patches in
-`packaging/coragent_packaging/pi/patches/` in order, skips completely applied groups, and rejects a
-partial or incompatible group before applying that group. Later patches can
-depend on earlier ones. Verification checks that
-Git can reverse every patch; comments or version strings alone are insufficient.
-A mismatched upstream commit is rejected. Verify the complete ordered stack in
-a separate checkout before installing it.
+`prepare.py` verifies the exact commit and package versions, applies patches in
+order and checks their complete reverse application in an isolated directory.
+It rejects incomplete or incompatible patches. Model catalog hydration is followed
+by the upstream offline build; there is no untracked provider type cast.
 
-The authoritative patch ownership, regression coverage and removal conditions are maintained in the [Pi integration registry](../packaging/coragent_packaging/pi/README.md).
+The Durable policy patch preserves request admission before model dispatch,
+request-bound research orientation, fixed-history summary supplements, and output
+reservation. The reserved context is the greater of the configured reserve and
+the effective requested output plus 4,096 tokens. Thresholds, admission and
+terminal telemetry use the same policy. A generation waiting on a shared summary
+places its queued write before rebuilding context. Conflicting compaction
+instructions fail explicitly; failed, declined or stale blocking summaries stop
+the generation. The system-baseline ordering fix is supplied by upstream 1.4.
 
-There is also a source modification outside the patch directory:
-`hydrate_model_data()` in `packaging/coragent_packaging/pi/prepare.py` adds an `as any` cast to
-the OpenCode Go model list. Include it in every upgrade audit. Pi 1.3.0 adds
-the Google API type and implementation missing from 1.1.0's provider; the
-migration should remove the cast and validate the hydrated catalog build.
+Credential updates preserve non-model secrets. The Chat Completions patch retains
+opted-in session-affinity headers even when a summary disables prompt caching.
+`compat.promptCacheKeyMode` supports `auto`, `enabled` and `disabled`; it uses the
+existing provider session ID and 64-character clamp. Long retention remains a
+separate option, and explicit `onPayload` overrides still apply. This controls
+routing hints; it does not prove a proxy's cache hit rate improved. See the
+[proxy configuration example](MODEL_COMPATIBILITY.md#prompt-cache-keys-for-chat-completions-proxies).
 
-Application integration lives outside these patches. The worker publishes the
-`coragent.client-queries` service, bound to its workspace, session, kernel bridge, and
-prompt manifest. The terminal consumes it through Pi's attached session service
-source, including over SSH. No client-side Python process reads research state.
-The slash registry is defined in `command_catalog.json`; Pi owns its editor,
-selectors, transcript, model commands, and input loop.
+CoRAgent-owned terminal code handles input identities, tool cards, internal
+continuation markers, Monitor status and command panels. `/compact` reports its
+durable outcome, displaying a compacted-context marker without exposing the
+internal summary as an ordinary reply. `/reload` refreshes model configuration
+and credentials; the removed experimental plugin loader is not supported.
+Closing or switching the terminal leaves the Worker running.
 
-`/resume` asks the Host for an available session in the current workspace, then
-closes and recreates only the terminal presentation. `/quit` disconnects only the
-terminal. SSH connections proxy both the Host and Pi sockets; proxies and their
-SSH children are closed when the terminal exits.
-
-## Updating Pi
-
-Prepare a separate checkout under the configured test environment. Validate the
-patch groups, real worker queries, presentation, session recovery, Host/Phone/
-Monitor contracts, and packaging before updating the source pin and npm lock.
-Source pin and Pi package versions must move together. Use a new managed runtime
-directory for a new commit; existing session directories retain their layout.
-
-Pi 1.1.0 takes the historical cutoff as `runtime.context(id, context, { at })`;
-patch 008 preserves request admission on this API. The upstream context cache
-uses its default idle retention (ten minutes). Patch 010 persists research orientation
-with the request cutoff and carries historical scope metadata through native
-compaction. Only current control data remains request-only. The estimator
-now uses 3.5 characters per token, so budget admission may compact earlier.
-Patch 016 reserves the requested output plus 4,096 safety tokens when this exceeds
-the configured reserve. Native background/blocking thresholds, final admission
-and terminal input-budget telemetry use the same rule; stream output overrides
-remain effective. The summary output budget still uses the configured reserve.
-
-Patches 017–019 correct compact behavior while retaining the Pi 1.1.0 pin,
-protocol 8, and the existing storage format:
-
-- 017 backports the Pi 1.3.0 system-baseline ordering fix (#10904). A baseline
-  rendered after compaction leads the request even when the retained history
-  includes assistant messages. Later positional system updates keep their order.
-- 018 makes manual, background, and blocking compaction reuse an existing task,
-  including a completed summary still queued for placement. A generation waiting
-  on a shared summary applies the ordinary inbox boundary before rebuilding its
-  request, preserving steering input and reset precedence. Failed, declined, or
-  stale blocking summaries stop that generation. Different explicit manual
-  instructions are rejected while another compaction is pending. The reused task
-  retains its ownership and background flag; pausing background work still uses
-  the existing `background: true` abort option. Ordinary generation may continue
-  while a background or manual summary runs.
-- 019 keeps the Chat Completions adapter's opted-in session-affinity headers when
-  a summary uses `cacheRetention: "none"`. Prompt-cache body fields still follow
-  the retention setting; explicit header overrides and affinity opt-out remain
-  effective. This supplies a consistent routing hint; a proxy still decides which
-  upstream account or cache handles the request.
-
-The output reservation in patch 016 remains required: compaction must leave room
-for the requested completion and overhead. These fixes do not establish the cause
-of the observed post-compaction cache plateau. In particular, the current CPA
-Chat Completions adapter already folds system messages into a leading message,
-so correcting the internal baseline order need not change its HTTP payload.
-
-Patch 020 backports the Chat Completions portion of upstream
-[#9442](https://github.com/earendil-works/pi/pull/9442), which was unmerged when
-reviewed. The pinned adapter otherwise omits `prompt_cache_key` for proxy URLs
-under short retention. `compat.promptCacheKeyMode` controls that generated field:
-`auto` (the default) preserves URL/retention detection, `enabled` uses the existing
-provider session ID whenever retention is not `none`, and `disabled` omits it.
-The existing 64-character clamp remains in use; no new identity is generated at
-compaction. `supportsLongCacheRetention` continues to control retention fields
-independently. Patch 019's affinity headers and caller `onPayload` overrides
-retain their own behavior. The policy is exposed in the Pi type and model
-configuration schema for Chat Completions; this backport does not change Responses.
-Use the [proxy configuration example](MODEL_COMPATIBILITY.md#prompt-cache-keys-for-chat-completions-proxies)
-to opt in. Sending a key supplies an upstream routing hint; it does not establish
-that the observed post-compaction cache plateau is fixed.
-
-Research tool cards show Pi's recorded `durationMs` for final results, including
-after reconnect, and omit it for older or untimed results. For `job_start` this
-is the tool's submission time; scientific Job duration remains owned by Job
-Manager. Expanded cards preserve the full result and label the tool duration.
-
-The pinned runtime uses `azure` as the Azure provider identity. Configure providers
-and credentials through the installation configuration described in
-[Model configuration](MODEL_COMPATIBILITY.md). The experimental TUI exposes only
-its supported commands, not the ordinary Pi command set.
-
-Job event admission is implemented in CoRAgent's worker service rather than another
-Pi source patch. `apps/agent/runtime/admission/jobs.mjs` uses the pinned
-`packages/durable/src/harness/submissions.ts` transaction primitive
-`admitSubmission`: run/inbox checks, immutable input provenance and placement
-share one short Pi commit. All State/Python assessment runs outside that commit.
-The Worker reassesses internal input before its first model consumption and
-records the State basis against the submission, across generation task changes.
-An authenticated producer submits structured event IDs; message text and ID
-prefixes never establish provenance. Job Manager acknowledges consumption, retaining
-pending or deferred events and earlier identities when State supersedes an input.
-Native tests cover busy rejection, batch idempotency, a slow bridge racing native
-input, consumption reassessment, and real Worker/Host restart recovery. Recheck
-the internal Pi API on every pin update.
-
-The CoRAgent footer shows model, thinking level, workspace/session, estimated context
-and cumulative model tokens. `/usage` opens provider-reported input/output/cache
-counters; reasoning is not added again to output. `pi.usage` preserves totals
-across compaction. The worker telemetry query uses Pi's internal
-`harness/compaction.ts:estimateContext` with the conversation's canonical context
-and the selected model's configured capacity. Recheck that estimate API when
-updating Pi; it is not a tokenizer or a billing measurement. Changed context or
-model identity invalidates an old estimate until refreshed. Set `CORAGENT_TUI_RING=0`
-for a numeric-only context display on fonts without suitable circle glyphs.
-
-The presentation subscribes to Host Monitor events and refreshes read-only
-snapshots on reconnect and every five seconds. Monitor status includes an
-observational pending-delivery summary; reading it never claims or batches an
-outbox entry. Counts are scoped to the attached session, while worker health is
-shared. Host `next_run` is not a Pi inbox enum: accepted queued messages use
-`followUp`. User input retains Pi's own queue display. Job Manager waits
-for idle admission, so busy-session wakes normally remain pending delivery.
+A source resolver retained by upstream under `src/experimental` loads pinned
+workspace aliases. It is a build/bootstrap helper, not the removed server stack.
+Other private model/settings/tool helpers remain isolated in `source.mjs` and
+must be checked on future upgrades. SQLite schema migration and rollback are
+covered in the [1.4 migration notes](PI_1_4_MIGRATION.zh-CN.md).

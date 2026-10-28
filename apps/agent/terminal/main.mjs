@@ -1,14 +1,7 @@
 #!/usr/bin/env node
 import { piModulePath } from "../runtime/source.mjs";
 
-/*
- * Host-mediated native Pi client.
- *
- * The Host owns session selection and the durable Pi runtime. This process is
- * deliberately a small adapter: it never creates a worker, a PTY, or a tmux
- * session. Once the Host returns its local connection descriptor, Pi's own
- * experimental client/TUI is exec'd directly against that socket.
- */
+/** Host selects the durable session; this process launches its CoRAgent presentation. */
 import { spawn } from "node:child_process";
 import { lstatSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
@@ -53,8 +46,7 @@ for (let index = 0; index < args.length; index += 1) {
     options[key.replaceAll("-", "_")] = parts.join("=");
     continue;
   }
-  // Presentation/plugin flags belong to the native Pi client. They are kept
-  // in the child argv and are never interpreted by the Host adapter.
+  // Presentation options are passed to the terminal client.
   piArgs.push(value);
 }
 
@@ -73,7 +65,7 @@ function validateWorkspaceRoot(value) {
 
 function descriptorConnect(descriptor) {
   if (!descriptor || descriptor.transport !== "unix" || typeof descriptor.socket_path !== "string" || !descriptor.socket_path.startsWith("/")) {
-    throw new Error("Host returned an invalid Pi connection descriptor");
+    throw new Error("Host returned an invalid Host connection descriptor");
   }
   const encodedPath = descriptor.socket_path.split("/").map((part) => encodeURIComponent(part)).join("/");
   return `unix://${encodedPath}`;
@@ -166,26 +158,19 @@ async function main() {
     peer.close();
   }
 
-  let appProxy;
   let hostProxy;
   try {
     if (remote) {
       hostProxy = await createSshUnixProxy({ ...remoteOptions, label: "host" });
-      appProxy = await createSshUnixProxy({
-        ...remoteOptions,
-        remoteSocketPath: descriptor.socket_path,
-        label: "pi",
-      });
+
     }
-    const connect = appProxy ? descriptorConnect({ ...descriptor, socket_path: appProxy.socketPath }) : descriptorConnect(descriptor);
+    descriptorConnect(descriptor); // Validate the Host-selected endpoint.
     const sourceRoot = process.env.CORAGENT_PI_RUNTIME_ROOT;
-    if (!sourceRoot) throw new Error("CORAGENT_PI_RUNTIME_ROOT is required for the native Pi client");
+    if (!sourceRoot) throw new Error("CORAGENT_PI_RUNTIME_ROOT is required for the terminal client");
     const resolver = piModulePath("resolver", sourceRoot);
     const client = resolve(packageRoot, "apps/agent/runtime/client.mjs");
-    const childArgs = ["--import", resolver, client, "--connect", connect, "--session-id", descriptor.session_id, ...kept];
+    const childArgs = ["--import", resolver, client, "--session-id", descriptor.session_id, ...kept];
     process.env.CORAGENT_SESSION_CWD = workspaceRoot;
-    process.env.PI_EXPERIMENTAL = "1";
-    process.env.PI_SERVER_DIR = appProxy?.directory || descriptor.server_directory || dirname(descriptor.socket_path);
     process.env.CORAGENT_PACKAGE_ROOT = packageRoot;
     const child = spawn(process.execPath, childArgs, {
       cwd: workspaceRoot,
@@ -208,7 +193,6 @@ async function main() {
     });
     process.exitCode = result.code ?? (result.signal ? 1 : 0);
   } finally {
-    await appProxy?.close();
     await hostProxy?.close();
   }
 }

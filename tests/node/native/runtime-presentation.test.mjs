@@ -18,19 +18,20 @@ test("task-controller input is marked for presentation without changing model ro
 });
 
 test("runtime continuation renderer recognizes current and legacy messages", async () => {
-  const { isRuntimeTaskContinuation, RuntimeTaskMessageComponent } = await import(pathToFileURL(join(
-    source, "packages/coding-agent/src/modes/interactive/components/runtime-task-message.ts",
-  )));
-  const { initTheme } = await import(pathToFileURL(join(
-    source, "packages/coding-agent/src/modes/interactive/theme/theme.ts",
-  )));
-  initTheme("dark");
+  const { isRuntimeTaskContinuation, createChatView } = await import("../../../apps/agent/terminal/chat.mjs");
+  const [components,themes] = await Promise.all([
+    import(pathToFileURL(join(source,"packages/tui/src/index.ts"))),
+    import(pathToFileURL(join(source,"packages/coding-agent/src/modes/interactive/theme/theme.ts"))),
+  ]);
+  themes.initTheme("dark");
   const prompt = "Continue the existing authorized user task using the runtime task snapshot.";
   assert.equal(isRuntimeTaskContinuation(`${RUNTIME_TASK_CONTINUATION_START}\n${prompt}\n${RUNTIME_TASK_CONTINUATION_END}`), true);
   assert.equal(isRuntimeTaskContinuation(prompt), true);
   assert.equal(isRuntimeTaskContinuation("Recover only the final response for the existing completion proposal."), true);
   assert.equal(isRuntimeTaskContinuation("Please inspect the candidate transition state."), false);
-  const rendered = new RuntimeTaskMessageComponent().render(100).join("\n");
+  const chat = createChatView({components,theme:themes.theme,markdownTheme:themes.getMarkdownTheme(),requestRender(){}});
+  chat.update({docs:{},entries:[{id:1,kind:"pi.user",model:[{role:"user",content:markInternalInput(prompt,"task_controller")}]}]});
+  const rendered = chat.render(100).join("\n");
   assert.match(rendered, /Continuing authorized task/);
   assert.match(rendered, /internal runtime/);
 });
@@ -68,4 +69,18 @@ test("unified credentials preserve other secrets through native Pi refresh and d
     else process.env.CORAGENT_CREDENTIALS_FILE = previous;
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('request admission failures remain visible without an assistant message',async()=>{
+  const {createChatView}=await import('../../../apps/agent/terminal/chat.mjs');
+  const [components,themes]=await Promise.all([
+    import(pathToFileURL(join(source,'packages/tui/src/index.ts'))),
+    import(pathToFileURL(join(source,'packages/coding-agent/src/modes/interactive/theme/theme.ts'))),
+  ]);
+  themes.initTheme('dark');
+  const chat=createChatView({components,theme:themes.theme,markdownTheme:themes.getMarkdownTheme(),requestRender(){}});
+  chat.update({entries:[],docs:{},failure:{summary:'Request blocked',detail:'Input budget exceeded'}});
+  assert.match(chat.render(100).join('\n'),/Input budget exceeded/);
+  chat.update({entries:[],docs:{'pi.live':{run:{}}},failure:null});
+  assert.doesNotMatch(chat.render(100).join('\n'),/Input budget exceeded/);
 });

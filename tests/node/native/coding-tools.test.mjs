@@ -10,20 +10,21 @@ import { codingExecutionContext } from "../../../apps/agent/tasks/execution-plan
 
 async function fixture(t, getSelection) {
   const cwd = await mkdtemp(join(TEST_ROOT, "c-"));
-  const { ExecutionEnvs } = await loadPi("setup");
+  const { ExecutionEnvs } = await import("../../../apps/agent/runtime/harness-config.mjs");
   const environments = new ExecutionEnvs(cwd);
   t.after(async () => { await environments.cleanup(TODO_CONTEXT); await rm(cwd, { recursive: true, force: true }); });
   const tools = await createCodingTools(cwd, getSelection);
   const invoke = async (name, args, context = TODO_CONTEXT) => {
     const output = [];
     let details;
-    const api = { callId: `test_${name}`, taskId: "task_1", conversationId: "root",
+    const api = { now: () => Date.now(), setTimer(callback, ms) { const timer = setTimeout(callback, ms); return () => clearTimeout(timer); },
+      retainedOutput: () => ({ text: output.join(""), truncated: false }), callId: `test_${name}`, taskId: "task_1", conversationId: "root",
       env: environments.env({ cwd }), agent: async () => ({ cwd }),
       output: chunk => output.push(String(chunk)), diagnostic() {},
       details: async value => { details = value; } };
     const result = await tools.find(tool => tool.name === name).execute(args, api, context);
     return { ...result, details: result.details ?? details,
-      text: result.content?.map(item => item.type === "text" ? item.text : "").join("\n") ?? output.join("") };
+      text: result.output?.map(item => item.type === "text" ? item.text : "").join("\n") ?? output.join("") };
   };
   return { cwd, tools, invoke };
 }

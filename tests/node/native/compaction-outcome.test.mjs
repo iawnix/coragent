@@ -7,7 +7,8 @@ import {createModels,fauxProvider,fauxAssistantMessage} from '@earendil-works/pi
 import {TODO_CONTEXT as context} from '@earendil-works/chord/context';
 import {pinnedPiSource} from './test-environment.mjs';
 const fromSource = path => import(pathToFileURL(join(pinnedPiSource(),path)));
-const {createAgentController} = await fromSource('packages/coding-agent/src/experimental/services/agent-controller-provider.ts');
+import {compactionOutcome} from '../../../apps/agent/runtime/compaction.mjs';
+import {createChatView} from '../../../apps/agent/terminal/chat.mjs';
 
 for (const scenario of ['completed','skipped','failed','cancelled']) {
   test(`manual compaction reports ${scenario} from its durable operation`, {timeout:10000}, async t => {
@@ -25,44 +26,40 @@ for (const scenario of ['completed','skipped','failed','cancelled']) {
       settings:{compaction:{enabled:false,keepRecentTokens:0},retry:{enabled:false}}},context);
     t.after(()=>harness.close(context));
     const conversation = await harness.root(context,{agent:{model:{provider:'faux',modelId:'faux-1'}}});
-    const controller = createAgentController(harness,conversation);
     if (scenario !== 'skipped') {
       faux.setResponses([fauxAssistantMessage('Answer'),fauxAssistantMessage('',{stopReason:'error',errorMessage:'Summary provider unavailable'})]);
       await (await conversation.submit({type:'input',content:'History '.repeat(100)},context)).wait(context);
     }
-    const operation = await controller.compact({customInstructions:null},context);
-    assert.equal(operation.accepted,true);
+    const operationId = await conversation.compact(undefined,context);
     if (scenario === 'cancelled') {
       await pending;
-      const aborting = controller.abort(context);
+      const aborting = conversation.abort(context,{background:true});
       release();
       await aborting;
     }
-    const outcome = await controller.waitForCompaction(operation.operationId,context);
+    const outcome = await compactionOutcome(harness,conversation,operationId,context,{wait:true});
     assert.equal(outcome.status,scenario);
     if (scenario === 'failed') assert.match(outcome.error,/Summary provider unavailable/);
     if (scenario === 'completed') {
       // Completion means the summary has actually been placed, including queued placement.
       const entries = await conversation.entries({},100,undefined,context);
       assert.ok(entries.items.some(entry => entry.kind === 'pi.compaction'));
-      const [{ExperimentalChatView},{TuiAltScreen},{VirtualTerminal},{initTheme}] = await Promise.all([
-        fromSource('packages/coding-agent/src/experimental/client-tui-chat.ts'),
-        fromSource('packages/tui/src/index.ts'),fromSource('packages/tui/test/virtual-terminal.ts'),
+      const [components,themes] = await Promise.all([
+        fromSource('packages/tui/src/index.ts'),
         fromSource('packages/coding-agent/src/modes/interactive/theme/theme.ts'),
       ]);
-      initTheme('dark');
-      const ui = new TuiAltScreen(new VirtualTerminal(100,24));
-      const chat = new ExperimentalChatView(ui, process.cwd());
+      themes.initTheme('dark');
+      const chat = createChatView({components,theme:themes.theme,markdownTheme:themes.getMarkdownTheme(),requestRender(){}});
       const state = await conversation.viewState(context);
       try {
-        chat.apply(state.value);
-        const rendered = chat.transcript.render(100).join('\n');
+        chat.update(state.value);
+        const rendered = chat.render(100).join('\n');
         assert.match(rendered,/Context compacted/);
         assert.doesNotMatch(rendered,/PRIVATE SUMMARY CONTENT/);
-      } finally {chat.dispose(); await state.dispose(context);}
+      } finally {await state.dispose(context);}
     }
-    await assert.rejects(controller.waitForCompaction('invalid',context),/Unknown compaction/);
+    await assert.rejects(compactionOutcome(harness,conversation,'invalid',context),/Unknown compaction/);
     const other = await harness.createConversation({ownership:{kind:'ownerless'}},context);
-    await assert.rejects(createAgentController(harness,other).waitForCompaction(operation.operationId,context),/Unknown compaction/);
+    await assert.rejects(compactionOutcome(harness,other,operationId,context),/Unknown compaction/);
   });
 }

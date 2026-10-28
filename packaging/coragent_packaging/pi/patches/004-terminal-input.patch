@@ -1,0 +1,15 @@
+diff --git a/packages/tui/src/stdin-buffer.ts b/packages/tui/src/stdin-buffer.ts
+index ed1b3ea5..4b0586b6 100644
+--- a/packages/tui/src/stdin-buffer.ts
++++ b/packages/tui/src/stdin-buffer.ts
+@@ -414,7 +414,9 @@ export class StdinBuffer extends EventEmitter<StdinBufferEventMap> {
+ 			// terminator into Ctrl+G (the external editor shortcut). Other input,
+ 			// including Alt+] followed by text, must retain bounded recovery.
+ 			if (TERMINAL_REPLY_HEADER_PATTERN.test(this.buffer)) return;
+-			const timeoutMs = this.buffer === ESC ? this.escapeTimeoutMs : this.timeoutMs;
++			// SSH can split a function key after its CSI/SS3 prefix as well as after ESC.
++			const partialKey = this.buffer === ESC || /^\x1b(?:O|\[[0-9;:?]*)$/.test(this.buffer);
++			const timeoutMs = partialKey ? Math.max(this.escapeTimeoutMs, this.timeoutMs) : this.timeoutMs;
+ 			this.timeout = setTimeout(() => {
+ 				const flushed = this.flush();
+ 

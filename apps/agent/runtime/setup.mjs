@@ -13,7 +13,7 @@ import { createMonitorService, recordRun, MONITOR_SERVICE_ID } from "../tasks/se
 import { CLIENT_QUERIES_SERVICE_ID, createClientQueries } from "./services/queries.mjs";
 import { dirname, join } from "node:path";
 import { readFile } from "node:fs/promises";
-import { createStaticFacetLoader, defineFacet, defineService } from "@earendil-works/chord";
+import { createHarnessSettings, configureHarnessHttp, ExecutionEnvs, findInitialAgentModel } from "./harness-config.mjs";
 import {
   Harness, createRegistry, defineExtension, hook, section,
   GenerationTask, CompactionTask, ToolTask, LiveDoc, InboxDoc,
@@ -35,15 +35,8 @@ import { createTransactionCoordinator } from "../bridge/transactions.mjs";
 const sourceRoot = process.env.CORAGENT_PI_RUNTIME_ROOT;
 if (!sourceRoot) throw new Error("CoRAgent worker requires CORAGENT_PI_RUNTIME_ROOT");
 const { estimateContextTokens } = await loadPi("estimate", sourceRoot);
-const setupModule = await loadPi("setup", sourceRoot);
-const { createHarnessSettings, configureHarnessHttp, ExecutionEnvs, findInitialAgentModel } = setupModule;
 // Pinned Pi transaction primitive keeps Monitor admission atomic with native input.
 const { admitSubmission } = await loadPi("submissions", sourceRoot);
-const CoRAgentJobAdmission = defineService(JOB_ADMISSION_SERVICE_ID);
-const CoRAgentInputAdmission = defineService(INPUT_ADMISSION_SERVICE_ID);
-const CoRAgentSessionAdmission = defineService(SESSION_ADMISSION_SERVICE_ID);
-const CoRAgentClientQueries = defineService(CLIENT_QUERIES_SERVICE_ID);
-const CoRAgentMonitor = defineService(MONITOR_SERVICE_ID);
 
 export async function createCoRAgentHarness(databasePath, options) {
   const producerToken = process.env.CORAGENT_INPUT_PRODUCER_TOKEN;
@@ -53,7 +46,7 @@ export async function createCoRAgentHarness(databasePath, options) {
   const modelRuntime = await (await loadPi("modelRuntime", sourceRoot)).ModelRuntime.create();
   const { SettingsManager } = await loadPi("settings", sourceRoot);
   const settingsManager = SettingsManager.create(cwd);
-  configureHarnessHttp(settingsManager);
+  await configureHarnessHttp(settingsManager);
   const executionEnvs = new ExecutionEnvs(cwd);
   let commandBridge, queryBridge, harness, taskController, cacheLog;
   try {
@@ -199,15 +192,15 @@ export async function createCoRAgentHarness(databasePath, options) {
       producerToken, taskController });
     const sessionAdmission = createSessionAdmission({ harness, conversation, LiveDoc, taskController });
     taskController.start();
+    const { validateConsumption: _validate, ...jobEventService } = jobAdmission;
     return {
       harness, conversation: bindUserInputConversation(conversation, inputAdmission, harness, sessionAdmission), modelRuntime, settingsManager,
-      facetLoader: createStaticFacetLoader([defineFacet({ id: "@coragent/client-queries", setup(env) {
-        const { validateConsumption: _validate, ...jobEventService } = jobAdmission;
-        env.provide(CoRAgentJobAdmission, jobEventService);
-        env.provide(CoRAgentInputAdmission, createInputService(inputAdmission));
-        env.provide(CoRAgentSessionAdmission, sessionAdmission);
-        env.provide(CoRAgentMonitor, createMonitorService({ controller: taskController, harness, conversation, queryKernel: queryBridge, workspaceId, sessionId, LiveDoc }));
-        env.provide(CoRAgentClientQueries, createClientQueries({ workspaceId, sessionId, queryBridge, promptManifest,
+      services: {
+        [JOB_ADMISSION_SERVICE_ID]: jobEventService,
+        [INPUT_ADMISSION_SERVICE_ID]: createInputService(inputAdmission),
+        [SESSION_ADMISSION_SERVICE_ID]: sessionAdmission,
+        [MONITOR_SERVICE_ID]: createMonitorService({ controller: taskController, harness, conversation, queryKernel: queryBridge, workspaceId, sessionId, LiveDoc }),
+        [CLIENT_QUERIES_SERVICE_ID]: createClientQueries({ workspaceId, sessionId, queryBridge, promptManifest,
           currentTask: context => taskController.current(context),
           readTelemetry: async (context) => {
             const { estimateContext } = await loadPi("compaction", sourceRoot);
@@ -223,8 +216,8 @@ export async function createCoRAgentHarness(databasePath, options) {
               estimated: true,
               entryId: view.entries.at(-1)?.id ?? null, firstEntryId: view.entries[0]?.id ?? null, headId: view.head?.id ?? null };
           },
-        }));
-      } })]),
+        }),
+      },
       cleanup: async (context) => { await taskController.close(); try { await executionEnvs.cleanup(context); } finally { await Promise.all([commandBridge.close(), queryBridge.close(), cacheLog?.flush()]); } },
     };
   } catch (error) {

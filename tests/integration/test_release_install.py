@@ -94,7 +94,12 @@ def test_real_release_build_excludes_development_tree(tmp_path: Path) -> None:
     assert "apps/agent/main.mjs" in names
     assert "apps/agent/runtime/worker.mjs" in names
     assert "packaging/coragent_packaging/pi/source.json" in names
-    assert "packaging/coragent_packaging/pi/patches/001-workspaces.patch" in names
+    from coragent_packaging.pi.prepare import PATCH_NAMES
+    assert all(f"packaging/coragent_packaging/pi/patches/{name}" in names for name in PATCH_NAMES)
+    assert "packaging/coragent_packaging/pi/patches/001-workspaces.patch" not in names
+    for module in ("runtime/worker-process.mjs", "runtime/session-catalog.mjs", "runtime/storage.mjs",
+                   "terminal/tui.mjs", "terminal/chat.mjs", "terminal/connection.mjs", "terminal/completion.mjs"):
+        assert f"apps/agent/{module}" in names
     assert "packaging/coragent_packaging/pi/prepare.py" in names
     assert not any(name.startswith("backend/src/research_agent/application/web/") for name in names)
     assert not any(name.startswith(("packages/research-compute/", "packages/coragent-provider-runtime/")) for name in names)

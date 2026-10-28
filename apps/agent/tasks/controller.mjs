@@ -8,23 +8,23 @@ import { hasPendingInput } from "../runtime/admission/input.mjs";
 import shared from "../tools/tool-schemas.json" with { type: "json" };
 
 export const UserTasks = defineDoc({ kind: "coragent.user-tasks", version: 1,
-  scope: "conversation", history: "latest", fork: "initial",
+  scope: "conversation", history: "latest", fork: "initial", checkpointWhen: () => false,
   initial: () => ({ current: null, ids: [], cancellation_tasks: [], job_cancellations: [], automatic_suppressed: false, user_epoch: 0, latest_user_submission_id: null }) });
 export const UserTask = defineDocFamily({ kind: "coragent.user-task", version: 6, family: true,
-  scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
+  scope: "conversation", history: "latest", fork: "initial", checkpointWhen: () => false, initial: () => ({}) });
 const ControlReceipt = defineDocFamily({ kind: "coragent.task-control-receipt", version: 1, family: true,
-  scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
+  scope: "conversation", history: "latest", fork: "initial", checkpointWhen: () => false, initial: () => ({}) });
 // A block ends scheduling, but the run that recorded it must deliver its explanation.
 const BlockFinalization = defineDocFamily({ kind: "coragent.task-block-finalization", version: 1, family: true,
-  scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
+  scope: "conversation", history: "latest", fork: "initial", checkpointWhen: () => false, initial: () => ({}) });
 // A user-directed stop disables scheduling immediately, but its consumed run
 // may still verify cancellations and acknowledge the user's instruction.
 const UserControlFinalization = defineDocFamily({ kind: "coragent.task-user-control-finalization", version: 1, family: true,
-  scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
+  scope: "conversation", history: "latest", fork: "initial", checkpointWhen: () => false, initial: () => ({}) });
 // Link user-driven recovery to Pi's submission outcome. Merely asking a question
 // must not restart automatic work; new task evidence and a successful run must agree.
 const UserRecoveryAttempt = defineDocFamily({ kind: "coragent.task-user-recovery", version: 1, family: true,
-  scope: "conversation", history: "latest", fork: "initial", initial: () => ({}) });
+  scope: "conversation", history: "latest", fork: "initial", checkpointWhen: () => false, initial: () => ({}) });
 const terminal = new Set(["completed", "partial", "cancelled"]);
 const jobFinished = new Set(["succeeded", "failed", "timed_out", "cancelled", "collected", "unknown"]);
 const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");

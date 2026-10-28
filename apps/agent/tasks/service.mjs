@@ -5,7 +5,7 @@ export { MONITOR_SERVICE_ID } from "../contracts/monitor.mjs";
 
 // References only: Pi remains authoritative for every execution status.
 export const RunIndex = defineDoc({ kind: "coragent.run-index", version: 1, scope: "conversation",
-  history: "latest", fork: "initial", initial: () => ({ runs: [] }) });
+  history: "latest", fork: "initial", checkpointWhen: () => false, initial: () => ({ runs: [] }) });
 export async function recordRun({ conversation, api, inputIds, userTaskId, context }) {
   if (!inputIds.length) return;
   await conversation.commit(async tx => {

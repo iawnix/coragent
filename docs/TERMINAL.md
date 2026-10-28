@@ -2,11 +2,9 @@
 
 [English](TERMINAL.md) | [简体中文](TERMINAL.zh-CN.md)
 
-`coragent --workspace <name>` is the public launcher for Pi's official remote
-`ExperimentalClientTui`. It uses Pi's editor, transcript rendering, and input loop.
-This is a separate presentation from ordinary Pi `InteractiveMode`, with its own
-command and plugin capabilities. The selected workspace is
-bound to one installation-level Pi Harness SQLite durable session.
+`coragent --workspace <name>` opens the CoRAgent terminal, built with public
+Pi TUI components. CoRAgent owns its session connection, commands and transcript
+presentation; Pi Durable executes and stores the selected workspace's session.
 
 Workspaces use the research mode automatically. No mode selection is needed; see the workspace commands below.
 
@@ -19,8 +17,8 @@ There is one Agent Server owner and several clients:
 
 ```text
 CoRHub/Web -- Link/HTTP --+      CoRAgent Agent Server / Host API
-Pi native TUI -- Unix/SSH ---+-->   Agent Session
-Monitor -- Host RPC ---------+      Harness / Pi App Server / SessionWorker
+CoRAgent TUI -- Unix/SSH ---+-->   Agent Session
+Monitor -- Host RPC ---------+      Pi Durable Harness / SessionWorker
 ```
 
 The Host is the Agent Server API and hosting layer. It owns routing, authentication,
@@ -50,8 +48,7 @@ its directory and filename include installation and server identities. The proxy
 example assumes `/opt/coragent` is the remote software root; a source checkout
 instead uses `<checkout>/apps/agent/transport/ssh.mjs`.
 
-The launcher uses the same SSH proxy for the Pi App Server socket returned by
-Host, then gives Pi a private local Unix endpoint. The workspace and session
+The launcher gives the terminal a private local Unix proxy to the remote Host. The workspace and session
 remain on the remote Host; the local directory is only a presentation cwd.
 
 ## Open a workspace
@@ -62,8 +59,7 @@ remain on the remote Host; the local directory is only a presentation cwd.
 ```
 
 The launcher first ensures the installation Host is ready, then requests a
-session descriptor and execs Pi's native client directly against the Pi App
-Server socket. Native Pi Harness is the only supported backend: no tmux
+session descriptor and connects the terminal to the Host socket. Native Pi Harness is the only supported backend: no tmux
 session or PTY scraping path is available. A second terminal
 attaches to the same SQLite durable session; closing a client does not stop the
 worker or interrupt a turn.
@@ -81,8 +77,9 @@ socket is under the configured runtime directory.
 
 ## Sessions and controls
 
-The remote `ExperimentalClientTui` provides `/resume`, `/model`, `/thinking`,
-`/compact`, `/reload`, and the Native CoRAgent commands. `/resume`
+The CoRAgent terminal provides `/resume`, `/model`, `/thinking`,
+`/compact`, `/reload`, and the CoRAgent commands. `/reload` refreshes model
+configuration and credentials. `/resume`
 switches to another SQLite durable session in the current workspace; it does not
 cross workspace boundaries. Switching disposes the old terminal connection before
 attaching the selected session; background tasks continue. Other standalone Pi
@@ -96,11 +93,9 @@ status line and leave the editor usable; no panel needs to be dismissed.
 that it was skipped, cancelled, or failed. The transcript shows a compacted
 context marker; it does not print the internal summary as an ordinary reply.
 
-Slash completion uses a stable viewport above the editor. Arrow keys select a
-candidate; Tab and clicks only complete it. Enter opens a command entry. Enter on
-an argument candidate only completes it; a subsequent Enter submits the command.
-Esc dismisses completion without clearing the input, and Tab reopens it. Monitor
-suggestions follow the current argument position and preserve case-sensitive IDs.
+Slash completion uses Pi 1.4's public Editor. Its menu appears alongside the
+input; arrow keys select candidates, and Tab or a click completes them. Monitor
+suggestions preserve case-sensitive IDs. Bracketed paste never executes a command.
 Incomplete commands report the missing argument without executing an operation.
 
 Failed commands return to an untouched editor for correction; late failures never

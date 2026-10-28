@@ -24,10 +24,7 @@ const configuredWorkspaceRoot = process.env.CORAGENT_WORKSPACE_ROOT || options.w
 if (!configuredWorkspaceRoot) throw new Error("Host requires the configured workspace root");
 const workspaceRoot = resolve(configuredWorkspaceRoot);
 const socketPath = join(resolve(options.directory), `${options["server-id"]}.sock`);
-// The CoRAgent Host owns <directory>/<server-id>.sock. Pi's experimental server
-// uses the same server-id-derived socket name, so keep its coordinator and
-// public socket in a private child directory to avoid endpoint collisions.
-const piServerDirectory = join(resolve(options.directory), "pi");
+const workerDirectory = join(resolve(options.directory), "pi");
 const python = process.env.CORAGENT_PYTHON || "python3";
 const jobToken = randomBytes(32).toString("hex");
 const provider = options.provider ?? process.env.CORAGENT_PROVIDER;
@@ -80,7 +77,7 @@ async function stop() {
   stopPromise = (async () => {
     // A signal can arrive while the managed Pi backend or Host socket is
     // still starting. Let that work settle, then close whichever resources
-    // were acquired instead of leaving a stale coordinator or public socket.
+    // were acquired instead of leaving a worker or public socket.
     await startupPromise.catch(() => {});
     for (const timer of timers) clearTimeout(timer);
     const exits = [...workers.values()].map((child) => new Promise((done) => {
@@ -127,7 +124,7 @@ for (const signal of shutdownSignals) {
 startupPromise = (async () => {
   try {
     // Do not expose runtime state until signal cleanup is installed above.
-    mkdirSync(piServerDirectory, { recursive: true, mode: 0o700 });
+    mkdirSync(workerDirectory, { recursive: true, mode: 0o700 });
     mkdirSync(stateRoot, { recursive: true, mode: 0o700 });
     const pin = JSON.parse(readFileSync(join(packageRoot, "packaging/coragent_packaging/pi/source.json"), "utf8"));
     const sourceRoot = resolve(process.env.CORAGENT_PI_RUNTIME_ROOT);
@@ -135,8 +132,8 @@ startupPromise = (async () => {
     if (process.env.CORAGENT_PI_RUNTIME_ROOT && resolve(process.env.CORAGENT_PI_RUNTIME_ROOT) !== sourceRoot) {
       throw new Error("CORAGENT_PI_RUNTIME_ROOT is installation-managed and cannot be overridden");
     }
-    if (!existsSync(piModulePath("server", sourceRoot))) {
-      throw new Error(`managed Pi experimental source is unavailable: ${sourceRoot}`);
+    if (!existsSync(piModulePath("modelRuntime", sourceRoot))) {
+      throw new Error(`managed Pi source is unavailable: ${sourceRoot}`);
     }
     process.env.CORAGENT_PI_RUNTIME_ROOT = sourceRoot;
     sessionBackend = await createCoRAgentHarnessBackend({
@@ -144,15 +141,12 @@ startupPromise = (async () => {
       packageRoot,
       installRoot,
       workspaceRoot,
-      // Pi puts several UUID-bearing Unix sockets below this directory. The
-      // launcher-provided hashed runtime directory is deliberately short so
-      // the resulting paths stay below the POSIX AF_UNIX limit.
-      serverDirectory: piServerDirectory,
+      // Keep the managed runtime directory stable across upgrades.
+      serverDirectory: workerDirectory,
       sessionDir: resolve(options["session-dir"] || process.env.CORAGENT_SESSION_ROOT),
       stateRoot,
       serverId: options["server-id"],
-      provider,
-      model,
+      model: model ? { provider, id: model } : undefined,
     });
     if (stopping) return;
     host = await startCoRAgentHost({

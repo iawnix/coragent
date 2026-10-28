@@ -162,12 +162,11 @@ test('monochrome tool summaries retain state without calling color functions',t=
 });
 
 test("native chat applies registered renderers and expands cards without losing their transcript", async () => {
-  const { ExperimentalChatView, configureToolRenderers, configureMarkdownTransformers } = await fromSource("packages/coding-agent/src/experimental/client-tui-chat.ts");
-  const { initTheme } = await fromSource("packages/coding-agent/src/modes/interactive/theme/theme.ts");
+  const { createChatView } = await import("../../../apps/agent/terminal/chat.mjs");
+  const themes = await fromSource("packages/coding-agent/src/modes/interactive/theme/theme.ts");
+  const {initTheme} = themes;
   initTheme("dark");
-  configureToolRenderers(createCoRAgentToolRenderers(tui, ["research_read"]));
-  configureMarkdownTransformers([enhanceMarkdown]);
-  const view = new ExperimentalChatView({ requestRender() {} }, process.cwd());
+  const view = createChatView({ components: tui, theme: themes.theme, markdownTheme: themes.getMarkdownTheme(), requestRender() {} });
   const raw = "evidence\n".repeat(100);
   try {
     const persisted = { docs: {}, entries: [
@@ -176,58 +175,54 @@ test("native chat applies registered renderers and expands cards without losing 
       { id: 1, kind: "pi.assistant", model: [{ role: "assistant", stopReason: "toolUse", content: [{ type: "toolCall", id: "one", name: "research_read", arguments: { mode: "context" } }] }] },
       { id: 2, kind: "pi.tool-result", model: [{ role: "toolResult", toolCallId: "one", toolName: "research_read", isError: false, durationMs: 1250, content: [{ type: "text", text: raw }] }] },
     ] };
-    view.apply(persisted);
-    const initial = view.transcript.render(60).join("\n");
+    view.update(persisted);
+    const initial = view.render(60).join("\n");
     assert.match(initial, /example\.com/);
     assert.match(initial, /Rendered note/);
     assert.match(initial, /\(1\) item/);
     assert.match(initial, /research_read/);
-    const collapsed = view.transcript.render(60).length;
+    const collapsed = view.render(60).length;
     view.toggleTools();
-    assert.ok(view.transcript.render(60).length > collapsed + 50);
-    assert.match(view.transcript.render(60).join("\n"), /evidence/);
+    assert.ok(view.render(60).length > collapsed + 50);
+    assert.match(view.render(60).join("\n"), /evidence/);
     view.toggleTools();
-    assert.equal(view.transcript.render(60).length, collapsed);
+    assert.equal(view.render(60).length, collapsed);
     // A newly attached presentation gets the recorded duration without a live timer.
-    const reattached = new ExperimentalChatView({ requestRender() {} }, process.cwd());
+    const reattached = createChatView({ components: tui, theme: themes.theme, markdownTheme: themes.getMarkdownTheme(), requestRender() {} });
     try {
-      reattached.apply(persisted);
-      assert.match(reattached.transcript.render(60).join("\n"), /1\.3s/);
-    } finally { reattached.dispose(); }
-  } finally { view.dispose(); configureToolRenderers({}); configureMarkdownTransformers([]); }
+      reattached.update(persisted);
+      assert.match(reattached.render(60).join("\n"), /1\.3s/);
+    } finally { reattached.invalidate(); }
+  } finally { view.invalidate(); }
 });
 
 test("skill invocations keep attached failures inside one collapsible card", async () => {
-  const { SkillInvocationMessageComponent } = await fromSource("packages/coding-agent/src/modes/interactive/components/skill-invocation-message.ts");
-  const { parseSkillBlock } = await fromSource("packages/coding-agent/src/core/agent-session.ts");
-  const { initTheme } = await fromSource("packages/coding-agent/src/modes/interactive/theme/theme.ts");
-  initTheme("dark");
-  const block = parseSkillBlock([
+  const { createChatView } = await import("../../../apps/agent/terminal/chat.mjs");
+  const themes = await fromSource("packages/coding-agent/src/modes/interactive/theme/theme.ts");
+  themes.initTheme("dark");
+  const component = createChatView({components:tui,theme:themes.theme,markdownTheme:themes.getMarkdownTheme(),requestRender(){}});
+  const text = [
     '<skill name="material-preparation" location="/package/skills/chemical/material-preparation/SKILL.md">',
-    "# Material preparation",
-    "</skill>",
-    "",
-    "<harness>\n[error] Tool call blocked\n</harness>",
-  ].join("\n"));
-  assert.ok(block);
-  const component = new SkillInvocationMessageComponent(block);
+    "# Material preparation", "</skill>", "", "<harness>\n[error] Tool call blocked\n</harness>",
+  ].join("\n");
+  component.update({docs:{},entries:[{id:1,kind:"pi.user",model:[{role:"user",content:text}]}]});
   const collapsed = component.render(120).join("\n");
   assert.match(collapsed, /\[skill\].*material-preparation.*▾/);
   assert.doesNotMatch(collapsed, /Tool call blocked/);
-  component.setExpanded(true);
+  component.handleMouse({type:"click",button:"left",y:1});
   const expanded = component.render(120).join("\n");
   assert.match(expanded, /material-preparation.*▴/);
   assert.match(expanded, /Tool call blocked/);
-  component.setExpanded(false);
+  component.handleMouse({type:"click",button:"left",y:1});
   assert.doesNotMatch(component.render(120).join("\n"), /Tool call blocked/);
 });
 
 test("monitor wake messages use the compact collapsible monitor card", async () => {
-  const { ExperimentalChatView, configureToolRenderers } = await fromSource("packages/coding-agent/src/experimental/client-tui-chat.ts");
-  const { initTheme } = await fromSource("packages/coding-agent/src/modes/interactive/theme/theme.ts");
+  const { createChatView } = await import("../../../apps/agent/terminal/chat.mjs");
+  const themes = await fromSource("packages/coding-agent/src/modes/interactive/theme/theme.ts");
+  const {initTheme} = themes;
   initTheme("dark");
-  configureToolRenderers(createCoRAgentToolRenderers(tui, ["monitor"]));
-  const view = new ExperimentalChatView({ requestRender() {} }, process.cwd());
+  const view = createChatView({ components: tui, theme: themes.theme, markdownTheme: themes.getMarkdownTheme(), requestRender() {} });
   const text = [
     "A compute monitor event requires attention.",
     "event_id=event_15", "monitor_id=monitor_15", "job_id=job_15", "node_id=node_2",
@@ -236,16 +231,15 @@ test("monitor wake messages use the compact collapsible monitor card", async () 
     "Use job_status, job_collect, or job_reconcile to reconcile status.",
   ].join("\n");
   try {
-    view.apply({ docs: {}, entries: [{ id: 4, kind: "pi.user", model: [{ role: "user", content: text }] }] });
-    const collapsed = view.transcript.render(100).join("\n");
+    view.update({ docs: {}, entries: [{ id: 4, kind: "pi.user", model: [{ role: "user", content: text }] }] });
+    const collapsed = view.render(100).join("\n");
     assert.match(collapsed, /× monitor\s+job_15\s+▾/);
     assert.doesNotMatch(collapsed, /event_id=event_15/);
     view.toggleTools();
-    const expanded = view.transcript.render(100).join("\n");
+    const expanded = view.render(100).join("\n");
     assert.match(expanded, /event_id=event_15/);
     assert.match(expanded, /reason=state_changed/);
   } finally {
-    view.dispose();
-    configureToolRenderers({});
+    view.invalidate();
   }
 });
