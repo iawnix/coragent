@@ -400,6 +400,9 @@ and Host; the phone snapshot/event protocol remains unchanged.
 Document deltas are field-level: a new token does not repeat unchanged tool lists or
 run state. When fields disappear, the frame marks a replacement so the client removes
 old state instead of leaving a completed status visible.
+Committed Pi Durable entries are immutable, so a view materialized from SQLite can
+reuse entry IDs as history boundaries without reading every historical message body
+to compare a new token.
 
 The working indicator occupies a fixed status row and animates independently of
 model tokens using Pi's public Loader. Its timer stops while a panel is open,

@@ -15,6 +15,14 @@ function changedDocument(previous, value) {
   return Object.keys(changed).length ? changed : undefined;
 }
 
+function sameEntry(previous, value) {
+  if (previous === value) return true;
+  // Pi Durable entry records are immutable once committed. Their numeric/string
+  // IDs and kinds are therefore a stable identity even when a fresh view array
+  // is materialized from SQLite for each watch notification.
+  return previous && value && previous.id !== undefined && previous.id === value.id && previous.kind === value.kind;
+}
+
 /** A presentation-only stream. A new connection always starts with a full view. */
 export function createViewStream() {
   let previous, sequence = 0;
@@ -29,9 +37,9 @@ export function createViewStream() {
       // Durable views and replicas retain immutable history between live updates.
       if (before !== after) {
         let start = 0, end = 0;
-        while (start < Math.min(before.length, after.length) && isDeepStrictEqual(before[start], after[start])) start++;
+        while (start < Math.min(before.length, after.length) && sameEntry(before[start], after[start])) start++;
         while (end < Math.min(before.length, after.length) - start
-          && isDeepStrictEqual(before[before.length - end - 1], after[after.length - end - 1])) end++;
+          && sameEntry(before[before.length - end - 1], after[after.length - end - 1])) end++;
         if (start !== before.length || start !== after.length) {
           entries = { start, deleteCount: before.length - start - end, items: after.slice(start, after.length - end) };
         }

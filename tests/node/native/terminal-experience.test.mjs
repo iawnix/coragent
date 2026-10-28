@@ -39,6 +39,19 @@ test('token updates do not inspect immutable historical entries', () => {
   assert.equal(reads, 0, 'streaming must not scan unchanged conversation history');
 });
 
+test('fresh watch arrays compare immutable entry identities without reading message bodies', () => {
+  let reads = 0;
+  const make = id => ({ id, kind: 'pi.assistant', get model() { reads++; return [{ role: 'assistant', content: 'stable' }]; } });
+  const first = Array.from({ length: 1000 }, (_, id) => make(id));
+  const stream = createViewStream();
+  stream.next({ entries: first, docs: {} });
+  for (let index = 0; index < 60; index++) {
+    const frame = stream.next({ entries: first.map(item => make(item.id)), docs: { 'pi.live': { generation: { text: index } } } });
+    assert.equal(frame.entries, undefined);
+  }
+  assert.equal(reads, 0, 'identity comparison must not deserialize immutable message bodies');
+});
+
 test('tool progress leaves historical messages untouched and records a repeatable workload', async () => {
   let reads = 0;
   const entries = Array.from({ length: 1000 }, (_, id) => {
