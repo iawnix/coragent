@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 PIN_PATH = ROOT / "packaging/coragent_packaging/pi/source.json"
 PATCH_ROOT = ROOT / "packaging/coragent_packaging/pi/patches"
-PATCH_NAMES = ("001-workspaces.patch", "002-worker-launch.patch", "003-client-connection.patch", "004-client-lifecycle.patch", "005-client-history.patch", "006-tool-presentation.patch", "007-client-status.patch", "008-request-admission.patch", "009-input-identity.patch", "010-context-lifecycle.patch", "011-markdown-presentation.patch", "012-skill-presentation.patch", "013-monitor-presentation.patch", "014-runtime-presentation.patch", "015-configuration-credentials.patch", "016-output-context-budget.patch")
+PATCH_NAMES = ("001-workspaces.patch", "002-worker-launch.patch", "003-client-connection.patch", "004-client-lifecycle.patch", "005-client-history.patch", "006-tool-presentation.patch", "007-client-status.patch", "008-request-admission.patch", "009-input-identity.patch", "010-context-lifecycle.patch", "011-markdown-presentation.patch", "012-skill-presentation.patch", "013-monitor-presentation.patch", "014-runtime-presentation.patch", "015-configuration-credentials.patch", "016-output-context-budget.patch", "017-compaction-system-baseline.patch", "018-compaction-coordination.patch", "019-compaction-session-affinity.patch")
 class PiSourceError(RuntimeError): pass
 
 def pin():
@@ -93,6 +93,11 @@ def patch_check(source, patch, *, reverse=False):
 def apply_patch(source):
     if git(source, "rev-parse", "HEAD") != pin()["commit"]:
         raise PiSourceError("refusing to patch a different Pi source commit")
+    # Later patches can replace an earlier patch's reverse-check context. A
+    # verified complete stack is already applied even when that earlier group
+    # no longer reverses independently against the final tree.
+    if verify_patches(source):
+        return
     # Apply patches in order. Later presentation patches intentionally build
     # on earlier managed patches, so checking every patch against the pristine
     # checkout would reject a valid ordered patch group.

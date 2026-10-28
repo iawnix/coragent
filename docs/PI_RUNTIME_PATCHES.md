@@ -57,6 +57,33 @@ the configured reserve. Native background/blocking thresholds, final admission
 and terminal input-budget telemetry use the same rule; stream output overrides
 remain effective. The summary output budget still uses the configured reserve.
 
+Patches 017–019 correct compact behavior while retaining the Pi 1.1.0 pin,
+protocol 8, and the existing storage format:
+
+- 017 backports the Pi 1.3.0 system-baseline ordering fix (#10904). A baseline
+  rendered after compaction leads the request even when the retained history
+  includes assistant messages. Later positional system updates keep their order.
+- 018 makes manual, background, and blocking compaction reuse an existing task,
+  including a completed summary still queued for placement. A generation waiting
+  on a shared summary applies the ordinary inbox boundary before rebuilding its
+  request, preserving steering input and reset precedence. Failed, declined, or
+  stale blocking summaries stop that generation. Different explicit manual
+  instructions are rejected while another compaction is pending. The reused task
+  retains its ownership and background flag; pausing background work still uses
+  the existing `background: true` abort option. Ordinary generation may continue
+  while a background or manual summary runs.
+- 019 keeps the Chat Completions adapter's opted-in session-affinity headers when
+  a summary uses `cacheRetention: "none"`. Prompt-cache body fields still follow
+  the retention setting; explicit header overrides and affinity opt-out remain
+  effective. This supplies a consistent routing hint; a proxy still decides which
+  upstream account or cache handles the request.
+
+The output reservation in patch 016 remains required: compaction must leave room
+for the requested completion and overhead. These fixes do not establish the cause
+of the observed post-compaction cache plateau. In particular, the current CPA
+Chat Completions adapter already folds system messages into a leading message,
+so correcting the internal baseline order need not change its HTTP payload.
+
 Research tool cards show Pi's recorded `durationMs` for final results, including
 after reconnect, and omit it for older or untimed results. For `job_start` this
 is the tool's submission time; scientific Job duration remains owned by Job

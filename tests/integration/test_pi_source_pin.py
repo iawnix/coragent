@@ -91,3 +91,33 @@ def test_patch_groups_are_idempotent_and_reject_partial_application(tmp_path, mo
     with pytest.raises(prepare.PiSourceError, match="partially applied"):
         prepare.apply_patch(source)
     assert (source / "worker.txt").read_text() == partial
+
+
+def test_overlapping_patch_stack_is_idempotent(tmp_path, monkeypatch) -> None:
+    from coragent_packaging.pi import prepare
+
+    source = tmp_path / "source"
+    source.mkdir()
+    def git(*args):
+        return subprocess.run(["git", "-C", str(source), *args], check=True, text=True, capture_output=True).stdout.strip()
+    git("init")
+    worker = source / "worker.txt"
+    worker.write_text("one\ntwo\nthree\n")
+    git("add", "worker.txt")
+    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "fixture")
+    monkeypatch.setattr(prepare, "pin", lambda: {"commit": git("rev-parse", "HEAD")})
+    first = tmp_path / "first.patch"
+    worker.write_text("ONE\ntwo\nthree\n")
+    first.write_text(git("diff") + "\n")
+    git("add", "worker.txt")
+    second = tmp_path / "second.patch"
+    worker.write_text("ONE AGAIN\ntwo\nthree\n")
+    second.write_text(git("diff") + "\n")
+    monkeypatch.setattr(prepare, "patches", lambda: [first, second])
+    worker.write_text("one\ntwo\nthree\n")
+    prepare.apply_patch(source)
+    assert worker.read_text() == "ONE AGAIN\ntwo\nthree\n"
+    assert not prepare.patch_check(source, first, reverse=True)
+    assert prepare.verify_patches(source)
+    prepare.apply_patch(source)
+    assert worker.read_text() == "ONE AGAIN\ntwo\nthree\n"

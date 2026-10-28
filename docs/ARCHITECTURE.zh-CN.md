@@ -99,7 +99,7 @@ Workspace、Research Memory、Task 与上下文管理保留完整研究核心的
 研究读取在应用组合层读取本地 Job 观察并重放已保存事实，不查询外部队列；已有 Job 使用原记录路由，
 不随当前平台配置变化而改道。
 
-Task Controller 位于 SessionWorker 内。普通工具工作继续使用原生 Pi 循环；run 正常结束后，活跃且空闲的任务通过同一输入接纳事务提交 `task_controller` 内部输入。当前实现不安装 `onYield` 延续路径。watch 和 30 秒核对恢复推进责任；等待只查询实际归属 Job，条件未满足时不请求模型。无新证据轮数仅作为模型重新评估方法的提示，不自动阻塞研究。临时模型服务故障可按配置退避，以新的 Pi 输入进行有限恢复；不可重试或额度耗尽时记录执行待处理，研究任务保留 active 或 completing。最终回复恢复保留完成证据，仅允许读取与回复。回复结束不代表研究完成：完成提议必须覆盖全部交付条件的证据，并且最终回复成功交付。
+Task Controller 位于 SessionWorker 内。普通工具工作继续使用原生 Pi 循环；run 正常结束后，活跃且空闲的任务通过同一输入接纳事务提交 `task_controller` 内部输入。当前实现不安装 `onYield` 延续路径。watch 和 30 秒核对恢复推进责任；等待只查询实际归属 Job，条件未满足时不请求模型。无新证据轮数仅作为模型重新评估方法的提示，不自动阻塞研究。临时模型服务故障按指数退避提交新的 Pi 输入，默认从 30 秒开始、最多间隔 5 分钟，不再默认限制恢复次数。CORAGENT_TASK_RECOVERY_MAX_RETRIES 可显式设置有限次数（0 禁用恢复，未设置或 unlimited 表示不限次数）；CORAGENT_TASK_RECOVERY_BASE_DELAY_MS 与 CORAGENT_TASK_RECOVERY_MAX_DELAY_MS 配置退避间隔。不可重试故障或显式额度耗尽时记录执行待处理，研究任务保留 active 或 completing。已有待处理记录仍需用户明确恢复；默认值变化不会解除暂停、阻塞或被新用户输入取代的工作。最终回复恢复保留完成证据，仅允许读取与回复。回复结束不代表研究完成：完成提议必须覆盖全部交付条件的证据，并且最终回复成功交付。
 
 暂停只抑制后续自动执行，当前回复和已有 Job 可以收尾；用户打断回复会同时暂停任务。恢复是用户控制操作。取消任务须显式选择保留还是请求取消已有 Job。Monitor 查询不发送模型输入或恢复任务。`CORAGENT_AUTOMATIC_CONTINUATION=0` 关闭自动输入，保留用户输入与状态读取。
 
@@ -117,10 +117,13 @@ Host 重启从 Pi 现有 session catalog 发现会话，最多并行恢复四个
 `/monitor` 统一展示任务、作业和执行详情。Host 与浏览器共用 `apps/agent/contracts/monitor.mjs` 的唯一方法目录，请求与返回见 [Monitor 合同](../contracts/monitor/README.md)。Pi generation/tool Task 位于 run 的诊断详情中，不列入用户任务。任务/作业变化与重连沿用现有通知读取最新快照。
 
 每个 SessionWorker 拥有执行通道和有界本地查询通道，两者复用同一 Python JSONL 协议、
-命令实现和工作区事务。查询通道只允许 `research_read`、`research_search`、`job_list`
+命令实现和工作区事务。执行及其它 Python 通道默认不限制调用方等待时长；命令、传输与 Job
+仍使用各自配置的截止时间。本地查询通道默认最多等待 30 秒，只允许 `research_read`、`research_search`、`job_list`
 与 `job_manager_assess`，合并相同的在途请求，同时最多接收 16 个不同请求。
 调用超时不会取消 Python 操作，实际响应或进程退出后才释放容量；Worker 关闭时清理两个进程。
-已发送请求超时的工具结果标记为结果未知、不可自动重试；发送前因容量不足拒绝则标记为未执行。
+已发送请求超时的工具结果标记为结果未知、不可自动重试，并给出在途请求身份、可用时的原操作
+请求身份以及读取原回执的恢复指引。发送前因容量不足拒绝则标记为未执行。显式通道等待时长
+须为 Node 定时器可表示的 1..2147483647 毫秒，null 表示不设等待截止时间。
 查询可能恢复事务、投影事件，仍遵守既有工作区锁。
 
 Monitor 读取持久 Task 状态及 Job Manager 观测，不在界面刷新时改变 Task 生命周期或查询远端调度器。

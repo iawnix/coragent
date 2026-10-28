@@ -124,12 +124,35 @@ head ID, request gap, and numeric input/cache usage from the raw response.
 `not_reported` is distinct from an explicit zero cache count. `completeSimple`
 calls, including summaries, use a separate `auxiliary` comparison stream.
 
+Schema `coragent-cache-diagnostic/2` adds `response_diagnostics` to response
+records: allowlisted server request IDs, response body IDs and model names,
+optional system fingerprints, finish reasons, Responses statuses and incomplete
+reasons, terminal/error events, the `[DONE]` marker, and timing to response headers
+and the first body byte. A drained stream is not necessarily a completed model
+response; inspect `outcome`, `terminal_event`, `error_event`, and finish reasons.
+The top-level client-generated `request_id`, server header IDs, and response body
+IDs remain separate.
+
+`usage_raw` retains numeric, boolean, null, and nested usage fields, including
+provider fields not yet normalized. Unexpected text is omitted and flagged by
+`usage_raw_filtered`; size/depth limits set `usage_raw_truncated`. Missing fields
+are never filled with zero. Metadata is also bounded, with `metadata_filtered`
+and `metadata_truncated` flags; skipped oversized SSE lines are counted. Only
+`x-request-id`, `request-id`, `x-correlation-id`, `cf-ray`, `x-cache`,
+`x-cache-status`, `openai-processing-ms`, and `openai-version` response headers
+are retained. Missing identifiers do not establish identical upstream accounts
+or nodes. Existing diagnostic switches enable these fields in newly started
+Workers once the updated code is installed.
+
 Comparison uses the final HTTP JSON message array, with separate comparisons for
 tools and top-level instructions. `common_prefix_bytes_lower_bound` measures
 matching 1 KiB JSON byte blocks, **not tokens** or guaranteed cache reuse. Keyed
 fingerprints remain in process memory; the first comparison after restart is
-unknown. No bodies, tool results, URLs, headers, credentials, or raw errors are
-logged. Unsupported transports and missing fields remain unknown. Diagnostic
+unknown. Diagnostic records omit bodies, tool results, URLs, request headers,
+non-allowlisted response headers, credentials, and raw errors. Separately enabling
+`CORAGENT_REQUEST_CAPTURE=1` saves complete request bodies and selected request
+headers under `request-bodies/`; those snapshots may contain private research
+content. Unsupported transports and missing fields remain unknown. Diagnostic
 write failures do not prevent inference.
 
 Check compaction, message prefixes, tools, and instructions before attributing

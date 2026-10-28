@@ -1,0 +1,20 @@
+diff --git a/packages/ai/src/api/openai-completions.ts b/packages/ai/src/api/openai-completions.ts
+--- a/packages/ai/src/api/openai-completions.ts
++++ b/packages/ai/src/api/openai-completions.ts
+@@ -345,14 +345,14 @@
+ 				compat.supportsOpenAIGrammarTools,
+ 			);
+ 			const cacheRetention = resolveCacheRetention(options?.cacheRetention, options?.env);
+-			const cacheSessionId = cacheRetention === "none" ? undefined : options?.sessionId;
++			// Routing affinity belongs to the conversation, even when a summary opts out of prompt caching.
+ 			const client = createClient(
+ 				model,
+ 				normalizedContext,
+ 				apiKey,
+ 				options?.headers,
+ 				options?.fetch,
+-				cacheSessionId,
++				options?.sessionId,
+ 				compat,
+ 			);
+ 			let params = buildParams(

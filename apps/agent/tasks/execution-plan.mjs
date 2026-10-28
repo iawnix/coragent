@@ -13,7 +13,7 @@ export function validateExecutionLimits(limits) {
     fail("Supply at least one execution limit; null explicitly removes that limit");
   for (const [key, value] of Object.entries(limits)) {
     if (!Object.hasOwn(executionLimits(null), key) || value !== null && (!Number.isSafeInteger(value)
-      || value < (key === "max_retries_per_work" ? 0 : 1) || key === "max_in_flight" && value > 1000))
+      || value < (key === "max_retries_per_work" ? 0 : 1)))
       fail("Invalid execution limit: " + key);
   }
   return { ...limits };
@@ -103,16 +103,27 @@ export async function resolveExecutionPlan(kernel, draft, policy, previous, jobs
   }
   if (new Set(items.map(item => item.id)).size !== items.length
     || new Set(items.map(item => item.work_id)).size !== items.length) fail("Item IDs and work IDs must be unique");
-  const byId = new Map(items.map(item => [item.id, item])), visiting = new Set(), visited = new Set();
-  const visit = id => {
-    if (!byId.has(id)) fail("Unknown dependency: " + id);
-    if (visiting.has(id)) fail("Execution dependencies contain a cycle");
-    if (visited.has(id)) return;
-    visiting.add(id);
-    for (const dependency of byId.get(id).depends_on) visit(dependency);
-    visiting.delete(id); visited.add(id);
-  };
-  for (const item of items) visit(item.id);
+  // Kahn's traversal is linear and does not consume one JS stack frame per
+  // dependency. Plan size is bounded by the request transport, not item count.
+  const byId = new Map(items.map(item => [item.id, item]));
+  const remaining = new Map(), dependents = new Map();
+  for (const item of items) {
+    const dependencies = new Set(item.depends_on);
+    remaining.set(item.id, dependencies.size);
+    for (const dependency of dependencies) {
+      if (!byId.has(dependency)) fail("Unknown dependency: " + dependency);
+      if (!dependents.has(dependency)) dependents.set(dependency, []);
+      dependents.get(dependency).push(item.id);
+    }
+  }
+  const ready = items.filter(item => remaining.get(item.id) === 0).map(item => item.id);
+  for (let index = 0; index < ready.length; index++) {
+    for (const id of dependents.get(ready[index]) || []) {
+      remaining.set(id, remaining.get(id) - 1);
+      if (remaining.get(id) === 0) ready.push(id);
+    }
+  }
+  if (ready.length !== items.length) fail("Execution dependencies contain a cycle");
   for (const old of previous?.items || []) {
     const current = byId.get(old.id);
     const submitted = jobs.some(job => job.execution_item?.id === old.id);

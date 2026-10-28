@@ -6,7 +6,11 @@ export function taskRecoveryPolicy(env = process.env) {
     return value;
   };
   const policy = {
-    maxRetries: integer("CORAGENT_TASK_RECOVERY_MAX_RETRIES", 2, 0),
+    // An outage is not a lifetime allowance. Only an explicit installation
+    // policy limits transient recovery; null survives health JSON unchanged.
+    maxRetries: env.CORAGENT_TASK_RECOVERY_MAX_RETRIES === undefined
+      || env.CORAGENT_TASK_RECOVERY_MAX_RETRIES === "unlimited"
+      ? null : integer("CORAGENT_TASK_RECOVERY_MAX_RETRIES", 0, 0),
     baseDelayMs: integer("CORAGENT_TASK_RECOVERY_BASE_DELAY_MS", 30000, 1),
     maxDelayMs: integer("CORAGENT_TASK_RECOVERY_MAX_DELAY_MS", 300000, 1),
   };
@@ -57,8 +61,12 @@ export function retryableSubmission(record) {
   return /\b(?:429|500|502|503|504)\b|rate.?limit|overloaded|temporar(?:y|ily) unavailable|service unavailable|timed?\s*out|timeout|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|fetch failed|connection (?:reset|closed)|network error/i.test(message);
 }
 
-export function recoveryReady(recovery, epoch, now, maxRetries = Infinity) {
+export function recoveryAttemptsAvailable(failures, maxRetries = null) {
+  return maxRetries === null || failures <= maxRetries;
+}
+
+export function recoveryReady(recovery, epoch, now, maxRetries = null) {
   return recovery?.state === "retrying" && recovery.control_epoch === epoch
-    && (recovery.failures ?? 0) <= maxRetries
+    && recoveryAttemptsAvailable(recovery.failures ?? 0, maxRetries)
     && recovery.next_retry_at !== null && Date.parse(recovery.next_retry_at) <= now;
 }

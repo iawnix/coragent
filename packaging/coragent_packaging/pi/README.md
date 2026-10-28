@@ -22,5 +22,8 @@ All patches target the commit in `source.json`. For an upgrade, evaluate every r
 | 014-runtime-presentation | Runtime continuation presentation | `runtime-presentation`, `worker-task-continuation` | Upstream distinguishes internal continuations in its clients |
 | 015-configuration-credentials | Shared credentials without overwriting non-model secrets | `test_install_credentials`, `product-resources` | Upstream credentials support the product's single configuration ownership |
 | 016-output-context-budget | Reserve requested output and request overhead before background or blocking compaction | `context-manager` | Upstream compaction reserves the effective output allowance before SDK output clamping |
+| 017-compaction-system-baseline | Backport Pi 1.3.0 #10904: lead with the post-compaction system baseline even when retained history includes assistants; preserve later positional updates | `compact-baseline` | Upstream context derivation includes #10904 |
+| 018-compaction-coordination | Reuse active or queued compactions; place a shared summary before a blocked generation resumes; reject conflicting manual instructions and stop on failed blocking compaction | `compact-coordination`, `compaction-outcome`, `context-manager` | Durable compaction coordinates manual/background/blocking callers and validates summary placement |
+| 019-compaction-session-affinity | Keep opted-in Chat Completions session affinity independent of prompt-cache retention | `compact-session-affinity` | Provider adapters separate routing identity from cache retention |
 
 Node coverage names refer to `tests/node/native/*.test.mjs`; installation credential tests are in `tests/integration/`. Patch contents are source integration only, never a second Agent loop or task store.

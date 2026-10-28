@@ -107,7 +107,7 @@ platform diagnostics do not. The Task remains one protocol and one Pi-owned life
 compose local Job observations and replayable facts in the application layer; they do not poll a queue.
 Existing Jobs retain their original recorded routes independently of changes to the current platform configuration.
 
-The Task Controller runs inside the SessionWorker. Normal tools continue within the native Pi loop. After a completed run, a durable `task_controller` input can continue an active idle task through the same admission transaction used by other inputs. The implementation does not install an `onYield` continuation path. Watch notifications and a 30-second check reconcile outstanding work; Job waits query concrete owned Jobs and invoke no model until ready. Runs without new evidence update an advisory count and a replanning reminder, never an automatic research blocker. Terminal transient provider failures can schedule bounded, delayed successor inputs; nonretryable or exhausted failures retain an execution-recovery attention record while the research state remains active or completing. Final-response recovery retains completion evidence and allows only reads and the response. A normal answer ending is not user-task completion: proposed completion needs evidence for every criterion and a successfully delivered final response.
+The Task Controller runs inside the SessionWorker. Normal tools continue within the native Pi loop. After a completed run, a durable `task_controller` input can continue an active idle task through the same admission transaction used by other inputs. The implementation does not install an `onYield` continuation path. Watch notifications and a 30-second check reconcile outstanding work; Job waits query concrete owned Jobs and invoke no model until ready. Runs without new evidence update an advisory count and a replanning reminder, never an automatic research blocker. Terminal transient provider failures schedule successor inputs with exponential backoff (30 seconds initially, capped at 5 minutes by default), without a default retry-count cap. An explicit CORAGENT_TASK_RECOVERY_MAX_RETRIES sets a finite cap (0 disables recovery; unset or unlimited removes the cap); CORAGENT_TASK_RECOVERY_BASE_DELAY_MS and CORAGENT_TASK_RECOVERY_MAX_DELAY_MS configure backoff. Nonretryable failures and explicitly exhausted limits retain an execution-recovery attention record while the research state remains active or completing. Existing attention records require an explicit user resume; changing the default does not resume paused, blocked, or superseded work. Final-response recovery retains completion evidence and allows only reads and the response. A normal answer ending is not user-task completion: proposed completion needs evidence for every criterion and a successfully delivered final response.
 
 Pause suppresses new automatic work while the current response and Jobs can finish. Interrupting a response also pauses the user task. Resume is a user control operation. Cancellation requires an explicit keep/cancel policy for owned Jobs. Querying Monitor does not send a prompt or resume a task. `CORAGENT_AUTOMATIC_CONTINUATION=0` disables automatic input while preserving user input and read access.
 
@@ -128,12 +128,17 @@ Host restart discovers sessions from Pi's existing catalog and reopens at most f
 
 Each SessionWorker owns an execution bridge and a bounded local-query bridge,
 using the same Python JSONL protocol, command implementations and workspace
-transactions. The query bridge admits only `research_read`, `research_search`,
+transactions. Execution and other Python transports default to no caller wait deadline; individual
+commands, transfers and Jobs retain their own configured deadlines. The local-query bridge defaults
+to a 30-second wait deadline and admits only `research_read`, `research_search`,
 `job_list` and `job_manager_assess`; it coalesces identical outstanding requests
 and accepts at most 16 distinct requests. A timeout does not cancel Python work:
 capacity is released when its actual response arrives or the process exits.
 Tool envelopes classify a sent request timeout as an unknown outcome, with no
-automatic retry; a capacity rejection before sending remains not executed.
+automatic retry; diagnostics include the pending bridge request and the original operation request
+identity when available, and direct recovery to its existing receipt. A capacity rejection before
+sending remains not executed. Explicit numeric bridge wait deadlines must fit the Node timer range
+(1..2147483647 ms); null disables the wait deadline.
 Both processes are closed with the Worker. Query commands may recover transactions
 or project events and retain the existing workspace locks.
 

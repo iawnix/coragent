@@ -100,10 +100,27 @@ Task Controller 是否推进任务与概览是否刷新分开判断。Agent 通�
 `not_reported` 表示没有可用缓存字段，不等同于服务明确报告零命中。摘要等
 `completeSimple` 调用标为 `auxiliary`，与主执行分开比较；该标签不是新的用户 Task。
 
+诊断格式 `coragent-cache-diagnostic/2` 在响应记录中增加 `response_diagnostics`：
+服务端请求头中的 `x-request-id` 等关联标识、响应体的 ID 与模型名、可选
+`system_fingerprint`、完成原因、Responses 状态及未完成原因、完成事件和 `[DONE]`
+标记，以及收到响应头和首个响应体字节的耗时。流读完不等于模型正常完成，应同时检查
+`outcome`、`terminal_event`、`error_event` 和完成原因。响应体 ID 与客户端生成的
+顶层 `request_id`、服务端响应头中的请求 ID 各自保留，不混用。
+
+`usage_raw` 保留服务返回的 usage 数值、布尔值、null 和嵌套结构，包括尚未标准化的
+计量字段；异常文本会被过滤并标记 `usage_raw_filtered`，超出深度或数量上限会标记
+`usage_raw_truncated`。缺失字段不会补成零。元数据也有长度和数量上限，过滤或截断
+分别标记为 `metadata_filtered`、`metadata_truncated`；超大 SSE 行的跳过数量另行记录。
+响应头只保存 `x-request-id`、`request-id`、`x-correlation-id`、`cf-ray`、`x-cache`、
+`x-cache-status`、`openai-processing-ms`、`openai-version`。这些字段可能缺失，不能据此
+认定上游账号或节点相同。现有诊断开关即可启用，新启动的 Worker 加载新代码后生效。
+
 前缀比较基于最终 HTTP JSON 中的消息数组，并独立比较工具和顶层 instructions。
 `common_prefix_bytes_lower_bound` 是按 1 KiB 块比较得到的 JSON 字节下界，**不是 Token 数**，
 也不证明服务端缓存必然命中。程序只在内存中保留带随机密钥的指纹；重启后首次比较为空。
-不保存正文、工具结果、URL、请求头、凭据或原始错误文本。不支持的传输和缺失字段保持未知，
+诊断日志不保存正文、工具结果、URL、请求头、非白名单响应头、凭据或原始错误文本。
+单独开启 `CORAGENT_REQUEST_CAPTURE=1` 时，完整请求体和筛选后的请求头另存于
+`request-bodies/`，因此请求快照可能包含私有研究内容。不支持的传输和缺失字段保持未知，
 诊断写入失败不阻止模型执行。
 
 排查时先看是否发生压缩、消息前缀是否变化、工具/instructions 是否变化，再对照缓存读取量。

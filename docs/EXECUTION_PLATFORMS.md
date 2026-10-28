@@ -109,6 +109,14 @@ See the [plan contract and examples](../skills/core/execution-platforms/referenc
 Job Manager remains the sole authority for actual execution state; `task_read.execution_progress`
 projects ready/blocked, native Job states, collecting and validating from those records.
 
+Execution plans have no fixed item-count cap; they must fit the transport message size. Dependency
+validation is iterative, including for long chains. Explicit task limits accept safe integers rather
+than imposing a separate 1000-concurrent-Job ceiling. Scheduler and resource limits still apply.
+
+`job_start.timeout_seconds` accepts positive safe integers without a fixed seven-day ceiling.
+Omitting it leaves the application execution deadline unset unless `submission.resources.walltime`
+supplies one; when both are present the shorter duration applies. Scheduler policies remain in force.
+
 Task limits are optional: omitted/null `max_in_flight`, `max_attempts`, and `max_retries_per_work`
 impose no task concurrency, cumulative Job count, or per-work retry cap, respectively. The legacy name
 `max_attempts` means total Jobs, including successes; it is not a failed-Job retry allowance. A retry cap

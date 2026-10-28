@@ -3,7 +3,7 @@ import { defineDoc, defineDocFamily } from "@earendil-works/pi-durable";
 import { resolveTaskExecution, resolveExecutionPlan, executionItemContext, projectExecutionPlan,
   executionLimits, validateExecutionLimits, projectExecutionUsage } from "./execution-plan.mjs";
 import { verifyAssessment, checkCompletion } from "./assessment.mjs";
-import { taskRecoveryPolicy, retryableSubmission, recoveryReady, classifyExecutionFailure, normalizeTaskBlockKind } from "./recovery.mjs";
+import { taskRecoveryPolicy, retryableSubmission, recoveryReady, recoveryAttemptsAvailable, classifyExecutionFailure, normalizeTaskBlockKind } from "./recovery.mjs";
 import { hasPendingInput } from "../runtime/admission/input.mjs";
 import shared from "../tools/tool-schemas.json" with { type: "json" };
 
@@ -979,7 +979,8 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       }
       task = await getCurrent(ctx);
       if (!["active", "completing"].includes(task.state)) return;
-      if (task.execution_recovery?.state === "retrying" && task.execution_recovery.failures > recoveryPolicy.maxRetries) {
+      if (task.execution_recovery?.state === "retrying"
+        && !recoveryAttemptsAvailable(task.execution_recovery.failures, recoveryPolicy.maxRetries)) {
         await conversation.commit(async tx => {
           const { task: current } = await currentTx(tx);
           if (current.revision !== task.revision) return;
@@ -1026,7 +1027,8 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
     const previous = task.execution_recovery;
     if (previous?.submission_id === record.id) return;
     const failures = (previous?.control_epoch === task.control_epoch ? previous.failures : 0) + 1;
-    const retry = !superseded && retryableSubmission(record) && failures <= recoveryPolicy.maxRetries;
+    const retry = !superseded && retryableSubmission(record)
+      && recoveryAttemptsAvailable(failures, recoveryPolicy.maxRetries);
     const delay = Math.min(recoveryPolicy.maxDelayMs, recoveryPolicy.baseDelayMs * 2 ** Math.min(failures - 1, 30));
     task.execution_recovery = { state: retry ? "retrying" : "attention_required", phase, failures,
       submission_id: record.id, control_epoch: task.control_epoch,
@@ -1034,7 +1036,7 @@ export function createTaskController({ harness, conversation, admission, LiveDoc
       ...classifyExecutionFailure(record),
       next_retry_at: retry ? new Date(now() + delay).toISOString() : null };
     changed(task, "runtime_failure", "task_controller", retry
-      ? "Agent execution failed; bounded recovery is scheduled" : "Agent execution needs attention; research has not been marked blocked",
+      ? "Agent execution failed; recovery with backoff is scheduled" : "Agent execution needs attention; research has not been marked blocked",
     { ...classifyExecutionFailure(record), submission_id: record.id });
   }
   function schedule() {

@@ -8,7 +8,8 @@ export interface JsonlSubprocessTransportOptions {
   readonly args?: readonly string[];
   readonly cwd?: string;
   readonly env?: NodeJS.ProcessEnv;
-  readonly timeout_ms?: number;
+  /** null waits for the operation receipt; a number bounds only caller waiting. */
+  readonly timeout_ms?: number | null;
   readonly max_pending?: number;
   readonly coalesce?: boolean;
 }

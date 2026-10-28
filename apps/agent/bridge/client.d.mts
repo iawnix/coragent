@@ -27,7 +27,8 @@ export interface PythonRuntimeBridgeOptions {
   readonly args?: readonly string[];
   readonly cwd?: string;
   readonly env?: NodeJS.ProcessEnv;
-  readonly timeout_ms?: number;
+  /** Execution defaults to null; local queries default to 30000 milliseconds. */
+  readonly timeout_ms?: number | null;
   readonly max_pending?: number;
   readonly coalesce?: boolean;
 }

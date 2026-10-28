@@ -3532,7 +3532,7 @@
                       "null"
                     ],
                     "minimum": 1,
-                    "maximum": 1000,
+                    "maximum": 9007199254740991,
                     "description": "Optional task concurrency cap. Omitted/null delegates concurrency to configured entries and schedulers. Unknown/conflicting Jobs retain their slot."
                   },
                   "max_attempts": {
@@ -3541,7 +3541,8 @@
                       "null"
                     ],
                     "minimum": 1,
-                    "description": "Legacy field name for an optional cumulative Job creation cap, including successful Jobs. Omitted/null means no task total cap. This is not a retry limit."
+                    "description": "Legacy field name for an optional cumulative Job creation cap, including successful Jobs. Omitted/null means no task total cap. This is not a retry limit.",
+                    "maximum": 9007199254740991
                   },
                   "max_retries_per_work": {
                     "type": [
@@ -3549,7 +3550,8 @@
                       "null"
                     ],
                     "minimum": 0,
-                    "description": "Optional retries per stable work_id after its initial Job. Zero permits only the initial Job; omitted/null imposes no retry cap. Distinct work does not consume this allowance."
+                    "description": "Optional retries per stable work_id after its initial Job. Zero permits only the initial Job; omitted/null imposes no retry cap. Distinct work does not consume this allowance.",
+                    "maximum": 9007199254740991
                   }
                 },
                 "required": [
@@ -3597,8 +3599,7 @@
                       "type": "string",
                       "pattern": "^art_[1-9][0-9]*$"
                     },
-                    "minItems": 0,
-                    "maxItems": 1000
+                    "minItems": 0
                   },
                   "plan_revision": {
                     "type": "integer",

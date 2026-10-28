@@ -59,6 +59,11 @@ execution_intent 引用原文。省略目标时在这些约束下解析配置默
 已有绑定不能再次用 bind_execution 替换；新要求用 refine 并引用新用户来源，误读原指令则用
 correct_execution、原始明确指令和纠错原因。
 
+执行计划不再设置固定项数上限，请求仍需符合传输消息大小限制；长依赖链使用迭代校验。
+显式任务限额接受可精确表示的整数，不再额外限制并发参数最多为 1000；调度器与资源限额仍生效。
+job_start.timeout_seconds 接受正的安全整数，不再限制最多 7 天。省略时不设置应用执行截止时间，
+除非 submission.resources.walltime 提供该限制；两者同时提供时取较短时长，调度器自身策略仍生效。
+
 一个 Task 可以包含多个独立放置的工作项。首次 task_update set_execution_plan 可以同时提供
 execution 字段，原子保存未绑定任务的位置与计划；已绑定任务沿用原策略，已有计划固定其策略。
 随后使用 select_execution_item 和 complete_execution_item 操作。

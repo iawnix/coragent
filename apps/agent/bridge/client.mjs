@@ -92,9 +92,10 @@ export function create_runtime_bridge({ workspace_root, workspace_id, transport 
 }
 
 
-/** Build a bridge backed by the local Python JSONL subprocess. */
-export function create_python_runtime_bridge({ workspace_root, workspace_id, ...transport_options } = {}) {
-  const transport = create_jsonl_subprocess_transport(transport_options);
+/** Execution waits for its receipt. Scheduler, command and transfer deadlines
+ * belong to the operation; a generic 30s timer cannot safely end a write. */
+export function create_python_runtime_bridge({ workspace_root, workspace_id, timeout_ms = null, ...transport_options } = {}) {
+  const transport = create_jsonl_subprocess_transport({ ...transport_options, timeout_ms });
   const bridge = create_runtime_bridge({ workspace_root, workspace_id, transport });
   return Object.freeze({ ...bridge });
 }
@@ -104,8 +105,8 @@ export function create_python_runtime_bridge({ workspace_root, workspace_id, ...
 const LOCAL_QUERIES = new Set(["research_read", "research_search", "job_list", "job_manager_assess"]);
 
 /** A bounded query process using the same protocol, commands and workspace locks. */
-export function create_query_runtime_bridge(options = {}) {
-  const bridge = create_python_runtime_bridge({ ...options, max_pending: 16, coalesce: true });
+export function create_query_runtime_bridge({ timeout_ms = 30_000, ...options } = {}) {
+  const bridge = create_python_runtime_bridge({ ...options, timeout_ms, max_pending: 16, coalesce: true });
   return Object.freeze({
     execute_command(command, params = {}) {
       if (!LOCAL_QUERIES.has(command)) throw new TypeError(`Not a local runtime query: ${command}`);

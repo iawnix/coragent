@@ -4,7 +4,6 @@ import { resolve } from "node:path";
 import { packageRoot } from "../platform/resources.mjs";
 import { KernelBridgeError, require_method } from "./ports.mjs";
 
-const DEFAULT_TIMEOUT_MS = 30_000;
 const REPOSITORY_ROOT = packageRoot;
 const ACTIVE_KERNEL_CHILDREN = new Set();
 process.once("exit", () => {
@@ -22,7 +21,7 @@ export function create_jsonl_subprocess_transport({
   args = [],
   cwd = REPOSITORY_ROOT,
   env = process.env,
-  timeout_ms = DEFAULT_TIMEOUT_MS,
+  timeout_ms = null,
   max_pending = 256,
   coalesce = false,
 } = {}) {
@@ -30,7 +29,8 @@ export function create_jsonl_subprocess_transport({
   if (!Array.isArray(args) || args.some((item) => typeof item !== "string")) {
     throw new TypeError("subprocess args must be an array of strings");
   }
-  if (!Number.isInteger(timeout_ms) || timeout_ms <= 0) throw new TypeError("timeout_ms must be positive");
+  if (timeout_ms !== null && (!Number.isSafeInteger(timeout_ms) || timeout_ms <= 0 || timeout_ms > 2147483647))
+    throw new TypeError("timeout_ms must be null or an integer between 1 and 2147483647");
   if (!Number.isInteger(max_pending) || max_pending <= 0) throw new TypeError("max_pending must be positive");
 
   const child = spawn(command, [...args, "-u", "-m", "research_agent.application.bridge_worker"], {
@@ -112,12 +112,15 @@ export function create_jsonl_subprocess_transport({
     const message = `${JSON.stringify({ id, method, payload })}\n`;
     const started = Date.now();
     const promise = new Promise((resolve_result, reject) => {
-      const timer = setTimeout(() => {
+      const timer = timeout_ms === null ? undefined : setTimeout(() => {
         // A timeout ends the caller's wait, not the Python operation. Keep its
         // capacity and coalescing entry until the actual reply or process exit.
         // Repeated refreshes cannot keep adding work behind a blocked request.
-        reject(new KernelBridgeError(`Python runtime request timed out: ${payload.command || method}`, {
+        reject(new KernelBridgeError(`Stopped waiting for Python runtime: ${payload.command || method}; the operation may still complete. Inspect its receipt before resubmitting.`, {
           code: "kernel_request_timeout", details: { request_id: id, command: payload.command || method,
+            operation_request_id: payload.params?.request_id ?? payload.request_id ?? null,
+            operation_state: "pending", action_outcome: "unknown", retry_safe: false,
+            recovery: "The operation was not cancelled. Read the existing Job or transaction receipt using its original identity; do not submit a new action to compensate for this wait timeout.",
             elapsed_ms: Date.now() - started, pending_requests: pending.size,
             outstanding: [...pending].map(([request_id, entry]) => ({ request_id, command: entry.command,
               elapsed_ms: Date.now() - entry.started })) },
