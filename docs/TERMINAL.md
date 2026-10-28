@@ -412,6 +412,10 @@ While reading history, a width change retains the current message and its line
 offset. This does not promise character-exact positioning when a long paragraph
 rewraps. Clicking a tool card pauses following and keeps its heading near its
 previous screen position. Scrolling back to the bottom resumes following.
+Expanded plain-text tool output reuses Pi `Text` layout caches per line; appending output
+only creates components for new lines, while a width change lets Pi recompute wrapping.
+Output is sanitized before it reaches the terminal renderer so tool logs cannot emit UI
+control sequences.
 
 Deterministic regression coverage in `terminal-streaming.test.mjs` includes
 1,000 historical messages, repeated streamed updates, resize/compaction, timer
@@ -421,3 +425,6 @@ expansion, and Chinese input and paste through Pi's full-screen renderer in a
 virtual terminal. It records tool-update and input-to-render timings, terminal
 output bytes and full-screen clears. These deterministic checks do not replace
 hands-on acceptance in physical terminals and over real SSH connections.
+`terminal-tool-output.test.mjs` covers Chinese text, blank lines, newlines, malformed
+escape sequences, resizing, append and replacement. It also verifies that a 150,000-line
+log does not exhaust the JavaScript call stack. Long-log evidence remains private.

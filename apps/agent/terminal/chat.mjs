@@ -149,7 +149,7 @@ export function createChatView({ components, theme, markdownTheme, requestRender
         cached = { width, signature: item.signature, revision: item.revision, lines: item.component.render(width) };
         layouts.set(item.component, cached);
       }
-      lines.push(...cached.lines);
+      for (const line of cached.lines) lines.push(line);
       positions.push({ ...item, start, end: offset + lines.length });
     }
     return { lines, rows: positions, width };
@@ -205,7 +205,8 @@ export function createChatView({ components, theme, markdownTheme, requestRender
       const tail = layout(liveItems, width, historyLayout.lines.length);
       rows = [...historyLayout.rows, ...tail.rows];
       renderedWidth = width;
-      renderedLines = [...historyLayout.lines, ...tail.lines];
+      renderedLines = historyLayout.lines.slice();
+      for (const line of tail.lines) renderedLines.push(line);
       if (anchor && scrollView) {
         const row = rows.find(item => item.key === anchor.key);
         if (row) {

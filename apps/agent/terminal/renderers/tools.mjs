@@ -1,5 +1,6 @@
 /** Compact Skinn-style tool cards keep identity and execution state separate. */
 import { stripVTControlCharacters } from 'node:util';
+import { createPlainOutput } from './plain-output.mjs';
 
 const ARGUMENT_KEYS = [
   'caseDirectory', 'case_directory', 'path', 'file_path', 'file', 'directory',
@@ -116,9 +117,15 @@ export function createCoRAgentToolRenderers({ Text }, names) {
         Boolean(options.expanded), hasOutput, durationMs);
       callComponent.setText(line);
       state.callComponent = callComponent;
-      if (!options.expanded || !hasOutput) return new Text('', 0, 0);
+      if (!options.expanded || !hasOutput) {
+        state.outputComponent = undefined;
+        return new Text('', 0, 0);
+      }
       const raw = sanitizeToolText(textOf(result));
-      return new Text(hadCallComponent ? `\n${raw}` : `${line}\n${raw}`, 0, 0);
+      if (!hadCallComponent) return new Text(`${line}\n${raw}`, 0, 0);
+      state.outputComponent ??= createPlainOutput(Text);
+      state.outputComponent.setText(`\n${raw}`);
+      return state.outputComponent;
     },
   }]));
 }
