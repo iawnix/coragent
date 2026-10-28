@@ -42,6 +42,43 @@ Repository model tests use local deterministic providers to verify invocation an
 error contracts. Actual credentials, quota and endpoint behavior need separate
 validation. Repository tests must not send private `local_debug/` materials to real models.
 
+## Prompt cache keys for Chat Completions proxies
+
+For an `openai-completions` proxy that accepts `prompt_cache_key`, set
+`compat.promptCacheKeyMode` on its provider or model. The managed Pi runtime
+supports these values:
+
+| Value | Generated `prompt_cache_key` |
+| --- | --- |
+| `auto` or omitted | Uses Pi's existing URL/retention detection: direct OpenAI requests, or long retention when supported |
+| `enabled` | Uses the existing provider session ID, including for proxies with short retention |
+| `disabled` | Omits the generated key |
+
+`cacheRetention: "none"` omits the generated key in every mode. A request without
+a session ID does not get a generated key. CoRAgent's durable conversation keeps
+its provider session ID across compaction; Pi limits the key to 64 characters.
+The key is a routing hint, and the upstream service determines actual cache hits.
+
+For example, merge these settings into an existing proxy's `compat` table in
+`config.toml` if it accepts cache keys and OpenAI affinity headers but does not
+support long retention (replace `my_proxy` with the provider's configured name):
+
+```toml
+[models.providers.my_proxy.compat]
+promptCacheKeyMode = "enabled"
+supportsLongCacheRetention = false
+sendSessionAffinityHeaders = true
+sessionAffinityFormat = "openai"
+```
+
+`supportsLongCacheRetention` governs retention fields separately from key
+generation; `false` does not disable prompt caching. Affinity headers are also
+independent and remain available to compaction summaries that use retention
+`none`. This policy applies to `openai-completions`. The configuration field is
+`promptCacheKeyMode`, not the older proposal's `supportsPromptCacheKey` name.
+Restart the owning Host after changing the canonical configuration as described
+above.
+
 ## Context capacity and input budget
 
 The runtime uses the selected model's `contextWindow` metadata. Custom endpoint

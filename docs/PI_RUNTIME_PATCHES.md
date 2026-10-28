@@ -84,6 +84,21 @@ of the observed post-compaction cache plateau. In particular, the current CPA
 Chat Completions adapter already folds system messages into a leading message,
 so correcting the internal baseline order need not change its HTTP payload.
 
+Patch 020 backports the Chat Completions portion of upstream
+[#9442](https://github.com/earendil-works/pi/pull/9442), which was unmerged when
+reviewed. The pinned adapter otherwise omits `prompt_cache_key` for proxy URLs
+under short retention. `compat.promptCacheKeyMode` controls that generated field:
+`auto` (the default) preserves URL/retention detection, `enabled` uses the existing
+provider session ID whenever retention is not `none`, and `disabled` omits it.
+The existing 64-character clamp remains in use; no new identity is generated at
+compaction. `supportsLongCacheRetention` continues to control retention fields
+independently. Patch 019's affinity headers and caller `onPayload` overrides
+retain their own behavior. The policy is exposed in the Pi type and model
+configuration schema for Chat Completions; this backport does not change Responses.
+Use the [proxy configuration example](MODEL_COMPATIBILITY.md#prompt-cache-keys-for-chat-completions-proxies)
+to opt in. Sending a key supplies an upstream routing hint; it does not establish
+that the observed post-compaction cache plateau is fixed.
+
 Research tool cards show Pi's recorded `durationMs` for final results, including
 after reconnect, and omit it for older or untimed results. For `job_start` this
 is the tool's submission time; scientific Job duration remains owned by Job

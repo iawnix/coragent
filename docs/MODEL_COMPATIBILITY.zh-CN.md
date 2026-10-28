@@ -35,6 +35,37 @@ CoRAgent 的模型测试使用本地确定性 provider，验证调用和错误�
 实际 endpoint 的凭据、配额和工具调用需要另行验证；项目测试不得把 `local_debug/`
 中的材料发送给真实模型。
 
+## Chat Completions 代理的缓存 key
+
+对于支持 `prompt_cache_key` 的 `openai-completions` 代理，可在 provider 或模型的
+`compat` 中配置 `promptCacheKeyMode`。当前受管理的 Pi 运行时支持：
+
+| 配置值 | 自动生成的 `prompt_cache_key` |
+| --- | --- |
+| `auto` 或未配置 | 沿用 Pi 的 URL/保留策略判断：直连 OpenAI，或请求长缓存且 endpoint 支持 |
+| `enabled` | 使用已有的 provider 会话 ID，代理的短缓存请求也会携带 |
+| `disabled` | 省略自动生成的 key |
+
+所有模式都尊重 `cacheRetention: "none"`，此时省略自动生成的 key；请求没有会话 ID 时
+也不会生成 key。CoRAgent 的持久会话在 compact 前后沿用同一 provider 会话 ID，Pi 将
+key 限制为 64 个字符。key 是路由提示，实际缓存命中仍由上游决定。
+
+例如，代理接受缓存 key 和 OpenAI 会话亲和头，但不支持长缓存时，把以下设置合并到
+`config.toml` 中已有的 `compat` 表；将 `my_proxy` 换成实际 provider 名称：
+
+```toml
+[models.providers.my_proxy.compat]
+promptCacheKeyMode = "enabled"
+supportsLongCacheRetention = false
+sendSessionAffinityHeaders = true
+sessionAffinityFormat = "openai"
+```
+
+`supportsLongCacheRetention` 单独控制保留时长字段，设为 `false` 不代表关闭缓存。
+会话亲和头也独立控制，compact 摘要使用 `none` 时仍可携带。这项策略适用于
+`openai-completions`；配置字段为 `promptCacheKeyMode`，旧提案中的
+`supportsPromptCacheKey` 不是本次支持的配置名。修改规范配置后，按上文重启所属 Host。
+
 ## 上下文窗口与预算
 
 模型元数据的 `contextWindow` 是运行时认定的容量，不是读取宣传页得到的数字。

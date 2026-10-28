@@ -17,6 +17,8 @@ port = 8766
 [models.providers]
 # Provider definitions use the Pi models format. For a secret field, use
 # apiKey = "credential:provider_key" and store the value in credentials.json.
+# For proxy prompt-cache keys and independent retention/affinity settings,
+# see docs/MODEL_COMPATIBILITY.md.
 
 # Execution is optional. Import job.execution.example.toml or job.qrun.example.toml
 # explicitly after choosing your platforms; installation does not create a default queue.
