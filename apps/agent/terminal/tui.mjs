@@ -157,6 +157,7 @@ export async function createClientTui({ session, request, connect, sourceRoot, t
   }
   editor.onSubmit = text => { void submit(text); };
   const scroll = new ScrollView(chat, { follow: "end", primary: true, scrollbar: "auto" });
+  chat.setScrollView(scroll);
   const conversationLayout = new HStack([
     { component: scroll, grow: 1, basis: 0, minSize: 0 },
     { component: new ScrollView(insights.sidebar, { scrollbar: "auto" }), basis: 36, shrink: 0,

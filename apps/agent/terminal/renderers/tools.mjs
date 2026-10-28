@@ -98,8 +98,9 @@ export function createCoRAgentToolRenderers({ Text }, names) {
     renderResult(result, options = {}, theme, context = {}) {
       theme = presentationTheme(theme);
       const state = context.state || {};
-      const raw = sanitizeToolText(textOf(result));
-      const hasOutput = raw.length > 0;
+      // A collapsed card only needs to know whether there is output. Avoid
+      // joining and sanitizing a growing command log on every progress update.
+      const hasOutput = (result?.content || []).some(block => block?.type === 'text' && Boolean(block.text));
       const isError = Boolean(context.isError || result?.isError);
       const resultContext = { ...context, isError };
       const hadCallComponent = context.lastComponent instanceof Text || state.callComponent instanceof Text;
@@ -116,6 +117,7 @@ export function createCoRAgentToolRenderers({ Text }, names) {
       callComponent.setText(line);
       state.callComponent = callComponent;
       if (!options.expanded || !hasOutput) return new Text('', 0, 0);
+      const raw = sanitizeToolText(textOf(result));
       return new Text(hadCallComponent ? `\n${raw}` : `${line}\n${raw}`, 0, 0);
     },
   }]));

@@ -22,7 +22,7 @@ export function createWorkingStatus({ Loader, Text, theme, requestRender, fallba
     update(view) {
       const next = workingLabel(view);
       if (next === label) return;
-      label = next; text.setText(theme.fg("muted", label)); sync();
+      label = next; text.setText(theme.fg("muted", label)); sync(); requestRender();
     },
     setActive(value) { if (active !== value) { active = value; sync(); } },
     invalidate() { text.invalidate(); loader?.invalidate(); fallback.invalidate?.(); },

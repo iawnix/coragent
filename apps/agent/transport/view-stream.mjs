@@ -10,12 +10,17 @@ export function createViewStream() {
         return { sequence: ++sequence, view };
       }
       const before = previous.entries, after = view.entries;
-      let start = 0, end = 0;
-      while (start < Math.min(before.length, after.length) && isDeepStrictEqual(before[start], after[start])) start++;
-      while (end < Math.min(before.length, after.length) - start
-        && isDeepStrictEqual(before[before.length - end - 1], after[after.length - end - 1])) end++;
-      const entries = start === before.length && start === after.length ? undefined
-        : { start, deleteCount: before.length - start - end, items: after.slice(start, after.length - end) };
+      let entries;
+      // Durable views and replicas retain immutable history between live updates.
+      if (before !== after) {
+        let start = 0, end = 0;
+        while (start < Math.min(before.length, after.length) && isDeepStrictEqual(before[start], after[start])) start++;
+        while (end < Math.min(before.length, after.length) - start
+          && isDeepStrictEqual(before[before.length - end - 1], after[after.length - end - 1])) end++;
+        if (start !== before.length || start !== after.length) {
+          entries = { start, deleteCount: before.length - start - end, items: after.slice(start, after.length - end) };
+        }
+      }
       const docs = Object.fromEntries(Object.entries(view.docs).filter(([key, value]) => !isDeepStrictEqual(previous.docs[key], value)));
       const removed = Object.keys(previous.docs).filter(key => !Object.hasOwn(view.docs, key));
       const failure = view.failure ?? null;

@@ -403,8 +403,21 @@ model tokens using Pi's public Loader. Its timer stops while a panel is open,
 when work finishes, and when the terminal closes. Set
 `CORAGENT_TUI_ANIMATION=0` to use static status text. Animation and input redraws
 reuse the chat layout; token updates reuse the completed history and update the
-current Markdown component. Hiding the sidebar suspends its research polling.
+current Markdown component. Unchanged history is skipped during entry comparisons,
+and tool progress updates only its own card. Hidden output in a collapsed tool
+continues to arrive without scheduling transcript redraws; expansion shows the
+latest output. Hiding the sidebar suspends its research polling.
+
+While reading history, a width change retains the current message and its line
+offset. This does not promise character-exact positioning when a long paragraph
+rewraps. Clicking a tool card pauses following and keeps its heading near its
+previous screen position. Scrolling back to the bottom resumes following.
 
 Deterministic regression coverage in `terminal-streaming.test.mjs` includes
 1,000 historical messages, repeated streamed updates, resize/compaction, timer
 cleanup and hidden polling. Timing evidence stays in the private test run.
+`terminal-experience.test.mjs` also covers tool progress, reading positions, card
+expansion, and Chinese input and paste through Pi's full-screen renderer in a
+virtual terminal. It records tool-update and input-to-render timings, terminal
+output bytes and full-screen clears. These deterministic checks do not replace
+hands-on acceptance in physical terminals and over real SSH connections.

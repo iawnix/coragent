@@ -19,6 +19,9 @@ export function createChatView({ components, theme, markdownTheme, requestRender
   let results = new Map(), historyCache = new Map(), liveCache = new Map();
   let historyDirty = true, liveDirty = true, historyItems = [], liveItems = [];
   let historyLayout, renderedWidth, renderedLines;
+  let scrollView, pendingAnchor;
+  let toolSlots = new Map();
+  const changedTools = new Set();
   let layouts = new WeakMap();
   const dirty = () => { historyDirty = liveDirty = true; renderedLines = undefined; };
   const toggled = new Map();
@@ -26,15 +29,35 @@ export function createChatView({ components, theme, markdownTheme, requestRender
   const line = text => new Text(text, 1, 0);
   const images = (content, filename) => (Array.isArray(content) ? content : []).filter(block => block.type === "image")
     .map(block => createImageView({ components, theme, block, filename }));
-  function card(name, id, args, result, partial) {
+  function card(name, id, args, result, partial, read) {
     const renderer = createCoRAgentToolRenderers(components, [name])[name];
     const state = {};
-    const context = { args, state, isPartial: partial, isError: result?.isError, durationMs: result?.durationMs };
     const container = new Container();
-    container.addChild(renderer.renderCall(args, theme, context));
-    if (result) container.addChild(renderer.renderResult(result, { expanded: toggled.get(id) ?? expanded }, theme, context));
-    for (const image of images(result?.content, args?.path || `${name} result`)) container.addChild(image);
-    return { component: container, id };
+    let previous;
+    return { component: container, id, revision: 0, refresh() {
+      const current = read ? read() : { result, partial };
+      const open = toggled.get(id) ?? expanded;
+      if (previous && previous.result === current.result && previous.slot === current.slot
+        && previous.partial === current.partial && previous.open === open) return false;
+      // Running text is hidden in a collapsed card. Keep its latest source for
+      // expansion, but do not rebuild a visually identical title on each chunk.
+      if (previous && !open && !previous.open && current.partial && previous.partial
+        && !current.result && !previous.result && Boolean(current.slot?.output) === Boolean(previous.slot?.output)) {
+        previous = { ...current, open };
+        return false;
+      }
+      previous = { ...current, open };
+      const output = current.result || (current.slot?.output ? {
+        content: [{ type: "text", text: current.slot.output }], details: current.slot.details,
+      } : undefined);
+      const context = { args, state, isPartial: current.partial, isError: output?.isError, durationMs: output?.durationMs };
+      container.clear();
+      container.addChild(renderer.renderCall(args, theme, context));
+      if (output) container.addChild(renderer.renderResult(output, { expanded: open }, theme, context));
+      for (const image of images(output?.content, args?.path || `${name} result`)) container.addChild(image);
+      this.revision++;
+      return true;
+    } };
   }
   function content(history) {
     const cache = history ? historyCache : liveCache;
@@ -45,17 +68,18 @@ export function createChatView({ components, theme, markdownTheme, requestRender
       let value = previous;
       if (!previous || previous.signature !== signature) {
         if (previous && update) { update(previous.component); previous.signature = signature; }
-        else value = { signature, ...create() };
+        else value = { key, signature, ...create() };
       }
+      value.refresh?.();
       nextCache.set(key, value); output.push(value);
     };
     const assistant = (message, key, isStreaming = false) => {
       for (const [index, block] of (message.content || []).entries()) {
         if (block.type === "toolCall") {
-          const slot = live.tools?.find(item => item.callId === block.id);
-          const result = results.get(block.id) || (slot?.output ? { content: [{ type: "text", text: slot.output }], details: slot.details } : undefined);
-          add(`tool:${block.id}`, JSON.stringify([block, result, toggled.get(block.id) ?? expanded, slot?.status]),
-            () => card(block.name, block.id, block.arguments, result, !results.has(block.id)));
+          add(`tool:${block.id}`, block, () => card(block.name, block.id, block.arguments, undefined, true, () => {
+            const result = results.get(block.id);
+            return { result, slot: result ? undefined : toolSlots.get(block.id), partial: !result };
+          }));
         } else if (block.type === "text" && block.text) add(`${key}:${index}:text`, JSON.stringify([block.text, isStreaming]), () => ({ component: markdown(block.text, isStreaming) }),
           component => component.setText(enhanceMarkdown(block.text, { isStreaming })));
         else if (block.type === "thinking" && block.thinking) add(`${key}:${index}:thinking`, block.thinking,
@@ -121,8 +145,8 @@ export function createChatView({ components, theme, markdownTheme, requestRender
       lines.push("");
       const start = offset + lines.length;
       let cached = layouts.get(item.component);
-      if (!cached || cached.width !== width || cached.signature !== item.signature) {
-        cached = { width, signature: item.signature, lines: item.component.render(width) };
+      if (!cached || cached.width !== width || cached.signature !== item.signature || cached.revision !== item.revision) {
+        cached = { width, signature: item.signature, revision: item.revision, lines: item.component.render(width) };
         layouts.set(item.component, cached);
       }
       lines.push(...cached.lines);
@@ -131,16 +155,35 @@ export function createChatView({ components, theme, markdownTheme, requestRender
     return { lines, rows: positions, width };
   }
   return {
+    setScrollView(value) { scrollView = value; },
     update(value) {
       if (value.entries !== view.entries) {
-        results = new Map();
+        const nextResults = new Map();
         for (const entry of value.entries) for (const message of entry.model || []) {
-          if (message.role === "toolResult") results.set(message.toolCallId, message);
+          if (message.role === "toolResult") nextResults.set(message.toolCallId, message);
         }
+        for (const id of new Set([...results.keys(), ...nextResults.keys()])) {
+          if (results.get(id) !== nextResults.get(id)) changedTools.add(id);
+        }
+        results = nextResults;
         historyDirty = true;
       }
-      if (value.docs["pi.live"]?.tools !== view.docs["pi.live"]?.tools) historyDirty = true;
-      view = value; liveDirty = true; renderedLines = undefined; requestRender();
+      const before = view.docs["pi.live"] || {}, after = value.docs["pi.live"] || {};
+      if (after.tools !== before.tools) {
+        for (const slot of [...toolSlots.values(), ...(after.tools || [])]) changedTools.add(slot.callId);
+        toolSlots = new Map((after.tools || []).map(slot => [slot.callId, slot]));
+      }
+      if (after.generation?.message !== before.generation?.message || after.compactionFailure !== before.compactionFailure
+        || Boolean(after.run) !== Boolean(before.run) || value.failure !== view.failure
+        || value.docs["pi.inbox"]?.items !== view.docs["pi.inbox"]?.items) liveDirty = true;
+      view = value;
+      let cardsChanged = false;
+      for (const id of changedTools) {
+        if (historyCache.get(`tool:${id}`)?.refresh()) { historyLayout = undefined; cardsChanged = true; }
+        if (liveCache.get(`tool:${id}`)?.refresh()) cardsChanged = true;
+      }
+      changedTools.clear();
+      if (historyDirty || liveDirty || cardsChanged) { renderedLines = undefined; requestRender(); }
     },
     toggleTools() { expanded = !expanded; toggled.clear(); dirty(); requestRender(); },
     invalidate() {
@@ -150,6 +193,12 @@ export function createChatView({ components, theme, markdownTheme, requestRender
     },
     render(width) {
       if (renderedLines && renderedWidth === width) return renderedLines;
+      let anchor = pendingAnchor;
+      pendingAnchor = undefined;
+      if (!anchor && scrollView && !scrollView.isFollowingEnd) {
+        const row = rows.find(item => item.key && item.end > scrollView.scrollTop);
+        if (row) anchor = { key: row.key, offset: scrollView.scrollTop - row.start };
+      }
       if (historyDirty) { historyItems = content(true); historyDirty = false; historyLayout = undefined; }
       if (liveDirty) { liveItems = content(false); liveDirty = false; }
       if (!historyLayout || historyLayout.width !== width) historyLayout = layout(historyItems, width);
@@ -157,12 +206,21 @@ export function createChatView({ components, theme, markdownTheme, requestRender
       rows = [...historyLayout.rows, ...tail.rows];
       renderedWidth = width;
       renderedLines = [...historyLayout.lines, ...tail.lines];
+      if (anchor && scrollView) {
+        const row = rows.find(item => item.key === anchor.key);
+        if (row) {
+          scrollView.updateLayout(renderedLines.length, scrollView.viewportHeight, requestRender);
+          scrollView.scrollTo(row.start + Math.min(anchor.offset, Math.max(0, row.end - row.start - 1)), { disableFollow: true });
+        }
+      }
       return renderedLines;
     },
     handleMouse(event) {
       if (event.type !== "click" || event.button !== "left") return;
       const row = rows.find(item => item.id && event.y >= item.start && event.y < item.end);
       if (!row) return;
+      // An explicit expansion is a reading action, including at the live edge.
+      if (scrollView) pendingAnchor = { key: row.key, offset: scrollView.scrollTop - row.start };
       toggled.set(row.id, !(toggled.get(row.id) ?? expanded)); dirty(); requestRender();
       return { handled: true, render: true };
     },
