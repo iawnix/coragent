@@ -1,5 +1,20 @@
 import { isDeepStrictEqual } from "node:util";
 
+function changedDocument(previous, value) {
+  if (isDeepStrictEqual(previous, value)) return undefined;
+  if (!previous || !value || typeof previous !== "object" || typeof value !== "object"
+    || Array.isArray(previous) || Array.isArray(value)) return value;
+  const previousKeys = Object.keys(previous), valueKeys = Object.keys(value);
+  // The replica merges document fields. A changed key set therefore needs a
+  // replacement document so fields removed at the Worker do not linger.
+  if (previousKeys.length !== valueKeys.length || previousKeys.some(key => !Object.hasOwn(value, key))) return value;
+  const changed = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (!isDeepStrictEqual(previous[key], item)) changed[key] = item;
+  }
+  return Object.keys(changed).length ? changed : undefined;
+}
+
 /** A presentation-only stream. A new connection always starts with a full view. */
 export function createViewStream() {
   let previous, sequence = 0;
@@ -21,13 +36,24 @@ export function createViewStream() {
           entries = { start, deleteCount: before.length - start - end, items: after.slice(start, after.length - end) };
         }
       }
-      const docs = Object.fromEntries(Object.entries(view.docs).filter(([key, value]) => !isDeepStrictEqual(previous.docs[key], value)));
+      const replaced = [];
+      const docs = Object.fromEntries(Object.entries(view.docs)
+        .map(([key, value]) => {
+          const next = changedDocument(previous.docs[key], value);
+          if (next && next === value && previous.docs[key] && typeof previous.docs[key] === "object"
+            && typeof value === "object" && !Array.isArray(value) && !Array.isArray(previous.docs[key])
+            && (Object.keys(previous.docs[key]).length !== Object.keys(value).length
+              || Object.keys(previous.docs[key]).some(field => !Object.hasOwn(value, field)))) replaced.push(key);
+          return [key, next];
+        })
+        .filter(([, value]) => value !== undefined));
       const removed = Object.keys(previous.docs).filter(key => !Object.hasOwn(view.docs, key));
       const failure = view.failure ?? null;
       if (!entries && !Object.keys(docs).length && !removed.length && isDeepStrictEqual(previous.failure ?? null, failure)
         && isDeepStrictEqual(previous.conversation, view.conversation)) return null;
       previous = view;
-      return { base: sequence, sequence: ++sequence, ...(entries ? { entries } : {}), docs, removed, failure, conversation: view.conversation };
+      return { base: sequence, sequence: ++sequence, ...(entries ? { entries } : {}), docs, removed,
+        ...(replaced.length ? { replaced } : {}), failure, conversation: view.conversation };
     },
   };
 }
@@ -57,8 +83,9 @@ export function createViewReplica() {
         // must not invalidate otherwise unchanged tool cards or status panels.
         for (const [key, value] of Object.entries(frame.docs || {})) {
           if (!value || typeof value !== "object" || Array.isArray(value)) continue;
-          docs[key] = Object.fromEntries(Object.entries(value).map(([field, item]) =>
-            [field, isDeepStrictEqual(view.docs[key]?.[field], item) ? view.docs[key]?.[field] : item]));
+          if ((frame.replaced || []).includes(key)) continue;
+          docs[key] = { ...view.docs[key], ...Object.fromEntries(Object.entries(value).map(([field, item]) =>
+            [field, isDeepStrictEqual(view.docs[key]?.[field], item) ? view.docs[key]?.[field] : item])) };
         }
         for (const key of frame.removed || []) delete docs[key];
         view = { ...view, entries, docs, failure: frame.failure, conversation: frame.conversation };

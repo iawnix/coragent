@@ -397,6 +397,9 @@ unchanged history is retained on the client. A sequence gap closes the connectio
 and reattaches with a fresh snapshot. Normal streaming does not issue
 `session/query` reads. The same incremental transport is used between the Worker
 and Host; the phone snapshot/event protocol remains unchanged.
+Document deltas are field-level: a new token does not repeat unchanged tool lists or
+run state. When fields disappear, the frame marks a replacement so the client removes
+old state instead of leaving a completed status visible.
 
 The working indicator occupies a fixed status row and animates independently of
 model tokens using Pi's public Loader. Its timer stops while a panel is open,

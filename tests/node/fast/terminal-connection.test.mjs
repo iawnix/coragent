@@ -53,6 +53,22 @@ test('view deltas recover append, edits, compaction, removed documents and failu
   assert.throws(()=>replica.apply({sequence:99,base:98,docs:{}}),/resynchronization/);
 });
 
+test('live document deltas omit unchanged tool and run fields while removals replace the document',()=>{
+  const producer=createViewStream(),replica=createViewReplica();
+  const tools=[{callId:'tool',name:'bash',status:'running',output:'fixture'}];
+  const initial=view('',[]);
+  initial.docs['pi.live']={run:{taskId:1},tools,generation:{message:{content:[{type:'text',text:'a'}]}}};
+  replica.apply(producer.next(initial));
+  const streamed={...initial,docs:{'pi.live':{run:{taskId:1},tools,generation:{message:{content:[{type:'text',text:'ab'}]}}}}};
+  const frame=producer.next(streamed);
+  assert.deepEqual(Object.keys(frame.docs['pi.live']),['generation']);
+  assert.deepEqual(replica.apply(frame),{...streamed,failure:null});
+  const finished={...streamed,docs:{'pi.live':{tools}}};
+  const replacement=producer.next(finished);
+  assert.deepEqual(replacement.docs['pi.live'],finished.docs['pi.live']);
+  assert.deepEqual(replica.apply(replacement),{...finished,failure:null});
+});
+
 test('notifications preceding attach response are buffered and sequence gaps reconnect with a new snapshot',async t=>{
   const views=[],errors=[]; let release,opens=0;
   const first=peer(view('initial')),second=peer(view('recovered',[entry(1)]));
