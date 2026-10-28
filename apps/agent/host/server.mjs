@@ -15,7 +15,7 @@ import { createRpcPeer, HOST_PROTOCOL, protocolError } from "../transport/host-c
 import { createWorkspaceCatalog, createHostWorkspaces } from "./workspaces.mjs";
 
 import { packageRoot as PACKAGE_ROOT } from "../platform/resources.mjs";
-const BASE_CAPABILITIES = ["workspace/list", "workspace/create", "workspace/attach", "session/list", "session/read", "session/create", "session/resume", "session/attach", "session/detach", "session/remove", "session/query", "session/compact", "session/configure", "session/reload", "session/pause", "input/send", "input/status", "turn/interrupt", "models/list", "model/select"];
+const BASE_CAPABILITIES = ["workspace/list", "workspace/create", "workspace/attach", "session/list", "session/read", "session/create", "session/resume", "session/attach", "session/detach", "session/remove", "session/query", "session/compact", "session/configure", "session/reload", "session/pause", "session/retry", "input/send", "input/status", "turn/interrupt", "models/list", "model/select"];
 
 /** Owns routing and durable acceptance records for the Native Pi Harness. */
 export async function startCoRAgentHost(options) {

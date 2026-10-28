@@ -1,10 +1,12 @@
 import { fork } from "node:child_process";
 import { join } from "node:path";
 import { piModulePath } from "./source.mjs";
+import { createViewReplica } from "../transport/view-stream.mjs";
 
 /** One supervised process and one in-flight startup per durable session. */
 export function startSessionWorker({ sourceRoot, packageRoot, metadata, producerToken, model, onView, onExit }) {
   const pending = new Map();
+  const viewReplica = createViewReplica();
   let nextId = 0, ready = false, stopped = false, exited = false, closePromise;
   const child = fork(join(packageRoot, "apps/agent/runtime/worker.mjs"), [], {
     cwd: metadata.cwd,
@@ -35,7 +37,11 @@ export function startSessionWorker({ sourceRoot, packageRoot, metadata, producer
     });
   }
   child.on("message", message => {
-    if (message.type === "view") { onView(message.value); return; }
+    if (message.type === "view") {
+      try { const view = viewReplica.apply(message.frame); if (view) onView(view); }
+      catch (cause) { fail(cause); child.kill("SIGTERM"); }
+      return;
+    }
     const waiting = pending.get(message.id);
     if (!waiting) return;
     clearTimeout(waiting.timer); pending.delete(message.id);

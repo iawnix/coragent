@@ -66,6 +66,26 @@ note 的内容指纹。不会为了计算版本而加载全部历史 note 正文
 不把最新研究状态倒填进旧摘要。正常恢复和压缩不单独要求重建概览。
 读取失败会注入明确的不可用状态，同一输入内不反复重试；新输入可重试。
 
+## 持久控制快照
+
+控制快照准备独立于研究概览刷新。每轮 generation 读取当前任务与已认证的本轮输入，
+在控制文本或输入绑定变化时，追加 `coragent.runtime-control/1` 类型的 `pi.context`。
+每进入新的 compact head，也会在首次普通请求前追加一次当前快照。
+`runtime_control` 标签和字段保持原样；旧消息留在原位置，后续请求保留先前的消息前缀。
+同一输入绑定、head 和内容下不重复追加。元数据与 memo 持久保存，Worker 重启后继续去重。
+
+只有运行时创建的条目元数据可证明控制快照的身份。旧快照里的用户提交 ID 和摘要正文
+不能构成新授权；自动输入的 `actual_user_submission_ids` 为空。任务操作仍检查来源、
+当前 run 输入与控制状态，写入任务前须通过 `task_read` 获取当前 revision。
+
+`beforeRequest` 比较已提交快照与最新状态，检查完整请求预算，并在 IO 后复核执行授权。
+发送前状态发生变化时，Pi 在同一 run 内重新准备上下文：最多立即重备三次，之后以
+1～30 秒的指数退避交给调度器等待，保留已接纳输入和原有模型请求重试额度。状态稳定后
+正常继续，取消操作可中断等待。状态刷新不会借助 compact 修复。
+
+压缩补充信息只描述选中的旧历史；新 head 的首次普通请求再读取并持久保存当前状态，
+后续保留该快照，不把现在的状态倒填进旧摘要。
+
 ## 上下文状态
 
 - availability：研究背景可用或不可用。
@@ -78,7 +98,7 @@ Task Controller 是否推进任务与概览是否刷新分开判断。Agent 通�
 ## 压缩与输入预算
 
 研究概览只是上下文的一部分。Pi 管理对话历史、工具结果、压缩摘要和最近保留内容；
-`beforeRequest` 附加当前任务控制信息，然后检查整个请求的估算大小。
+控制快照通过 `prepareContext` 持久追加；`beforeRequest` 核对状态并检查整个请求的估算大小。
 输入预算取 `contextWindow - max(reserveTokens, maxTokens + 4096)` 与可选
 `maxInputTokens` 的较小值，最低为零。`maxTokens` 使用 stream 输出配置或模型最大输出。
 `reserveTokens` 是回答和请求开销的预留；它与研究概览的 2,000/4,000 token 软目标不同。
@@ -126,6 +146,31 @@ Task Controller 是否推进任务与概览是否刷新分开判断。Agent 通�
 排查时先看是否发生压缩、消息前缀是否变化、工具/instructions 是否变化，再对照缓存读取量。
 如果这些都稳定而命中下降，需要进一步核对转发服务和上游行为。用合成内容从 128k 附近
 逐步扩大对照，分别测试完全重复与末尾追加；小上下文高命中不能代替长上下文验证。
+
+### 临时省略 runtime_control 的对照
+
+`CORAGENT_DEBUG_OMIT_RUNTIME_CONTROL_SESSIONS` 接受逗号或空白分隔的完整会话 ID。
+默认未设置；ID 完全匹配的会话会跳过新 `runtime_control` 快照的准备及其新鲜度检查。
+这里填写会话 UUID；`debug_gpt_5-6-luna7` 这样的工作区名称和通配符均不匹配。
+在启动 Host/Worker 前设置该变量；Worker 初始化上下文管理器时固定该选择。
+已有 Worker 需要在运行结束后重启才会读取变化；取消变量并重启即可恢复快照准备。
+
+```bash
+export CORAGENT_DEBUG_OMIT_RUNTIME_CONTROL_SESSIONS="<测试会话 UUID>"
+```
+
+该开关仅用于定位缓存问题。模型会少收到当前任务状态、revision、控制状态及真实用户
+提交 ID，可能影响任务工具调用；运行时的请求预算、任务准入、暂停/停止与工具授权检查
+仍正常执行。省略时不插入替代标记，不改写历史、system、工具定义或缓存 key。
+已经提交的控制快照仍作为历史保留；若对照要求请求里完全没有控制消息，应使用新的比较会话。
+
+`research-request-context/5` 记录 `control_mode`（`persistent` 或 `omitted`）、
+`control_present` 和 `control_entry_id`。`control_injected` 恒为 `false`，表示准入阶段
+没有附加临时消息；`control_tokens` 与 `control_digest` 描述最后一条持久控制快照，
+没有快照时分别为 `0` 和 `null`。使用请求快照核对完整消息序列，
+再比较相同模型/版本和相近输入规模下 compact 后多轮 `cached_tokens` 的增长、恢复轮数
+及耗时。启用和关闭两组使用相同的重启步骤；切换后的首轮不用于单独定论，且缺失缓存字段
+仍按未知处理。此开关不会自行发送测试请求。
 
 仓库提供固定四步的合成测试脚本，无需部署或启动研究会话：
 

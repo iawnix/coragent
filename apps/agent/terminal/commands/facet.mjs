@@ -1,4 +1,5 @@
 import { loadPi } from "../../runtime/source.mjs";
+import { isDeepStrictEqual } from "node:util";
 import { parseSlashCommand, slashCompletions, SLASH_COMMAND_DEFINITIONS } from "../../tools/commands.mjs";
 import { createStatusPresentation } from "../status/presentation.mjs";
 import { createDocumentView } from "../renderers/document.mjs";
@@ -40,18 +41,30 @@ export async function createCoRAgentNativeClientFacet({ sourceRoot, session } = 
           read: () => session.monitor(),
           apply(value) {
             if (value.session_id !== session.sessionId || value.workspace_id !== session.workspaceId) throw new Error('Monitor query returned a different session or workspace');
-            status.update({monitor:value, monitorError:null}); redraw();
+            status.update({monitor:value, monitorError:null}); ui.updateInsights?.({ monitor: value, monitorError: null }); redraw();
           },
-          onError(error) { status.update({monitorError:error.message || String(error)}); redraw(); },
+          onError(error) { status.update({monitorError:error.message || String(error)}); ui.updateInsights?.({ monitorError: error.message }); redraw(); },
         });
+        const insightRefreshes = [
+          ["runtime", () => queries.runtime()],
+          ["research", () => queries.research("")],
+        ].map(([name, read]) => createRefreshLoop({ signal: session.signal, read,
+          enabled: () => name !== "research" || ui.isSidebarVisible?.() !== false,
+          apply(value) {
+            if (name === "research") checkQueryResponse(value, session);
+            ui.updateInsights?.({ [name]: value, [`${name}Error`]: null });
+          },
+          onError(error) { ui.updateInsights?.({ [`${name}Error`]: error.message || String(error) }); },
+        }));
         let signature;
         env.own(transcript.state.subscribe(view => {
-          status.update({view});
+          status.update({view}); ui.updateInsights?.({ view });
           const next = JSON.stringify([view.entries.at(-1)?.id, view.docs["pi.agent"], view.entries[0]?.id]);
-          if (next !== signature) { signature = next; telemetryRefresh.schedule(); monitorRefresh.schedule(); }
+          if (next !== signature) { signature = next; telemetryRefresh.schedule(); monitorRefresh.schedule(); insightRefreshes.forEach(loop => loop.schedule()); }
           // Pi already repaints transcript changes; the components read current state at render time.
         }));
         redraw(); void telemetryRefresh.refresh(); void monitorRefresh.refresh();
+        insightRefreshes.forEach(loop => { void loop.refresh(); env.own(() => loop.stop()); });
         if (session.subscribeMonitor) env.own(session.subscribeMonitor(() => { monitorRefresh.schedule(); }, () => {
           // A notification connection can drop while the request connection is
           // still healthy. Re-read the authoritative snapshot before showing an
@@ -72,8 +85,9 @@ export async function createCoRAgentNativeClientFacet({ sourceRoot, session } = 
 }
 
 /** One in-flight read per source; bursts request only one follow-up refresh. */
-export function createRefreshLoop({ read, apply, onError, signal, intervalMs = 5000, coalesceMs = 250 }) {
+export function createRefreshLoop({ read, apply, onError, signal, enabled = () => true, intervalMs = 5000, coalesceMs = 250 }) {
   let stopped = false, running = false, dirty = false, timer, scheduledUpdate = false;
+  let previous, hasValue = false;
   const active = () => !stopped && !signal?.aborted;
   const scheduleAfter = (delay, update) => {
     clearTimeout(timer);
@@ -84,12 +98,17 @@ export function createRefreshLoop({ read, apply, onError, signal, intervalMs = 5
   async function refresh() {
     if (!active()) return;
     if (running) { dirty = true; return; }
+    if (!enabled()) { scheduleAfter(intervalMs, false); return; }
     clearTimeout(timer); timer = undefined; scheduledUpdate = false;
     running = true; dirty = false;
     try {
       const value = await read();
-      if (active()) apply(value);
+      if (active()) {
+        if (!hasValue || !isDeepStrictEqual(previous, value)) apply(value);
+        previous = value; hasValue = true;
+      }
     } catch (error) {
+      hasValue = false;
       if (active()) onError(error);
     } finally {
       running = false;

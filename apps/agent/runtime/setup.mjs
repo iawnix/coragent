@@ -30,6 +30,7 @@ import { createToolExecutionContext } from "../tools/context.mjs";
 import { create_python_runtime_bridge, create_query_runtime_bridge } from "../bridge/client.mjs";
 import { RESEARCH_MEMORY_WRITE_PRINCIPAL } from "../bridge/ports.mjs";
 import { createTransactionCoordinator } from "../bridge/transactions.mjs";
+import { createCoRAgentCredentialStore } from "./credentials.mjs";
 
 
 const sourceRoot = process.env.CORAGENT_PI_RUNTIME_ROOT;
@@ -43,7 +44,9 @@ export async function createCoRAgentHarness(databasePath, options) {
   delete process.env.CORAGENT_INPUT_PRODUCER_TOKEN;
   if (!producerToken) throw new Error("Worker requires supervised input producer identity");
   const { cwd, workspaceId, id: sessionId } = options.metadata;
-  const modelRuntime = await (await loadPi("modelRuntime", sourceRoot)).ModelRuntime.create();
+  const { ModelRuntime } = await loadPi("modelRuntime", sourceRoot);
+  const credentials = await createCoRAgentCredentialStore({ sourceRoot });
+  const modelRuntime = await ModelRuntime.create({ credentials });
   const { SettingsManager } = await loadPi("settings", sourceRoot);
   const settingsManager = SettingsManager.create(cwd);
   await configureHarnessHttp(settingsManager);
@@ -97,6 +100,23 @@ export async function createCoRAgentHarness(databasePath, options) {
     }));
     let jobAdmission, inputAdmission;
     const recordedUserSources = new Set();
+    async function readControlState(api, context) {
+      const live = await api.snapshot(LiveDoc, api.conversationId, context);
+      const inputIds = live?.run?.inputs || [];
+      const actualUserIds = [], sources = [], inputs = [];
+      for (const id of inputIds) {
+        const record = await (await harness.submission(id, context)).status(context);
+        const origin = await inputAdmission.origin(record, context);
+        if (origin?.producer === "user") actualUserIds.push(String(id));
+        sources.push({ producer: origin?.producer ?? "unknown", reason: origin?.reason ?? "unknown" });
+        inputs.push({ record, origin });
+      }
+      return { sources, inputs, state: {
+        task: await taskController.current(context), input_ids: inputIds,
+        actual_user_submission_ids: actualUserIds,
+        automatic_continuation_enabled: taskController.health().automatic_continuation_enabled,
+      } };
+    }
     const registry = createRegistry();
     registry.install(defineExtension({ name: "coding-tools", tools:
       await createCodingTools(cwd, async context => {
@@ -136,31 +156,31 @@ export async function createCoRAgentHarness(databasePath, options) {
               const live = await api.snapshot(LiveDoc, api.conversationId, context);
               await recordUserSources({ harness, admission: inputAdmission, jobAdmission, taskController, api, context, inputIds: live?.run?.inputs,
                 bridge: commandBridge, sessionId, recordedIds: recordedUserSources });
-              const task = await taskController.current(context);
-              await recordRun({ conversation, api, inputIds: live?.run?.inputs || [], userTaskId: task?.user_task_id ?? null, context });
-              const actualUserIds = [], sources = [];
-              for (const id of live?.run?.inputs || []) {
-                const record = await (await harness.submission(id, context)).status(context);
-                const origin = await inputAdmission.origin(record, context);
-                if (origin?.producer === "user") actualUserIds.push(String(id));
-                sources.push({ producer: origin?.producer ?? "unknown", reason: origin?.reason ?? "unknown" });
-              }
-              const admitted = await contextManager.admit(request, String(api.taskId), {
-                task, actual_user_submission_ids: actualUserIds,
-                automatic_continuation_enabled: taskController.health().automatic_continuation_enabled,
-              });
-              // Recheck after external projection IO, immediately before Pi sends the request.
-              for (const id of live?.run?.inputs || []) {
-                const record = await (await harness.submission(id, context)).status(context);
-                const origin = await inputAdmission.origin(record, context);
+              const { state } = await readControlState(api, context);
+              const stale = contextManager.checkControl(request, state);
+              if (stale) return stale;
+              await recordRun({ conversation, api, inputIds: state.input_ids, userTaskId: state.task?.user_task_id ?? null, context });
+              const admitted = await contextManager.admit(request, String(api.taskId));
+              // The durable snapshot is fixed. Recheck live permission and state
+              // after telemetry IO; a change prepares a new committed snapshot.
+              const current = await readControlState(api, context);
+              for (const { record, origin } of current.inputs) {
                 if (origin.producer !== "user") await taskController.assertExecutionAllowed(record, origin, context);
               }
-              if (admitted.messages) cacheDiagnostics?.tag(admitted.messages, { generation_id: String(api.taskId), sources });
+              const final = await readControlState(api, context);
+              const changed = contextManager.checkControl(request, final.state);
+              if (changed) return changed;
+              if (admitted.messages) cacheDiagnostics?.tag(admitted.messages, { generation_id: String(api.taskId), sources: final.sources });
               return admitted;
             })();
           },
         }),
+        hook(GenerationTask, {
+          prepareContext: async (view, api, context) => contextManager.prepareControl(view, api, context,
+            (await readControlState(api, context)).state),
+        }),
         hook(CompactionTask, { prepareSummary: input => contextManager.prepareSummary(input) }),
+        hook(CompactionTask, { prepareSummary: input => contextManager.prepareControlSummary(input) }),
         hook(ToolTask, {
           beforeTool: async (call, api, context) => {
             const restriction = await taskController.toolRestriction(context, call.name);

@@ -131,7 +131,7 @@ test('explicit cap and Pi reserve share one admission budget', async () => {
   assert.ok((await native.admit({...nativeRequest,messages:[{role:'user',content:'x'.repeat(20000)}]},'native')).block);
   assert.equal(telemetry.at(-1).input_budget_tokens,3616);
   assert.equal(telemetry[0].snapshot,undefined);
-  assert.equal(telemetry[0].schema_version,'research-request-context/4');
+  assert.equal(telemetry[0].schema_version,'research-request-context/5');
   assert.throws(()=>contextPolicy({},'bad'),/integer/);
   assert.equal(contextPolicy({}).compaction?.maxInputTokens,undefined);
   assert.equal(contextPolicy({},'131072').compaction.maxInputTokens,131072);
@@ -231,22 +231,31 @@ test('latest action and blocker survive compaction without refreshing the histor
   const task = {...fullTask(),next_action:'Inspect route A.'};
   const first = await manager.prepare({entries:[]},memoApi(),context,{task});
   const metadata = manager.prepareSummary({entries:[committed(first)],firstKept:3}).metadata;
-  const view = {entries:[{id:4,kind:'pi.compaction',data:{metadata:[metadata]}}]};
+  const head = {id:4,kind:'pi.compaction',data:{metadata:[metadata]}};
+  let view = {head,entries:[head],messages:[{role:'user',content:'Historical summary',timestamp:0}]};
   const revised = {...task,revision:2,next_action:'Validate route B against the original constraints.'};
   assert.equal(await manager.prepare(view,memoApi(),context,{task:revised}),undefined);
-  const request = {messages:[{role:'user',content:'Historical summary',timestamp:0}],model:{contextWindow:1000000},maxTokens:1024};
-  const current = await manager.admit(request,'progress',{task:revised});
+  const request = {model:{contextWindow:1000000},maxTokens:1024};
+  let entryId = head.id;
+  const admitState = async (task,requestId) => {
+    const control = await manager.prepareControl(view,memoApi(),context,{task});
+    assert.ok(control);
+    view = {...view,entries:[...view.entries,committed(control,++entryId)],messages:[...view.messages,...control.messages]};
+    assert.equal(manager.checkControl({...request,view,messages:view.messages},{task}),undefined);
+    return manager.admit({...request,view,messages:view.messages},requestId);
+  };
+  const current = await admitState(revised,'progress');
   assert.equal(decode(current.messages.at(-1)).task.next_action,revised.next_action);
   const blocked = {...revised,state:'blocked',block_details:{kind:'missing_user_input',resume_when:'Supply the boundary value.',evidence_refs:[]}};
-  const stopped = await manager.admit(request,'block',{task:blocked});
+  const stopped = await admitState(blocked,'block');
   assert.deepEqual(decode(stopped.messages.at(-1)).task.block_details,blocked.block_details);
-  const resumed = await manager.admit(request,'resume',{task:{...revised,block_details:null}});
+  const resumed = await admitState({...revised,block_details:null},'resume');
   assert.equal(decode(resumed.messages.at(-1)).task.block_details,undefined);
   assert.equal(reads,2);
   assert.equal(decode(first.messages[0]).task.next_action,'Inspect route A.');
   const long = '\u0001中文😀'.repeat(1000);
-  const oversized = await manager.admit(request,'large-hints',{task:{...blocked,next_action:long,
-    block_details:{kind:'scientific_dead_end',resume_when:long,evidence_refs:Array(64).fill(long)}}});
+  const oversized = await admitState({...blocked,next_action:long,
+    block_details:{kind:'scientific_dead_end',resume_when:long,evidence_refs:Array(64).fill(long)}},'large-hints');
   const projected = decode(oversized.messages.at(-1)).task;
   assert.ok(Buffer.byteLength(JSON.stringify(projected))<4000);
   assert.equal(projected.continuation_truncated,true);
@@ -431,21 +440,28 @@ test('checkpoint metadata covers only the selected prefix and never queries curr
   assert.deepEqual(contextAnchor([head]),first.data);
 });
 
-test('runtime control is small, current and isolated from a stable provider system prefix', async () => {
+test('runtime control stays in durable history and preserves the provider prefix', async () => {
   const {convertMessages} = await import(pathToFileURL(join(pinnedPiSource(),'packages/ai/src/api/openai-completions.ts')));
   const manager = fixtureManager(), task=fullTask();
   task.sources[0].text = 'Long original requirement '.repeat(2000) + ' FINAL: no external delivery';
   const prepared = await manager.prepare({entries:[]},memoApi(),context,{task});
   assert.match(prepared.messages[0].content,/FINAL: no external delivery/);
-  const request = {messages:[{role:'system',content:'Stable policy',timestamp:0},...prepared.messages],
+  const stateA={task,input_ids:[1],actual_user_submission_ids:['actual']};
+  const first=await manager.prepareControl({entries:[]},memoApi(),context,stateA);
+  const entryA=committed(first,3), viewA={entries:[entryA]};
+  const request = {view:viewA,messages:[{role:'system',content:'Stable policy',timestamp:0},...prepared.messages,...first.messages],
     model:{id:'fixture',provider:'local',api:'openai-completions',baseUrl:'http://127.0.0.1:1',input:['text'],reasoning:false,contextWindow:1000000},maxTokens:1024};
-  const a = await manager.admit(request,'a',{task,actual_user_submission_ids:['actual']});
-  const b = await manager.admit(request,'b',{task:{...task,revision:2,state:'paused'},actual_user_submission_ids:[]});
+  const a = await manager.admit(request,'a');
+  const stateB={task:{...task,revision:2,state:'paused'},input_ids:[2],actual_user_submission_ids:[]};
+  const second=await manager.prepareControl(viewA,memoApi(),context,stateB);
+  const requestB={...request,view:{entries:[entryA,committed(second,4)]},
+    messages:[...a.messages,fauxAssistantMessage('Acknowledged'),...second.messages]};
+  const b = await manager.admit(requestB,'b');
   assert.ok(estimateContextTokens([a.messages.at(-1)]).tokens < 300);
   assert.equal(decode(b.messages.at(-1)).task.state,'paused');
   const compat={supportsMidConvoSystemMessages:false,supportsDeveloperRole:true};
   const wa=convertMessages(request.model,{messages:a.messages},compat), wb=convertMessages(request.model,{messages:b.messages},compat);
-  assert.deepEqual(wa.slice(0,-1),wb.slice(0,-1));
+  assert.deepEqual(wa,wb.slice(0,wa.length));
   assert.doesNotMatch(wa[0].content,/Long original/);
 });
 
@@ -455,11 +471,14 @@ async function nativeFixture(t,{storage,settings,manager,hooks=[]}={}) {
   const registry=createRegistry();
   let reads=0,task=fullTask();
   manager ||= fixtureManager({bridge:{async execute_command(){reads++;return snapshot();}}});
+  const controlState=async(api,ctx)=>({task,input_ids:(await api.snapshot(LiveDoc,api.conversationId,ctx))?.run?.inputs||[]});
   registry.install(defineExtension({name:'unified-context',hooks:[
     hook(GenerationTask,{
       async prepareContext(view,api,ctx){const live=await api.snapshot(LiveDoc,api.conversationId,ctx);return manager.prepare(view,api,ctx,{task,input_ids:live?.run?.inputs||[]});},
-      beforeRequest:(request,api)=>manager.admit(request,String(api.taskId),{task}),
-    }),hook(CompactionTask,{prepareSummary:input=>manager.prepareSummary(input)}),...hooks]}));
+      beforeRequest:async(request,api,ctx)=>manager.checkControl(request,await controlState(api,ctx))||manager.admit(request,String(api.taskId)),
+    }),hook(GenerationTask,{prepareContext:async(view,api,ctx)=>manager.prepareControl(view,api,ctx,await controlState(api,ctx))}),
+    hook(CompactionTask,{prepareSummary:input=>manager.prepareSummary(input)}),
+    hook(CompactionTask,{prepareSummary:input=>manager.prepareControlSummary(input)}),...hooks]}));
   const harness=await Harness.open(storage||new MemoryStorage(),{models,registry,
     settings:settings||{compaction:{enabled:false,keepRecentTokens:0},retry:{enabled:false}}},context);
   t.after(()=>harness.close(context));
@@ -488,8 +507,8 @@ test('native compaction carries context metadata and a reopened SQLite session d
   await (await first.conversation.submit({type:'input',content:'Next'},context)).wait(context);
   assert.equal(first.reads,3);
   const all=await first.conversation.entries({},100,undefined,context);
-  assert.equal(all.items.filter(e=>e.kind==='pi.context').length,1);
-  assert.doesNotMatch(JSON.stringify(all.items),/<runtime_control/);
+  assert.equal(all.items.filter(e=>e.kind==='pi.context'&&e.data.key==='coragent.research-context/2').length,1);
+  assert.match(JSON.stringify(all.items),/<runtime_control/);
   await first.harness.close(context);
   const second=await nativeFixture(t,{storage:await openNodeSqliteStorage(db)});
   second.faux.setResponses([request=>{assert.match(JSON.stringify(request.messages),/no external delivery/);return fauxAssistantMessage('Restored');}]);
@@ -575,5 +594,5 @@ test('a background summary never overwrites a newer scope or duplicates an admit
   assert.equal(view.messages.filter(m=>m.role==='user'&&m.content==='event_fixture arrived').length,1);
   assert.match(JSON.stringify(view.messages),/node_future/);
   const all=await fixture.conversation.entries({},100,undefined,context);
-  assert.equal(all.items.filter(e=>e.kind==='pi.context').length,2);
+  assert.equal(all.items.filter(e=>e.kind==='pi.context'&&e.data.key==='coragent.research-context/2').length,2);
 });

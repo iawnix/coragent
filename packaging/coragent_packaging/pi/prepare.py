@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 PIN_PATH = ROOT / "packaging/coragent_packaging/pi/source.json"
 PATCH_ROOT = ROOT / "packaging/coragent_packaging/pi/patches"
-PATCH_NAMES = ("001-durable-policy.patch", "002-configuration-credentials.patch", "003-proxy-cache-affinity.patch", "004-terminal-input.patch")
+PATCH_NAMES = ("001-durable-policy.patch", "003-proxy-cache-affinity.patch", "004-terminal-input.patch")
 class PiSourceError(RuntimeError): pass
 
 def pin():
@@ -62,6 +62,11 @@ def verify_patches(source):
                 path = line[6:]
                 if path != "/dev/null":
                     touched.add(path)
+    # A removed patch may modify a file no longer named by the current stack.
+    # Reverse-applying only current patches must not accept that stale change.
+    changed = set(filter(None, git(source, "diff", "--name-only", "-z", "HEAD", "--").split("\0")))
+    if changed - touched:
+        return False
     with tempfile.TemporaryDirectory(prefix=".pi-verify-", dir=source.parent) as temporary:
         checkout = Path(temporary)
         # The repository root is nested in the product checkout, so create a
@@ -77,6 +82,17 @@ def verify_patches(source):
             if not patch_check(checkout, patch, reverse=True):
                 return False
             subprocess.run(["git", "-C", str(checkout), "apply", "--reverse", str(patch)], check=True, text=True)
+        # Also detect stale hunks in files that are still patched. Reversing the
+        # managed stack must recover the pinned source bytes exactly.
+        for relative in touched:
+            original = subprocess.run(["git", "-C", str(source), "show", f"HEAD:{relative}"],
+                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            restored = checkout / relative
+            if original.returncode == 0:
+                if not restored.is_file() or restored.read_bytes() != original.stdout:
+                    return False
+            elif restored.exists():
+                return False
     return True
 
 def patch_check(source, patch, *, reverse=False):
@@ -106,6 +122,8 @@ def apply_patch(source):
             subprocess.run(["git", "-C", str(source), "apply", str(patch)], check=True, text=True)
         except subprocess.CalledProcessError as exc:
             raise PiSourceError(f"failed to apply {patch.name}: {exc}") from exc
+    if not verify_patches(source):
+        raise PiSourceError("Pi checkout differs from the managed patch stack")
 
 def clone(destination):
     p=pin(); destination.parent.mkdir(parents=True,exist_ok=True)

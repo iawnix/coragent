@@ -1,25 +1,9 @@
-/** Reattach through the Host after a transport failure; snapshots recover missed frames. */
+import { createViewReplica } from "../transport/view-stream.mjs";
+
+/** Reconnect with a snapshot; steady-state streaming never queries the Worker. */
 export function subscribeSession({ connect, workspaceId, sessionId, onView, onError, retryMs = 1000 }) {
-  let stopped = false, peer, retryTimer, refreshTimer, reading = false, dirty = false;
+  let stopped = false, peer, retryTimer;
   const scope = { workspace_id: workspaceId, session_id: sessionId };
-  async function refresh() {
-    if (stopped || !peer) return;
-    if (reading) { dirty = true; return; }
-    reading = true; dirty = false;
-    const connection = peer;
-    try {
-      const view = await connection.request("session/query", { ...scope, query: "view" });
-      if (!stopped && peer === connection) onView(view);
-    } catch (error) { if (!stopped && peer === connection) onError(error); }
-    finally {
-      reading = false;
-      if (dirty && !stopped) schedule();
-    }
-  }
-  function schedule() {
-    dirty = true;
-    if (!refreshTimer) refreshTimer = setTimeout(() => { refreshTimer = undefined; void refresh(); }, 20);
-  }
   function retry(error) {
     if (stopped) return;
     onError(error); clearTimeout(retryTimer);
@@ -31,20 +15,37 @@ export function subscribeSession({ connect, workspaceId, sessionId, onView, onEr
       connection = await connect();
       if (stopped) { connection.close(); return; }
       peer = connection;
+      const replica = createViewReplica();
+      let attached = false;
+      const buffered = [];
+      const receive = frame => { const view = replica.apply(frame); if (view) onView(view); };
+      const fail = error => {
+        if (peer !== connection) return;
+        peer = undefined; connection.close(); retry(error);
+      };
       connection.on("notification", event => {
-        if (event.method === "session/event" && event.params.workspace_id === workspaceId && event.params.session_id === sessionId) schedule();
+        if (stopped || peer !== connection || event.method !== "session/view"
+          || event.params.workspace_id !== workspaceId || event.params.session_id !== sessionId) return;
+        try {
+          if (attached) receive(event.params.frame);
+          else if (buffered.length < 256) buffered.push(event.params.frame);
+          else throw new Error("Session view attachment overflow");
+        } catch (error) { fail(error); }
       });
-      connection.on("close", error => { if (peer === connection) { peer = undefined; retry(error); } });
-      await connection.request("session/attach", { ...scope, presentation: "terminal" });
-      await refresh();
+      connection.on("close", error => fail(error));
+      const { frame } = await connection.request("session/attach", { ...scope, presentation: "terminal", view_stream: true });
+      if (stopped || peer !== connection) return;
+      receive(frame);
+      for (const pending of buffered) receive(pending);
+      attached = true;
     } catch (error) {
-      if (peer === connection) peer = undefined;
-      connection?.close(); retry(error);
+      if (connection && peer !== connection) return;
+      peer = undefined; connection?.close(); retry(error);
     }
   }
   void open();
   return () => {
-    stopped = true; clearTimeout(retryTimer); clearTimeout(refreshTimer);
+    stopped = true; clearTimeout(retryTimer);
     const previous = peer; peer = undefined; previous?.close();
   };
 }

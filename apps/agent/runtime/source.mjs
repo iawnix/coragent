@@ -6,6 +6,7 @@ const MODULES = Object.freeze({
   resolver: "packages/coding-agent/src/experimental/source-resolver.ts",
   skills: "packages/coding-agent/src/core/skills.ts",
   modelRuntime: "packages/coding-agent/src/core/model-runtime.ts",
+  authStorage: "packages/coding-agent/src/core/auth-storage.ts",
   http: "packages/coding-agent/src/core/http-dispatcher.ts",
   modelResolver: "packages/coding-agent/src/core/model-resolver.ts",
   settings: "packages/coding-agent/src/core/settings-manager.ts",

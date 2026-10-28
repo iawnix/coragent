@@ -14,14 +14,14 @@ CoRAgent 负责会话连接、命令和记录展示，Pi Durable 负责执行及
 
 ```text
 CoRHub/Web ── Link/HTTP ──┐
-Pi 原生 TUI ─ Unix/SSH ─────┼─> CoRAgent Agent Server / Host API
+CoRAgent TUI ─ Unix/SSH ────┼─> CoRAgent Agent Server / Host API
 Monitor ─ Host RPC ─────────┘       ├─ Agent Session
                                     └─ Harness / Host / SessionWorker
 ```
 
 Host 是 Agent Server 的 API 和宿主层，负责路由、认证、会话管理 RPC 回执、会话发现
 以及 Job Manager supervisor；Harness worker 在同一个 Agent Server 内拥有 agent loop、模型、工具、
-transcript、用户任务控制回执和 SQLite durable lane。Pi 原生 TUI、Phone、Monitor 都是同一个 lane 的客户端，
+transcript、用户任务控制回执和 SQLite durable lane。CoRAgent TUI、Phone、Monitor 都是同一个 lane 的客户端，
 不会启动第二个 agent loop。
 
 Host client 的 RPC transport 可以是本机 Unix socket，也可以通过 SSH 启动远端
@@ -42,7 +42,7 @@ socket。SSH transport 只改变连接路径，不改变 workspace、session 或
 proxy 示例假定远端软件根是 `/opt/coragent`；使用源码检出时则为
 `<checkout>/apps/agent/transport/ssh.mjs`。
 
-启动器会对 Host 返回的 Host socket 再使用同一个 SSH proxy，并给 Pi 一个本地私有
+启动器会对 Host 返回的 Host socket 再使用同一个 SSH proxy，并给终端客户端一个本地私有
 Unix endpoint。workspace 和 session 仍由远端 Host 持有；本地目录只用于 presentation cwd。
 
 ## 打开工作区
@@ -52,7 +52,7 @@ Unix endpoint。workspace 和 session 仍由远端 Host 持有；本地目录只
 ./coragent --workspace reaction-a -c
 ```
 
-启动器先确保安装级 Host 在线，再请求 session descriptor，直接把 Pi 官方 native client
+启动器先确保安装级 Host 在线，再请求 session descriptor，把 CoRAgent 自有终端客户端
 连接到 Host socket。Native Pi Harness 是唯一支持的后端，不提供 tmux 或 PTY scraping
 路径。同一 workspace 的第二个终端会连接同一个 SQLite durable session；客户端关闭不会
 停止 worker，也不会打断当前 turn。
@@ -67,6 +67,24 @@ systemctl --user status coragent.service
 system service 去掉 `--user`。Host 私有 socket 位于配置的 runtime 目录。
 
 ## 会话和操作
+
+终端宽度至少为 110 列、对话区至少有 12 行时，右侧显示研究/Job 侧栏，包括当前任务、
+关联问题、下一步和活动 Job。`/sidebar off` 隐藏侧栏，`/sidebar auto` 或 `/sidebar on`
+在空间足够时启用。窄终端保留完整对话宽度，通过 `/research`、`/monitor` 查看详情。
+任务和 Job 的执行状态不代表科学结论成立。
+
+`/tasks` 查看运行、等待及下次检查时间、排队输入和恢复提示。`/retry [task-id]` 选择或指定
+因 Pi 重启次数超限而暂停的执行，从已保存进度继续，不重放已完成的工具。
+压缩失败使用 `/compact` 重试；研究任务暂停使用 `/monitor task resume <task-id>`。
+状态自动刷新且不调用模型，查询失败会明确标记不可用。
+
+`/image <工作区相对路径>` 通过 Host 预览 PNG、JPEG、GIF、WebP，支持 SSH 远端工作区。
+文件上限为 8 MiB、4000 万像素；使用 `inputs/`、`artifacts/`、`runs/`、`reports/`、`outputs/`
+下的材料路径，例如 `/image outputs/plot.png`。路径可含空格，无需 shell 引号。读取分块进行并校验文件版本，
+Esc 取消后续读取。此命令只预览图片，不向模型提交图片。工具返回或会话消息中的图片也会
+显示在对话记录中。Kitty 图形协议显示 PNG，iTerm2 图形协议支持其它图片格式；终端或格式
+不支持时显示文字占位。使用 Kitty 类终端时可将图片导出为 PNG。不会自动读取 Markdown
+里的图片路径或下载 URL。
 
 CoRAgent 终端 提供 `/resume`、`/model`、`/thinking`、`/compact`、
 `/reload` 以及 CoRAgent 命令。`/reload` 刷新模型配置与凭据。`/resume` 只能切换当前 workspace 中的 SQLite durable
@@ -278,3 +296,19 @@ workspace `.pi/sessions` 历史不是受支持的输入，Native runtime 不会 
 研究状态应保存在 workspace Research Memory；SQLite durable session 使用 Host 的会话控制接口。
 
 详见[架构](ARCHITECTURE.zh-CN.md)和[安装说明](INSTALLATION.zh-CN.md)。
+
+### 流式更新与动画
+
+终端以 `presentation: "terminal"`、`view_stream: true` 调用 `session/attach`，
+首次返回完整视图，之后通过 `session/view` 推送带序号的历史条目变更和文档更新。
+序号不连续时重新连接并获取完整快照；正常流式输出不再调用 `session/query`。
+Worker 到 Host 也使用增量传输，手机端继续使用现有快照与事件协议。
+
+工作动画使用 Pi 公开的 Loader，位于固定状态行，独立于模型输出刷新。
+打开面板、执行结束或退出终端时停止动画定时器。
+设置 `CORAGENT_TUI_ANIMATION=0` 可使用静态状态文字。
+动画和输入刷新复用聊天排版结果，流式文字复用已完成的历史及当前 Markdown 组件。
+隐藏侧栏时暂停其 Research 轮询。
+
+`terminal-streaming.test.mjs` 使用 1,000 条历史消息验证流式刷新、窗口宽度变化、
+压缩、定时器清理和隐藏轮询；耗时证据保存在本机私有测试目录。

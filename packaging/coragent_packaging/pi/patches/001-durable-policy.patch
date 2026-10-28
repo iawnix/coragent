@@ -135,7 +135,7 @@ index b7376a88..044f8973 100644
  	const result: CompactionResult =
  		current.owner === undefined
 diff --git a/packages/durable/src/harness/generation.ts b/packages/durable/src/harness/generation.ts
-index c8d26791..d378ad3a 100644
+index c8d26791..e99d326c 100644
 --- a/packages/durable/src/harness/generation.ts
 +++ b/packages/durable/src/harness/generation.ts
 @@ -29,7 +29,7 @@ import type {
@@ -147,11 +147,13 @@ index c8d26791..d378ad3a 100644
  import { applyBoundary, type Boundary, prepareBoundary, withdrawQueuedInputs } from "./inbox.ts";
  import { assignJson } from "./json.ts";
  import { endRun, LiveDoc, type LiveState, type ToolSlot } from "./live.ts";
-@@ -57,10 +57,11 @@ export type GenerationCheckpoint =
+@@ -57,16 +57,20 @@ export type GenerationCheckpoint =
  	| {
  			phase: "prepare";
  			attempt: number;
 -			/** The blocking compaction this generation waited for; it starts no other compaction (spec §8.3). */
++			/** Repeated admission refreshes yield to the scheduler without settling the run's inputs. */
++			contextRefreshes?: number;
 +			/** The compaction this generation waited for, possibly shared; it starts no other compaction. */
  			compacted?: TaskId<CompactionResult>;
  			/** Error text of the overflow that started `compacted`; checked once when `prepare` resumes. */
@@ -160,13 +162,20 @@ index c8d26791..d378ad3a 100644
  			/** Set when the blocking threshold started `compacted`; its outcome is checked once when `prepare` resumes. */
  			threshold?: true;
  	  }
-@@ -137,19 +138,38 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint,
+ 	| {
+ 			phase: "request";
+ 			attempt: number;
++			contextRefreshes?: number;
+ 			compacted?: TaskId<CompactionResult>;
+ 			model: ModelRef;
+ 			thinkingLevel: ModelThinkingLevel;
+@@ -137,19 +141,38 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint,
  			const { model, thinkingLevel } = agent;
  			const resolved = model === undefined ? undefined : runtime.models.getModel(model.provider, model.modelId);
  			if (model === undefined || resolved === undefined) return failNoModel(runtime, model, context);
 -			const { attempt, compacted, overflow, threshold: blocked } = task.state.checkpoint;
 -			if (compacted !== undefined && overflow !== undefined) {
-+			const { attempt, compacted, overflow, failureReason, threshold: blocked } = task.state.checkpoint;
++			const { attempt, contextRefreshes = 0, compacted, overflow, failureReason, threshold: blocked } = task.state.checkpoint;
 +			if (compacted !== undefined) {
  				const [outcome] = await runtime.outcomes([compacted], context);
 -				if (outcome?.status !== "completed" || outcome.result.entryId === undefined) {
@@ -210,7 +219,7 @@ index c8d26791..d378ad3a 100644
  				}
  			}
  			const view = await runtime.context(conversationId, context);
-@@ -176,7 +196,7 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint,
+@@ -176,27 +199,47 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint,
  			const entries = planSystemEntries(view, desired, agent.tools, runtime.now());
  			const threshold =
  				compacted === undefined
@@ -219,7 +228,11 @@ index c8d26791..d378ad3a 100644
  					: undefined;
  			if (threshold === "blocking") {
  				// Compact first and prepare again; the transcript is unchanged until the compaction appends.
-@@ -187,14 +207,33 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint,
+ 				await runtime.commit(async (tx): Promise<Next> => {
+ 					const child = await createCompaction(tx, conversationId, { reason: "threshold" }, runtime.taskId);
+-					const checkpoint = { phase: "prepare", attempt, compacted: child, threshold: true } as const;
++					const checkpoint = { phase: "prepare", attempt, contextRefreshes, compacted: child, threshold: true } as const;
+ 					return { status: "waiting", checkpoint, on: [child], policy: "allSettled" };
  				}, context);
  				return;
  			}
@@ -256,20 +269,34 @@ index c8d26791..d378ad3a 100644
 +				if (cutoff === undefined) throw new Error(`Conversation ${conversationId} has no entries to send`);
  				const request = {
  					attempt,
++					contextRefreshes,
  					...(compacted === undefined ? {} : { compacted }),
-@@ -219,10 +258,54 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint,
+ 					model,
+ 					thinkingLevel,
+@@ -207,7 +250,7 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint,
+ 			}, context);
+ 		},
+ 		request: async (task, runtime, context) => {
+-			const { attempt, compacted, model: ref, thinkingLevel, streamOptions, cutoff } = task.state.checkpoint;
++			const { attempt, contextRefreshes = 0, compacted, model: ref, thinkingLevel, streamOptions, cutoff } = task.state.checkpoint;
+ 			const conversationId = runtime.conversationId;
+ 			await runtime.commit(async (tx) => {
+ 				const live = await tx.doc(LiveDoc, conversationId);
+@@ -219,10 +262,70 @@ export const GenerationTask = defineTask<GenerationInput, GenerationCheckpoint,
  			if (model === undefined) return failNoModel(runtime, ref, context);
  			const view = await runtime.context(conversationId, context, { at: cutoff });
  			let messages = view.messages;
 +			let blocked: { block: string; compact?: boolean } | undefined;
++			let reprepare: string | undefined;
  			await runtime.hooks.each("beforeRequest", async (hook) => {
 -				const replaced = await hook({ messages }, runtime, context);
 -				if (replaced !== undefined) messages = replaced.messages;
-+				if (blocked) return;
++				if (blocked || reprepare !== undefined) return;
 +				try {
 +					const replaced = await hook(
 +						{
 +							messages,
++							view,
 +							model,
 +							maxTokens: streamOptions.maxTokens ?? model.maxTokens,
 +						},
@@ -277,6 +304,7 @@ index c8d26791..d378ad3a 100644
 +						context,
 +					);
 +					if (replaced && "block" in replaced) blocked = replaced;
++					else if (replaced && "reprepare" in replaced) reprepare = replaced.reprepare;
 +					else if (replaced) messages = replaced.messages;
 +				} catch (error) {
 +					runtime.signal.throwIfAborted();
@@ -285,6 +313,18 @@ index c8d26791..d378ad3a 100644
 +					};
 +				}
  			});
++			if (reprepare !== undefined) {
++				// Keep the same run, admitted inputs and provider attempt budget. After
++				// three immediate refreshes, release the invocation with bounded backoff.
++				const refreshes = Math.min(contextRefreshes + 1, 32);
++				const delay = refreshes <= 3 ? 0 : Math.min(30000, 1000 * 2 ** Math.min(refreshes - 4, 5));
++				const checkpoint: GenerationCheckpoint = { phase: "prepare", attempt, contextRefreshes: refreshes,
++					...(compacted === undefined ? {} : { compacted }) };
++				await runtime.commit((): Next => delay === 0
++					? { status: "running", checkpoint }
++					: { status: "sleeping", until: runtime.now() + delay, checkpoint }, context);
++				return;
++			}
 +			if (blocked) {
 +				const failure = blocked.block;
 +				if (
@@ -299,6 +339,7 @@ index c8d26791..d378ad3a 100644
 +							checkpoint: {
 +								phase: "prepare",
 +								attempt,
++								contextRefreshes,
 +								compacted: child,
 +								overflow: failure,
 +								failureReason: "request_blocked",
@@ -314,7 +355,7 @@ index c8d26791..d378ad3a 100644
  			const options: SimpleStreamOptions = {
  				...streamOptions,
  				signal: runtime.signal,
-@@ -338,7 +421,7 @@ function createToolTask(tx: Tx, runtime: Runtime, assistant: EntryId, callId: st
+@@ -338,7 +441,7 @@ function createToolTask(tx: Tx, runtime: Runtime, assistant: EntryId, callId: st
  
  /**
   * Which threshold compaction preparation starts before its request (spec §8.3): `blocking` above
@@ -323,7 +364,7 @@ index c8d26791..d378ad3a 100644
   * cut. The caller starts a background one only while no compaction is listed.
   */
  function thresholdCompaction(
-@@ -346,13 +429,14 @@ function thresholdCompaction(
+@@ -346,13 +449,14 @@ function thresholdCompaction(
  	planned: readonly { readonly model?: readonly Message[] }[],
  	contextWindow: number,
  	policy: CompactionPolicy,
@@ -339,7 +380,7 @@ index c8d26791..d378ad3a 100644
  	const background = blocking - policy.backgroundTokens;
  	const over =
  		tokens > blocking ? "blocking" : policy.backgroundTokens > 0 && tokens > background ? "background" : undefined;
-@@ -374,14 +458,14 @@ function compactionFailure(outcome: Exclude<TaskOutcome<CompactionResult>, { sta
+@@ -374,14 +478,14 @@ function compactionFailure(outcome: Exclude<TaskOutcome<CompactionResult>, { sta
  }
  
  /** Settle the run's inputs `unanswered` with `model_error` and fail with `text`. */
@@ -358,7 +399,7 @@ index c8d26791..d378ad3a 100644
  		};
  	}, context);
  }
-@@ -547,9 +631,9 @@ async function classify(
+@@ -547,9 +651,9 @@ async function classify(
  			const text = message.errorMessage ?? "Context overflow";
  			await runtime.commit(async (tx): Promise<Next> => {
  				const live = await tx.doc(LiveDoc, conversationId);
@@ -370,7 +411,7 @@ index c8d26791..d378ad3a 100644
  				return { status: "waiting", checkpoint, on: [child], policy: "allSettled" };
  			}, context);
 diff --git a/packages/durable/src/harness/types.ts b/packages/durable/src/harness/types.ts
-index 289b5c4e..9e076cf7 100644
+index 289b5c4e..e1d0eb3c 100644
 --- a/packages/durable/src/harness/types.ts
 +++ b/packages/durable/src/harness/types.ts
 @@ -1,5 +1,7 @@
@@ -399,7 +440,7 @@ index 289b5c4e..9e076cf7 100644
  };
  
  /**
-@@ -850,18 +856,30 @@ export type HookResult<T> = T | undefined | Promise<T | undefined>;
+@@ -850,18 +856,33 @@ export type HookResult<T> = T | undefined | Promise<T | undefined>;
  
  /** Hooks of the built-in generation task. */
  export interface GenerationHooks {
@@ -407,15 +448,18 @@ index 289b5c4e..9e076cf7 100644
 +	/**
 +	 * Before each attempt; replacements are request-only. The first block stops the request.
 +	 * A compact block permits at most one blocking compaction, then reruns admission.
++	 * `view` is the committed context at this request's cutoff. A `reprepare` result
++	 * refreshes durable context on the same run without a provider call; repeated
++	 * refreshes yield with bounded backoff, retaining the run's admitted inputs.
 +	 * A thrown hook fails closed; it never sends an unvalidated request to the model.
 +	 */
  	beforeRequest(
 -		request: { readonly messages: readonly Message[] },
-+		request: { readonly messages: readonly Message[]; readonly model: Model<Api>; readonly maxTokens: number },
++		request: { readonly messages: readonly Message[]; readonly view: ContextView; readonly model: Model<Api>; readonly maxTokens: number },
  		api: HookApi,
  		context: Context,
 -	): HookResult<{ readonly messages: readonly Message[] }>;
-+	): HookResult<{ readonly messages: readonly Message[] } | { readonly block: string; readonly compact?: boolean }>;
++	): HookResult<{ readonly messages: readonly Message[] } | { readonly block: string; readonly compact?: boolean } | { readonly reprepare: string }>;
  	/** Every terminal provider message, before classification. */
  	afterResponse(message: AssistantMessage, api: HookApi, context: Context): void | Promise<void>;
  	/** A final answer; the first `continue` appends a user message and continues the run. */
@@ -433,7 +477,7 @@ index 289b5c4e..9e076cf7 100644
  }
  
  /** A call as tool hooks see it; `parent` is set for a nested call, one a running tool made through `executeTool()`. */
-@@ -904,4 +922,11 @@ export interface CompactionHooks {
+@@ -904,4 +925,11 @@ export interface CompactionHooks {
  		api: HookApi,
  		context: Context,
  	): HookResult<{ readonly decline: true } | { readonly summary: string }>;

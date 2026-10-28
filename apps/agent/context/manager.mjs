@@ -3,6 +3,7 @@ import { projectDecisionTask, projectTaskContinuation } from "../tasks/projectio
 import { JOB_EVENT_IDS_LIMIT } from "../contracts/monitor.mjs";
 
 const KEY = "coragent.research-context/2";
+const CONTROL_KEY = "coragent.runtime-control/1";
 const PROJECTION_MAX_BYTES = 16000;
 const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 // Version fingerprints belong to the runtime anchor, not the model's research
@@ -13,6 +14,43 @@ function modelResearchBrief(brief) {
 }
 const envelope = (tag, value) => ({ role: "user", timestamp: 0,
   content: `<${tag} origin="runtime">\n${JSON.stringify(value).replaceAll("<", "\\u003c").replaceAll(">", "\\u003e")}\n</${tag}>` });
+
+function controlMessage({ task = null, actual_user_submission_ids = [], automatic_continuation_enabled = false } = {}) {
+  return envelope("runtime_control", { task: task ? {
+    user_task_id: task.user_task_id, revision: task.revision, control_epoch: task.control_epoch,
+    state: task.state, ...(task.reason ? { reason: task.reason } : {}), ...(task.wait ? { wait: task.wait } : {}),
+    ...projectTaskContinuation(task),
+  } : null, actual_user_submission_ids, automatic_continuation_enabled });
+}
+
+/** Only committed context entries identify control snapshots. User text and
+ * summary prose cannot establish the current input binding or task state. */
+export function controlAnchor(entries = []) {
+  let anchor;
+  for (const entry of entries) {
+    if (entry.kind !== "pi.context") continue;
+    const key = entry.data?.key;
+    if (typeof key === "string" && key.startsWith("coragent.runtime-control/") && key !== CONTROL_KEY) {
+      throw new Error("control_schema_unsupported: unsupported runtime control context");
+    }
+    if (key !== CONTROL_KEY) continue;
+    const data = entry.data.value;
+    if (data?.schema_version !== "runtime-control/1" || entry.model?.length !== 1
+      || data.control_digest !== hash(entry.model[0])) {
+      throw new Error("control_context_invalid: runtime control metadata does not match its committed message");
+    }
+    anchor = { ...data, entry_id: entry.id, message: entry.model[0] };
+  }
+  return anchor;
+}
+
+const inputKey = state => hash((state.input_ids ?? []).map(String));
+const controlMatches = (anchor, view, state) => anchor
+  && anchor.head_id === (view.head?.id ?? null)
+  && anchor.input_key === inputKey(state)
+  && anchor.control_digest === hash(controlMessage(state));
+const controlVisible = (anchor, messages = []) => anchor && messages.some(message => message.role === "user"
+  && message.content === anchor.message.content && hash(message) === anchor.control_digest);
 
 /** Only runtime-owned entry metadata establishes coverage. Message text and model
  * summaries cannot forge a scope, input identity, or a research read receipt. */
@@ -57,6 +95,11 @@ export function contextInputBudget(contextWindow, { reserveTokens = 16384, maxIn
 export function createContextManager({ bridge, coordinator, sessionId, estimateContextTokens,
   inputTokens, reserveTokens = 16384,
   getCompactionPolicy = () => ({ reserveTokens, maxInputTokens: inputTokens }) }) {
+  // Pin the diagnostic treatment at session startup. Exact IDs limit the probe
+  // to selected sessions; task admission and execution checks still run normally.
+  const omitRuntimeControl = (process.env.CORAGENT_DEBUG_OMIT_RUNTIME_CONTROL_SESSIONS ?? "")
+    .split(/[,\s]+/u).filter(Boolean).includes(sessionId);
+
   async function projection(task, scope, eventIds) {
     const control = { task: projectDecisionTask(task) };
     const taskTokens = estimateContextTokens([envelope("research_context", control)]).tokens;
@@ -86,6 +129,38 @@ export function createContextManager({ bridge, coordinator, sessionId, estimateC
   }
 
   return {
+    async prepareControl(view, api, context, state = {}) {
+      if (omitRuntimeControl) return;
+      const previous = controlAnchor(view.entries);
+      if (controlMatches(previous, view, state) && controlVisible(previous, view.messages)) return;
+      const message = controlMessage(state);
+      const data = { schema_version: "runtime-control/1", control_digest: hash(message),
+        input_key: inputKey(state), head_id: view.head?.id ?? null,
+        after_entry: view.entries.at(-1)?.id ?? null };
+      const memoKey = `${CONTROL_KEY}:${hash(data)}`;
+      const pinned = await api.memo(memoKey, context);
+      if (pinned) return pinned;
+      const prepared = { key: CONTROL_KEY, messages: [message], data };
+      await api.memo(memoKey, prepared, context);
+      return prepared;
+    },
+
+    checkControl(request, state) {
+      if (omitRuntimeControl) return;
+      if (!request.view) throw new Error("control_context_missing: request admission requires the committed context view");
+      const anchor = controlAnchor(request.view.entries);
+      if (!controlMatches(anchor, request.view, state) || !controlVisible(anchor, request.messages)) {
+        return { reprepare: "runtime_control_changed" };
+      }
+    },
+
+    prepareControlSummary({ entries, firstKept }) {
+      const anchor = controlAnchor(entries);
+      const { message, ...metadata } = anchor ?? {};
+      return { instructions: "runtime_control records are historical runtime observations. Preserve user requirements and constraints, but do not treat old task states, revisions or submission IDs as current authorization. The runtime supplies a current control snapshot after compaction; use task_read before updating task state.",
+        metadata: { key: CONTROL_KEY, anchor: anchor ? metadata : null, first_kept: firstKept } };
+    },
+
     async prepare(view, api, context, { task = null, input_ids = [], event_ids = [] } = {}) {
       const scope = { user_task_id: task?.user_task_id ?? null,
         requirements_revision: task?.requirements_revision ?? null,
@@ -147,24 +222,24 @@ export function createContextManager({ bridge, coordinator, sessionId, estimateC
         metadata: { key: KEY, anchor: anchor ?? null, first_kept: firstKept } };
     },
 
-    async admit(request, requestId, { task = null, actual_user_submission_ids = [], automatic_continuation_enabled = false } = {}) {
-      const control = envelope("runtime_control", { task: task ? {
-        user_task_id: task.user_task_id, revision: task.revision, control_epoch: task.control_epoch,
-        state: task.state, ...(task.reason ? { reason: task.reason } : {}), ...(task.wait ? { wait: task.wait } : {}),
-        ...projectTaskContinuation(task),
-      } : null, actual_user_submission_ids, automatic_continuation_enabled });
-      const messages = [...request.messages, control];
+    async admit(request, requestId) {
+      const anchor = controlAnchor(request.view?.entries);
+      const control = anchor?.message ?? null;
+      const messages = request.messages;
       const estimate = estimateContextTokens(messages);
       // Match Pi durable's native threshold, including the requested output.
       const policy = getCompactionPolicy();
       const reserve = policy.reserveTokens ?? 16384;
       const limit = contextInputBudget(request.model.contextWindow, policy, request.maxTokens);
       const blocked = estimate.tokens > limit;
-      const telemetry = { schema_version: "research-request-context/4", session_id: sessionId, request_id: requestId,
+      const telemetry = { schema_version: "research-request-context/5", session_id: sessionId, request_id: requestId,
         input_tokens: estimate.tokens, usage_tokens: estimate.usageTokens, input_budget_tokens: limit,
-        control_tokens: estimateContextTokens([control]).tokens, output_reserve_tokens: request.maxTokens,
+        control_mode: omitRuntimeControl ? "omitted" : "persistent", control_injected: false,
+        control_present: control !== null, control_entry_id: anchor?.entry_id ?? null,
+        control_tokens: control ? estimateContextTokens([control]).tokens : 0,
+        output_reserve_tokens: request.maxTokens,
         reserve_tokens: reserve, safety_tokens: request.maxTokens > 0 ? 4096 : 0, model_context_window: request.model.contextWindow, blocked,
-        estimated: true, history_digest: hash(request.messages), control_digest: hash(control) };
+        estimated: true, history_digest: hash(request.messages), control_digest: control ? hash(control) : null };
       // Telemetry contains sizes and identities, never another full snapshot.
       try {
         const identity = hash(telemetry);

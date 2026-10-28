@@ -1,6 +1,6 @@
 # 任务生命周期
 
-使用 `runtime_control` 中真实的 submission ID，不编造 ID，也不使用研究 `user_*` 引用、引用历史或 Monitor 事件代替用户提交。更新状态前用 `task_read` 获取当前 `expected_revision`。除非用户修改范围，后续指令继续属于当前委托。
+使用最新 `runtime_control` 快照中属于本轮的真实 submission ID；空列表表示本轮没有新用户指令，不得借用旧快照里的 ID。不编造 ID，也不使用研究 `user_*` 引用、引用历史或 Monitor 事件代替用户提交。更新状态前用 `task_read` 获取当前 `expected_revision`。除非用户修改范围，后续指令继续属于当前委托。
 
 ## 等待与阻塞
 

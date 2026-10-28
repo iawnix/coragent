@@ -59,7 +59,7 @@ for (const scenario of ["single", "branches", "block-resume", "execution-recover
         }).filter(Boolean);
         const envelope = request.messages.findLast(message =>
           typeof message.content === "string" && message.content.startsWith('<runtime_control origin="runtime">'));
-        assert.ok(envelope, "every request must carry runtime context at the tail");
+        assert.ok(envelope, "every request must retain the latest committed runtime context");
         const taskContext = JSON.parse(envelope.content.split("\n")[1]);
         const task = taskContext.task;
         const node = results.find(result => result?.node)?.node;

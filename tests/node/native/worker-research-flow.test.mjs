@@ -212,10 +212,9 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     assert.ok(journal.records.some(r => r.kind === "material"));
     for (const request of requests) {
       const snapshots = request.messages.filter(m => JSON.stringify(m.content).includes("<runtime_control"));
-      assert.equal(snapshots.length, 1, "each real provider request has exactly one current projection");
-      assert.equal(snapshots[0].role, "user", "runtime data must remain after history on the provider wire");
-      assert.equal(request.messages.at(-1), snapshots[0]);
-      assert.match(snapshots[0].content, /origin="runtime"/);
+      assert.ok(snapshots.length >= 1, "each provider request retains its committed control snapshots");
+      assert.equal(snapshots.at(-1).role, "user", "runtime data uses a user message carrier");
+      assert.match(snapshots.at(-1).content, /origin="runtime"/);
     }
     const truncated = toolResults.find(result => String(result.content).includes("Historical artifact metadata"));
     assert.ok(truncated, "actual Native read result must reach the provider");
@@ -225,7 +224,7 @@ test("Worker reads installed Skills, runs a Job, publishes a Node result after a
     assert.match(JSON.stringify(afterTruncation.messages), /Exercise the local fixture/);
     assert.match(JSON.stringify(requests.at(-1).messages), /Exercise the local fixture/);
     assert.match(JSON.stringify(requests.at(-1).messages), /fixture produced its required output/);
-    assert.equal(read.snapshot.messages.some(m => JSON.stringify(m).includes("<runtime_control")), false, "projection must not enter durable transcript");
+    assert.equal(read.snapshot.messages.some(m => JSON.stringify(m).includes("<runtime_control")), true, "control snapshots remain in the durable transcript");
     const researchEntries = requests.at(-1).messages.filter(m => String(m.content).startsWith('<research_context origin="runtime">'));
     assert.ok(researchEntries.length >= 1, "the durable orientation remains available after internal evidence");
     assert.ok((await readdir(join(workspace, "operations/contexts"))).length > 0);

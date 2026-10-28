@@ -2,11 +2,14 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { backupBeforeMigration } from "./storage.mjs";
 import { compactionOutcome } from "./compaction.mjs";
+import { inspectRuntime, retryRuntimeTask } from "./inspection.mjs";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
+import { createViewStream } from "../transport/view-stream.mjs";
 
 if (!process.send) throw new Error("Session worker requires a supervised IPC channel");
 process.umask(0o077);
 let runtime, context, watch, release, startup, closing, viewTimer, latestView;
+const viewStream = createViewStream();
 const send = value => new Promise((resolve, reject) => {
   if (!process.connected) { resolve(); return; }
   process.send(value, error => error ? reject(error) : resolve());
@@ -34,8 +37,9 @@ async function open({ metadata, model }) {
       latestView = value;
       if (!viewTimer && !closing) viewTimer = setTimeout(() => {
         viewTimer = undefined;
-        void send({ type: "view", value: latestView }).catch(() => close());
-      }, 20);
+        const frame = viewStream.next(latestView);
+        if (frame) void send({ type: "view", frame }).catch(() => close());
+      }, 16);
     });
     void watch.closed.then(end => { if (!closing && end.reason !== "stopped") shutdown(); });
     runtime.harness.resume();
@@ -65,6 +69,8 @@ async function handle(method, params) {
   if (closing) throw new Error("Worker is closing");
   await startup;
   if (!runtime) throw new Error("Worker is not initialized");
+  if (method === "runtime/status") return inspectRuntime(runtime.harness, context);
+  if (method === "runtime/retry") return retryRuntimeTask(runtime.harness, params.task_id, context);
   if (method === "snapshot") {
     // A watch may lag the transaction that just acknowledged an input.
     const state = await runtime.conversation.viewState(context);

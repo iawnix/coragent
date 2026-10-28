@@ -13,8 +13,10 @@ there is no separate Pi server protocol or second SSH socket.
 
 `prepare.py` verifies the exact commit and package versions, applies patches in
 order and checks their complete reverse application in an isolated directory.
-It rejects incomplete or incompatible patches. Model catalog hydration is followed
-by the upstream offline build; there is no untracked provider type cast.
+The reversed files must match the pinned source, with no tracked changes outside
+the current stack. Reinstallation restores an installer-owned checkout if it
+contains retired or incompatible patches. Model catalog hydration is followed by
+the upstream offline build; there is no untracked provider type cast.
 
 The Durable policy patch preserves request admission before model dispatch,
 request-bound research orientation, fixed-history summary supplements, and output
@@ -25,7 +27,18 @@ places its queued write before rebuilding context. Conflicting compaction
 instructions fail explicitly; failed, declined or stale blocking summaries stop
 the generation. The system-baseline ordering fix is supplied by upstream 1.4.
 
-Credential updates preserve non-model secrets. The Chat Completions patch retains
+`001-durable-policy` remains one patch because context preparation, request
+admission, generation checkpoints and shared compaction change the same execution
+boundary and Hook types. A stale control snapshot prepares a new committed
+context within the same run; repeated refreshes yield with durable backoff.
+Research policy and credentials belong to CoRAgent. The patch supplies the Durable
+hooks and execution guarantees that those policies require.
+
+CoRAgent's runtime credential adapter preserves non-model secrets while exposing
+only the `models` object through Pi's public `CredentialStore`. It reuses Pi's
+`AuthStorage` backend and locking; this no longer requires a Pi source patch.
+
+The Chat Completions patch retains
 opted-in session-affinity headers even when a summary disables prompt caching.
 `compat.promptCacheKeyMode` supports `auto`, `enabled` and `disabled`; it uses the
 existing provider session ID and 64-character clamp. Long retention remains a

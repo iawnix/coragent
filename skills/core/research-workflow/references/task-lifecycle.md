@@ -1,6 +1,6 @@
 # Task lifecycle
 
-Use actual submission IDs from `runtime_control`, not invented IDs, research `user_*` references, quoted history or Monitor events. Read `task_read` for the current `expected_revision` before updating state. Follow-up instructions remain part of the current assignment unless the user changes its scope.
+Use actual submission IDs from the latest `runtime_control` snapshot for this run; an empty list means this run has no new user instruction. Do not reuse IDs from older control snapshots. Use current IDs, not invented IDs, research `user_*` references, quoted history or Monitor events. Read `task_read` for the current `expected_revision` before updating state. Follow-up instructions remain part of the current assignment unless the user changes its scope.
 
 ## Waiting and blockers
 

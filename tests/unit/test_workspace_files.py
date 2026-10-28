@@ -64,3 +64,14 @@ def test_explicit_snapshot_is_stable_and_source_is_not_modified(workspace):
     (workspace/'inputs/ethanol.xyz').write_text('modified')
     assert (workspace/first['path']).read_bytes()==original
     with pytest.raises(FileAccessError,match='changed'):dispatch(workspace,request)
+
+@pytest.mark.parametrize('suffix', ['.png', '.jpg', '.jpeg', '.gif', '.webp'])
+def test_image_materials_use_the_existing_versioned_read_boundary(workspace, suffix):
+    path = f'inputs/plot{suffix}'
+    content = b'local image fixture'
+    (workspace / path).write_bytes(content)
+    file = stat_file(workspace, path)
+    result = dispatch(workspace, {'operation': 'read', 'path': path, 'expected_version': file['version']})
+    assert base64.b64decode(result['data_base64']) == content
+    assert result['eof'] is True
+    assert result['file']['version'] == file['version']

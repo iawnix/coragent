@@ -90,6 +90,35 @@ prepared value. Compaction summarizes selected historical context and does not
 insert today's research state into an earlier summary. Read failures produce an
 explicit unavailable state; a new input can retry.
 
+## Persistent runtime control
+
+Control preparation is independent of research Brief refresh. Before each
+generation, the runtime reads the task and authenticates the current run's input
+sources. It appends a `coragent.runtime-control/1` `pi.context` record when the
+control text or input binding changes, or on the first request under a new
+compaction head. The `runtime_control` label and fields are unchanged. Old records
+stay at their original positions, so later requests preserve the earlier prefix.
+Equal state within the same input binding and head adds no record. Committed
+metadata and memo make this decision recoverable across Worker restarts.
+
+Only runtime-owned entry metadata establishes a control snapshot. Old user
+submission IDs and summary prose grant no new authorization. Automatic inputs
+produce an empty `actual_user_submission_ids`; task operations still verify
+provenance, current run membership and control state. Read `task_read` for the
+current revision before updating a task.
+
+`beforeRequest` checks the committed snapshot against live state, checks the full
+input budget and rechecks execution permission after IO. If state changes before
+dispatch, Pi returns to context preparation on the same run. It permits three
+immediate refreshes, then sleeps with exponential backoff from one to thirty
+seconds, keeping the admitted inputs and provider attempt budget. A stable state
+resumes normally; cancellation can interrupt the sleep. This path does not use
+compaction to repair a state change.
+
+Compaction supplements describe only the selected historical range. The first
+ordinary request after a new head commits a fresh current control snapshot;
+subsequent requests preserve it. No live state is inserted into an old summary.
+
 ## Independent status and input budgets
 
 - `availability` states whether research background is available.
@@ -159,6 +188,38 @@ Check compaction, message prefixes, tools, and instructions before attributing
 low cache usage to the gateway or upstream. Use synthetic long-context controls
 starting near 128k, comparing exact repeats and appended messages; high cache
 reuse in a small prompt does not establish long-context behavior.
+
+### Temporarily omitting runtime_control
+
+`CORAGENT_DEBUG_OMIT_RUNTIME_CONTROL_SESSIONS` accepts exact session IDs separated
+by commas or whitespace. It is unset by default. Matching sessions skip preparing
+new `runtime_control` snapshots and their freshness check. Use the session UUID, not
+a workspace name such as `debug_gpt_5-6-luna7`; wildcards are not supported.
+Set it before starting the Host/Worker. The context manager reads it once at
+startup, so existing Workers must finish their run and restart to pick up a
+change. Unset the variable and restart to restore control preparation.
+
+```bash
+export CORAGENT_DEBUG_OMIT_RUNTIME_CONTROL_SESSIONS="<test session UUID>"
+```
+
+This is a cache diagnostic switch. The model stops receiving updated task state,
+revision, control state and actual user submission IDs, which can affect task
+tool calls. Runtime budget, task admission, pause/stop and tool authorization
+checks still execute. Omission adds no replacement marker and does not rewrite
+history, system instructions, tools or cache keys. Previously committed control
+snapshots remain as historical records; use a fresh comparison session when the
+experiment requires requests with no control messages at all.
+
+`research-request-context/5` reports `control_mode` (`persistent` or `omitted`),
+`control_present`, and `control_entry_id`. `control_injected` is always `false`:
+admission adds no temporary message. `control_tokens` and `control_digest`
+describe the latest committed control entry, or zero/null when none exists.
+Confirm the complete message sequence in request captures, then compare cached-token growth,
+recovery request counts and elapsed time over several requests after compaction,
+using the same model/version and similar input sizes. Restart both groups in the
+same way; one first request after switching is not conclusive. Missing cache
+fields remain unknown. This switch sends no test requests by itself.
 
 Run `python3 -B tools/test/cache_probe.py --size-k 128` for the deterministic local
 probe. Add `--live --installation /path/to/coragent` to use configured credentials

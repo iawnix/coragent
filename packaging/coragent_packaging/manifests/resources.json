@@ -357,10 +357,10 @@
     "skills/core/research-memory/references/evidence.zh-CN.md": "sha256:44385c3c5f85a4e8c17c8e0a4bac266ee3bf05a8be077c8c213f20fa2f9b9064",
     "skills/core/research-memory/references/planning.md": "sha256:243ed1f9b4a216c82b1fe58065d8c287192b660117bac3f96f16e03936c981c5",
     "skills/core/research-memory/references/planning.zh-CN.md": "sha256:b03b62e7740eb37b7f46d45052862dd22aed600c2f99370f22fd93c2c8842cb2",
-    "skills/core/research-memory/references/storage.md": "sha256:1eed9b6d7a6b3585085a8797c26ced73e2fec2d54a705d6f0dfad78bab632570",
-    "skills/core/research-memory/references/storage.zh-CN.md": "sha256:22094d7847accbfb081f57cb5c3216add1556543117b0a202a2c1c871adf2a7f",
-    "skills/core/research-workflow/SKILL.md": "sha256:094aa9f83cd5129f9aff4c155f91ba2eb18243a0580aa3a4f00bb9f36fa53f20",
-    "skills/core/research-workflow/SKILL.zh-CN.md": "sha256:571815002a707a66ef36c0799a1322c12e7213b3b8e515634a68535acb8111d3",
+    "skills/core/research-memory/references/storage.md": "sha256:cf6bd01591fd7b81fb5c32316be3dcb79eee46306aa755519795a95617d32929",
+    "skills/core/research-memory/references/storage.zh-CN.md": "sha256:a751fe34a450885f4535dbd7fc878d07c123d2faeb1e3564b1dbbf97055fa8c6",
+    "skills/core/research-workflow/SKILL.md": "sha256:5eb46c2b3bef771b4c3c8ceb49c6a82a8ef0523b909734949d53df7072974d70",
+    "skills/core/research-workflow/SKILL.zh-CN.md": "sha256:2e061d31591a3639e9c99802e99efac0a8c172631b8f9d4d1e2d3cc764abef61",
     "skills/core/research-workflow/references/acceptance.md": "sha256:7f46e16f0f3c3653074efeb051d29f86dd1d7ca90efc0a163f30eb94e3622814",
     "skills/core/research-workflow/references/acceptance.zh-CN.md": "sha256:cf6eb94fdce01d9c3d423c54b458cccdade1e506efaa70a806242dd7870db9cd",
     "skills/core/research-workflow/references/execution-targets.md": "sha256:a8993cc13ace1a95a3d715c31322f3ffbc6ad34aff1f7c177f70605d8f0ffec4",
@@ -369,9 +369,9 @@
     "skills/core/research-workflow/references/jobs-and-artifacts.zh-CN.md": "sha256:441d554a368b964a618ff6a79a2579d550aa04a5599ae63486a961800fe45366",
     "skills/core/research-workflow/references/skills.md": "sha256:a55fcd366362d5bbe7eb58cec0cc45ccfc85a0dde90014fa7acf32216ee8a5e0",
     "skills/core/research-workflow/references/skills.zh-CN.md": "sha256:4f0dfae7c342a622d7ead5183308ef954213111234e8839d2fb7fbe1420931dd",
-    "skills/core/research-workflow/references/task-lifecycle.md": "sha256:1ac9955621cc848286ca110b36c234557994ea1d4b477781e8d5b0106bea3ead",
-    "skills/core/research-workflow/references/task-lifecycle.zh-CN.md": "sha256:c9dd2ad58de1fcb9c84b4e5e25000c963bbaab70b032bfcbcc5f1e07d5ea6416",
-    "apps/agent/prompts/coragent.md": "sha256:172b41e7650c221bfe3cb407d8bb137174a31d7d729027e6da3c1fdf1caf66d2",
-    "apps/agent/prompts/coragent.zh-CN.md": "sha256:c042d394a321fa0914c24e84a846db4e53dd2a4115d77e1744299b47d209a747"
+    "skills/core/research-workflow/references/task-lifecycle.md": "sha256:5405d849c318fe16bccfda9c0b7e8cc7a763b963f533b1bb721e5fc87cfd56b0",
+    "skills/core/research-workflow/references/task-lifecycle.zh-CN.md": "sha256:f6127a1d99c5e3a5ebdd61cc337fcd3027e2de8c5480f1033bbbf483ecf7bff2",
+    "apps/agent/prompts/coragent.md": "sha256:89a66bcb0f13af457bb4cb3b9414ee6077c9462a7ff9fcead903d6913dcdd7aa",
+    "apps/agent/prompts/coragent.zh-CN.md": "sha256:3652d8addc6fba4b97e4b3babc116c3bfcae9b703338acad4a079fa78050fdd1"
   }
 }

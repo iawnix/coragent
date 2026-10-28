@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { protocolError, MAX_FRAME_BYTES } from "../transport/host-client.mjs";
 import { validateId, cleanRequest } from "./validation.mjs";
 import { JOB_EVENT_IDS_LIMIT } from "../contracts/monitor.mjs";
+import { createViewStream } from "../transport/view-stream.mjs";
 
 const SESSION_EVENT_HISTORY_LIMIT = 256;
 const SESSION_EVENT_HISTORY_BYTES = MAX_FRAME_BYTES / 4;
@@ -9,6 +10,7 @@ const JOB_EVENT_ID = /^event_[1-9][0-9]*$/u;
 
 export function createHostSessions({ sessionBackend, workspace, deduplicate, clients, epoch, jobToken }) {
   const live = new Map();
+  const messageSizes = new WeakMap();
   // Sequence identity survives reconnecting the same backend within a Host epoch.
   const sessionSequences = new Map();
   const keyFor = (workspaceId, sessionId) => `${workspaceId}/${sessionId}`;
@@ -38,7 +40,13 @@ export function createHostSessions({ sessionBackend, workspace, deduplicate, cli
       session: params.session,
       event: params.event,
     });
-    const bytes = Buffer.byteLength(JSON.stringify(item));
+    const messages = params.snapshot.messages;
+    let messageBytes = messageSizes.get(messages);
+    if (messageBytes === undefined) {
+      messageBytes = Buffer.byteLength(JSON.stringify(messages)); messageSizes.set(messages, messageBytes);
+    }
+    // Historical messages are immutable and shared across token updates.
+    const bytes = Buffer.byteLength(JSON.stringify({ ...item, snapshot: { ...item.snapshot, messages: [] } })) - 2 + messageBytes;
     record.history.push({ item, bytes });
     record.historyBytes = (record.historyBytes || 0) + bytes;
     while (record.history.length > SESSION_EVENT_HISTORY_LIMIT || record.historyBytes > SESSION_EVENT_HISTORY_BYTES) {
@@ -46,6 +54,13 @@ export function createHostSessions({ sessionBackend, workspace, deduplicate, cli
     }
     for (const client of clients) if (client.subscriptions.has(keyFor(params.workspace_id, params.session_id))) {
       try { client.peer.notify("session/event", params); } catch { client.peer.close(); }
+    }
+    if (record.view) for (const client of clients) {
+      const stream = client.viewSubscriptions?.get(keyFor(params.workspace_id, params.session_id));
+      if (!stream) continue;
+      const frame = stream.next(record.view);
+      if (frame) try { client.peer.notify("session/view", { workspace_id: params.workspace_id, session_id: params.session_id, frame }); }
+      catch { client.peer.close(); }
     }
   }
 
@@ -70,17 +85,18 @@ export function createHostSessions({ sessionBackend, workspace, deduplicate, cli
       record.snapshot = sanitizeSnapshot(value.snapshot);
       record.session = { ...record.session, ...(value.session || {}), workspace_id: workspaceId, session_id: sessionId, online: true };
     }
+    if (value.view) record.view = { ...value.view, failure: record.snapshot.runtime_error ?? null };
     emitSession(record, value.event ?? null, value.event === null ? "snapshot" : "event");
   }
 
   sessionBackend.setEventHandler(acceptBackendEvent);
 
   async function handle(client, method, params) {
-    if (["session/query", "session/compact", "session/configure", "session/reload", "session/pause"].includes(method)) {
+    if (["session/query", "session/compact", "session/configure", "session/reload", "session/pause", "session/retry"].includes(method)) {
       await workspace(params.workspace_id);
       validateId(params.session_id, "session_id");
       if (method === "session/query") {
-        if (!["view", "telemetry", "research", "systemPrompt", "compaction"].includes(params.query)
+        if (!["view", "telemetry", "research", "systemPrompt", "compaction", "runtime"].includes(params.query)
           || (params.args !== undefined && (typeof params.args !== "string" || params.args.length > 16_384))) {
           throw protocolError("invalid_query", "Invalid session query");
         }
@@ -93,16 +109,33 @@ export function createHostSessions({ sessionBackend, workspace, deduplicate, cli
       if (method === "session/configure" && !["off", "minimal", "low", "medium", "high", "xhigh"].includes(params.thinking_level)) {
         throw protocolError("invalid_input", "Unknown thinking level");
       }
-      const action = { "session/compact": "compact", "session/configure": "configure", "session/reload": "reload", "session/pause": "pause" }[method];
+      if (method === "session/retry" && (typeof params.task_id !== "string" || !/^[1-9]\d*$/u.test(params.task_id)
+        || !Number.isSafeInteger(Number(params.task_id)))) throw protocolError("invalid_task", "Invalid runtime task ID");
+      const action = { "session/compact": "compact", "session/configure": "configure", "session/reload": "reload", "session/pause": "pause", "session/retry": "retry" }[method];
       return deduplicate(method, params.request_id, cleanRequest(params), () => sessionBackend[action](params));
     }
     if (method === "session/list") return { sessions: (await listSessions(params.workspace_id)).map((session) => stripSessionClient(session)) };
     if (method === "session/read" || method === "session/attach") {
+      if (method === "session/attach" && params.view_stream === true) {
+        if (params.presentation !== "terminal") throw protocolError("invalid_input", "View streams require terminal presentation");
+        await workspace(params.workspace_id);
+        validateId(params.session_id, "session_id");
+        const initial = await sessionBackend.readView(params.workspace_id, params.session_id);
+        const key = keyFor(params.workspace_id, params.session_id);
+        const stream = createViewStream();
+        const frame = stream.next(live.get(key)?.view ?? initial);
+        client.subscriptions.delete(key);
+        (client.viewSubscriptions ??= new Map()).set(key, stream);
+        return { frame };
+      }
       const requestedCursor = parseSessionCursor(params, epoch);
       const sameEpoch = requestedCursor?.epoch === epoch;
       const afterSequence = sameEpoch ? requestedCursor.sequence : 0;
       const result = await readSession(params.workspace_id, params.session_id);
-      if (method === "session/attach") client.subscriptions.add(keyFor(params.workspace_id, params.session_id));
+      if (method === "session/attach") {
+        client.viewSubscriptions?.delete(keyFor(params.workspace_id, params.session_id));
+        client.subscriptions.add(keyFor(params.workspace_id, params.session_id));
+      }
       const liveRecord = live.get(keyFor(params.workspace_id, params.session_id));
       const replay = sameEpoch ? (liveRecord?.history || []).map(row => row.item).filter(item => item.cursor.sequence > afterSequence) : [];
       const cursorSequence = liveRecord?.sequence ?? 0;
@@ -117,6 +150,7 @@ export function createHostSessions({ sessionBackend, workspace, deduplicate, cli
     }
     if (method === "session/detach") {
       client.subscriptions.delete(keyFor(params.workspace_id, params.session_id));
+      client.viewSubscriptions?.delete(keyFor(params.workspace_id, params.session_id));
       return { accepted: true };
     }
     if (method === "session/create" || method === "session/resume") {

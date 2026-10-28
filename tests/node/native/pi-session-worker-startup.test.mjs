@@ -120,6 +120,9 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
       assert.ok(telemetry.result.contextTokens>=0);
       assert.equal((await query("research","")).result.schema_version,"research-brief/1");
       assert.equal((await query("research","read")).result.schema_version,"research-search/2");
+      assert.equal((await query("runtime")).scheduling,"running");
+      await assert.rejects(request("session/retry",{...scope,request_id:"invalid-retry",task_id:"-1"}),{code:"invalid_task"});
+      await assert.rejects(request("session/retry",{...scope,request_id:"missing-retry",task_id:"999999"}),{code:"task_not_retryable"});
       assert.match((await query("research","storage bootstrap")).error.message,/Usage/);
       assert.deepEqual((await backend.readSession("startup",scope.session_id)).snapshot.messages,read.snapshot.messages);
       const [{VirtualTerminal},{renderLayoutFrame}] = await Promise.all([
@@ -147,7 +150,7 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
       component.start();
       await waitFor(()=>!text().includes("Context: Unknown")&&text().includes("Monitor: Connected"));
       assert.equal(modelRequests,0);
-      for(const command of ["usage","monitor","research","sys-prompt","model","thinking"]){
+      for(const command of ["usage","monitor","research","sys-prompt","model","thinking","tasks"]){
         submit(`/${command}`);
         await waitFor(()=>text().includes("Esc Back"));
         const focus=component.tui.getFocusedComponent();
@@ -156,6 +159,18 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
         for(const [w,h] of [[100,24],[32,12],[20,10]])assert.equal(frame(w,h).lines.length,h);
         await back();
       }
+      const wideText = () => stripVTControlCharacters(frame(140,32).lines.join("\n"));
+      assert.match(wideText(),/Research & jobs/);
+      assert.doesNotMatch(text(),/Research & jobs/);
+      assert.equal(frame(140,32).primaryScrollView,frame().primaryScrollView);
+      submit("/sidebar off");await waitFor(()=>!wideText().includes("Research & jobs"));await back();
+      submit("/sidebar auto");await waitFor(()=>wideText().includes("Research & jobs"));await back();
+      submit("/retry");await waitFor(()=>text().includes("No tasks are paused"));await back();
+      await mkdir(join(workspaceRoot,"startup","outputs"),{recursive:true});
+      await writeFile(join(workspaceRoot,"startup","outputs","plot.png"),Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=","base64"));
+      submit("/image outputs/plot.png");await waitFor(()=>text().includes("Preview only"));
+      assert.match(text(),/plot.png.*1×1/);
+      await back();
       submit("/monitor");await waitFor(()=>text().includes("job_0 · running"));
       monitorRunning=2;refreshMonitor();await waitFor(()=>text().includes("job_1 · running"));
       await back();

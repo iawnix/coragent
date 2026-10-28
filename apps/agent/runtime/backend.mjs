@@ -50,7 +50,7 @@ export async function createCoRAgentHarnessBackend(options = {}) {
   function publish(binding) {
     if (closed || binding.closed || removals.has(binding.key)) return;
     eventHandler({ workspace_id: binding.summary.workspaceId, session_id: binding.summary.id,
-      session: summaryFor(binding.summary, binding), snapshot: hostSnapshot(binding.snapshot), event: null });
+      session: summaryFor(binding.summary, binding), snapshot: hostSnapshot(binding.snapshot), view: binding.view, event: null });
   }
   async function serviceCall(binding, service, method, args) {
     return binding.worker.request("service", { service, method, ...(args === undefined ? {} : { args }) });
@@ -98,7 +98,7 @@ export async function createCoRAgentHarnessBackend(options = {}) {
       const binding = { key, summary, snapshot: normalizeLane(null), sequence: 0, closed: false, view: null };
       const update = view => {
         if (binding.closed || closed) return;
-        binding.view = view; binding.snapshot = normalizeLane(view); binding.sequence++;
+        binding.snapshot = normalizeLane(view, binding.view, binding.snapshot); binding.view = view; binding.sequence++;
         publish(binding);
         if (!view.docs["pi.live"]?.run) void refreshOutcome(binding).then(() => publish(binding)).catch(() => {});
       };
@@ -147,6 +147,10 @@ export async function createCoRAgentHarnessBackend(options = {}) {
         .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
     },
     async readSession(workspaceId, sessionId) { return resultFor(await openBinding(workspaceId, sessionId)); },
+    async readView(workspaceId, sessionId) {
+      const binding = await openBinding(workspaceId, sessionId);
+      return { ...binding.view, failure: hostSnapshot(binding.snapshot).runtime_error };
+    },
     async createSession({ workspace_id: workspaceId, session_id: sessionId, model }) {
       const cwd = await workspace(workspaceId);
       const summary = await catalog.create({ workspaceId, sessionId, cwd });
@@ -211,6 +215,7 @@ export async function createCoRAgentHarnessBackend(options = {}) {
         return { ...binding.view, failure: result.snapshot.runtime_error };
       }
       if (params.query === "compaction") return binding.worker.request("compaction/status", { task_id: params.args });
+      if (params.query === "runtime") return binding.worker.request("runtime/status");
       if (!["telemetry", "research", "systemPrompt"].includes(params.query)) throw error("invalid_query", "Unsupported session query");
       return serviceCall(binding, CLIENT_QUERIES_SERVICE_ID, params.query, params.args);
     },
@@ -218,6 +223,7 @@ export async function createCoRAgentHarnessBackend(options = {}) {
     async configure(params) { return (await openBinding(params.workspace_id, params.session_id)).worker.request("configure", { thinkingLevel: params.thinking_level }); },
     async reload(params) { return (await openBinding(params.workspace_id, params.session_id)).worker.request("reload"); },
     async pause(params) { return (await openBinding(params.workspace_id, params.session_id)).worker.request("abort"); },
+    async retry(params) { return (await openBinding(params.workspace_id, params.session_id)).worker.request("runtime/retry", { task_id: params.task_id }); },
     async close() {
       if (closed) return;
       closed = true;
@@ -305,7 +311,7 @@ function hostSnapshot(value) {
 }
 
 /** Project the pinned Pi ConversationView for Host presentation. */
-function normalizeLane(value) {
+function normalizeLane(value, previousView, previousLane) {
   const source = value || { entries: [], docs: {} };
   if (source.__coragentLane === true) return source;
   const docs = source.docs && typeof source.docs === "object" ? source.docs : {};
@@ -339,7 +345,8 @@ function normalizeLane(value) {
     message: item.content ?? item.entry ?? null,
   })) : [];
   if (!Array.isArray(source.entries) || !source.docs) throw error("invalid_pi_view", "Expected pinned Pi ConversationView");
-  const transcript = source.entries.flatMap(entry => (entry.model || []).map(message => ({ ...message, entry_id: entry.id })));
+  const transcript = source.entries === previousView?.entries && previousLane ? previousLane.transcript
+    : source.entries.flatMap(entry => (entry.model || []).map(message => ({ ...message, entry_id: entry.id })));
   return {
     __coragentLane: true,
     operation,

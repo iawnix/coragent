@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { markInternalInput, RUNTIME_TASK_CONTINUATION_START, RUNTIME_TASK_CONTINUATION_END } from "../../../apps/agent/runtime/admission/input.mjs";
 import { pinnedPiSource } from "./test-environment.mjs";
+import { createCoRAgentCredentialStore } from "../../../apps/agent/runtime/credentials.mjs";
 
 const source = pinnedPiSource();
 
@@ -48,9 +49,8 @@ test("unified credentials preserve other secrets through native Pi refresh and d
       secrets: { smtp_password: "fake-smtp", tri_token: "fake-tri" },
     }), { mode: 0o600 });
     process.env.CORAGENT_CREDENTIALS_FILE = credentialPath;
-    const { AuthStorage } = await import(pathToFileURL(join(source, "packages/coding-agent/src/core/auth-storage.ts")));
-    const first = AuthStorage.create();
-    const second = AuthStorage.create();
+    const first = await createCoRAgentCredentialStore({ sourceRoot: source });
+    const second = await createCoRAgentCredentialStore({ sourceRoot: source });
     await first.modify("fixture", async credential => ({ ...credential, access: "fake-refreshed" }));
     assert.equal((await second.read("fixture")).access, "fake-refreshed");
     await Promise.all([

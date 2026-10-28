@@ -5,6 +5,8 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -19,7 +21,9 @@ def test_pi_source_pin_is_explicit_and_uses_latest_durable_runtime() -> None:
     patch = "\n".join(path.read_text(encoding="utf-8") for path in sorted((ROOT / "packaging/coragent_packaging/pi/patches").glob("*.patch")))
     assert "prepareContext" in patch
     assert "prepareSummary" in patch
-    assert "CORAGENT_CREDENTIALS_FILE" in patch
+    assert "CORAGENT_CREDENTIALS_FILE" not in patch
+    adapter = (ROOT / "apps/agent/runtime/credentials.mjs").read_text(encoding="utf-8")
+    assert "CORAGENT_CREDENTIALS_FILE" in adapter
     assert "promptCacheKeyMode" in patch
     assert "src/experimental/" not in patch
     assert "@earendil-works/pi-server" not in patch
@@ -122,3 +126,52 @@ def test_overlapping_patch_stack_is_idempotent(tmp_path, monkeypatch) -> None:
     assert prepare.verify_patches(source)
     prepare.apply_patch(source)
     assert worker.read_text() == "ONE AGAIN\ntwo\nthree\n"
+
+
+@pytest.mark.parametrize("retired_file", [
+    "packages/coding-agent/src/core/auth-storage.ts",
+    "packages/durable/src/harness/generation.ts",
+])
+def test_managed_install_removes_retired_patch_changes(tmp_path, monkeypatch, retired_file) -> None:
+    from coragent_packaging.pi import prepare
+
+    source = tmp_path / "pi"
+    source.mkdir()
+    def git(*args):
+        return subprocess.run(["git", "-C", str(source), *args], check=True, capture_output=True, text=True).stdout.strip()
+    git("init")
+    for relative in (
+        "packages/durable/src/index.ts", "packages/durable/src/storage/sqlite/node.ts",
+        "packages/coding-agent/src/core/model-runtime.ts", "packages/tui/src/index.ts",
+        "packages/durable/src/harness/generation.ts", "packages/coding-agent/src/core/auth-storage.ts",
+    ):
+        target = source / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("".join(f"line {index}\n" for index in range(30)))
+    for package in ("ai", "durable", "coding-agent", "tui"):
+        target = source / "packages" / package / "package.json"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text('{"version":"1.4.0"}\n')
+    git("add", ".")
+    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "fixture")
+    commit = git("rev-parse", "HEAD")
+    monkeypatch.setattr(prepare, "pin", lambda: {"commit": commit, "tag": "v1.4.0"})
+    worker = source / "packages/durable/src/harness/generation.ts"
+    worker.write_text(worker.read_text().replace("line 0\n", "current patch\n"))
+    patch = tmp_path / "current.patch"
+    patch.write_text(git("diff") + "\n")
+    monkeypatch.setattr(prepare, "patches", lambda: [patch])
+    retired = source / retired_file
+    expected = retired.read_bytes()
+    retired.write_text(retired.read_text().replace("line 29\n", "retired patch\n"))
+    assert not prepare.verify_patches(source)
+    with pytest.raises(prepare.PiSourceError, match="managed patch stack"):
+        prepare.apply_patch(source)
+    # Keep dependency preparation local and deterministic; exercise real Git
+    # restoration, patch application and source verification during reinstall.
+    for step in ("install_deps", "hydrate_model_data", "prepare_build"):
+        monkeypatch.setattr(prepare, step, lambda _source: None)
+    prepare._install_locked(source, commit)
+    assert retired.read_bytes() == expected
+    assert worker.read_text().startswith("current patch\n")
+    assert prepare.verify(source) == commit

@@ -5,11 +5,14 @@ import { createChatView, messageText, isRuntimeTaskContinuation } from "./chat.m
 import { createCoRAgentNativeClientFacet } from "./commands/facet.mjs";
 import { subscribeSession } from "./connection.mjs";
 import { createCommandCompletionProvider } from "./completion.mjs";
+import { createSessionInsights } from "./status/insights.mjs";
+import { createSessionToolCommands } from "./commands/session-tools.mjs";
+import { createWorkingStatus } from "./status/working.mjs";
 
 /** Own presentation lifetime independently of the durable session lifetime. */
 export async function createClientTui({ session, request, connect, sourceRoot, terminal }) {
   const [components, themes] = await Promise.all([loadPi("tui", sourceRoot), loadPi("theme", sourceRoot)]);
-  const { TuiAltScreen, ProcessTerminal, Editor, VStack, ScrollView, Text, CombinedAutocompleteProvider, matchesKey } = components;
+  const { TuiAltScreen, ProcessTerminal, Editor, HStack, VStack, ScrollView, Text, CombinedAutocompleteProvider, matchesKey } = components;
   themes.initTheme("dark");
   terminal ??= new ProcessTerminal();
   const tui = new TuiAltScreen(terminal);
@@ -17,21 +20,23 @@ export async function createClientTui({ session, request, connect, sourceRoot, t
   const commands = new Map(), listeners = new Set(), uncertain = new Map();
   const history = new Set();
   let view = { entries: [], docs: {} }, footer, activity, presentation, feedback, feedbackTimer;
-  let panel, closePanel, stopped = false, started = false, currentCommand;
+  let panel, closePanel, stopped = false, started = false, currentCommand, sidebarMode = "auto";
   const scope = { workspace_id: session.workspaceId, session_id: session.sessionId };
   const redraw = () => { if (!stopped) tui.requestRender(); };
   const active = context => !stopped && !session.signal.aborted && (!context || context === currentCommand);
   const chat = createChatView({ components, theme: themes.theme, markdownTheme: themes.getMarkdownTheme(), requestRender: redraw });
+  const insights = createSessionInsights({ ...components, theme: themes.theme });
+  const working = createWorkingStatus({ ...components, theme: themes.theme, requestRender: redraw, fallback: insights.activity });
   const dynamic = read => ({ invalidate() { read()?.invalidate?.(); }, render: width => read()?.render(width) || [] });
   function dismiss(value) {
     const finish = closePanel; closePanel = undefined; panel = undefined;
-    tui.setFocus(editor); finish?.(value); redraw();
+    working.setActive(started && !stopped); tui.setFocus(editor); finish?.(value); redraw();
   }
   function clearFeedback() { clearTimeout(feedbackTimer); feedback = undefined; redraw(); }
-  function cancelCommand() { currentCommand = undefined; dismiss(); clearFeedback(); }
+  function cancelCommand() { currentCommand?.lifetime.abort(); currentCommand = undefined; dismiss(); clearFeedback(); }
   async function display(component, context) {
     if (!active(context)) return;
-    dismiss(); panel = component;
+    dismiss(); panel = component; working.setActive(false);
     const focused = { handleInput(data) {
       if (matchesKey(data, "escape")) dismiss();
       else { component.handleInput?.(data); redraw(); }
@@ -40,6 +45,8 @@ export async function createClientTui({ session, request, connect, sourceRoot, t
     return new Promise(resolve => { closePanel = resolve; });
   }
   const ui = {
+    isSidebarVisible: () => sidebarMode !== "off" && terminal.columns >= 110 && terminal.rows >= 18,
+    updateInsights(value) { if (!stopped && insights.update(value)) redraw(); },
     setFooter(value) { footer = value; redraw(); },
     setActivity(value) { activity = value; redraw(); },
     setCommandPresentation(value) { presentation = value; },
@@ -57,7 +64,7 @@ export async function createClientTui({ session, request, connect, sourceRoot, t
         onSelect: value => dismiss(value), onCancel: () => dismiss() }), context);
     },
   };
-  const queries = Object.fromEntries(["telemetry", "research", "systemPrompt"].map(query => [query,
+  const queries = Object.fromEntries(["telemetry", "research", "systemPrompt", "runtime"].map(query => [query,
     args => request("session/query", { ...scope, query, ...(query === "research" ? { args } : {}) })]));
   const controller = await createCoRAgentNativeClientFacet({ sourceRoot, session });
   const registry = { replace(command) { commands.set(command.name, command); return () => commands.delete(command.name); } };
@@ -97,10 +104,14 @@ export async function createClientTui({ session, request, connect, sourceRoot, t
     await request("session/reload", { ...scope, request_id: randomUUID() });
     ui.showStatus("Reloaded model configuration and credentials.", context, "success");
   } });
+  for (const command of createSessionToolCommands({ session, request, ui, insights, components, theme: themes.theme, active,
+    setSidebar(mode) { sidebarMode = mode; redraw(); },
+  })) registry.replace(command);
   editor.setAutocompleteProvider(createCommandCompletionProvider(CombinedAutocompleteProvider, [...commands.values()], process.cwd()));
   async function runCommand(name, args, original) {
     cancelCommand();
-    const context = currentCommand = { name, abortSignal: session.signal };
+    const lifetime = new AbortController();
+    const context = currentCommand = { name, lifetime, abortSignal: AbortSignal.any([session.signal, lifetime.signal]) };
     const command = commands.get(name);
     const fail = error => {
       if (!active(context)) return;
@@ -146,6 +157,11 @@ export async function createClientTui({ session, request, connect, sourceRoot, t
   }
   editor.onSubmit = text => { void submit(text); };
   const scroll = new ScrollView(chat, { follow: "end", primary: true, scrollbar: "auto" });
+  const conversationLayout = new HStack([
+    { component: scroll, grow: 1, basis: 0, minSize: 0 },
+    { component: new ScrollView(insights.sidebar, { scrollbar: "auto" }), basis: 36, shrink: 0,
+      visible: viewport => sidebarMode !== "off" && viewport.width >= 110 && terminal.rows >= 18 },
+  ], { gap: 1 });
   let panelHeight = 4;
   const panelSlot = { invalidate() { panel?.invalidate?.(); }, render(width) {
     panel?.setViewport?.(panelHeight, true);
@@ -160,13 +176,14 @@ export async function createClientTui({ session, request, connect, sourceRoot, t
     tui.setFocus(editor); return result ? { ...result, focus: false } : result;
   } };
   const layoutRoot = new VStack([
-    { component: scroll, grow: 1, basis: 0, minSize: 0, visible: () => !panel },
+    { component: conversationLayout, grow: 1, basis: 0, minSize: 0, visible: () => !panel },
     { component: panelSlot, grow: 1, basis: 0, minSize: 4, visible: viewport => {
-      panelHeight = Math.max(4, Math.min(viewport.height, terminal.rows) - editor.render(viewport.width).length - 3);
+      panelHeight = Math.max(4, Math.min(viewport.height, terminal.rows) - editor.render(viewport.width).length - 4);
       return Boolean(panel);
     } },
     { component: dynamic(() => feedback), shrink: 0, visible: () => !panel },
     { component: dynamic(() => activity), shrink: 0 },
+    { component: working, shrink: 0 },
     { component: editorSlot, shrink: 0 }, { component: dynamic(() => footer), shrink: 0 },
   ]);
   tui.setLayoutRoot(layoutRoot); tui.setFocus(editor);
@@ -191,8 +208,7 @@ export async function createClientTui({ session, request, connect, sourceRoot, t
   });
   const unsubscribe = subscribeSession({ connect, workspaceId: session.workspaceId, sessionId: session.sessionId,
     onView(value) {
-      view = value;
-      for (const entry of value.entries) {
+      for (const entry of value.entries === view.entries ? [] : value.entries) {
         if (entry.kind !== "pi.user" || history.has(entry.id)) continue;
         history.add(entry.id);
         for (const message of entry.model || []) {
@@ -201,20 +217,20 @@ export async function createClientTui({ session, request, connect, sourceRoot, t
             && !text.startsWith("A compute monitor event requires attention.")) editor.addToHistory(text);
         }
       }
-      chat.update(value); for (const listener of listeners) listener(value);
+      view = value; working.update(value); chat.update(value); for (const listener of listeners) listener(value);
     },
     onError(error) { ui.showStatus(`Reconnecting: ${error?.message || "Host connection lost"}`); },
   });
   function close() {
     if (stopped) return;
-    stopped = true; unsubscribe(); clearTimeout(feedbackTimer); dispose(); removeInput(); dismiss();
+    stopped = true; working.dispose(); currentCommand?.lifetime.abort(); unsubscribe(); clearTimeout(feedbackTimer); dispose(); removeInput(); dismiss();
     session.signal.removeEventListener("abort", close);
     if (started) tui.stop();
   }
   session.signal.addEventListener("abort", close, { once: true });
   return { ui, commands: registry, tui, editor, layoutRoot,
     render: width => layoutRoot.render(width),
-    start() { if (!session.signal.aborted && !stopped) { started = true; tui.start(); } }, close,
+    start() { if (!session.signal.aborted && !stopped) { started = true; tui.start(); working.setActive(!panel); } }, close,
   };
 }
 

@@ -15,7 +15,7 @@ import stat
 import secrets
 
 ROOTS = frozenset({"inputs", "artifacts", "runs", "reports", "outputs"})
-EXTENSIONS = frozenset({".xyz", ".mol", ".sdf", ".mol2", ".pdb", ".cif", ".mmcif", ".csv", ".tsv", ".txt", ".md", ".log", ".out", ".err", ".inp", ".gjf", ".com", ".cube", ".cub", ".png", ".jpg", ".jpeg", ".pdf"})
+EXTENSIONS = frozenset({".xyz", ".mol", ".sdf", ".mol2", ".pdb", ".cif", ".mmcif", ".csv", ".tsv", ".txt", ".md", ".log", ".out", ".err", ".inp", ".gjf", ".com", ".cube", ".cub", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf"})
 CHUNK = 65536
 MAX_PREVIEW = 8 * 1024 * 1024
 

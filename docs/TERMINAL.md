@@ -25,7 +25,7 @@ The Host is the Agent Server API and hosting layer. It owns routing, authenticat
 session discovery, session-management RPC receipts, and
 the Job Manager supervisor. The Pi Harness worker inside that same Agent Server
 owns input admission and idempotency, user-task control receipts, the Agent loop, model, tools, transcript, and durable SQLite lane.
-The native Pi TUI, Phone, and Monitor all address that same lane; none starts
+The CoRAgent TUI, Phone, and Monitor all address that same lane; none starts
 another agent loop.
 
 The Host client's RPC transport can be a local Unix socket or an SSH-launched
@@ -76,6 +76,32 @@ Use the same commands without `--user` for a system unit. The private Host
 socket is under the configured runtime directory.
 
 ## Sessions and controls
+
+The conversation has a research/Job sidebar on terminals at least 110 columns
+wide with 12 rows available for the conversation. `/sidebar off` hides it;
+`/sidebar auto` or `/sidebar on` enables it when there is enough room. Narrow
+terminals keep the full conversation width; `/research` and `/monitor` provide
+the corresponding details. The sidebar tracks the current research task, linked
+questions, next action and active Jobs; execution status is not a scientific judgment.
+
+`/tasks` shows current execution, sleeping tasks and their next check, queued
+inputs, and recovery guidance. `/retry [task-id]` selects or retries only a Pi
+task parked at the restart limit. It continues from saved progress, and does
+not rerun completed tools. Use `/compact` to retry a failed compaction, or
+`/monitor task resume <task-id>` for a paused research task. Status refreshes
+without calling a model; unavailable sources are marked explicitly.
+
+`/image <workspace-relative path>` previews PNG, JPEG, GIF or WebP files up to
+8 MiB and 40 megapixels through the Host, including over SSH. Use material paths
+under `inputs/`, `artifacts/`, `runs/`, `reports/` or `outputs/`, for example
+`/image outputs/plot.png`. Spaces in paths
+are supported without shell quoting. Reads are version-checked and chunked;
+Esc cancels further reads. This is a local preview, not an image submission to
+the model. Images returned by tools or present in session messages also render
+in the transcript. Rendering follows terminal capabilities: Kitty graphics
+displays PNG; iTerm2 graphics also supports other image formats. Unsupported
+terminals/formats show a text fallback. Export a PNG for Kitty-based previews.
+No image paths or URLs in Markdown are fetched automatically.
 
 The CoRAgent terminal provides `/resume`, `/model`, `/thinking`,
 `/compact`, `/reload`, and the CoRAgent commands. `/reload` refreshes model
@@ -361,3 +387,24 @@ Research Memory and use the Host session controls for SQLite durable sessions.
 
 See [Architecture](ARCHITECTURE.md) and [Installation](INSTALLATION.md) for
 service, package, and recovery details.
+
+### Streaming and animation
+
+The terminal attaches with `session/attach` using `presentation: "terminal"` and
+`view_stream: true`. The reply contains a full view frame. Subsequent
+`session/view` notifications carry sequenced entry splices and changed documents;
+unchanged history is retained on the client. A sequence gap closes the connection
+and reattaches with a fresh snapshot. Normal streaming does not issue
+`session/query` reads. The same incremental transport is used between the Worker
+and Host; the phone snapshot/event protocol remains unchanged.
+
+The working indicator occupies a fixed status row and animates independently of
+model tokens using Pi's public Loader. Its timer stops while a panel is open,
+when work finishes, and when the terminal closes. Set
+`CORAGENT_TUI_ANIMATION=0` to use static status text. Animation and input redraws
+reuse the chat layout; token updates reuse the completed history and update the
+current Markdown component. Hiding the sidebar suspends its research polling.
+
+Deterministic regression coverage in `terminal-streaming.test.mjs` includes
+1,000 historical messages, repeated streamed updates, resize/compaction, timer
+cleanup and hidden polling. Timing evidence stays in the private test run.

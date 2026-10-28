@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createHostSessions } from '../../../apps/agent/host/sessions.mjs';
+import { createViewReplica } from '../../../apps/agent/transport/view-stream.mjs';
+
+test('terminal attach streams changes directly while other clients keep their snapshot protocol',async()=>{
+  let publish,reads=0;
+  const session={workspace_id:'w',session_id:'s'},entries=[{id:1,kind:'pi.user',model:[{role:'user',content:'hello'}]}];
+  const initial={conversation:{id:1},entries,docs:{}};
+  const snapshot={messages:[{role:'user',content:'hello'}],is_streaming:false};
+  const makeClient=()=>{const events=[];return {events,subscriptions:new Set(),peer:{notify:(method,params)=>events.push({method,params}),close:assert.fail}};};
+  const terminal=makeClient(),phone=makeClient();
+  const backend={setEventHandler(handler){publish=handler;},readView:async()=>{reads++;return initial;},readSession:async()=>({session,snapshot})};
+  const host=createHostSessions({sessionBackend:backend,clients:new Set([terminal,phone]),workspace:async()=>{},epoch:'fixture'});
+  const response=await host.handle(terminal,'session/attach',{workspace_id:'w',session_id:'s',presentation:'terminal',view_stream:true});
+  await host.handle(phone,'session/attach',{workspace_id:'w',session_id:'s'});
+  const replica=createViewReplica(); replica.apply(response.frame);
+  const live={conversation:{id:1},entries,docs:{'pi.live':{run:{taskId:1},generation:{message:{content:[{type:'text',text:'delta'}]}}}}};
+  publish({...session,session,snapshot,view:live,event:null});
+  assert.equal(reads,1); assert.equal(terminal.events.length,1); assert.equal(terminal.events[0].method,'session/view');
+  assert.equal(terminal.events[0].params.frame.entries,undefined);
+  assert.deepEqual(replica.apply(terminal.events[0].params.frame),{...live,failure:null});
+  assert.equal(phone.events[0].method,'session/event'); assert.deepEqual(phone.events[0].params.snapshot.messages,snapshot.messages);
+  publish({...session,session,snapshot,view:live,event:null}); assert.equal(terminal.events.length,1);
+  const failure={summary:'Blocked',detail:'fixture'};
+  publish({...session,session,snapshot:{...snapshot,runtime_error:failure},view:live,event:null});
+  assert.deepEqual(replica.apply(terminal.events.at(-1).params.frame).failure,failure);
+  await host.handle(terminal,'session/detach',{workspace_id:'w',session_id:'s'});
+  publish({...session,session,snapshot,view:initial,event:null}); assert.equal(terminal.events.length,2);
+  await assert.rejects(host.handle(terminal,'session/attach',{workspace_id:'w',session_id:'s',view_stream:true}),{code:'invalid_input'});
+});

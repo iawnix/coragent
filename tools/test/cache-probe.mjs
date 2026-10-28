@@ -61,7 +61,14 @@ export async function runCacheProbe(config, emit = value => console.log(JSON.str
   const manager=createContextManager({bridge:{},coordinator:{async commit_files(){}},sessionId:'synthetic-probe',
     estimateContextTokens,inputTokens:Math.min(model.contextWindow-4096,config.sizeK*1024*2)});
   const sessionId=`synthetic-cache-${randomUUID()}`;
-  const initial=history(model,config.sizeK);
+  // This standalone probe models an immutable control entry; the Worker uses
+  // Pi's prepareContext transaction to commit the same entry before admission.
+  const memo=new Map();
+  const control=await manager.prepareControl({entries:[]},{async memo(key,value,context){
+    if(context!==undefined&&!memo.has(key))memo.set(key,value);return memo.get(key);
+  }},{},{});
+  const entries=control?[{id:1,kind:'pi.context',model:control.messages,data:{key:control.key,value:control.data}}]:[];
+  const initial=[...history(model,config.sizeK),...(control?.messages||[])];
   let messages=initial,lastReply,requests=0,completed=false;
   const results=[];
   try {
@@ -73,7 +80,7 @@ export async function runCacheProbe(config, emit = value => console.log(JSON.str
         messages=[...messages,lastReply,{role:'toolResult',timestamp:0,toolCallId:calls[0].id,toolName:tool.name,isError:false,
           content:[{type:'text',text:'1'}]}];
       }
-      const prepared=await manager.admit({messages,model,maxTokens:512},`probe-${index}`);
+      const prepared=await manager.admit({view:{entries},messages,model,maxTokens:512},`probe-${index}`);
       if(!prepared.messages)throw new Error('probe_input_budget_exceeded');
       diagnostics.context(`probe-${index}`,null);
       diagnostics.tag(prepared.messages,{generation_id:`probe-${index}`,sources:[{producer:'user',reason:'user_message'}]});

@@ -12,7 +12,7 @@ server/client/plugin 栈原先确实位于 CoRAgent 核心调用链；仅修改�
 | 终端 | 使用公开 pi-tui 组件，自行维护命令与会话连接 | 中：布局和键盘行为需端到端验证 |
 | SQLite | 自动从 schema 1 迁移到 2，升级前在线备份 | 高：新版数据库不能直接交回旧版 |
 | 上游私有接口 | 集中在 `runtime/source.mjs` | 中：模型配置、主题、搜索工具和事务 helper 仍依赖固定源码 |
-| 产品策略补丁 | 原二十个补丁合并为四个职责明确的补丁 | 中：升级时必须重新构建并跑行为测试 |
+| 产品策略补丁 | 原二十个补丁合并为三个 Pi 源码补丁，共享凭据适配移到 CoRAgent | 中：升级时必须重新构建并跑行为测试 |
 | Host、Phone、Monitor | 保持 `coragent-host/3`，终端也走 Host | 需要客户端兼容测试；不代表真实设备已验收 |
 
 不再使用 `pi-client`、`pi-protocol`、`pi-server` 或 Chord 的 service/facet

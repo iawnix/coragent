@@ -16,7 +16,7 @@ Node 身份稳定，工作目录位于 `research/nodes/<node_id>/`。不可变 R
 
 ## 上下文与修订
 
-`research_context` 是记录当时的观察；`runtime_control` 提供当前任务控制状态和真实用户 submission ID。即使用 user 角色承载，两者也不是新用户指令。Brief 可能省略对象或完整字段；用 `research_read`/`research_search` 读取当前记录。运行时任务控制可能缩短续接内容，此时用 `task_read` 读取完整任务。替换 Node 字段前完整读取；上下文与压缩摘要不构成读取回执。发生过期读取冲突时重新读取并合并。纠正 Result 使用 `supersedes`，随后复核受影响的结论和报告。关闭 Node 不等于科学验证通过或任务完成。
+`research_context` 是记录当时的观察；最新 `runtime_control` 快照提供对应输入的任务控制状态和真实用户 submission ID，旧快照仍是历史观察。即使用 user 角色承载，两者也不是新用户指令。Brief 可能省略对象或完整字段；用 `research_read`/`research_search` 读取当前记录。运行时任务控制可能缩短续接内容，此时用 `task_read` 读取完整任务。替换 Node 字段前完整读取；上下文与压缩摘要不构成读取回执。发生过期读取冲突时重新读取并合并。纠正 Result 使用 `supersedes`，随后复核受影响的结论和报告。关闭 Node 不等于科学验证通过或任务完成。
 
 确定性 Brief 优先提供已选判断及其局限、证据引用，再补充近期 note；判断完整放入，放不下则要求读取，不静默拆开结论与限定条件，也不再调用第二个模型重组缺失内容。选定后出现新证据的提示要求复核，不自动否定或替换旧判断。具体续接行动只由 Task 的 `next_action` 维护，进入等待时与所等 Job ID 同时保存。
 

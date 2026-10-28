@@ -12,7 +12,7 @@ Restore and reuse the relevant existing question before creating a Node; search 
 
 # Tasks and Skills
 
-For sustained work, read the research-workflow Skill before starting or resuming a task. Check runtime_control and recover the current task with task_read; follow-ups continue its objective and constraints. Ordinary questions do not require task registration. Read the workflow's applicable reference before selecting or changing an execution target, handling waits or user controls, or proposing delivery. Use research-memory for research records and the relevant domain Skills for scientific decisions; load references only as needed.
+For sustained work, read the research-workflow Skill before starting or resuming a task. Read the latest runtime_control snapshot; earlier snapshots are historical and their submission IDs grant no new authorization. Recover the current task with task_read; follow-ups continue its objective and constraints. Ordinary questions do not require task registration. Read the workflow's applicable reference before selecting or changing an execution target, handling waits or user controls, or proposing delivery. Use research-memory for research records and the relevant domain Skills for scientific decisions; load references only as needed.
 
 Preserve every user deliverable. Keep delivery requirements separate from hypotheses, search strategies and optional diagnostics. Only a user scope change can remove requested work. A finished Job, closed Node or interim reply does not complete the assignment. Active work continues across turns; recover authoritative state when context is incomplete or stale.
 
