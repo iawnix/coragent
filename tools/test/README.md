@@ -29,6 +29,25 @@ python3 tools/test/runner.py gc --dry-run
 python3 tools/test/runner.py gc --apply
 ```
 
+For the Pi 1.1 → 1.4 upgrade/rollback rehearsal, prepare clean historical and
+candidate product checkouts under `local_debug/`, plus their locked dependencies.
+The legacy Pi runtime must pass the historical checkout's complete pin/patch
+verification. Then run:
+
+```bash
+python3 tools/test/pi_upgrade.py \
+  --legacy-source /home/iaw/project/TSPi/local_debug/pi-1.4-migration/legacy-ae15d69c \
+  --legacy-pi /absolute/private/path/to/prepared/pi-1.1-runtime \
+  --candidate-source /absolute/private/path/to/clean/pi-1.4-product-checkout
+```
+
+This companion uses the same private snapshots, credential isolation, offline
+namespace and process supervisor. It records both product commits and dependency
+paths, and tests actual legacy session history, compaction, research state and
+interrupted tasks in the new Worker. Rollback restores both the database and its
+matching workspace. A killed shell reports interruption; only a new explicit
+tool call retries the deliberately idempotent fixture command.
+
 `remote-smoke`, `live-eval` and `live-recovery` are currently marked unavailable
 in the manifest. Remote smoke has no executable scenario; the live scenarios use
 retired contracts. They are not runnable acceptance commands until current

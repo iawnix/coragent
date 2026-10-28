@@ -196,7 +196,12 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
       submit("/compact");await waitFor(()=>text().includes("Nothing to compact."));await back();
       submit("/reload");await waitFor(()=>text().includes("Reloaded model configuration"));await back();
       assert.equal(modelRequests,0);
-      submit("Run the local deterministic fixture");await waitFor(()=>modelRequests===1,10000);
+      const pastedInput="请检查这份本地测试资料。\n"+"中文长消息与约束保持完整。".repeat(300);
+      terminal.sendInput("\x05");terminal.sendInput("\x15");
+      terminal.sendInput(`\x1b[200~${pastedInput}\x1b[201~`);
+      assert.equal(component.editor.getExpandedText(),pastedInput);
+      terminal.sendInput("\r");await waitFor(()=>modelRequests===1,10000);
+      assert.ok(modelRequest.messages.some(message=>message.role==="user" && message.content===pastedInput));
       assert.ok(modelRequest.tools.some(tool=>tool.function.name==="task_read"));
       assert.ok(!modelRequest.tools.some(tool=>tool.function.name==="system_prompt"));
       assert.match(JSON.stringify(modelRequest.messages.filter(m=>m.role==="system")),/<available_skills>/);
@@ -210,6 +215,9 @@ test("real worker terminal isolates monitor refresh, command feedback and task c
       assert.equal((await backend.readSession("startup",scope.session_id)).session.is_streaming,true);
       component=await createClientTui({session,request,connect,sourceRoot,terminal:new VirtualTerminal(100,24)});
       component.start();await waitFor(()=>text().includes("Working"));
+      const persisted=await query("view");
+      assert.equal(persisted.entries.flatMap(entry=>entry.model||[]).filter(message=>message.role==="user" &&
+        JSON.stringify(message.content).includes("中文长消息与约束保持完整。")).length,1);
       component.tui.terminal.sendInput("\x1b");
       await waitFor(async()=>!(await backend.readSession("startup",scope.session_id)).session.is_streaming,10000);
       component.tui.terminal.sendInput("/quit");component.tui.terminal.sendInput("\r");await waitFor(()=>quit);

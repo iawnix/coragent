@@ -13,6 +13,7 @@ import { createCoRAgentHarnessBackend } from '../../../apps/agent/runtime/backen
 import { startCoRAgentHost } from '../../../apps/agent/host/server.mjs';
 import { connectHost } from '../../../apps/agent/transport/host-client.mjs';
 import { backupBeforeMigration } from '../../../apps/agent/runtime/storage.mjs';
+import { subscribeSession } from '../../../apps/agent/terminal/connection.mjs';
 
 async function fixture(t) {
   const root=await mkdtemp(join(TEST_ROOT,'lifecycle-'));
@@ -48,6 +49,31 @@ test('Host services are available without Pi server/client/plugin packages or an
       assert.deepEqual((await peer.request('session/list',{workspace_id:'work'})).sessions,[]);
     } finally {peer.close();}
   } finally {await host.close();}
+  assert.equal((await readdir(socket)).some(file=>file.endsWith('.sock')),false);
+});
+
+test('terminal reconnect recovers input missed during a real Host socket disconnect',{timeout:30000},async t=>{
+  const {options,socket}=await fixture(t);
+  const backend=await createCoRAgentHarnessBackend(options);
+  const host=await startCoRAgentHost({socketPath:join(socket,'host.sock'),workspaceRoot:options.workspaceRoot,stateRoot:options.stateRoot,sessionBackend:backend,monitorPollMs:0});
+  const views=[],peers=[];let reconnect,stop;
+  const until=async predicate=>{for(let i=0;i<200;i++){if(await predicate())return;await new Promise(resolve=>setTimeout(resolve,25));}assert.fail('Host reconnect did not settle');};
+  try {
+    await backend.createSession({workspace_id:'work',session_id:'reconnect'});
+    stop=subscribeSession({workspaceId:'work',sessionId:'reconnect',retryMs:1,
+      connect:async()=>{if(peers.length)await new Promise(resolve=>{reconnect=resolve;});
+        const peer=await connectHost({socketPath:host.socketPath});peers.push(peer);return peer;},
+      onView:view=>views.push(view),onError() {},
+    });
+    await until(()=>views.length===1);peers[0].close();await until(()=>reconnect);
+    const receipt=await backend.sendInput({workspace_id:'work',session_id:'reconnect',client_message_id:'during-disconnect',
+      text:'断线期间保留这条输入。',mode:'auto'});
+    assert.equal(receipt.accepted,true);
+    reconnect();await until(()=>peers.length===2 && views.length>=2);
+    await until(()=>views.at(-1).entries.some(entry=>JSON.stringify(entry.model).includes('断线期间保留这条输入。')));
+    assert.equal(views.at(-1).entries.filter(entry=>entry.kind==='pi.user' && JSON.stringify(entry.model).includes('断线期间保留这条输入。')).length,1);
+    assert.equal((await backend.listSessions('work')).length,1);
+  } finally {stop?.();reconnect?.();for(const peer of peers)peer.close();await host.close();}
   assert.equal((await readdir(socket)).some(file=>file.endsWith('.sock')),false);
 });
 
