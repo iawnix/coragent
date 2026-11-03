@@ -151,6 +151,8 @@ python3 -B /absolute/path/qrun.py \
 qrun status                           # 队列总览、服务在线情况
 qrun resources                        # 总预算、预留、可派发、主机实际可用内存
 qrun jobs                             # 未完成作业，按 FIFO 顺序
+qrun list                             # 兼容旧调用的完整账本 JSON 导出
+qrun list --json                      # 显式 JSON 导出，与 list 相同
 qrun jobs --all --limit 20             # 包括历史，最新优先
 qrun jobs --state failed               # 可重复 --state 筛选
 qrun show 4                           # 数字作业编号
@@ -174,7 +176,15 @@ ssh agent.com30 /home/agent/soft/Qrun/qrun show 4
 作业编号为池内持久递增的数字，例如 `4`；提交／恢复回执中的 `scheduler_id` 为同一编号的字符串。跨主机使用时同时保留目标／资源池身份。
 这些命令支持 `--json`，查询响应标记 `qrun-view/1`；`jobs` 支持 `--limit`（1–100）
 与 `--offset` 分页。`watch --count N` 可限定刷新次数，Ctrl-C 结束显示。
-原 `list` 保留为完整账本 JSON 导出；一般查询用带分页的 `jobs`。
+`list` 保留旧的完整账本 JSON 数组、字段和升序，终端和管道行为一致，不破坏旧脚本；
+`list --json` 是显式的等价写法。该导出不包含在线／新鲜度标记。
+人工查看历史使用 `jobs --all --limit 20`，自动化查询使用同一命令加 `--json`。
+
+交互终端使用颜色强调：成功为绿色，运行／启动为青色，排队／暂停／取消和等待原因为黄色，
+失败／超时／未知、离线提示及超出预算为红色。状态文字始终保留，颜色只是辅助。
+重定向或管道输出、设置 `NO_COLOR`（包括空值）、`TERM=dumb` 时不着色；JSON 输出不含颜色。
+例如 `NO_COLOR=1 qrun jobs`。`qrun --help` 按查询、控制、安装维护分组；内部协议与执行入口
+仍可由安装器和守护进程调用，但不列入日常帮助。`qrun --help-all` 提供自动化与完整入口说明。
 
 资源显示区分三种含义：
 
@@ -201,10 +211,123 @@ portable CPU 预算上限为当前允许使用的逻辑 CPU 数，内存预算�
 直接脚本读 Qrun 捕获的输出；只允许固定日志文件，拒绝符号链接，单次最多读取 64 KiB。
 日志保留在磁盘，不自动轮转或清理；长期输出较多的作业需自行规划磁盘容量。
 CoRAgent 的 `job_probe` 现在返回同一队列总览，普通 Job 状态 diagnostics 包含用量与排队原因。
+缺失的单作业采样使用 `available=false` 和空测量值。汇总的 `job_usage.cpu_cores`、`memory_mb`
+兼容保留原含义：只对新鲜采样求和，可能只是部分作业。新增 `complete`、`total_cpu_cores`、
+`total_memory_mb`：存在缺失／过期活动采样或服务离线时，总量为 null；在线且无活动作业时为完整的零。
+
+## AI 与程序接口契约
+
+人使用表格，AI／程序显式使用 `--json`。输出格式不随终端／管道改变，只有颜色自适应；
+操作命令不询问交互确认。`--help`、`--help-all` 始终输出文本，即使同时提供 `--json`。
+
+### JSON 格式和退出码
+
+`status`、`resources`、`jobs`、`show`、`logs`、`watch`、`pause`、`resume`、`config`、
+`cancel` 支持 `--json`。成功结果保留所有原有顶层字段，新增 `cli_version: "qrun-cli/1"`、
+`ok: true`、`command`（调用的命令名）。失败同样包含版本、`ok: false`、`command` 和
+`error`，其中有 `code`、`message`、`retryable`、`action_outcome`、`recovery`。
+参数解析失败时 `command` 为 null。消费者必须容忍新增字段。CLI 版本、查询版本
+`view_version: "qrun-view/1"`、handler 的 `schema_version` 各自描述不同边界。
+
+退出码：0 表示成功响应（包括明确标记为过期的离线读取），1 表示操作失败，2 表示参数解析
+失败，130 表示 JSON 命令被中断。还要检查 JSON 字段，不能只看退出码。
+stdout 只放 JSON 结果；帮助文本和兼容的 `list` 数组是 CLI 对象格式的例外。
+`watch --json`、`logs --follow --json` 输出逐条立即刷新的 **JSON Lines**；后续发生错误时
+追加一条错误记录，以非零码退出。有限观察用 `watch --count 1 --json`，其中 overview 和 jobs
+是分别读取的快照，不保证同一时刻。
+
+```sh
+qrun jobs --all --limit 20 --offset 0 --json
+qrun show 4 --json
+qrun logs 4 --stream stderr --bytes 4096 --json
+qrun watch --count 1 --json
+qrun cancel 4 --json
+```
+
+例如 `qrun jobs --limit invalid --json` 返回退出码 2 和以下结构：
+
+```json
+{"cli_version":"qrun-cli/1","ok":false,"command":null,"error":{"code":"invalid_arguments","message":"argument --limit: invalid int value: 'invalid'","retryable":false,"action_outcome":"not_submitted","recovery":"Check qrun COMMAND --help and correct the arguments."}}
+```
+
+| 错误码 | 含义与处理 |
+| --- | --- |
+| `invalid_arguments` | 按子命令帮助修正参数。 |
+| `job_not_found` | 核对执行主机、资源池和数字编号。 |
+| `state_unavailable` | 无法读取本地配置／账本，检查安装、目录与权限。 |
+| `qrun_unavailable` | 守护进程不可达或回执丢失，修改操作可能已生效。 |
+| `response_too_large` | 缩小作业页或日志片段。 |
+| `qrun_error` | 其它守护进程／运行时拒绝或错误，查看说明及当前状态。 |
+| `interrupted` | 客户端被中断，进行中的修改可能已经生效。 |
+
+`retryable` 是诊断信息，**不表示可以直接重复修改操作**。保留守护进程的 `action_outcome`；
+`unknown` 不等于明确拒绝。CLI 参数解析错误的 `not_submitted` 表示尚未派发请求。
+控制操作丢失回执后，先查询 `config`、`status` 或 `show` 核对是否已生效；程序不会自动重试。
+提交任务则遵循下述身份／恢复流程。
+
+### 观测、单位与分页
+
+- 作业 ID 是池内递增数字的字符串，同时保存主机和资源池身份。CoRAgent 工作区 Job ID
+  属于另一命名空间。
+- `online` 只证明联系到了守护进程，不证明每个进程都刚刚被独立核实。`source` 为 `daemon`
+  或 `ledger`，`state_basis` 始终是 `ledger`。`observed_at` 是生成视图的时间，并非逐个
+  检查进程的时间。离线标记 `stale=true` 并保留 `last_heartbeat`（可能为 null）；历史
+  `running` 不能作为进程存活证据。
+- CPU 预算是逻辑 CPU 数，`cpu_cores` 是采样核当量；所有 `_mb` 内存字段单位是 **MiB**，
+  时长单位是秒，时间戳是 UTC ISO 8601。缺失值为 null 或明确标记 unavailable，不能解释成零。
+- 检查 `job_usage.complete` 与总量字段判断当前采样是否完整；逐作业使用 `usage.available`、
+  `stale`、`sampled_at`、`final`。未检查覆盖范围时，不能把兼容的“新鲜采样之和”当作完整总量。
+- `jobs` 默认只列未完成作业，FIFO 顺序；`--all` 含历史、最新优先；仅终态的 `--state` 筛选
+  也按最新优先。返回 `order`、`total`、`limit`、`offset`、`has_more`、`next_offset`；
+  按 next_offset 继续，直到 null。各页是实时快照，期间提交或状态改变可能使行移动；
+  按 ID 去重，必要时重新扫描，不能当作冻结的全量导出。
+- `logs` 返回有界的 `text`、字节 `offset`、`identity`、`eof`、`reset`、`finished`。
+  用返回的 `--offset`、`--identity` 继续读取，追加内容不会重复返回；文件变化或截断时
+  从零重新读并设置 `reset=true`。UTF-8 不完整／非法字节会替换解码，这是文本视图而非二进制导出。
+- 取消成功仅表示 `accepted=true`。继续查询 `show ID --json`，确认 `job.execution_finished`、
+  `state`、`cancel_requested`、`cleaned`。完成结果可以先于取消生效，`unknown` 仍保留资源；
+  调度成功不代表科学结果有效。
+
+### handler 协议与恢复
+
+`qrun --state-dir /绝对路径/资源池 handler` 从 stdin 读取一个 JSON 对象，返回一个
+`coragent-external-job/1` 响应。原有响应结构及协议错误返回退出码 0 的行为保留，
+不加入 CLI 元数据；必须读取 `error`，不能只看退出码。提交／状态契约另见
+[External Jobs](EXTERNAL_JOBS.md)。
+
+提交请求示例（路径必须已经存在于执行主机允许的工作根目录内）：
+
+```json
+{"schema_version":"coragent-external-job/1","action":"submit","request_id":"example-001","job_id":"example-job","cwd":"/srv/qrun/jobs/example","script":"/srv/qrun/jobs/example/run.sh","resources":{"cpus":1,"memory_mb":512},"timeout_seconds":60}
+```
+
+发送前保存完整请求。成功回执提供 `scheduler_id`；回执丢失时保留所有身份字段
+（`request_id`、`job_id`、`cwd`、`script`、`resources`、`queue`、`timeout_seconds`），
+仅把 `action` 改成 `recover`。找到记录时返回原编号，不要生成新 request_id 重试。
+查询和取消使用相同身份字段，加返回的 scheduler_id，action 分别为 `status`、`cancel`。
+同 ID 不同内容会被拒绝。`found=false` 只是当时未找到记录，不授权创建新身份；
+重复发送同一合法提交身份仍由守护进程去重。
+
+人工命令和 handler 共用队列实现：
+
+| CLI 命令 | handler action 与字段 |
+| --- | --- |
+| `status` | `overview`（handler 的 `status` 需要完整作业身份） |
+| `resources` | `resources` |
+| `jobs` | `jobs`：`all`、`states` 数组、`limit`、`offset` |
+| `show ID` | `show`：`identifier` |
+| `logs ID` | `logs`：`identifier`、`stream`、`bytes`，可选 `offset`、`identity` |
+| `pause`、`resume` | `pause`、`resume` |
+| `config` | 读取用 `overview`；修改用 `configure` 加 `cpus` 和／或 `memory_mb` |
+| `cancel ID` | `cancel_job`：`identifier`（handler 的 `cancel` 使用完整作业身份） |
+
+所有 handler 请求都带 schema_version，且要求守护进程在线；只读离线回退属于人工命令层。
+`maintenance`、`serve`、`_run`、`_portable-run` 和 `service ensure` 是安装器／守护进程入口，
+不是另一套提交 API；完整帮助可以发现它们，机器提交仍应使用 handler。
 
 ## 运维
 
-使用安装返回的 program、同一 `--state-dir`，执行 `list` 或 `cancel 4`。
+使用安装返回的 program、同一 `--state-dir`，执行 `jobs`、`list` 或 `cancel 4`。完整账本导出用 `list --json`。
 CoRAgent 普通 Job 的状态、取消、恢复、回收接口保持可用。队列记录包含本机路径，应保密。
 
 独立安装的队列升级时先排空／取消作业、停止队列服务，再用原配置执行 install；活动服务通过锁拒绝

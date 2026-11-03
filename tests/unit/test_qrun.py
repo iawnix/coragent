@@ -383,7 +383,10 @@ def test_target_installation_is_standalone_and_does_not_start_without_flag(tmp_p
     assert Path(installed['program']).read_bytes() == Path(qrun.__file__).read_bytes()
     assert 'Restart=on-failure' in Path(installed['unit_path']).read_text()
     result = subprocess.run([sys.executable, '-B', installed['program'], '--help'], capture_output=True, text=True)
-    assert result.returncode == 0 and 'handler' in result.stdout
+    assert result.returncode == 0 and 'usage: qrun ' in result.stdout
+    assert Path(installed['program']).name not in result.stdout
+    internal = subprocess.run([sys.executable, '-B', installed['program'], 'handler', '--help'], capture_output=True, text=True)
+    assert internal.returncode == 0 and 'qrun handler' in internal.stdout
     assert not (root / 'queue.sqlite3').exists()
 
 

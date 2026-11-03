@@ -178,6 +178,8 @@ Local and SSH operations use exactly the same commands:
 qrun status
 qrun resources
 qrun jobs
+qrun list
+qrun list --json
 qrun jobs --all --limit 20
 qrun jobs --state failed
 qrun show 4
@@ -191,12 +193,24 @@ qrun cancel 4
 ssh agent.com30 /home/agent/soft/Qrun/qrun resources
 ```
 
-All commands support `--json`. Query responses identify `qrun-view/1`. Job IDs are persistent, increasing numbers local to the pool (for example, `4`).
+The operator commands above support `--json`. Query responses identify `qrun-view/1`. Job IDs are persistent, increasing numbers local to the pool (for example, `4`).
 Submit/recover receipts expose the same number as a string in `scheduler_id`. Keep the target/pool with the ID.
 `jobs` defaults to unfinished jobs in FIFO order; `--all` includes history, newest first.
 Use repeatable `--state`, `--limit` (1–100) and `--offset` for filtering/pagination.
 `watch` refreshes every two seconds; `--count N` bounds refreshes; Ctrl-C exits.
-The original `list` remains an unbounded ledger JSON export.
+`list` preserves the original unbounded ledger JSON array, fields and ascending order,
+in both terminals and pipes. `list --json` is an explicit equivalent. This legacy export
+has no online/freshness metadata; use `jobs --all --limit 20` for human tables and
+`jobs --all --limit 20 --json` for bounded automation.
+
+Interactive terminals emphasize success in green, running/starting in cyan,
+queued/paused/cancelled and waiting reasons in yellow, and failed/timed-out/unknown,
+offline warnings and excess reservations in red. State labels remain visible;
+color is supplementary. Redirected/piped output, `NO_COLOR` (including an empty value),
+and `TERM=dumb` disable colors. JSON output never includes color sequences.
+For example, use `NO_COLOR=1 qrun jobs`. Top-level help groups queries, controls and
+installation commands; internal protocol and worker entrypoints remain callable
+but are omitted from everyday help. Use `qrun --help-all` for automation and the full entrypoint list.
 
 Resource views distinguish the configured budget, ledger reservations and actual usage.
 Starting, running, stopping and unknown jobs all retain their reservations. Free queue
@@ -227,10 +241,137 @@ regular log files are readable, without symlink traversal; each read is bounded 
 Follow uses file identity/offset and ends after terminal output is drained. Logs are retained
 on disk without automatic rotation; provision disk space for verbose workloads.
 CoRAgent `job_probe` exposes the same overview; Job status diagnostics include usage and wait reasons.
+Missing per-job samples carry `available=false` and null measurement fields. Aggregated
+`job_usage.cpu_cores` and `memory_mb` retain their original meaning: sums of fresh samples,
+which may cover only part of the queue. New `complete`, `total_cpu_cores` and `total_memory_mb`
+make the distinction explicit: totals are null if any active sample is unavailable/stale or
+the daemon is offline. An online queue with no active jobs has complete zero totals.
+
+## Machine interface contract
+
+Use human tables for inspection and explicit `--json` for automation. Output format does
+not depend on whether stdout is a terminal; only color does. No operator command prompts
+for confirmation. `--help` and `--help-all` are text discovery interfaces, even with `--json`.
+
+### Operator JSON and exit codes
+
+`status`, `resources`, `jobs`, `show`, `logs`, `watch`, `pause`, `resume`, `config` and
+`cancel` support `--json`. Success retains every existing top-level result field and adds
+`cli_version: "qrun-cli/1"`, `ok: true`, and `command` (the invoked CLI command).
+Errors use the same CLI version, `ok: false`, `command`, and an `error` object with
+`code`, `message`, `retryable`, `action_outcome`, and `recovery`. Parse errors have
+`command: null`. Consumers must tolerate additional fields. The CLI version is distinct
+from `view_version: "qrun-view/1"` and the handler's `schema_version`.
+
+Exit status is 0 for a successful response, including an explicitly stale offline read;
+1 for an operation error; 2 for argument parsing errors; 130 for an interrupted JSON
+command. Always check the JSON status as well. stdout contains only JSON results; help
+and the legacy `list` export are deliberate exceptions to this CLI object format.
+`watch --json` and `logs --follow --json` emit **JSON Lines**, flushed after every record;
+a later failure emits one error record and exits nonzero. Use `watch --count 1 --json`
+for a bounded observation. The nested overview and jobs views are separate snapshots.
+
+```sh
+qrun jobs --all --limit 20 --offset 0 --json
+qrun show 4 --json
+qrun logs 4 --stream stderr --bytes 4096 --json
+qrun watch --count 1 --json
+qrun cancel 4 --json
+```
+
+A usage error, for example `qrun jobs --limit invalid --json`, returns exit 2:
+
+```json
+{"cli_version":"qrun-cli/1","ok":false,"command":null,"error":{"code":"invalid_arguments","message":"argument --limit: invalid int value: 'invalid'","retryable":false,"action_outcome":"not_submitted","recovery":"Check qrun COMMAND --help and correct the arguments."}}
+```
+
+| Error code | Meaning and recovery |
+| --- | --- |
+| `invalid_arguments` | Correct the arguments using command help. |
+| `job_not_found` | Check the execution host, pool and numeric ID. |
+| `state_unavailable` | Local state/config/ledger could not be read; check installation, paths and permissions. |
+| `qrun_unavailable` | The daemon could not be reached or its acknowledgment was lost. A mutation may have applied. |
+| `response_too_large` | Reduce the page or log chunk size. |
+| `qrun_error` | Other daemon/runtime rejection or failure; inspect the message and current state. |
+| `interrupted` | The client was interrupted; an in-flight mutation may have applied. |
+
+`retryable` is diagnostic, **not permission to repeat a mutation**. Preserve daemon
+`action_outcome` values; `unknown` is not a rejection. A CLI parse failure with
+`not_submitted` happened before dispatch. After a lost control acknowledgment, query
+`config`, `status` or `show` to reconcile before deciding what to do next. Control
+commands do not automatically retry. For submissions, use the identity/recover workflow below.
+
+### Observations, units and pagination
+
+- IDs are strings containing pool-local increasing numbers. Keep the execution host and
+  pool identity alongside each ID. CoRAgent workspace Job IDs are a different namespace.
+- `online` confirms contact with the daemon, not independent verification of every process.
+  `source` is `daemon` or `ledger`; `state_basis` is always `ledger`. `observed_at` is when
+  the view was built, not when each process was inspected. Offline views set `stale=true`
+  and preserve `last_heartbeat` (possibly null). A saved `running` state is not liveness proof.
+- CPU budgets are logical CPU counts; `cpu_cores` is sampled core-equivalent usage. All
+  memory fields ending in `_mb` use **MiB**, time durations use seconds, timestamps are UTC
+  ISO 8601. Missing values are null or explicitly unavailable; never infer zero from them.
+- `job_usage.complete` and the total fields describe current aggregate coverage; per-job
+  `usage.available`, `stale`, `sampled_at` and `final` describe individual measurements.
+  Legacy fresh-sample sums must not be treated as complete totals without checking coverage.
+- `jobs` defaults to unfinished jobs in FIFO order. `--all` includes history, newest first;
+  terminal-only `--state` filters also sort newest first. Responses include `order`, `total`,
+  `limit`, `offset`, `has_more` and `next_offset`. Continue with `next_offset` until null.
+  Pages are live snapshots, not a stable export: submissions and state changes between calls
+  can move rows. Deduplicate by ID or rescan when a consistent inventory is needed.
+- `logs` returns bounded `text`, byte `offset`, `identity`, `eof`, `reset` and `finished`.
+  To continue, pass the returned `--offset` and `--identity`; appends then yield only new
+  bytes. A changed file or truncation restarts at byte zero and sets `reset=true`.
+  UTF-8 decoding replaces incomplete/invalid bytes; this is a text view, not binary export.
+- Cancellation success means `accepted=true`, not termination. Poll `show ID --json` and
+  check `job.execution_finished`, `state`, `cancel_requested` and `cleaned`. A completed
+  result may win a cancellation race. `unknown` retains reservations. A scheduler success
+  does not establish the scientific validity of outputs.
+
+### Handler protocol and recovery
+
+`qrun --state-dir /absolute/pool handler` reads one JSON object on stdin and writes one
+`coragent-external-job/1` response. Its existing envelope and exit-0 protocol-error
+behavior remain unchanged; do not expect CLI metadata or use exit status alone to judge
+success. See [External Jobs](EXTERNAL_JOBS.md) for the submission/status contract.
+
+Example submit request (paths must already exist inside an allowed execution-host work root):
+
+```json
+{"schema_version":"coragent-external-job/1","action":"submit","request_id":"example-001","job_id":"example-job","cwd":"/srv/qrun/jobs/example","script":"/srv/qrun/jobs/example/run.sh","resources":{"cpus":1,"memory_mb":512},"timeout_seconds":60}
+```
+
+Save this exact request before sending it. A successful submission returns `scheduler_id`.
+After response loss, reuse **all identity fields** (`request_id`, `job_id`, `cwd`, `script`,
+`resources`, `queue`, `timeout_seconds`) and change only `action` to `recover`. A found
+record returns the original scheduler ID; do not generate a new request ID to retry.
+Status and cancellation use the same identity fields with `action: "status"` or `"cancel"`
+and the returned `scheduler_id`. Reusing an ID with different content is rejected.
+`found=false` is a point-in-time absence observation, not authorization for a new identity;
+repeating the same valid submit identity remains deduplicated by the daemon.
+
+Operator commands and handler requests share the queue implementation:
+
+| CLI command | Handler action and fields |
+| --- | --- |
+| `status` | `overview` (handler `status` instead requires a full job identity) |
+| `resources` | `resources` |
+| `jobs` | `jobs`: `all`, `states` array, `limit`, `offset` |
+| `show ID` | `show`: `identifier` |
+| `logs ID` | `logs`: `identifier`, `stream`, `bytes`, optional `offset`, `identity` |
+| `pause`, `resume` | `pause`, `resume` |
+| `config` | `overview` for reads; `configure` with `cpus` and/or `memory_mb` for changes |
+| `cancel ID` | `cancel_job`: `identifier` (handler `cancel` uses a full job identity) |
+
+Every handler request includes `schema_version`. Direct handler calls require a running
+daemon; the read-only offline fallback belongs to the operator CLI. `maintenance`, `serve`,
+`_run`, `_portable-run` and `service ensure` are installer/daemon entrypoints, not alternate
+submission APIs. Discover them with `--help-all`, but use `handler` for machine submissions.
 
 ## Operations
 
-Use the installed `program` with the same `--state-dir` and `list`, or
+Use the installed `program` with the same `--state-dir` and `jobs` or `list` (`list --json` for a full ledger export), or
 `cancel 4`. Normal CoRAgent Job status/cancel/reconcile/collect APIs still
 apply. Queue records include local execution paths and must remain private.
 

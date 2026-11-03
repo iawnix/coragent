@@ -33,6 +33,8 @@ import sys
 import time
 
 PROTOCOL = "coragent-external-job/1"
+VIEW_VERSION = 'qrun-view/1'
+CLI_VERSION = 'qrun-cli/1'
 TERMINAL = {"succeeded", "failed", "cancelled", "timed_out"}
 ACTIVE = {"starting", "running", "stopping", "unknown"}
 MAX_MESSAGE = 1024 * 1024
@@ -96,9 +98,17 @@ def private_root(path):
 
 
 class RequestError(ValueError):
-    def __init__(self, message, *, outcome='unknown'):
+    def __init__(self, message, *, outcome='unknown', code='qrun_error'):
         super().__init__(message)
         self.outcome = outcome
+        self.code = code
+
+
+class QueryError(RuntimeError):
+    """Keep a daemon/transport error intact for the operator CLI."""
+    def __init__(self, error):
+        super().__init__(error['message'])
+        self.error = error
 
 
 class Systemd:
@@ -335,7 +345,7 @@ def resolve_job(rows, identifier):
     key = str(identifier)
     matches = [row for row in rows if str(row['seq']) == key]
     if len(matches) != 1:
-        raise ValueError('ambiguous job ID' if matches else 'unknown job ID')
+        raise RequestError('ambiguous job ID' if matches else 'unknown job ID', code='job_not_found')
     return matches[0]
 
 
@@ -376,7 +386,8 @@ class QueueView:
     def usage(self, row):
         value = read_json(self.root / 'jobs' / row['id'] / 'usage.json')
         if not value:
-            return {'available': False, 'stale': True}
+            return {'available': False, 'stale': True, 'sampled_at': None,
+                    'cpu_cores': None, 'memory_mb': None, 'cpu_seconds': None, 'peak_memory_mb': None}
         return {**value, 'available': True, 'stale': (not self.online or
             (row['state'] in ACTIVE and (age(value['sampled_at']) > 3 or value.get('final', False)))),
             'age_seconds': round(age(value['sampled_at']), 1)}
@@ -385,6 +396,7 @@ class QueueView:
         value = {key: row[key] for key in ('seq', 'id', 'request_id', 'state', 'cpus', 'memory_mb',
                   'created_at', 'started_at', 'finished_at', 'exit_code', 'error')}
         value.update(id=str(row['seq']), cancel_requested=bool(row['cancel']), cleaned=bool(row['cleaned']),
+            execution_finished=row['state'] in TERMINAL,
             wait_reason=self.waiting.get(row['id']), usage=self.usage(row),
             wait_seconds=age(row['created_at'], row['started_at'] or row['finished_at']),
             elapsed_seconds=age(row['started_at'], row['finished_at']))
@@ -398,34 +410,46 @@ class QueueView:
         capacity = {key: self.config[key] for key in self.reserved}
         usage = [self.usage(row) for row in self.rows if row['state'] in ACTIVE]
         fresh = [item for item in usage if item['available'] and not item['stale']]
+        complete = self.online and len(fresh) == len(usage)
+        cpu = round(sum(item['cpu_cores'] for item in fresh), 3)
+        memory = round(sum(item['memory_mb'] for item in fresh), 3)
         return {'runtime': self.config.get('runtime', 'systemd'),
             'memory_enforcement': 'sampled-rss' if self.config.get('runtime') == 'portable' else 'cgroup',
             'paused': self.control['paused'], 'capacity': capacity, 'reserved': self.reserved,
             'free': {key: max(0, capacity[key] - self.reserved[key]) for key in capacity},
             'overcommitted': {key: max(0, self.reserved[key] - capacity[key]) for key in capacity},
             'states': dict(Counter(row['state'] for row in self.rows)), 'host': self.host,
-            'job_usage': {'cpu_cores': round(sum(item['cpu_cores'] for item in fresh), 3),
-                'memory_mb': round(sum(item['memory_mb'] for item in fresh), 3),
+            'job_usage': {'cpu_cores': cpu, 'memory_mb': memory, 'complete': complete,
+                'total_cpu_cores': cpu if complete else None, 'total_memory_mb': memory if complete else None,
                 'fresh_jobs': len(fresh), 'missing_or_stale_jobs': len(usage) - len(fresh)}}
 
     def query(self, request):
-        result = {'view_version': 'qrun-view/1', 'online': self.online, 'stale': not self.online,
+        result = {'view_version': VIEW_VERSION, 'online': self.online, 'stale': not self.online,
+                  'source': 'daemon' if self.online else 'ledger', 'state_basis': 'ledger',
                   'observed_at': now(), 'last_heartbeat': self.heartbeat.get('sampled_at')}
         action = request['action']
         if action in {'overview', 'resources'}:
             return {**result, **self.overview()}
         if action == 'jobs':
-            states = request.get('states') or (ACTIVE | {'queued'} if not request.get('all') else ACTIVE | TERMINAL | {'queued'})
-            if not isinstance(states, (list, set)) or set(states) - ACTIVE - TERMINAL - {'queued'}:
-                raise ValueError('invalid state filter')
+            if 'all' in request and type(request['all']) is not bool:
+                raise RequestError('all must be a boolean', code='invalid_arguments')
+            states = request.get('states')
+            if states is None or states == []:
+                states = ACTIVE | {'queued'} if not request.get('all') else ACTIVE | TERMINAL | {'queued'}
+            if (not isinstance(states, (list, set)) or any(not isinstance(state, str) for state in states)
+                    or set(states) - ACTIVE - TERMINAL - {'queued'}):
+                raise RequestError('invalid state filter', code='invalid_arguments')
             limit, offset = request.get('limit', 50), request.get('offset', 0)
             if type(limit) is not int or not 1 <= limit <= 100 or type(offset) is not int or offset < 0:
-                raise ValueError('limit must be 1..100 and offset must be nonnegative')
+                raise RequestError('limit must be 1..100 and offset must be nonnegative', code='invalid_arguments')
             selected = [row for row in self.rows if row['state'] in states]
             # History is newest first, while the live queue follows FIFO order.
             if request.get('all') or set(states) <= TERMINAL:
                 selected.reverse()
             return {**result, 'total': len(selected), 'limit': limit, 'offset': offset,
+                    'has_more': offset + limit < len(selected),
+                    'next_offset': offset + limit if offset + limit < len(selected) else None,
+                    'order': 'newest_first' if request.get('all') or set(states) <= TERMINAL else 'fifo',
                     'jobs': [self.job(row) for row in selected[offset:offset + limit]]}
         row = resolve_job(self.rows, request.get('identifier', ''))
         if action == 'show':
@@ -440,9 +464,9 @@ def job_logs(root, row, request):
     limit = request.get('bytes', 16384)
     offset = request.get('offset')
     if stream not in {'stdout', 'stderr'} or type(limit) is not int or not 1 <= limit <= 65536:
-        raise ValueError('stream must be stdout/stderr and bytes must be 1..65536')
+        raise RequestError('stream must be stdout/stderr and bytes must be 1..65536', code='invalid_arguments')
     if offset is not None and (type(offset) is not int or offset < 0):
-        raise ValueError('invalid log offset')
+        raise RequestError('invalid log offset', code='invalid_arguments')
     cwd = Path(json.loads(row['request'])['cwd'])
     candidates = [cwd / 'logs' / (stream + '.log'), root / 'jobs' / row['id'] / (stream + '.log')]
     for path in candidates:
@@ -491,7 +515,9 @@ def query(root, request):
         answer = client(root, {'schema_version': PROTOCOL, **request}, timeout=5)
     except (OSError, ValueError):
         if request['action'] not in READ_ACTIONS:
-            raise RuntimeError('Qrun daemon unavailable; start it before changing the queue') from None
+            raise QueryError({'code': 'qrun_unavailable',
+                'message': 'Qrun daemon unavailable or response lost; operation outcome is unknown',
+                'retryable': True, 'action_outcome': 'unknown'}) from None
         config = json.loads((root / 'config.json').read_text())
         connection = sqlite3.connect((root / 'queue.sqlite3').as_uri() + '?mode=ro', uri=True)
         connection.row_factory = sqlite3.Row
@@ -501,7 +527,7 @@ def query(root, request):
         finally:
             connection.close()
     if isinstance(answer.get('error'), dict):
-        raise ValueError(answer['error']['message'])
+        raise QueryError(answer['error'])
     return answer
 
 
@@ -750,6 +776,8 @@ class Queue:
         if request.get('schema_version') != PROTOCOL:
             raise RequestError('unsupported protocol')
         action = request.get('action')
+        if not isinstance(action, str):
+            raise RequestError('action must be a string', code='invalid_arguments')
         if action in READ_ACTIONS:
             return self.view().query(request)
         if action in {'pause', 'resume'}:
@@ -928,7 +956,7 @@ def response(queue, request):
     try:
         return {'schema_version': PROTOCOL, **queue.handle(request)}
     except (RequestError, OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
-        return {'schema_version': PROTOCOL, 'error': {'code': 'qrun_error', 'message': str(exc),
+        return {'schema_version': PROTOCOL, 'error': {'code': getattr(exc, 'code', 'qrun_error'), 'message': str(exc),
             'retryable': False, 'action_outcome': getattr(exc, 'outcome', 'unknown')}}
 
 
@@ -957,7 +985,9 @@ def serve(root):
                         answer = response(queue, request)
                     encoded = json.dumps(answer).encode() + b'\n'
                     if len(encoded) > MAX_MESSAGE:
-                        encoded = json.dumps({'error': {'message': 'response too large; use a smaller page'}}).encode() + b'\n'
+                        encoded = json.dumps({'schema_version': PROTOCOL, 'error': {
+                            'code': 'response_too_large', 'message': 'response too large; use a smaller page',
+                            'retryable': False, 'action_outcome': 'unknown'}}).encode() + b'\n'
                     self.wfile.write(encoded)
                 except (ValueError, OSError):
                     return
@@ -994,7 +1024,10 @@ def client(root, request, *, timeout=60):
             raw = stream.readline(MAX_MESSAGE + 1)
         if len(raw) > MAX_MESSAGE:
             raise ValueError('Qrun response too large')
-        return json.loads(raw)
+        answer = json.loads(raw)
+        if not isinstance(answer, dict):
+            raise ValueError('Qrun response must be an object')
+        return answer
 
 
 def run_job(root, identifier):
@@ -1474,25 +1507,121 @@ def printable(value):
     return ''.join(char if char in '\n\t' or char.isprintable() else '?' for char in str(value))
 
 
-def display(value, *, as_json=False):
+ANSI_RESET = '\033[0m'
+ANSI_BOLD = '\033[1m'
+ANSI_DIM = '\033[2m'
+ANSI_RED = '\033[31m'
+ANSI_GREEN = '\033[32m'
+ANSI_YELLOW = '\033[33m'
+ANSI_CYAN = '\033[36m'
+
+
+def color_enabled(stream=None):
+    """Return whether human-readable output should use ANSI emphasis."""
+    stream = sys.stdout if stream is None else stream
+    if os.environ.get('NO_COLOR') is not None or os.environ.get('TERM') == 'dumb':
+        return False
+    try:
+        return bool(stream.isatty())
+    except (AttributeError, OSError):
+        return False
+
+
+def paint(value, color, *, enabled):
+    text = str(value)
+    return color + text + ANSI_RESET if enabled else text
+
+
+def state_color(state):
+    return {
+        'succeeded': ANSI_GREEN,
+        'running': ANSI_CYAN,
+        'starting': ANSI_CYAN,
+        'stopping': ANSI_YELLOW,
+        'queued': ANSI_YELLOW,
+        'cancelled': ANSI_YELLOW,
+        'timed_out': ANSI_RED,
+        'failed': ANSI_RED,
+        'unknown': ANSI_RED,
+    }.get(state, ANSI_DIM)
+
+
+def cli_result(value, command):
+    """Add CLI metadata without moving or renaming existing response fields."""
+    return {**value, 'cli_version': CLI_VERSION, 'ok': True, 'command': command}
+
+
+def cli_error(exc, command, *, code=None):
+    if isinstance(exc, QueryError):
+        error = dict(exc.error)
+    else:
+        error = {'code': code or getattr(exc, 'code', None) or (
+            'state_unavailable' if isinstance(exc, (OSError, sqlite3.Error, json.JSONDecodeError)) else
+            'invalid_arguments' if isinstance(exc, ValueError) else 'qrun_error'),
+            'message': str(exc), 'retryable': False,
+            'action_outcome': getattr(exc, 'outcome', 'unknown')}
+    error.setdefault('code', 'qrun_error')
+    error.setdefault('retryable', False)
+    error.setdefault('action_outcome', 'unknown')
+    error['recovery'] = {
+        'invalid_arguments': 'Check qrun COMMAND --help and correct the arguments.',
+        'job_not_found': 'Check the execution host, state directory and numeric job ID with jobs --json.',
+        'state_unavailable': 'Check the state directory, installation and file permissions.',
+        'response_too_large': 'Reduce jobs --limit or logs --bytes and query again.',
+    }.get(error['code'], 'Read status/config/show before retrying a mutation; an unacknowledged operation may have applied.')
+    return {'cli_version': CLI_VERSION, 'ok': False, 'command': command, 'error': error}
+
+
+class CLIUsageError(ValueError):
+    outcome = 'not_submitted'
+
+
+class CLIParser(argparse.ArgumentParser):
+    def error(self, message):
+        raise CLIUsageError(message)
+
+
+def display(value, *, as_json=False, color=None):
+    if color is None:
+        color = not as_json and color_enabled()
     if as_json:
-        print(json.dumps(value, ensure_ascii=True))
+        print(json.dumps(value, ensure_ascii=True), flush=True)
         return
     if not value.get('online', True):
-        print('OFFLINE — saved state only; last heartbeat: ' + str(value.get('last_heartbeat')))
+        print(paint('OFFLINE — saved state only; last heartbeat: ' + str(value.get('last_heartbeat')),
+                    ANSI_RED + ANSI_BOLD, enabled=color))
     if 'capacity' in value:
-        print('Qrun ' + value['runtime'] + (' | PAUSED' if value['paused'] else ' | dispatching'))
+        mode = 'OFFLINE' if not value.get('online', True) else ('PAUSED' if value['paused'] else 'dispatching')
+        mode_color = ANSI_RED if mode == 'OFFLINE' else (ANSI_YELLOW if value['paused'] else ANSI_GREEN)
+        print('Qrun ' + paint(value['runtime'], ANSI_CYAN, enabled=color) + ' | ' +
+              paint(mode, mode_color + (ANSI_BOLD if value['paused'] else ''), enabled=color))
         print(f"{'Resource':<12} {'Budget':>12} {'Reserved':>12} {'Free':>12} {'Over budget':>12}")
         for key, label in (('cpus', 'CPU'), ('memory_mb', 'Memory MiB')):
-            print(f"{label:<12}" + ''.join(f"{value[name][key]:>13}" for name in ('capacity', 'reserved', 'free', 'overcommitted')))
+            columns = []
+            for name in ('capacity', 'reserved', 'free', 'overcommitted'):
+                text = f"{value[name][key]:>13}"
+                if name == 'overcommitted' and value[name][key]:
+                    text = paint(text, ANSI_RED + ANSI_BOLD, enabled=color)
+                elif name == 'free' and value[name][key]:
+                    text = paint(text, ANSI_GREEN, enabled=color)
+                columns.append(text)
+            print(f"{label:<12}" + ''.join(columns))
         usage = value['job_usage']
-        print(f"Job samples: {usage['cpu_cores']} CPU cores, {usage['memory_mb']} MiB RSS/current; "
-              f"{usage['missing_or_stale_jobs']} missing/stale")
+        # Old daemons may not yet provide completeness-aware totals.
+        complete = usage.get('complete', value.get('online', True) and not usage['missing_or_stale_jobs'])
+        cpu = usage['cpu_cores'] if complete else '-'
+        memory = usage['memory_mb'] if complete else '-'
+        print(f"Job usage: {cpu} CPU cores, {memory} MiB RSS/current; " +
+              paint(f"{usage['missing_or_stale_jobs']} missing/stale", ANSI_YELLOW,
+                    enabled=color and bool(usage['missing_or_stale_jobs'])))
         host = value.get('host')
         if host:
             print(f"Host: {host['logical_cpus']} logical CPUs ({host['allowed_cpus']} allowed), "
                   f"busy {host['cpu_busy_percent']}%; available memory {host['memory_available_mb']} MiB")
-        print('Jobs: ' + (', '.join(f'{key}={number}' for key, number in sorted(value['states'].items())) or 'none'))
+        states = []
+        for key, number in sorted(value['states'].items()):
+            states.append(paint(f'{key}={number}', state_color(key), enabled=color))
+        print('Jobs: ' + (', '.join(states) or 'none'))
         print('Memory enforcement: ' + value['memory_enforcement'])
     elif 'jobs' in value:
         print(f"{'ID':>6} {'STATE':<10} {'CPU':>4} {'MEM MiB':>8} {'CPU used':>8} {'RSS MiB':>9}  WAIT")
@@ -1502,7 +1631,9 @@ def display(value, *, as_json=False):
             reason = row['wait_reason']
             wait = '' if reason is None else reason['code'] + (
                 ' ' + reason['blocked_by'] if 'blocked_by' in reason else '')
-            print(f"{row['id']:>6} {row['state']:<10} {row['cpus']:>4} {row['memory_mb']:>8} "
+            state = paint(f"{row['state']:<10}", state_color(row['state']), enabled=color)
+            wait = paint(wait, ANSI_YELLOW, enabled=color) if wait else wait
+            print(f"{row['id']:>6} {state} {row['cpus']:>4} {row['memory_mb']:>8} "
                   f"{usage.get('cpu_cores') if measured else '-':>8} {usage.get('memory_mb') if measured else '-':>9}  "
                   + wait)
         print(f"{len(value['jobs'])} shown / {value['total']} matching (offset {value['offset']})")
@@ -1510,7 +1641,17 @@ def display(value, *, as_json=False):
         for key, item in value['job'].items():
             if key in {'seq', 'request_id', 'unit'}:
                 continue
-            print(f'{key}: ' + printable(json.dumps(item, ensure_ascii=True) if isinstance(item, (dict, list)) else item))
+            rendered = printable(json.dumps(item, ensure_ascii=True) if isinstance(item, (dict, list)) else item)
+            if key == 'state':
+                rendered = paint(rendered, state_color(str(item)), enabled=color)
+            elif key == 'error' and item:
+                rendered = paint(rendered, ANSI_RED, enabled=color)
+            elif key == 'wait_reason' and item:
+                rendered = paint(rendered, ANSI_YELLOW, enabled=color)
+            print(f'{key}: ' + rendered)
+    elif value.get('accepted') is True and 'scheduler_id' in value:
+        print(paint('Cancellation accepted for job ' + str(value['scheduler_id']) + '.', ANSI_YELLOW, enabled=color))
+        print('This does not confirm termination. Check: qrun show ' + str(value['scheduler_id']))
     else:
         print(json.dumps(value, ensure_ascii=True))
 
@@ -1519,12 +1660,15 @@ def operator_command(root, args):
     action = args.action
     if action == 'logs':
         request = {'action': 'logs', 'identifier': args.identifier, 'stream': args.stream, 'bytes': args.bytes}
+        if args.offset is not None:
+            request.update(offset=args.offset, identity=args.identity)
         while True:
             value = query(root, request)
             if not value['online'] and not args.json:
-                print('OFFLINE — retained log only.', file=sys.stderr)
+                print(paint('OFFLINE — retained log only.', ANSI_RED + ANSI_BOLD,
+                            enabled=color_enabled(sys.stderr)), file=sys.stderr)
             if args.json:
-                display(value, as_json=True)
+                display(cli_result(value, action), as_json=True)
             else:
                 print(printable(value['text']), end='', flush=True)
                 if not value['available'] and (not args.follow or value['finished']):
@@ -1541,9 +1685,9 @@ def operator_command(root, args):
             overview = query(root, {'action': 'overview'})
             jobs = query(root, {'action': 'jobs'})
             if args.json:
-                print(json.dumps({'overview': overview, 'jobs': jobs}))
+                display(cli_result({'overview': overview, 'jobs': jobs}, action), as_json=True)
             else:
-                if sys.stdout.isatty():
+                if sys.stdout.isatty() and os.environ.get('TERM') != 'dumb':
                     print('\033[2J\033[H', end='')
                 display(overview)
                 display(jobs)
@@ -1560,7 +1704,66 @@ def operator_command(root, args):
         request['identifier'] = args.identifier
     if action == 'jobs':
         request.update(states=args.state, all=args.all, limit=args.limit, offset=args.offset)
-    display(query(root, request), as_json=args.json)
+    value = query(root, request)
+    display(cli_result(value, action) if args.json else value, as_json=args.json)
+
+
+CLI_COMMANDS = (
+    ('Inspect jobs', (
+        ('status', 'queue overview'),
+        ('jobs', 'unfinished jobs; --all includes history'),
+        ('list', 'legacy full ledger JSON export; use jobs for tables'),
+        ('show', 'job details by numeric ID'),
+        ('logs', 'tail retained output'),
+        ('resources', 'budget, reservations and actual host/job usage'),
+        ('watch', 'refresh resources and live jobs'),
+    )),
+    ('Control the queue', (
+        ('pause', 'pause new dispatch; keep running jobs'),
+        ('resume', 'resume dispatch'),
+        ('cancel', 'request cancellation by numeric job ID'),
+        ('config', 'show or resize budget without stopping jobs'),
+    )),
+    ('Installation and service', (
+        ('install', 'install Qrun and its queue service on this host'),
+        ('service', 'manage the installed queue daemon'),
+        ('init', 'create a pool without starting services'),
+        ('unit', 'print the systemd service definition'),
+    )),
+)
+
+
+def cli_help(*, full=False):
+    sections = []
+    for title, entries in CLI_COMMANDS:
+        sections.append(title + ':\n' + '\n'.join(f'  {name:<12} {description}' for name, description in entries))
+    sections.append('Examples:\n  qrun jobs\n  qrun jobs --all --limit 20\n  qrun show 4\n  qrun watch')
+    sections.append('Use qrun COMMAND --help for options. Query commands support --json.')
+    sections.append('Use qrun --help-all for automation, protocol and internal entrypoints.')
+    if full:
+        sections.append('Automation:\n'
+            '  qrun jobs --all --limit 20 --json\n'
+            '  qrun show 4 --json\n'
+            '  qrun watch --count 1 --json\n'
+            '  qrun --state-dir /absolute/pool handler < request.json\n\n'
+            'Operator JSON: qrun-cli/1 metadata; existing view fields stay at the top level.\n'
+            'Exit codes: 0 success (including stale reads), 1 operation error, 2 usage error,\n'
+            '130 interrupted JSON command. watch and logs --follow emit flushed JSON Lines.\n'
+            'Read ok, online, stale and job_usage.complete; accepted cancellation is not termination.\n'
+            'Follow next_offset until null; pages are live and may change between calls.\n'
+            'list is the legacy unbounded array exception, with no freshness guarantee.')
+        sections.append('Machine protocol:\n'
+            '  handler       one coragent-external-job/1 JSON request on stdin\n'
+            '                actions: probe, submit, recover, status, cancel; queue views/controls\n'
+            '                unchanged protocol envelope; errors are JSON, exit status is 0\n'
+            '                preserve request_id and request fields; recover after response loss\n\n'
+            'Internal lifecycle (not job submission interfaces):\n'
+            '  maintenance   installer-owned lifecycle request on stdin\n'
+            '  serve         run the queue daemon in the foreground\n'
+            '  _run          systemd worker entrypoint\n'
+            '  _portable-run portable worker entrypoint\n\n'
+            'See docs/QRUN.md or docs/QRUN.zh-CN.md for the machine contract.')
+    return '\n\n'.join(sections)
 
 
 def main(argv=None):
@@ -1568,34 +1771,41 @@ def main(argv=None):
         print('Qrun requires Python 3.11 or newer', file=sys.stderr)
         return 1
     os.umask(0o077)
-    parser = argparse.ArgumentParser(description=__doc__)
+    argv = list(sys.argv[1:] if argv is None else argv)
+    json_requested = '--json' in argv
+    parser = CLIParser(prog='qrun', description='Qrun: a durable CPU/memory job queue for this host.',
+        formatter_class=argparse.RawDescriptionHelpFormatter, epilog=cli_help(full='--help-all' in argv),
+        usage='%(prog)s [-h] [--state-dir STATE_DIR] COMMAND ...')
+    parser.add_argument('--help-all', action='help', help='show automation and internal entrypoint help')
     parser.add_argument('--state-dir', type=Path, default=Path.home() / '.local/state/coragent/qrun')
-    commands = parser.add_subparsers(dest='action', required=True)
-    init = commands.add_parser('init', help='create a pool; does not start services')
+    commands = parser.add_subparsers(prog='qrun', dest='action', required=True, metavar='COMMAND', help=argparse.SUPPRESS)
+    descriptions = dict(entry for _, entries in CLI_COMMANDS for entry in entries)
+
+    def command_parser(name):
+        return commands.add_parser(name, description=descriptions[name])
+
+    init = command_parser('init')
     init.add_argument('--cpus', type=int, required=True)
     init.add_argument('--memory-mb', type=int, required=True)
     init.add_argument('--work-root', action='append', required=True)
     init.add_argument('--runtime', choices=('auto', 'systemd', 'portable'), default='auto')
-    installer = commands.add_parser('install', help='install this standalone program and its user service on this host')
+    installer = command_parser('install')
     installer.add_argument('--cpus', type=int, required=True)
     installer.add_argument('--memory-mb', type=int, required=True)
     installer.add_argument('--work-root', action='append', required=True)
     installer.add_argument('--no-start', action='store_true', help='write installation without contacting the service manager')
     installer.add_argument('--runtime', choices=('auto', 'systemd', 'portable'), default='auto')
-    service = commands.add_parser('service', help='manage the installed queue daemon')
+    service = command_parser('service')
     service.add_argument('operation', choices=('start', 'stop', 'status', 'ensure'))
     commands.add_parser('maintenance', help='installation-owned lifecycle request on stdin')
-    commands.add_parser('handler', help='one CoRAgent JSON request on stdin')
+    commands.add_parser('handler', description='Read one coragent-external-job/1 JSON request from stdin; '
+        'write one protocol response. See --help-all and the Qrun machine contract.')
     commands.add_parser('serve', help='run the persistent queue daemon')
-    commands.add_parser('unit', help='print the user systemd unit for this installation')
-    commands.add_parser('list', help='list durable queue records while daemon is stopped or running')
+    command_parser('unit')
+    listing = command_parser('list')
+    listing.add_argument('--json', action='store_true', help='explicit legacy JSON export (also the default)')
     for name in ('status', 'resources', 'pause', 'resume', 'config', 'jobs', 'show', 'logs', 'watch'):
-        command = commands.add_parser(name, help={
-            'status': 'queue overview', 'resources': 'budget, reservations and actual host/job usage',
-            'pause': 'persistently pause new dispatch; keep running jobs', 'resume': 'resume dispatch',
-            'config': 'show or resize live budget without stopping jobs', 'jobs': 'job table (unfinished by default)',
-            'show': 'job details by numeric ID', 'logs': 'tail retained output',
-            'watch': 'refresh resources and live jobs'}[name])
+        command = command_parser(name)
         command.add_argument('--json', action='store_true')
         if name in {'show', 'logs'}:
             command.add_argument('identifier')
@@ -1611,18 +1821,29 @@ def main(argv=None):
             command.add_argument('--stream', choices=('stdout', 'stderr'), default='stdout')
             command.add_argument('--bytes', type=int, default=16384, help='tail/chunk bytes, at most 65536')
             command.add_argument('--follow', '-f', action='store_true')
+            command.add_argument('--offset', type=int, help='resume from a returned byte offset; pair with --identity')
+            command.add_argument('--identity', help='file identity returned by an earlier logs --json response')
         if name in {'watch', 'logs'}:
             command.add_argument('--interval', type=float, default=2)
         if name == 'watch':
             command.add_argument('--count', type=int)
-    cancel = commands.add_parser('cancel', help='request cancellation by numeric job ID')
+    cancel = command_parser('cancel')
     cancel.add_argument('identifier')
     cancel.add_argument('--json', action='store_true')
     worker = commands.add_parser('_run', help=argparse.SUPPRESS)
     worker.add_argument('identifier')
     portable_worker = commands.add_parser('_portable-run', help=argparse.SUPPRESS)
     portable_worker.add_argument('identifier')
-    args = parser.parse_args(argv)
+    try:
+        args = parser.parse_args(argv)
+    except CLIUsageError as exc:
+        if json_requested:
+            display(cli_error(exc, None, code='invalid_arguments'), as_json=True)
+        else:
+            parser.print_usage(sys.stderr)
+            print('qrun: error: ' + str(exc), file=sys.stderr)
+        return 2
+    json_requested = getattr(args, 'json', False)
     try:
         root = args.state_dir.expanduser().resolve()
         if hasattr(args, 'interval') and not .2 <= args.interval <= 3600:
@@ -1673,13 +1894,20 @@ def main(argv=None):
                 raise ValueError('Qrun request must be an object')
             print(json.dumps(client(root, request)))
     except KeyboardInterrupt:
+        if json_requested:
+            display(cli_error(RuntimeError('Command interrupted; query state to determine whether an in-flight operation applied'),
+                              args.action, code='interrupted'), as_json=True)
+            return 130
         return 0
     except (OSError, ValueError, RuntimeError, sqlite3.Error, subprocess.SubprocessError) as exc:
         if args.action == 'handler':
             print(json.dumps({'schema_version': PROTOCOL, 'error': {'code': 'qrun_unavailable',
                 'message': str(exc), 'retryable': True, 'action_outcome': 'unknown'}}))
             return 0
-        print(str(exc), file=sys.stderr)
+        if json_requested:
+            display(cli_error(exc, args.action), as_json=True)
+            return 1
+        print(paint(str(exc), ANSI_RED, enabled=color_enabled(sys.stderr)), file=sys.stderr)
         return 1
     return 0
 

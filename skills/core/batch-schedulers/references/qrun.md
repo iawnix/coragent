@@ -5,6 +5,12 @@ Qrun is one persistent FIFO CPU/memory pool on an execution host. Use
 Its installed standalone handler implements the same external-Job protocol as
 the cluster adapters; no separate Skill script is needed.
 
+## Contents
+
+- [Configure and check the target](#configure-and-check-the-target)
+- [Submit, observe and recover](#submit-observe-and-recover)
+- [Queue controls](#queue-controls)
+
 ## Configure and check the target
 
 ```toml
@@ -58,17 +64,36 @@ qrun resources --json
 qrun jobs --json
 qrun jobs --all --state failed --limit 20 --json
 qrun show 12 --json
-qrun logs 12 --stream stderr --follow
-qrun watch
+qrun logs 12 --stream stderr --bytes 4096 --json
+qrun watch --count 1 --json
 qrun cancel 12 --json
 ```
+
+For automation, parse JSON rather than colored tables. Operator JSON adds
+`cli_version="qrun-cli/1"`, `ok` and `command` without moving existing view fields.
+Check both exit status and `ok`; failures include structured `error.code`,
+`retryable`, `action_outcome` and `recovery`. `retryable` does not authorize
+repeating a mutation: after a lost acknowledgment, query current state first.
+Use bounded pages and `next_offset` until null, deduplicating IDs because pages
+can change between calls. `list` remains a legacy full JSON array without
+freshness metadata; prefer `jobs --json` for observation. For log continuation,
+pass the returned `--offset` and `--identity`; inspect `reset` after rotation.
+`watch --json` and `logs --follow --json` produce JSON Lines; avoid unbounded
+follow/watch calls for routine agent checks. Use `--help-all` to discover the
+machine interface; the standalone handler retains `coragent-external-job/1`.
+Its protocol errors still exit 0, so always inspect `error`. `handler status`
+is a job-identity request, while the pool overview action is `overview`.
 
 Budget, reserved and free are scheduler accounting; host availability and sampled
 usage are different observations. Starting/running/stopping/unknown jobs retain
 reservations. OFFLINE/stale output is saved evidence, not a current process check.
 Inspect show's wait_reason: paused, insufficient_resources, fifo (blocked_by is
 another numeric ID), exceeds_capacity or ready. Strict FIFO does not backfill.
-Cancellation acceptance is not completion; confirm terminal state and cleanup.
+Cancellation acceptance is not completion; check `job.execution_finished`, terminal
+state and `cleaned` with `show`. `online=true` confirms daemon contact, not per-process
+liveness; all states are ledger observations. Missing/stale samples are not zero:
+use `job_usage.complete` and nullable `total_cpu_cores`/`total_memory_mb`; the legacy
+CPU/memory sample sums can be partial.
 
 Logs prefer staged application stdout/stderr and otherwise use captured direct
 script output. Old jobs may have no retained log or metrics. Use job_collect to
