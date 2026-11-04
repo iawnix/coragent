@@ -86,6 +86,33 @@ async function fixture(t, storage = new MemoryStorage(), controllerOptions = {},
     reopen: async () => { await controller.close(); controller = openController(); } };
 }
 
+test("model task tools bound long histories while preserving durable control and field access", async t => {
+  const { controller, conversation, begin } = await fixture(t);
+  const task = await begin();
+  await conversation.commit(async tx => {
+    const current = await tx.doc(UserTask, conversation.id, task.user_task_id, null);
+    current.audit.push(...Array.from({ length: 800 }, () => ({ action: "progress", reason: "Retained historical observation. ".repeat(20) })));
+  }, context);
+  const read = createTaskTools(() => controller).find(tool => tool.name === "task_read");
+  const result = await read.execute({}, { taskId: 99999 }, context);
+  const view = JSON.parse(result.content[0].text);
+  assert.ok(Buffer.byteLength(result.content[0].text) < 24000);
+  assert.deepEqual(view.criteria, task.criteria);
+  assert.equal(view.revision, task.revision);
+  assert.equal(view.audit, undefined);
+  const full = await controller.current(context);
+  assert.ok(full.audit.length >= 800);
+  const page = await read.execute({ field: "audit", limit: 1000 }, { taskId: 99999 }, context);
+  assert.equal(page.details.result.content, JSON.stringify(full.audit, null, 2).slice(0, 1000));
+  assert.ok(page.details.result.next_offset > 0);
+  const update = createTaskTools(() => controller).find(tool => tool.name === "task_update");
+  const changed = await update.execute({ action: "progress", expected_revision: view.revision, evidence_refs: ["result_1"],
+    next_action: "Compare endpoint connectivity with the retained original requirements." }, { taskId: 99998 }, context);
+  assert.equal(changed.details.result.revision, view.revision + 1);
+  assert.equal(changed.details.result.audit, undefined);
+  assert.deepEqual((await controller.current(context)).criteria, task.criteria);
+});
+
 test("idle active tasks continue beyond three evidence-free runs and explicit blockers remain recoverable", async t => {
   const { controller, conversation, faux, begin, admission } = await fixture(t);
   const task = await begin();

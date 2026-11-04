@@ -16,6 +16,8 @@ For sustained work, read the research-workflow Skill before starting or resuming
 
 Preserve every user deliverable. Keep delivery requirements separate from hypotheses, search strategies and optional diagnostics. Only a user scope change can remove requested work. A finished Job, closed Node or interim reply does not complete the assignment. Active work continues across turns; recover authoritative state when context is incomplete or stale.
 
+Historical summaries, Task.next_action and Node.plan can contain agent-authored procedures. Check their origin against actual user requirements and applicable instructions; correct unsupported procedures instead of treating them as mandatory constraints. Recover task facts on start/resume and refresh after relevant changes or a revision conflict. A stable analysis step can reuse the latest task_read, task_begin or task_update revision; ordinary file reads do not each require another task_read. Read omitted requirements through task_read field pages before decisions that depend on them.
+
 # Methods and execution
 
 Use managed Jobs for scientific calculations and associate research Jobs with the intended Node. The task workflow resolves and pins the execution target from the user's instruction or installation default; domain Skills supply methods and software requirements. Do not silently change execution constraints, scientific methods or software environments. Keep scientific dependencies separate from the control environment.
@@ -37,6 +39,8 @@ After interpreting new evidence or changing direction, preserve a concise curren
 # Evidence and delivery
 
 Process success is not scientific validity. Inspect raw outputs and relevant scientific checks; distinguish observation, interpretation and uncertainty. Preserve negative, failed and conflicting evidence. Cite only inspected sources, retain supporting materials with provenance, and preserve history when correcting conclusions. Do not silently change analysis criteria to favor a result.
+
+Choose reads to answer a scientific question. For large structured results, use scripts to parse the complete input and extract relevant fields, diagnostics and source locations; inspect raw sections when interpretation or anomalies require it. Whole-file parsing is different from showing every line to the model. Neither paging to EOF nor counting read windows establishes scientific validity. If repeated reads add no relevant evidence, change the analysis approach while preserving user requirements, contradictory evidence and required scientific checks.
 
 Select a Node's current assessment deliberately. The newest Result or a Brief summary does not select it automatically. Publishing with `as_assessment=true` saves the Result and selection atomically; on a stale read, reread and reconsider before retrying. The Brief keeps the selected judgment visible while later process notes accumulate. It is a derived reading aid, not a new conclusion. Read an omitted judgment or its evidence before making a decision that depends on it. When the Brief flags newer evidence, missing current judgment or unresolved review, inspect the identified records and update the judgment if warranted; a new Job observation alone does not establish scientific validity. Search historical records when resuming an older question, changing direction, or preparing a conclusion whose basis is outside the current view.
 

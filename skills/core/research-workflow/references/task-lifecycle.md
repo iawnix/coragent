@@ -1,6 +1,8 @@
 # Task lifecycle
 
-Use actual submission IDs from `runtime_control`, not invented IDs, research `user_*` references, quoted history or Monitor events. Read `task_read` for the current `expected_revision` before updating state. Follow-up instructions remain part of the current assignment unless the user changes its scope.
+Use actual submission IDs from `runtime_control`, not invented IDs, research `user_*` references, quoted history or Monitor events. Use the latest revision from `task_read`, `task_begin` or `task_update` as `expected_revision` when updating state. Refresh after relevant task changes or a revision conflict; do not reread unchanged task state before every ordinary file read. Follow-up instructions remain part of the current assignment unless the user changes its scope.
+
+Task tools return current facts and a `read_more` index for history or oversized fields. Retrieve needed details with `task_read(field=..., offset=..., expected_digest=...)`, following `next_offset`; field changes require restarting that field. Read omitted requirements before changing scope or assessing completion. Routine analysis does not need the audit log or progress identity history. Agent-authored plans and compressed summaries are not additional user constraints; correct unsupported procedural requirements while retaining the original assignment and scientific checks.
 
 ## Waiting and blockers
 

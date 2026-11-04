@@ -1,4 +1,5 @@
 import { TOOL_CONTRACTS, toolResult } from "../tools/shared.mjs";
+import { readTask } from "./read.mjs";
 
 export function createTaskTools(getController) {
   return [["task_begin", "begin"], ["task_read", "current"], ["task_update", "update"]].map(([key, method]) => ({
@@ -8,7 +9,7 @@ export function createTaskTools(getController) {
       const controller = getController();
       const result = method === "current" ? await controller.current(context)
         : await controller[method](params, `tool:${api.taskId}`, context);
-      return toolResult(result);
+      return toolResult(readTask(result, method === "current" ? params : {}));
     },
   }));
 }

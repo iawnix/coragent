@@ -1157,7 +1157,29 @@
     },
     "task_read": {
       "type": "object",
-      "properties": {},
+      "properties": {
+        "field": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional top-level task field to read as paginated JSON text, including fields listed in read_more. Omit for current task facts."
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Character offset in the selected field; use the returned next_offset."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12000,
+          "description": "Maximum characters in a field page; default 8000. Output byte limits can shorten a page."
+        },
+        "expected_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "Field digest from read_more or a prior page; required after offset 0 to reject changes between pages."
+        }
+      },
       "additionalProperties": false
     },
     "task_update": {

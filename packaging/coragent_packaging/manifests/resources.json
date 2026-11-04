@@ -369,9 +369,9 @@
     "skills/core/research-workflow/references/jobs-and-artifacts.zh-CN.md": "sha256:441d554a368b964a618ff6a79a2579d550aa04a5599ae63486a961800fe45366",
     "skills/core/research-workflow/references/skills.md": "sha256:a55fcd366362d5bbe7eb58cec0cc45ccfc85a0dde90014fa7acf32216ee8a5e0",
     "skills/core/research-workflow/references/skills.zh-CN.md": "sha256:4f0dfae7c342a622d7ead5183308ef954213111234e8839d2fb7fbe1420931dd",
-    "skills/core/research-workflow/references/task-lifecycle.md": "sha256:1ac9955621cc848286ca110b36c234557994ea1d4b477781e8d5b0106bea3ead",
-    "skills/core/research-workflow/references/task-lifecycle.zh-CN.md": "sha256:c9dd2ad58de1fcb9c84b4e5e25000c963bbaab70b032bfcbcc5f1e07d5ea6416",
-    "apps/agent/prompts/coragent.md": "sha256:172b41e7650c221bfe3cb407d8bb137174a31d7d729027e6da3c1fdf1caf66d2",
-    "apps/agent/prompts/coragent.zh-CN.md": "sha256:c042d394a321fa0914c24e84a846db4e53dd2a4115d77e1744299b47d209a747"
+    "skills/core/research-workflow/references/task-lifecycle.md": "sha256:3d65d6ba9050b08d010add7c66d08679b2052142044ea153ee3a630247dc5de2",
+    "skills/core/research-workflow/references/task-lifecycle.zh-CN.md": "sha256:53f9f83da09dc8bb57e774fddea4ca12adef3558ec94d8707dec65463f9d4a6b",
+    "apps/agent/prompts/coragent.md": "sha256:655b0b5137b07957ad75c2465d9637afc4e8490a3235320658df0ac6bb7dfdf4",
+    "apps/agent/prompts/coragent.zh-CN.md": "sha256:eaa743d7507104931f4804d0796fb1b90f8883f20937163b3843270f5565d7de"
   }
 }

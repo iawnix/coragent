@@ -29,6 +29,26 @@ const memoApi = () => {const values = new Map();return {async memo(key, value, c
 const committed = (item,id=2) => ({id,kind:'pi.context',model:item.messages,data:{key:item.key,value:item.data}});
 const decode = message => JSON.parse(message.content.split('\n')[1]);
 
+test('repeated-read guidance reaches the provider as advisory without changing task control', async () => {
+  const manager = fixtureManager(), task = fullTask();
+  const messages = Array.from({length:8}, () => [
+    {role:'assistant',content:[{type:'toolCall',name:'task_read',id:'read',arguments:{}}]},
+    {role:'toolResult',toolName:'task_read',toolCallId:'read',content:[{type:'text',text:JSON.stringify({revision:1})}]},
+  ]).flat();
+  const request = {messages,model:{contextWindow:65536},maxTokens:1024};
+  const original = structuredClone(request);
+  const admitted = await manager.admit(request,'reading-loop',{task,automatic_continuation_enabled:true});
+  assert.equal(admitted.block,undefined);
+  const control = decode(admitted.messages.at(-1));
+  assert.match(control.reading_guidance,/does not block tools/);
+  assert.equal(control.task.state,'active');
+  assert.equal(control.automatic_continuation_enabled,true);
+  assert.deepEqual(request,original);
+  const summary = manager.prepareSummary({entries:[],firstKept:1});
+  assert.match(summary.instructions,/Separate actual user requirements/);
+  assert.match(summary.instructions,/Never promote repeated tool usage/);
+});
+
 test('retired context metadata is rejected instead of silently injected through a second protocol', () => {
   assert.throws(()=>contextAnchor([{kind:'pi.context',data:{key:'coragent.research-context/1',value:{}}}]), /context_schema_unsupported/);
   assert.throws(()=>contextAnchor([{kind:'pi.compaction',data:{metadata:[{key:'coragent.research-context/1',anchor:{}}]}}]), /context_schema_unsupported/);
@@ -499,10 +519,12 @@ test('native compaction carries context metadata and a reopened SQLite session d
 
 test('native operating budget compacts far below a million-token model window', {timeout:15000}, async t => {
   let summaries=0;
+  const admittedTokens=[];
   const fixture=await nativeFixture(t,{settings:contextPolicy({compaction:{keepRecentTokens:1000},retry:{enabled:false}},'8192'),
     manager:fixtureManager({inputTokens:8192})});
   const response=request=>{
     if (JSON.stringify(request.messages[0]).includes('context summarization assistant')) {summaries++;return fauxAssistantMessage('Preserved constraints and research progress.');}
+    admittedTokens.push(estimateContextTokens(request.messages).tokens);
     return fauxAssistantMessage('Acknowledged');
   };
   fixture.faux.setResponses(Array(15).fill(response));
@@ -512,8 +534,10 @@ test('native operating budget compacts far below a million-token model window', 
   }
   await fixture.conversation.waitForIdle(context);
   assert.ok(summaries>0,'compaction must occur at the operating budget');
-  const view=await fixture.conversation.context(context);
-  assert.ok(estimateContextTokens(view.messages).tokens<8192);
+  // waitForIdle excludes background compaction, so the stored tail may still
+  // await its summary. The budget applies to each admitted provider request.
+  assert.equal(admittedTokens.length,5);
+  assert.ok(admittedTokens.every(tokens=>tokens<8192));
 });
 
 test('context preparation errors stop before provider use', {timeout:10000}, async t => {

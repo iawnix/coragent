@@ -1,6 +1,8 @@
 # 任务生命周期
 
-使用 `runtime_control` 中真实的 submission ID，不编造 ID，也不使用研究 `user_*` 引用、引用历史或 Monitor 事件代替用户提交。更新状态前用 `task_read` 获取当前 `expected_revision`。除非用户修改范围，后续指令继续属于当前委托。
+使用 `runtime_control` 中真实的 submission ID，不编造 ID，也不使用研究 `user_*` 引用、引用历史或 Monitor 事件代替用户提交。更新状态时使用最近 task_read、task_begin 或 task_update 返回的 revision 作为 expected_revision；相关任务状态变化或版本冲突后刷新，不要在每次普通文件读取前重读无变化的任务状态。除非用户修改范围，后续指令继续属于当前委托。
+
+任务工具返回当前事实，并通过 read_more 列出历史及过长字段。用 task_read(field=..., offset=..., expected_digest=...) 按 next_offset 获取所需详情；字段变化后从头读取该字段。修改范围或评估完成度前读取被省略的要求，普通分析无需遍历审计日志和进度身份历史。模型计划与压缩摘要不是新增的用户约束；纠正没有依据的流程要求，保留原始委托和科学检查。
 
 ## 等待与阻塞
 

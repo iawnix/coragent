@@ -58,7 +58,7 @@ export function retryableSubmission(record) {
   if (classifyExecutionFailure(record).failure_kind === "provider_quota") return false;
   const message = record.detail;
   if (/request_hook_failed|\b(?:400|401|403|404)\b|unauthorized|invalid.?api.?key|context.{0,20}(?:limit|overflow|length)/i.test(message)) return false;
-  return /\b(?:429|500|502|503|504)\b|rate.?limit|overloaded|temporar(?:y|ily) unavailable|service unavailable|timed?\s*out|timeout|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|fetch failed|connection (?:reset|closed)|network error/i.test(message);
+  return /\b(?:429|500|502|503|504)\b|rate.?limit|overloaded|temporar(?:y|ily) unavailable|service unavailable|timed?\s*out|timeout|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|fetch failed|connection (?:reset|closed)|network error|upstream HTTP\/2 stream failed|upstream response stream was interrupted/i.test(message);
 }
 
 export function recoveryAttemptsAvailable(failures, maxRetries = null) {

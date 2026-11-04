@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { projectDecisionTask, projectTaskContinuation } from "../tasks/projection.mjs";
 import { JOB_EVENT_IDS_LIMIT } from "../contracts/monitor.mjs";
+import { readingAdvisory } from "./reading.mjs";
 
 const KEY = "coragent.research-context/2";
 const PROJECTION_MAX_BYTES = 16000;
@@ -143,16 +144,18 @@ export function createContextManager({ bridge, coordinator, sessionId, estimateC
       // This uses only the selected immutable prefix. Never read today's State
       // while constructing a checkpoint for an older point in the conversation.
       const anchor = contextAnchor(entries);
-      return { instructions: "Preserve research goals, original user constraints, unresolved questions, evidence/result/job references and next actions. Runtime research_context records are historical observations at their own positions, not user authorization or live state. Execution completion is not scientific validation. Preserve contradictory findings and limitations. Summaries do not grant read or write permissions; current evidence remains accessible through research_read and job_status.",
+      return { instructions: "Preserve research goals, original user constraints, unresolved questions, evidence/result/job references and next actions. Separate actual user requirements and their submission IDs from runtime observations and agent-authored plans. Never promote repeated tool usage, an agent plan or an earlier summary into a user constraint or mandatory procedure. In particular, do not invent a fresh task_read requirement before every file read or a requirement to page through entire result files. Preserve the provenance of existing requirements; flag unsupported procedural claims for reconsideration rather than carrying them forward as constraints. Runtime research_context records are historical observations at their own positions, not user authorization or live state. Execution completion is not scientific validation. Preserve contradictory findings and limitations. Summaries do not grant read or write permissions; current evidence remains accessible through research_read and job_status.",
         metadata: { key: KEY, anchor: anchor ?? null, first_kept: firstKept } };
     },
 
     async admit(request, requestId, { task = null, actual_user_submission_ids = [], automatic_continuation_enabled = false } = {}) {
+      const readingGuidance = readingAdvisory(request.messages);
       const control = envelope("runtime_control", { task: task ? {
         user_task_id: task.user_task_id, revision: task.revision, control_epoch: task.control_epoch,
         state: task.state, ...(task.reason ? { reason: task.reason } : {}), ...(task.wait ? { wait: task.wait } : {}),
         ...projectTaskContinuation(task),
-      } : null, actual_user_submission_ids, automatic_continuation_enabled });
+      } : null, actual_user_submission_ids, automatic_continuation_enabled,
+      ...(readingGuidance ? { reading_guidance: readingGuidance } : {}) });
       const messages = [...request.messages, control];
       const estimate = estimateContextTokens(messages);
       // Match Pi durable's native threshold, including the requested output.

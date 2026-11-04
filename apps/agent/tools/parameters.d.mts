@@ -198,7 +198,12 @@ export interface ToolParameters {
       "max_retries_per_work"?: number | null;
     };
   };
-  task_read: Record<string, never>;
+  task_read: {
+    "field"?: string;
+    "offset"?: number;
+    "limit"?: number;
+    "expected_digest"?: string;
+  };
   task_update: {
     "expected_revision": number;
     "action": "refine" | "progress" | "bind_execution" | "wait" | "block" | "propose_completion" | "set_research" | "apply_user_control" | "correct_execution" | "set_execution_plan" | "select_execution_item" | "complete_execution_item" | "set_execution_limits";

@@ -35,7 +35,8 @@ test("daily quotas require attention while ordinary 429s remain retryable", () =
 });
 
 test("execution recovery classifies provider failures conservatively", () => {
-  for (const detail of ["503 Service Unavailable", "429 rate limit", "fetch failed", "ECONNRESET", "Request timed out"]) {
+  for (const detail of ["503 Service Unavailable", "429 rate limit", "fetch failed", "ECONNRESET", "Request timed out",
+    "Upstream response stream was interrupted", "Compaction failed: Summarization failed: Upstream HTTP/2 stream failed"]) {
     assert.equal(retryableSubmission({ reason: "model_error", detail }), true);
   }
   for (const record of [
@@ -44,6 +45,9 @@ test("execution recovery classifies provider failures conservatively", () => {
     { reason: "model_error", detail: "request_hook_failed: 503 unavailable" },
     { reason: "model_error", detail: "Context length limit exceeded" },
     { reason: "model_error", detail: "Unclassified error" },
+    { reason: "aborted", detail: "Upstream response stream was interrupted" },
+    { reason: "model_error", detail: "request_hook_failed: Upstream HTTP/2 stream failed" },
+    { reason: "model_error", detail: "DAILY_LIMIT_EXCEEDED: Upstream HTTP/2 stream failed" },
   ]) assert.equal(retryableSubmission(record), false);
 });
 
